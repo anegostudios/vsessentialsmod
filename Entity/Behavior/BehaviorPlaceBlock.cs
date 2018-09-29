@@ -90,7 +90,7 @@ namespace Vintagestory.GameContent
 
             if (entity.World.Calendar == null) return;
             
-            if (entity.World.Calendar.TotalHours > TotalHoursUntilPlace)
+            while (entity.World.Calendar.TotalHours > TotalHoursUntilPlace && entity.World.Rand.NextDouble() < 0.5f)
             {
                 AssetLocation[] codes = BlockCodes;
                 Block block = entity.World.GetBlock(codes[entity.World.Rand.Next(codes.Length)]);
@@ -104,10 +104,11 @@ namespace Vintagestory.GameContent
                     TryPlace(block, 0, 0, 1)
                 ;
 
-                if (placed) TotalHoursUntilPlace = entity.World.Calendar.TotalHours + RndHourDelay;
+                if (placed) TotalHoursUntilPlace += RndHourDelay;
+                if (!placed || MinHourDelay <= 0) break;
             }
 
-            entity.World.FrameProfiler.Mark("entity-creatblock");
+            entity.World.FrameProfiler.Mark("entity-createblock");
         }
 
         private bool TryPlace(Block block, int dx, int dy, int dz)
@@ -119,6 +120,17 @@ namespace Vintagestory.GameContent
             if (blockAtPos.IsReplacableBy(block) && blockAccess.GetBlock(pos.X, pos.Y - 1, pos.Z).SideSolid[BlockFacing.UP.Index])
             {
                 blockAccess.SetBlock(block.BlockId, pos);
+
+                // Not the most elegant solution, but should work either way
+                BlockEntityTransient betran = blockAccess.GetBlockEntity(pos) as BlockEntityTransient;
+                if (betran != null)
+                {
+                    if (!betran.WasPlacedAtTotalHours(TotalHoursUntilPlace))
+                    {
+                        blockAccess.SetBlock(0, pos);
+                    }
+                }
+
                 return true;
             }
 

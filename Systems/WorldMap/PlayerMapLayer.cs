@@ -100,24 +100,18 @@ namespace Vintagestory.GameContent
                 if (MapComps.TryGetValue(player, out cmp))
                 {
                     cmp?.Dispose();
+                    MapComps.Remove(player);
                 }
+                
+                if (cmp != null)
+                {
+                    mapSink.RemoveMapData(cmp);
+                }
+                
 
                 if (player.Entity == null)
                 {
                     capi.World.Logger.Warning("Can't add player {0} to world map, missing entity :<", player.PlayerUID);
-
-                    foreach (var val in capi.World.LoadedEntities)
-                    {
-                        if (val.Value is EntityPlayer)
-                        {
-                            EntityPlayer eplr = val.Value as EntityPlayer;
-                            if (eplr.PlayerUID == player.PlayerUID)
-                            {
-                                Console.WriteLine("but in loaded?");
-                            }
-                        }
-                    }
-
                     continue;
                 }
 

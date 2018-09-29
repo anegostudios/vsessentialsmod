@@ -130,7 +130,7 @@ namespace Vintagestory.GameContent
 
 
             long ellapseMs = capi.World.ElapsedMilliseconds;
-            if (entity.Collided || entity.Swimming) touchGroundMS = ellapseMs;
+            if (entity.Collided || entity.Swimming || capi.IsGamePaused) touchGroundMS = ellapseMs;
 
             float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
             float angleMs = Math.Max(ellapseMs - touchGroundMS, 0) * easeIn;

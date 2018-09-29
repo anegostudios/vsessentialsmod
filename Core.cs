@@ -81,7 +81,8 @@ namespace Vintagestory.ServerMods
 
         private void RegisterDefaultBlockEntities()
         {
-            
+            api.RegisterBlockEntityClass("ParticleEmitter", typeof(BlockEntityParticleEmitter));
+            api.RegisterBlockEntityClass("Transient", typeof(BlockEntityTransient));
         }
 
 

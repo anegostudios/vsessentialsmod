@@ -192,7 +192,6 @@ namespace Vintagestory.ServerMods.NoObf
 
                 foreach (EntityType type in GatherEntities(val.Key, val.Value))
                 {
-                    type.InitClass(api.Assets);
                     api.RegisterEntityClass(type.Class, type.CreateProperties());
                 }
             }

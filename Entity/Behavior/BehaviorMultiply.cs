@@ -132,6 +132,9 @@ namespace Vintagestory.GameContent
                 {
                     entity.WatchedAttributes.SetAttribute("multiply", multiplyTree = new TreeAttribute());
                     TotalDaysLastBirth = entity.World.Calendar.TotalHours;
+
+                    double daysNow = entity.World.Calendar.TotalHours / 24f;
+                    TotalDaysCooldownUntil = daysNow + (MultiplyCooldownDaysMin + entity.World.Rand.NextDouble() * (MultiplyCooldownDaysMax - MultiplyCooldownDaysMin));
                 }
 
                 callbackId = entity.World.RegisterCallback(CheckMultiply, 3000);

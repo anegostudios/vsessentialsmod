@@ -97,8 +97,8 @@ namespace Vintagestory.GameContent
                 (int)EnumCharacterDressType.Neck,
                 (int)EnumCharacterDressType.Head,
                 (int)EnumCharacterDressType.Ring,
-                (int)EnumCharacterDressType.Arm,
                 (int)EnumCharacterDressType.Hand,
+                (int)EnumCharacterDressType.Arm,
             };
 
             if (gearInv == null && eagent?.GearInventory != null)

@@ -59,7 +59,6 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public BlockDropItemStack[] Drops;
 
-        public Dictionary<string, AssetLocation[]> ResolvedSounds = new Dictionary<string, AssetLocation[]>();
 
         public EntityProperties CreateProperties()
         {
@@ -86,7 +85,7 @@ namespace Vintagestory.ServerMods.NoObf
                 RotateModelOnClimb = RotateModelOnClimb,
                 KnockbackResistance = KnockbackResistance,
                 Attributes = Attributes,
-                Sounds = new Dictionary<string, AssetLocation[]>(ResolvedSounds),
+                Sounds = Sounds == null ? new Dictionary<string, AssetLocation>() : new Dictionary<string, AssetLocation>(Sounds),
                 IdleSoundChance = IdleSoundChance,
                 IdleSoundRange = IdleSoundRange,
                 Drops = DropsCopy
@@ -119,38 +118,8 @@ namespace Vintagestory.ServerMods.NoObf
             return properties;
         }
 
-        public void InitSounds(IAssetManager assetManager)
-        {
-            if (Sounds != null)
-            {
-                foreach (var val in Sounds)
-                {
-                    if (val.Value.Path.EndsWith("*"))
-                    {
-                        List<IAsset> assets = assetManager.GetMany("sounds/" + val.Value.Path.Substring(0, val.Value.Path.Length - 1), val.Value.Domain);
-                        AssetLocation[] sounds = new AssetLocation[assets.Count];
-                        int i = 0;
 
-                        foreach (IAsset asset in assets)
-                        {
-                            sounds[i++] = asset.Location;
-                        }
-
-                        ResolvedSounds[val.Key] = sounds;
-                    }
-                    else
-                    {
-                        ResolvedSounds[val.Key] = new AssetLocation[] { val.Value.Clone().WithPathPrefix("sounds/") };
-                    }
-                }
-            }
-
-        }
-
-        public void InitClass(IAssetManager assetManager)
-        {
-            InitSounds(assetManager);
-        }
+        
 
         /// <summary>
         /// Fills in placeholders in the composite texture (called by the VSGameContent mod during item loading)

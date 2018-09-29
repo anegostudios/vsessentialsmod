@@ -43,7 +43,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
@@ -54,6 +53,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BlockEntity\BEParticleEmitter.cs" />
+    <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Core.cs" />
     <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />
     <Compile Include="EntityRenderer\EntityItemRenderer.cs" />
