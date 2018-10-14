@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -138,7 +139,8 @@ namespace Vintagestory.GameContent
                     foreach (Waypoint p in Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray())
                     {
                         Vec3d pos = p.Position.Clone();
-                        pos.Sub(api.World.DefaultSpawnPosition.XYZ);
+                        pos.X -= api.World.DefaultSpawnPosition.X;
+                        pos.Z -= api.World.DefaultSpawnPosition.Z;
                         wps.AppendLine(string.Format("{0}: {1} at {2}", i, p.Title, pos.AsBlockPos));
                         i++;
                     }

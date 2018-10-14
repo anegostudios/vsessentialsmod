@@ -253,9 +253,9 @@ namespace Vintagestory.GameContent
             worldMapDlg.mapElem.AddMapComponent(cmp);
         }
 
-        public void RemoveMapData(MapComponent cmp)
+        public bool RemoveMapData(MapComponent cmp)
         {
-            worldMapDlg.mapElem.RemoveMapComponent(cmp);
+            return worldMapDlg.mapElem.RemoveMapComponent(cmp);
         }
         
         

@@ -162,7 +162,9 @@ namespace Vintagestory.GameContent
                 int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
 
                 TextureAtlasPosition pos = texSource["all"];
-                CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : entity.Properties.Client.FirstTexture.Alternates[altTexNumber - 1];
+                CompositeTexture[] Alternates = entity.Properties.Client.FirstTexture.Alternates;
+
+                CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : Alternates[altTexNumber % Alternates.Length];
                 meshdata = capi.Tesselator.VoxelizeTexture(tex, capi.EntityTextureAtlas.Size, pos);
                 for (int i = 0; i < meshdata.xyz.Length; i+=3)
                 {

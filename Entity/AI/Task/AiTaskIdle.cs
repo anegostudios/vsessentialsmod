@@ -17,6 +17,7 @@ namespace Vintagestory.GameContent
         public int minduration;
         public int maxduration;
         public float chance;
+        public AssetLocation onBlockBelowCode;
 
         public long idleUntilMs;
 
@@ -25,7 +26,11 @@ namespace Vintagestory.GameContent
             this.minduration = taskConfig["minduration"].AsInt(2000);
             this.maxduration = taskConfig["maxduration"].AsInt(4000);
             this.chance = taskConfig["chance"].AsFloat(1.1f);
-
+            string code = taskConfig["onBlockBelowCode"].AsString(null);
+            if (code != null && code.Length > 0)
+            {
+                this.onBlockBelowCode = new AssetLocation(code);
+            }
 
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
 
@@ -34,7 +39,14 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            return entity.World.Rand.NextDouble() < chance && cooldownUntilMs < entity.World.ElapsedMilliseconds;
+            if (entity.World.Rand.NextDouble() < chance && cooldownUntilMs < entity.World.ElapsedMilliseconds)
+            {
+                if (onBlockBelowCode == null) return true;
+                Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
+                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z);
+                return block.WildCardMatch(onBlockBelowCode) || (belowBlock.WildCardMatch(onBlockBelowCode) && block.Replaceable >= 6000);
+            }
+            return false;
         }
 
         public override void StartExecute()

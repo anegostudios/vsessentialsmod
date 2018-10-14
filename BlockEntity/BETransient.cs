@@ -30,7 +30,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void CheckTransition(float dt)
+        public void CheckTransition(float dt)
         {
             if (transitionAtTotalDays > api.World.Calendar.TotalDays) return;
 

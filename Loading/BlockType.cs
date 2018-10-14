@@ -60,6 +60,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public Dictionary<string, bool> SideAo;
         [JsonProperty]
+        public Dictionary<string, bool> NeighbourSideAo;
+        [JsonProperty]
         public Dictionary<string, bool> SideSolid;
 
         [JsonProperty]
@@ -186,6 +188,7 @@ namespace Vintagestory.ServerMods.NoObf
             ResolveStringBoolDictFaces(SideSolid);
             ResolveStringBoolDictFaces(SideOpaque);
             ResolveStringBoolDictFaces(SideAo);
+            ResolveStringBoolDictFaces(NeighbourSideAo);
 
             TintIndex = GameMath.Clamp(TintIndex, 0, 2);
 
@@ -270,6 +273,11 @@ namespace Vintagestory.ServerMods.NoObf
                 if (SideAo != null && SideAo.ContainsKey(facing.Code))
                 {
                     block.SideAo[facing.Index] = SideAo[facing.Code];
+                }
+
+                if (NeighbourSideAo != null && NeighbourSideAo.ContainsKey(facing.Code))
+                {
+                    block.NeighbourSideAo[facing.Index] = NeighbourSideAo[facing.Code];
                 }
 
                 if (SideSolid != null && SideSolid.ContainsKey(facing.Code))

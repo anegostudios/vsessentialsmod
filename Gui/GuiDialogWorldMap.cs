@@ -12,7 +12,7 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public delegate void OnViewChangedDelegatae(List<Vec2i> nowVisibleChunks, List<Vec2i> nowHiddenChunks);
+    public delegate void OnViewChangedDelegate(List<Vec2i> nowVisibleChunks, List<Vec2i> nowHiddenChunks);
 
 
     public class GuiDialogWorldMap : GuiDialogGeneric
@@ -28,12 +28,12 @@ namespace Vintagestory.GameContent
 
 
         public GuiElementMap mapElem;
-        OnViewChangedDelegatae viewChanged;
+        OnViewChangedDelegate viewChanged;
         long listenerId;
         GuiElementHoverText hoverTextElem;
         bool requireRecompose = false;
 
-        public GuiDialogWorldMap(OnViewChangedDelegatae viewChanged, ICoreClientAPI capi) : base("", capi)
+        public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
         {
             this.viewChanged = viewChanged;
             ComposeDialog();
@@ -88,11 +88,13 @@ namespace Vintagestory.GameContent
                 .EndIf()
                 .BeginChildElements(bgBounds)
                     .AddHoverText("", CairoFont.WhiteDetailText(), 350, mapBounds.FlatCopy(), "hoverText")
-                    .AddInteractiveElement(mapElem = new GuiElementMap(mapComponents, centerPos, capi, mapBounds))
+                    .AddInteractiveElement(new GuiElementMap(mapComponents, centerPos, capi, mapBounds), "mapElem")
                 .EndChildElements()
                 .Compose()
             ;
             SingleComposer.OnRecomposed += SingleComposer_OnRecomposed;
+
+            mapElem = SingleComposer.GetElement("mapElem") as GuiElementMap;
 
             mapElem.viewChanged = viewChanged;
             mapElem.ZoomAdd(1, 0.5f, 0.5f);
@@ -105,6 +107,7 @@ namespace Vintagestory.GameContent
             {
                 capi.Event.UnregisterGameTickListener(listenerId);
             }
+
             listenerId = capi.Event.RegisterGameTickListener(
                 (dt) => {
                     mapElem.EnsureMapFullyLoaded();
@@ -115,7 +118,7 @@ namespace Vintagestory.GameContent
                         requireRecompose = false;
                     }
                 }
-                , 100);
+            , 100);
         }
 
         private void SingleComposer_OnRecomposed()
@@ -126,11 +129,17 @@ namespace Vintagestory.GameContent
         public override void OnGuiOpened()
         {
             base.OnGuiOpened();
-            if (mapElem != null) mapElem.worldBoundsBefore = new Cuboidi();
+            //Console.WriteLine("on gui opened 1");
+
+            if (mapElem != null) mapElem.chunkViewBoundsBefore = new Cuboidi();
             mapComponents.Clear();
             mapElem.EnsureMapFullyLoaded();
 
+           // Console.WriteLine("on gui opened 2");
+
             OnMouseMove(new MouseEvent() { X = capi.Input.MouseX, Y = capi.Input.MouseY });
+
+           // Console.WriteLine("on gui opened 3");
         }
 
 
@@ -174,6 +183,23 @@ namespace Vintagestory.GameContent
             mapComponents.Clear();
         }
 
+
+        public override void Dispose()
+        {
+            base.Dispose();
+
+            capi.Event.UnregisterGameTickListener(listenerId);
+            listenerId = 0;
+
+            foreach (MapComponent cmp in mapComponents)
+            {
+                cmp.Dispose();
+            }
+
+            mapComponents.Clear();
+        }
+
+
         Vec3d hoveredWorldPos = new Vec3d();
         public override void OnMouseMove(MouseEvent args)
         {
@@ -211,6 +237,19 @@ namespace Vintagestory.GameContent
         public override void OnMouseDown(MouseEvent args)
         {
             base.OnMouseDown(args);
+        }
+
+
+        public override void OnRender2D(float deltaTime)
+        {
+            base.OnRender2D(deltaTime);
+            capi.Render.CheckGlError("map-rend2d");
+        }
+
+        public override void OnFinalizeFrame(float dt)
+        {
+            base.OnFinalizeFrame(dt);
+            capi.Render.CheckGlError("map-fina");
         }
     }
 }

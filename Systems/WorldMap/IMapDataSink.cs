@@ -13,7 +13,7 @@ namespace Vintagestory.GameContent
     {
         bool IsOpened { get; }
         void AddMapData(MapComponent cmp);
-        void RemoveMapData(MapComponent cmp);
+        bool RemoveMapData(MapComponent cmp);
 
         void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos);
 

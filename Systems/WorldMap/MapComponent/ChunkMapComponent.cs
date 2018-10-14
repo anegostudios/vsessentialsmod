@@ -30,6 +30,8 @@ namespace Vintagestory.GameContent
         {
             map.TranslateWorldPosToViewPos(worldPos, ref viewPos);
 
+            if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+
             capi.Render.Render2DTexture(
                 Texture.TextureId,
                 (int)(map.Bounds.renderX + viewPos.X),
@@ -48,31 +50,5 @@ namespace Vintagestory.GameContent
 
     }
 
-    public abstract class MapComponent
-    {
-        public ICoreClientAPI capi;
 
-        public MapComponent(ICoreClientAPI capi)
-        {
-            this.capi = capi;
-        }
-        
-
-
-        public virtual void Render(GuiElementMap map, float dt)
-        {
-            
-        }
-
-
-        public virtual void Dispose()
-        {
-
-        }
-
-        public virtual void OnMouseMove(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
-        {
-            
-        }
-    }
 }

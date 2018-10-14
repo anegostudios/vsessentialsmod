@@ -37,6 +37,9 @@ namespace Vintagestory.GameContent
             //api.Render.GlToggleBlend(true, EnumBlendMode.PremultipliedAlpha);
             ICoreClientAPI api = map.Api;
 
+            if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+            if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+
             IShaderProgram prog = api.Render.GetEngineShader(EnumShaderProgram.Gui);
             prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
             prog.Uniform("extraGlow", 0);

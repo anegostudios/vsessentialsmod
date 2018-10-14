@@ -171,7 +171,7 @@ namespace Vintagestory.GameContent
                 if (!directContact) return false;
 
                 bool alive = targetEntity.Alive;
-
+                
                 ((EntityAgent)targetEntity).ReceiveDamage(
                     new DamageSource() { Source = EnumDamageSource.Entity, SourceEntity = entity, Type = EnumDamageType.BluntAttack },
                     damage
@@ -203,6 +203,12 @@ namespace Vintagestory.GameContent
         public bool IsValidPos(BlockPos pos)
         {
             return entity.World.BlockAccessor.IsValidPos(pos);
+        }
+
+
+        public Entity[] GetEntitiesAround(Vec3d position, float horRange, float vertRange, ActionConsumable<Entity> matches = null)
+        {
+            return new Entity[0];
         }
     }
 }

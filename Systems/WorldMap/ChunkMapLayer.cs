@@ -109,11 +109,15 @@ namespace Vintagestory.GameContent
                 {
                     if (loadedMapData.ContainsKey(cord))
                     {
-                        loadedMapData[cord].Dispose();
                         mapSink.RemoveMapData(loadedMapData[cord]);
+                        loadedMapData[cord].Dispose();
+
+                        //Console.WriteLine("disposed " + cord);
                     }
 
                     mapSink.AddMapData(loadedMapData[cord] = LoadMapData(cord, pixels));
+
+                    //Console.WriteLine("generated " + cord);
                 }, "chunkmaplayerready");
             }
         }
@@ -126,6 +130,11 @@ namespace Vintagestory.GameContent
                 {
                     if (loadedMapData.ContainsKey(cord))
                     {
+                        if (mapSink.RemoveMapData(loadedMapData[cord]))
+                        {
+                            // In case it got added twice due to race condition (which tends to happen)
+                        }
+
                         mapSink.AddMapData(loadedMapData[cord]);
                         continue;
                     }
@@ -140,7 +149,10 @@ namespace Vintagestory.GameContent
                 if (loadedMapData.TryGetValue(cord, out mc))
                 {
                     mapSink.RemoveMapData(mc);
+                    loadedMapData.Remove(cord);
                 }
+
+                //Console.WriteLine("removed " + cord);
             }
         }
 
@@ -150,16 +162,12 @@ namespace Vintagestory.GameContent
         {
             ICoreClientAPI capi = api as ICoreClientAPI;
             int chunksize = api.World.BlockAccessor.ChunkSize;
-            int textureId = capi.Render.LoadTextureFromRgba(
-                pixels,
-                api.World.BlockAccessor.ChunkSize,
-                api.World.BlockAccessor.ChunkSize,
-                false,
-                0
-            );
+            LoadedTexture tex = new LoadedTexture(capi, 0, chunksize, chunksize);
+
+            capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref tex);
             
             ChunkMapComponent cmp = new ChunkMapComponent(capi, chunkCoord.Copy());
-            cmp.Texture = new LoadedTexture(capi, textureId, chunksize, chunksize);
+            cmp.Texture = tex;
 
             return cmp;
         }

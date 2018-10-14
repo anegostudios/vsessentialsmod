@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -31,6 +32,9 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap map, float dt)
         {
+            if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+            if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
+
             map.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
 
             float x = (float)(map.Bounds.renderX + viewPos.X);
@@ -52,9 +56,10 @@ namespace Vintagestory.GameContent
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
             prog.UniformMatrix("modelViewMatrix", api.Render.CurrentModelviewMatrix);
-
+            
             api.Render.RenderMesh(quadModel);
             api.Render.GlPopMatrix();
+            
         }
 
         public override void Dispose()
@@ -62,6 +67,8 @@ namespace Vintagestory.GameContent
             base.Dispose();
 
             quadModel.Dispose();
+
+            // Texture is disposed by WaypointMapLayer
         }
 
 

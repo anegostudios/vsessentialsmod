@@ -20,9 +20,9 @@ namespace Vintagestory.GameContent
 
 
         Vec3d prevPlayerPos = new Vec3d();
-        public Cuboidi worldBoundsBefore = new Cuboidi();
+        public Cuboidi chunkViewBoundsBefore = new Cuboidi();
 
-        public OnViewChangedDelegatae viewChanged;
+        public OnViewChangedDelegate viewChanged;
 
         public ICoreClientAPI Api => api;
 
@@ -30,7 +30,7 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// In blocks
         /// </summary>
-        public Cuboidd CurrentViewBounds = new Cuboidd();
+        public Cuboidd CurrentBlockViewBounds = new Cuboidd();
 
         public GuiElementMap(List<MapComponent> mapComponents, Vec3d centerPos, ICoreClientAPI capi, ElementBounds bounds) : base(capi, bounds)
         {
@@ -48,10 +48,10 @@ namespace Vintagestory.GameContent
             Bounds.CalcWorldBounds();
 
             mapComponents.Clear();
-            worldBoundsBefore = new Cuboidi();
+            chunkViewBoundsBefore = new Cuboidi();
 
             BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
-            CurrentViewBounds = new Cuboidd(
+            CurrentBlockViewBounds = new Cuboidd(
                 start.X - Bounds.InnerWidth / 2, 0, start.Z - Bounds.InnerHeight / 2, 
                 start.X + Bounds.InnerWidth / 2, 0, start.Z + Bounds.InnerHeight / 2
             );
@@ -65,9 +65,12 @@ namespace Vintagestory.GameContent
             foreach (MapComponent cmp in mapComponents)
             {
                 cmp.Render(this, deltaTime);
+                api.Render.CheckGlError();
             }
 
             api.Render.EndScissor();
+
+            api.Render.CheckGlError();
         }
 
         public override void PostRenderInteractiveElements(float deltaTime)
@@ -75,7 +78,7 @@ namespace Vintagestory.GameContent
             base.PostRenderInteractiveElements(deltaTime);
 
             EntityPlayer plr = api.World.Player.Entity;
-            CurrentViewBounds.Translate((plr.Pos.X - prevPlayerPos.X), 0, (plr.Pos.Z - prevPlayerPos.Z));
+            CurrentBlockViewBounds.Translate((plr.Pos.X - prevPlayerPos.X), 0, (plr.Pos.Z - prevPlayerPos.Z));
 
             prevPlayerPos.Set(plr.Pos.X, plr.Pos.Y, plr.Pos.Z);
 
@@ -99,7 +102,7 @@ namespace Vintagestory.GameContent
         {
             if (IsDragingMap)
             {
-                CurrentViewBounds.Translate(-args.MovementX / ZoomLevel, 0, -args.MovementY / ZoomLevel);
+                CurrentBlockViewBounds.Translate(-args.MovementX / ZoomLevel, 0, -args.MovementY / ZoomLevel);
             }
         }
 
@@ -130,12 +133,12 @@ namespace Vintagestory.GameContent
 
 
             double nowRelSize = 1 / ZoomLevel;
-            double diffX = Bounds.InnerWidth * nowRelSize - CurrentViewBounds.Width;
-            double diffZ = Bounds.InnerHeight * nowRelSize - CurrentViewBounds.Length;
-            CurrentViewBounds.X2 += diffX;
-            CurrentViewBounds.Z2 += diffZ;
+            double diffX = Bounds.InnerWidth * nowRelSize - CurrentBlockViewBounds.Width;
+            double diffZ = Bounds.InnerHeight * nowRelSize - CurrentBlockViewBounds.Length;
+            CurrentBlockViewBounds.X2 += diffX;
+            CurrentBlockViewBounds.Z2 += diffZ;
 
-            CurrentViewBounds.Translate(-diffX * px, 0, -diffZ * pz);
+            CurrentBlockViewBounds.Translate(-diffX * px, 0, -diffZ * pz);
             
 
             EnsureMapFullyLoaded();
@@ -144,20 +147,20 @@ namespace Vintagestory.GameContent
 
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
-            double blocksWidth = CurrentViewBounds.X2 - CurrentViewBounds.X1;
-            double blocksLength = CurrentViewBounds.Z2 - CurrentViewBounds.Z1;
+            double blocksWidth = CurrentBlockViewBounds.X2 - CurrentBlockViewBounds.X1;
+            double blocksLength = CurrentBlockViewBounds.Z2 - CurrentBlockViewBounds.Z1;
             
-            viewPos.X = (float)((worldPos.X - CurrentViewBounds.X1) / blocksWidth * Bounds.InnerWidth);
-            viewPos.Y = (float)((worldPos.Z - CurrentViewBounds.Z1) / blocksLength * Bounds.InnerHeight);
+            viewPos.X = (float)((worldPos.X - CurrentBlockViewBounds.X1) / blocksWidth * Bounds.InnerWidth);
+            viewPos.Y = (float)((worldPos.Z - CurrentBlockViewBounds.Z1) / blocksLength * Bounds.InnerHeight);
         }
 
         public void TranslateViewPosToWorldPos(Vec2f viewPos, ref Vec3d worldPos)
         {
-            double blocksWidth = CurrentViewBounds.X2 - CurrentViewBounds.X1;
-            double blocksLength = CurrentViewBounds.Z2 - CurrentViewBounds.Z1;
+            double blocksWidth = CurrentBlockViewBounds.X2 - CurrentBlockViewBounds.X1;
+            double blocksLength = CurrentBlockViewBounds.Z2 - CurrentBlockViewBounds.Z1;
 
-            worldPos.X = viewPos.X * blocksWidth / Bounds.InnerWidth + CurrentViewBounds.X1;
-            worldPos.Z = viewPos.Y * blocksLength / Bounds.InnerHeight + CurrentViewBounds.Z1;
+            worldPos.X = viewPos.X * blocksWidth / Bounds.InnerWidth + CurrentBlockViewBounds.X1;
+            worldPos.Z = viewPos.Y * blocksLength / Bounds.InnerHeight + CurrentBlockViewBounds.Z1;
             worldPos.Y = api.World.BlockAccessor.GetRainMapHeightAt(worldPos.AsBlockPos);
         }
 
@@ -173,44 +176,38 @@ namespace Vintagestory.GameContent
             nowVisible.Clear();
             nowHidden.Clear();
 
-            Cuboidi worldBounds = CurrentViewBounds.ToCuboidi();
-            worldBounds.Div(chunksize);
-            //worldBounds.GrowBy(1);
+            Cuboidi chunkviewBounds = CurrentBlockViewBounds.ToCuboidi();
+            chunkviewBounds.Div(chunksize);
 
-            BlockPos cur = new BlockPos().Set(worldBounds.X1, 0, worldBounds.Z1);
+            BlockPos cur = new BlockPos().Set(chunkviewBounds.X1, 0, chunkviewBounds.Z1);
+            
 
-       //     StringBuilder debug = new StringBuilder();
-
-            while (cur.X <= worldBounds.X2)
+            while (cur.X <= chunkviewBounds.X2)
             {
-                cur.Z = worldBounds.Z1;
+                cur.Z = chunkviewBounds.Z1;
 
-                while (cur.Z <= worldBounds.Z2)
+                while (cur.Z <= chunkviewBounds.Z2)
                 {
-                    if (!worldBoundsBefore.ContainsOrTouches(cur))
+                    if (!chunkViewBoundsBefore.ContainsOrTouches(cur))
                     {
                         nowVisible.Add(new Vec2i(cur.X, cur.Z));
-                 //       debug.Append(string.Format("{0}/{1}, ", cur.X, cur.Z));
                     }
-
                     cur.Z++;
                 }
 
                 cur.X++;
             }
-
-    //        if (nowVisible.Count > 0) Console.WriteLine("{0} chunks now visible: {1}", nowVisible.Count, debug.ToString());
-
             
-            cur.Set(worldBoundsBefore.X1, 0, worldBoundsBefore.Z1);
+            
+            cur.Set(chunkViewBoundsBefore.X1, 0, chunkViewBoundsBefore.Z1);
 
-            while (cur.X <= worldBoundsBefore.X2)
+            while (cur.X <= chunkViewBoundsBefore.X2)
             {
-                cur.Z = worldBoundsBefore.Z1;
+                cur.Z = chunkViewBoundsBefore.Z1;
 
-                while (cur.Z <= worldBoundsBefore.Z2)
+                while (cur.Z <= chunkViewBoundsBefore.Z2)
                 {
-                    if (!worldBounds.ContainsOrTouches(cur))
+                    if (!chunkviewBounds.ContainsOrTouches(cur))
                     {
                         nowHidden.Add(new Vec2i(cur.X, cur.Z));
                     }
@@ -222,7 +219,7 @@ namespace Vintagestory.GameContent
             }
 
 
-            worldBoundsBefore = worldBounds.Clone();
+            chunkViewBoundsBefore = chunkviewBounds.Clone();
 
             viewChanged(nowVisible, nowHidden);
         }
@@ -233,14 +230,14 @@ namespace Vintagestory.GameContent
             mapComponents.Add(cmp);
         }
 
-        internal void RemoveMapComponent(MapComponent cmp)
+        internal bool RemoveMapComponent(MapComponent cmp)
         {
-            mapComponents.Remove(cmp);
+            return mapComponents.Remove(cmp);
         }
 
         public override void Dispose()
         {
-            
+            // mapComponents is diposed by the Gui Dialog
         }
     }
 }

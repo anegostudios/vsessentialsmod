@@ -102,14 +102,19 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetBool("isPregnant", value); }
         }
 
+        bool requiresFood = true;
+
         public bool ShouldEat
         {
             get
             {
                 return 
-                    !IsPregnant 
-                    && GetSaturation() < PortionsEatenForMultiply 
-                    && TotalDaysCooldownUntil <= entity.World.Calendar.TotalDays
+                    !requiresFood || 
+                    (
+                        !IsPregnant 
+                        && GetSaturation() < PortionsEatenForMultiply 
+                        && TotalDaysCooldownUntil <= entity.World.Calendar.TotalDays
+                    )
                 ;
             }
         }
@@ -124,6 +129,11 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, attributes);
 
             this.attributes = attributes;
+
+
+            requiresFood = attributes["requiresFood"].AsBool(true);
+
+
             multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");
 
             if (entity.World.Side == EnumAppSide.Server)

@@ -56,6 +56,7 @@
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Core.cs" />
+    <Compile Include="JsonExport.cs" />
     <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />
     <Compile Include="EntityRenderer\EntityItemRenderer.cs" />
     <Compile Include="EntityRenderer\EntityShapeRenderer.cs" />
@@ -131,6 +132,7 @@
     <Compile Include="Systems\WorldMap\IMapDataSink.cs" />
     <Compile Include="Systems\WorldMap\MapComponent\ChunkMapComponent.cs" />
     <Compile Include="Systems\WorldMap\MapComponent\EntityMapComponent.cs" />
+    <Compile Include="Systems\WorldMap\MapComponent\MapComponent.cs" />
     <Compile Include="Systems\WorldMap\MapComponent\WaypointMapComponent.cs" />
     <Compile Include="Systems\WorldMap\MapLayer.cs" />
     <Compile Include="Systems\WorldMap\PlayerMapLayer.cs" />
