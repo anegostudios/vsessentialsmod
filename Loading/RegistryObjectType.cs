@@ -54,5 +54,52 @@ namespace Vintagestory.ServerMods.NoObf
 
             return Regex.IsMatch(Code.Path, @"^" + pattern + @"$");
         }
+
+        public static bool WildCardMatch(string wildCard, string text)
+        {
+            if (wildCard == text) return true;
+            string pattern = Regex.Escape(wildCard).Replace(@"\*", @"(.*)");
+            return Regex.IsMatch(text, @"^" + pattern + @"$");
+        }
+
+        public static bool WildCardMatches(string blockCode, List<string> wildCards, out string matchingWildcard)
+        {
+            foreach (string wildcard in wildCards)
+            {
+                if (WildCardMatch(wildcard, blockCode))
+                {
+                    matchingWildcard = wildcard;
+                    return true;
+                }
+            }
+            matchingWildcard = null;
+            return false;
+        }
+
+        public static bool WildCardMatch(AssetLocation wildCard, AssetLocation blockCode)
+        {
+            if (wildCard == blockCode) return true;
+
+            string pattern = Regex.Escape(wildCard.Path).Replace(@"\*", @"(.*)");
+
+            return Regex.IsMatch(blockCode.Path, @"^" + pattern + @"$");
+        }
+
+        public static bool WildCardMatches(AssetLocation blockCode, List<AssetLocation> wildCards, out AssetLocation matchingWildcard)
+        {
+            foreach (AssetLocation wildcard in wildCards)
+            {
+                if (WildCardMatch(wildcard, blockCode))
+                {
+                    matchingWildcard = wildcard;
+                    return true;
+                }
+            }
+
+            matchingWildcard = null;
+
+            return false;
+        }
+
     }
 }

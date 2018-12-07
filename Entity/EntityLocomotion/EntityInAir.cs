@@ -8,7 +8,7 @@ namespace Vintagestory.GameContent
 {
     public class EntityInAir : EntityLocomotion
     {
-        public static float airMovingStrength = 0.05f;
+        public float airMovingStrength = 0.05f;
         double wallDragFactor = 0.3f;
 
         internal override void Initialize(EntityProperties properties)
@@ -17,6 +17,7 @@ namespace Vintagestory.GameContent
             if (physics != null)
             {
                 wallDragFactor = 0.3 * (float)physics["wallDragFactor"].AsDouble(1);
+                airMovingStrength = (float)physics["airMovingStrength"].AsDouble(0.05);
             }
         }
 

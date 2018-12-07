@@ -183,7 +183,7 @@ namespace Vintagestory.GameContent
 
         private void OnGameTick(float dt)
         {
-            weatherSim.Update(dt);
+            weatherSim?.Update(dt);
         }
 
         private void InitWeatherSim()

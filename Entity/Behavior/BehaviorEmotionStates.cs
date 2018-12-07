@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
         Sum, Max, NoAccum
     }
 
-    class EmotionState
+    public class EmotionState
     {
         public string Code = "";
         public float Duration = 0;
@@ -32,7 +32,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorEmotionStates : EntityBehavior
     {
         Dictionary<string, EmotionState> availableStates = new Dictionary<string, EmotionState>();
-        Dictionary<string, float> activeStates = new Dictionary<string, float>();
+        public Dictionary<string, float> ActiveStates = new Dictionary<string, float>();
 
         TreeAttribute entityAttr;
 
@@ -48,7 +48,7 @@ namespace Vintagestory.GameContent
 
                     foreach (var val in entityAttr)
                     {
-                        activeStates[val.Key] = (float)val.Value.GetValue();
+                        ActiveStates[val.Key] = (float)val.Value.GetValue();
                     }
 
                 }
@@ -110,11 +110,11 @@ namespace Vintagestory.GameContent
 
             float activedur = 0;
 
-            foreach (string activestatecode in activeStates.Keys)
+            foreach (string activestatecode in ActiveStates.Keys)
             {
                 if (activestatecode == statecode)
                 {
-                    activedur = activeStates[activestatecode];
+                    activedur = ActiveStates[activestatecode];
                     continue;
                 }
 
@@ -127,7 +127,7 @@ namespace Vintagestory.GameContent
                     else
                     {
                         // New state has priority
-                        activeStates.Remove(activestatecode);
+                        ActiveStates.Remove(activestatecode);
                         entityAttr.RemoveAttribute(activestatecode);
                         break;
                     }
@@ -139,7 +139,7 @@ namespace Vintagestory.GameContent
             if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activedur, newstate.Duration);
             if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activedur > 0 ? activedur : newstate.Duration;
 
-            activeStates[statecode] = newDuration;
+            ActiveStates[statecode] = newDuration;
             entityAttr.SetFloat(statecode, newDuration);
 
             return true;
@@ -151,15 +151,15 @@ namespace Vintagestory.GameContent
             timer++;
             if (timer % 10 != 0) return;
 
-            List<string> active = activeStates.Keys.ToList();
+            List<string> active = ActiveStates.Keys.ToList();
 
             foreach (string statecode in active) 
             {
-                activeStates[statecode] -= 10*deltaTime;
-                float leftDur = activeStates[statecode];
+                ActiveStates[statecode] -= 10*deltaTime;
+                float leftDur = ActiveStates[statecode];
                 if (leftDur <= 0)
                 {
-                    activeStates.Remove(statecode);
+                    ActiveStates.Remove(statecode);
                     entityAttr.RemoveAttribute(statecode);
                     continue;
                 }

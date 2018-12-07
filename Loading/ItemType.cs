@@ -31,9 +31,26 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public EnumTool? Tool = null;
 
-        public void InitItem(IClassRegistryAPI instancer, Item item, Dictionary<string, string> searchReplace)
+        public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, Dictionary<string, string> searchReplace)
         {
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);
+
+            List<string> toRemove = new List<string>();
+            int i = 0;
+            foreach (var val in Textures)
+            {
+                if (val.Value.Base == null)
+                {
+                    logger.Error("The texture definition #{0} in item with code {1} is invalid. The base property is null. Will skip.", i, item.Code);
+                    toRemove.Add(val.Key);
+                }
+                i++;
+            }
+
+            foreach (var val in toRemove)
+            {
+                Textures.Remove(val);
+            }
         }
     }
 }

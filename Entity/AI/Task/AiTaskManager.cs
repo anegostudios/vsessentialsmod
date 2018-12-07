@@ -5,40 +5,52 @@ using Vintagestory.API.Common.Entities;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskManager
+    public static class AiTaskRegistry
     {
         public static Dictionary<string, Type> TaskTypes = new Dictionary<string, Type>();
         public static Dictionary<Type, string> TaskCodes = new Dictionary<Type, string>();
 
-        public static void RegisterTaskType(string task, Type type)
+        public static void Register(string code, Type type)
         {
-            TaskTypes[task] = type;
-            TaskCodes[type] = task;
+            TaskTypes[code] = type;
+            TaskCodes[type] = code;
         }
 
-        static AiTaskManager()
+        public static void Register<T>(string code) where T : AiTaskBase
         {
-            RegisterTaskType("wander", typeof(AiTaskWander));
-            RegisterTaskType("lookaround", typeof(AiTaskLookAround));
-            RegisterTaskType("meleeattack", typeof(AiTaskMeleeAttack));
-            RegisterTaskType("seekentity", typeof(AiTaskSeekEntity));
-            RegisterTaskType("fleeentity", typeof(AiTaskFleeEntity));
-            RegisterTaskType("stayclosetoentity", typeof(AiTaskStayCloseToEntity));
-            RegisterTaskType("getoutofwater", typeof(AiTaskGetOutOfWater));
-            RegisterTaskType("idle", typeof(AiTaskIdle));
-            RegisterTaskType("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
-            
+            TaskTypes[code] = typeof(T);
+            TaskCodes[typeof(T)] = code;
         }
+
+        static AiTaskRegistry()
+        {
+            Register("wander", typeof(AiTaskWander));
+            Register("lookaround", typeof(AiTaskLookAround));
+            Register("meleeattack", typeof(AiTaskMeleeAttack));
+            Register("seekentity", typeof(AiTaskSeekEntity));
+            Register("fleeentity", typeof(AiTaskFleeEntity));
+            Register("stayclosetoentity", typeof(AiTaskStayCloseToEntity));
+            Register("getoutofwater", typeof(AiTaskGetOutOfWater));
+            Register("idle", typeof(AiTaskIdle));
+            Register("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
+        }
+    }
+
+
+    public class AiTaskManager
+    {
+        public event API.Common.Action<IAiTask> OnTaskStarted;
+        public ActionBoolReturn<IAiTask> ShouldExecuteTask = (task) => true;
+
+        Entity entity;
+        List<IAiTask> Tasks = new List<IAiTask>();
+        IAiTask[] ActiveTasksBySlot = new IAiTask[8];       
 
 
         public AiTaskManager(Entity entity)
         {
             this.entity = entity;
         }
-
-        Entity entity;
-        List<IAiTask> Tasks = new List<IAiTask>();
-        IAiTask[] ActiveTasksBySlot = new IAiTask[8];
 
         public void AddTask(IAiTask task)
         {
@@ -55,6 +67,7 @@ namespace Vintagestory.GameContent
             task.StartExecute();
             ActiveTasksBySlot[slot] = task;
         }
+
 
         public void StopTask(Type taskType)
         {
@@ -73,7 +86,7 @@ namespace Vintagestory.GameContent
             {
                 int slot = task.Slot;
 
-                if ((ActiveTasksBySlot[slot] == null || task.Priority > ActiveTasksBySlot[slot].PriorityForCancel) && task.ShouldExecute() && entity.ShouldExecuteTask(task))
+                if ((ActiveTasksBySlot[slot] == null || task.Priority > ActiveTasksBySlot[slot].PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
                 {
                     if (ActiveTasksBySlot[slot] != null)
                     {
@@ -82,6 +95,7 @@ namespace Vintagestory.GameContent
 
                     ActiveTasksBySlot[slot] = task;
                     task.StartExecute();
+                    OnTaskStarted?.Invoke(task);
                 }
             }
 
@@ -108,11 +122,12 @@ namespace Vintagestory.GameContent
                     IAiTask task = ActiveTasksBySlot[i];
                     if (task == null) continue;
                     if (j++ > 0) tasks += ", ";
-                    tasks += TaskCodes[task.GetType()] + "("+task.Priority+")";
+                    tasks += AiTaskRegistry.TaskCodes[task.GetType()] + "("+task.Priority+")";
                 }
                 entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
             }
         }
+        
 
         internal void Notify(string key, object data)
         {
@@ -133,6 +148,7 @@ namespace Vintagestory.GameContent
 
                         ActiveTasksBySlot[slot] = task;
                         task.StartExecute();
+                        OnTaskStarted?.Invoke(task);
                     }
                 }
             }

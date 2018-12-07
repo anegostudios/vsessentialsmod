@@ -262,7 +262,7 @@ namespace Vintagestory.GameContent
 
             return entity.World.GetEntitiesAround(entity.ServerPos.XYZ, RequiresNearbyEntityRange, RequiresNearbyEntityRange, (e) =>
             {
-                return RequiresNearbyEntityCode.Equals(e.Code.Path);
+                return e.WildCardMatch(new AssetLocation(RequiresNearbyEntityCode));
             }).Length > 0;
         }
 

@@ -4,7 +4,7 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    class EntityBehaviorCollectEntities : EntityBehavior
+    public class EntityBehaviorCollectEntities : EntityBehavior
     {
         int waitTicks = 0;
         int lastCollectedEntityIndex = 0;
@@ -30,12 +30,14 @@ namespace Vintagestory.GameContent
             }
             if (waitTicks-- > 0) return;
 
+            if ((entity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Spectator) return;
+
             tmp.Set(entity.ServerPos.X, entity.ServerPos.Y + entity.CollisionBox.Y1 + entity.CollisionBox.Y2 / 2, entity.ServerPos.Z);
-            IEntity[] entities = entity.World.GetEntitiesAround(tmp, 1.5f, 1.5f, entityMatcher);
+            Entity[] entities = entity.World.GetEntitiesAround(tmp, 1.5f, 1.5f, entityMatcher);
             if (entities.Length == 0)
             {
                 unconsumedDeltaTime = 0;
-                entity.World.FrameProfiler.Mark("entity-collectentities");
+                //entity.World.FrameProfiler.Mark("entity-collectentities");
                 return;
             }
 
@@ -44,7 +46,7 @@ namespace Vintagestory.GameContent
 
             while ((deltaTime - 1/itemsPerSecond) > 0)
             {
-                IEntity targetItem = null;
+                Entity targetItem = null;
                 int targetIndex = 0;
 
                 for (; targetIndex < entities.Length; targetIndex++)
@@ -78,11 +80,11 @@ namespace Vintagestory.GameContent
 
             unconsumedDeltaTime = deltaTime;
 
-            entity.World.FrameProfiler.Mark("entity-collectentities");
+            //entity.World.FrameProfiler.Mark("entity-collectentities");
         }
 
 
-        public virtual bool OnFoundCollectible(IEntity foundEntity)
+        public virtual bool OnFoundCollectible(Entity foundEntity)
         {
             ItemStack itemstack = foundEntity.OnCollected(this.entity);
             bool collected = false;
@@ -106,7 +108,7 @@ namespace Vintagestory.GameContent
             return false;
         }
 
-        private bool entityMatcher(IEntity foundEntity)
+        private bool entityMatcher(Entity foundEntity)
         {
             return foundEntity.CanCollect(entity);
         }

@@ -26,7 +26,7 @@ namespace Vintagestory.ServerMods.NoObf
             Class = "Block";
             Shape = new CompositeShape() { Base = new AssetLocation("game", "block/basic/cube") };
             GuiTransform = ModelTransform.BlockDefaultGui();
-            FpHandTransform = ModelTransform.BlockDefault();
+            FpHandTransform = ModelTransform.BlockDefaultFp();
             TpHandTransform = ModelTransform.BlockDefaultTp();
             GroundTransform = ModelTransform.BlockDefaultGround();
             MaxStackSize = 64;
@@ -54,7 +54,7 @@ namespace Vintagestory.ServerMods.NoObf
         public BlockSounds Sounds;
         [JsonProperty]
         public Dictionary<string, CompositeTexture> TexturesInventory = new Dictionary<string, CompositeTexture>();
-        
+
         [JsonProperty]
         public Dictionary<string, bool> SideOpaque;
         [JsonProperty]
@@ -110,7 +110,7 @@ namespace Vintagestory.ServerMods.NoObf
         public bool RainPermeable = false;
         [JsonProperty]
         public bool? SnowCoverage = null;
-        
+
         [JsonProperty]
         public int LiquidLevel;
         [JsonProperty]
@@ -119,7 +119,7 @@ namespace Vintagestory.ServerMods.NoObf
         public float DragMultiplier = 1f;
         [JsonProperty]
         public BlockDropItemStack[] Drops;
-        
+
         [JsonProperty]
         public BlockCropPropertiesType CropProps = null;
 
@@ -175,7 +175,7 @@ namespace Vintagestory.ServerMods.NoObf
             if (CollisionSelectionBoxR != null)
             {
                 CollisionBoxes = ToCuboidf(CollisionSelectionBoxR);
-                SelectionBoxes = ToCuboidf(CollisionSelectionBoxR);    
+                SelectionBoxes = ToCuboidf(CollisionSelectionBoxR);
             }
 
             if (CollisionSelectionBoxesR != null)
@@ -199,8 +199,8 @@ namespace Vintagestory.ServerMods.NoObf
             LightHsv[1] = (byte)GameMath.Clamp(LightHsv[1], 0, ColorUtil.SatQuantities - 1);
             LightHsv[2] = (byte)GameMath.Clamp(LightHsv[2], 0, ColorUtil.BrightQuantities - 1);
         }
-        
-        
+
+
         public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, Dictionary<string, string> searchReplace)
         {
             BlockBehaviorType[] behaviorTypes = Behaviors;
@@ -244,11 +244,11 @@ namespace Vintagestory.ServerMods.NoObf
                 if (CropProps.Behaviors != null)
                 {
                     block.CropProps.Behaviors = new CropBehavior[CropProps.Behaviors.Length];
-                    for(int i = 0; i < CropProps.Behaviors.Length; i++)
+                    for (int i = 0; i < CropProps.Behaviors.Length; i++)
                     {
                         CropBehaviorType behaviorType = CropProps.Behaviors[i];
                         CropBehavior behavior = instancer.CreateCropBehavior(block, behaviorType.name);
-                        if(behaviorType.properties != null)
+                        if (behaviorType.properties != null)
                         {
                             behavior.Initialize(behaviorType.properties);
                         }
@@ -290,6 +290,23 @@ namespace Vintagestory.ServerMods.NoObf
                     block.SideOpaque[facing.Index] = SideOpaque[facing.Code];
                 }
             }
+
+            List<string> toRemove = new List<string>();
+            int j = 0;
+            foreach (var val in Textures)
+            {
+                if (val.Value.Base == null)
+                {
+                    logger.Error("The texture definition #{0} in block with code {1} is invalid. The base property is null. Will skip.", j, block.Code);                    
+                    toRemove.Add(val.Key);
+                }
+                j++;
+            }
+
+            foreach (var val in toRemove)
+            {
+                Textures.Remove(val);
+            }
         }
 
         public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, Dictionary<string, string> searchReplace)
@@ -300,7 +317,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 for (int i = 0; i < val.Value.Length; i++)
                 {
-                    string blockCode = Block.FillPlaceHolder(val.Value[i], searchReplace);
+                    string blockCode = RegistryObject.FillPlaceHolder(val.Value[i], searchReplace);
 
                     if (WildCardMatch(blockCode, code.Path))
                     {
@@ -312,53 +329,6 @@ namespace Vintagestory.ServerMods.NoObf
 
             return tabs.ToArray();
         }
-
-        public static bool WildCardMatch(string wildCard, string text)
-        {
-            if (wildCard == text) return true;
-            string pattern = Regex.Escape(wildCard).Replace(@"\*", @"(.*)");
-            return Regex.IsMatch(text, @"^" + pattern + @"$");
-        }
-
-        public static bool WildCardMatches(string blockCode, List<string> wildCards, out string matchingWildcard)
-        {
-            foreach (string wildcard in wildCards)
-            {
-                if (WildCardMatch(wildcard, blockCode))
-                {
-                    matchingWildcard = wildcard;
-                    return true;
-                }
-            }
-            matchingWildcard = null;
-            return false;
-        }
-
-        public static bool WildCardMatch(AssetLocation wildCard, AssetLocation blockCode)
-        {
-            if (wildCard == blockCode) return true;
-
-            string pattern = Regex.Escape(wildCard.Path).Replace(@"\*", @"(.*)");
-
-            return Regex.IsMatch(blockCode.Path, @"^" + pattern + @"$");
-        }
-
-        public static bool WildCardMatches(AssetLocation blockCode, List<AssetLocation> wildCards, out AssetLocation matchingWildcard)
-        {
-            foreach (AssetLocation wildcard in wildCards)
-            {
-                if (WildCardMatch(wildcard, blockCode))
-                {
-                    matchingWildcard = wildcard;
-                    return true;
-                }
-            }
-
-            matchingWildcard = null;
-
-            return false;
-        }
-
 
         void ResolveStringBoolDictFaces(Dictionary<string, bool> stringBoolDict)
         {
@@ -388,8 +358,6 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                 }
             }
-
         }
-
     }
 }

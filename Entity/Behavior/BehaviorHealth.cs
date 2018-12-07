@@ -8,7 +8,7 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    class EntityBehaviorHealth : EntityBehavior
+    public class EntityBehaviorHealth : EntityBehavior
     {
         ITreeAttribute healthTree;
 
@@ -83,6 +83,8 @@ namespace Vintagestory.GameContent
             
 
             UpdateMaxHealth();
+
+            
         }
 
         
@@ -117,29 +119,17 @@ namespace Vintagestory.GameContent
             if (Health <= 0)
             {
                 Health = 0;
+
                 entity.Die(
                     EnumDespawnReason.Death, 
                     damageSource
                 );
-
-                float lengthHalf = entity.CollisionBox.X2 - entity.CollisionBox.X1;
-                float height = entity.CollisionBox.Y2;
-                Random rnd = entity.World.Rand;
-
-                entity.World.SpawnParticles(30,
-                    ColorUtil.ToRgba(100, 255, 255, 255),
-                    entity.Pos.XYZ.SubCopy(lengthHalf, 0, lengthHalf),
-                    entity.Pos.XYZ.AddCopy(lengthHalf, height, lengthHalf), 
-                    new Vec3f(0, 0, 0),
-                    new Vec3f(2 * (float)rnd.NextDouble() - 1f, 2 * (float)rnd.NextDouble() - 1f, 2 * (float)rnd.NextDouble() - 1f),
-                    1f,
-                    -0.1f,
-                    1f,
-                    EnumParticleModel.Quad
-                );
             } else
             {
-                if (damage > 1f) entity.StartAnimation("hurt");
+                if (damage > 1f)
+                {
+                    entity.AnimManager.StartAnimation("hurt");
+                }
             }
         }
 

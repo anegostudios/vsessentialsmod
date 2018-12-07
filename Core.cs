@@ -118,6 +118,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("controlledphysics", typeof(EntityBehaviorControlledPhysics));
             
             api.RegisterEntityBehaviorClass("taskai", typeof(EntityBehaviorTaskAI));
+            api.RegisterEntityBehaviorClass("goalai", typeof(EntityBehaviorGoalAI));
             api.RegisterEntityBehaviorClass("interpolateposition", typeof(EntityBehaviorInterpolatePosition));
             api.RegisterEntityBehaviorClass("despawn", typeof(EntityBehaviorDespawn));
 
@@ -129,6 +130,8 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("tiredness", typeof(EntityBehaviorTiredness));
             api.RegisterEntityBehaviorClass("nametag", typeof(EntityBehaviorNameTag));
             api.RegisterEntityBehaviorClass("placeblock", typeof(EntityBehaviorPlaceBlock));
+            api.RegisterEntityBehaviorClass("deaddecay", typeof(EntityBehaviorDeadDecay));
+            api.RegisterEntityBehaviorClass("floatupwhenstuck", typeof(EntityBehaviorFloatUpWhenStuck));            
         }
 
 

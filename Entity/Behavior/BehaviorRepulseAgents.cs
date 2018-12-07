@@ -14,51 +14,76 @@ namespace Vintagestory.GameContent
     {
         Cuboidd entityCuboid = new Cuboidd();
         Vec3d pushVector = new Vec3d();
-        double touchDistance;
+        double ownTouchDistance;
+
+        int chunksize;
+
+        EntityPartitioning partitionUtil;
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
-            
+            chunksize = entity.World.BlockAccessor.ChunkSize;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
             base.Initialize(properties, attributes);
 
-            touchDistance = Math.Sqrt((entity.CollisionBox.X2 - entity.CollisionBox.X1) * (entity.CollisionBox.X2 - entity.CollisionBox.X1));
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
         }
+
+        Vec3d tmppos = new Vec3d();
+        Vec3d ownPos = new Vec3d();
+        Vec3d hisPos = new Vec3d();
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.State == EnumEntityState.Inactive) return;
+            if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
 
-            Vec3d pos = entity.LocalPos.XYZ;
+            ownPos.Set(
+                entity.LocalPos.X + (entity.CollisionBox.X2 - entity.OriginCollisionBox.X2), 
+                entity.LocalPos.Y + (entity.CollisionBox.Y2 - entity.OriginCollisionBox.Y2), 
+                entity.LocalPos.Z + (entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2)
+            );
+
+            ownTouchDistance = (entity.CollisionBox.X2 - entity.CollisionBox.X1)/2;
             
             pushVector.Set(0, 0, 0);
-            Vec3d p = new Vec3d();
-
-            entity.World.GetEntitiesAround(pos, 10, 5, (e) => {
-                EntityPos epos = e.LocalPos;
-                double distanceSq = epos.SquareDistanceTo(pos);
-
-                if (e != entity && distanceSq < touchDistance * touchDistance && e.HasBehavior("repulseagents") && e.IsInteractable)
-                {
-                    p.Set(pos.X - epos.X, pos.Y - epos.Y, pos.Z - epos.Z);
-                    p.Normalize().Mul(1 - GameMath.Sqrt(distanceSq) / touchDistance);
-                    pushVector.Add(p.X, p.Y, p.Z);
-                }
-
-                return false;
-            });
-
             
+            partitionUtil.WalkEntityPartitions(ownPos, ownTouchDistance + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
+
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
             pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 3);
             pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
-            entity.LocalPos.Motion.Add(pushVector.X / 15, pushVector.Y / 30, pushVector.Z / 15);
+            entity.LocalPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
 
             entity.World.FrameProfiler.Mark("entity-repulse");
         }
+
+
+        Cuboidd tmpCuboid = new Cuboidd();
+
+        private void WalkEntity(Entity e)
+        {
+            double hisTouchDistance = (e.CollisionBox.X2 - e.CollisionBox.X1) / 2;
+            EntityPos epos = e.LocalPos;
+
+            hisPos.Set(
+                epos.X + (e.CollisionBox.X2 - e.OriginCollisionBox.X2),
+                epos.Y + (e.CollisionBox.Y2 - e.OriginCollisionBox.Y2),
+                epos.Z + (e.CollisionBox.Z2 - e.OriginCollisionBox.Z2)
+            );
+
+            double centerToCenterDistance = GameMath.Sqrt(hisPos.SquareDistanceTo(ownPos));
+
+            if (e != entity && centerToCenterDistance < ownTouchDistance + hisTouchDistance && e.HasBehavior("repulseagents") && e.IsInteractable)
+            {
+                tmppos.Set(ownPos.X - hisPos.X, ownPos.Y - hisPos.Y, ownPos.Z - hisPos.Z);
+                tmppos.Normalize().Mul(1 - centerToCenterDistance / (ownTouchDistance + hisTouchDistance));
+                pushVector.Add(tmppos.X, tmppos.Y, tmppos.Z);
+            }
+        }
+        
 
         public override string PropertyName()
         {

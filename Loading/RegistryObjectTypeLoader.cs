@@ -21,7 +21,7 @@ namespace Vintagestory.ServerMods.NoObf
         public List<string> Types;
     }
 
-    public class ResolvedBlockVariant
+    public class ResolvedVariant
     {
         public Dictionary<string, string> Codes = new Dictionary<string, string>();
     }
@@ -202,7 +202,7 @@ namespace Vintagestory.ServerMods.NoObf
         {
             List<EntityType> entities = new List<EntityType>();
 
-            List<ResolvedBlockVariant> variants = null;
+            List<ResolvedVariant> variants = null;
             try
             {
                 variants = GatherVariants(entityType.VariantGroups, entityType.Code);
@@ -220,7 +220,7 @@ namespace Vintagestory.ServerMods.NoObf
             else
             {
                 // Multi item type
-                foreach (ResolvedBlockVariant variant in variants)
+                foreach (ResolvedVariant variant in variants)
                 {
                     AssetLocation fullcode = entityType.Code.Clone();
                     foreach (string code in variant.Codes.Values)
@@ -228,7 +228,6 @@ namespace Vintagestory.ServerMods.NoObf
                         fullcode.Path += "-" + code;
                     }
                     EntityType typedEntity = baseEntityFromEntityType(entityType, fullcode, variant.Codes);
-                    typedEntity.FillPlaceHolders(variant.Codes);
 
                     if (entityType.SkipVariants != null)
                     {
@@ -263,7 +262,7 @@ namespace Vintagestory.ServerMods.NoObf
                 jsonObject = entityType.jsonObject.DeepClone() as JObject
             };
 
-            solveByType(newEntityType.jsonObject, fullcode.Path);
+            solveByType(newEntityType.jsonObject, fullcode.Path, searchReplace);
 
             try
             {
@@ -308,7 +307,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         void GatherItems(AssetLocation location, ItemType itemType, List<Item> items)
         {
-            List<ResolvedBlockVariant> variants = null;
+            List<ResolvedVariant> variants = null;
             try
             {
                 variants = GatherVariants(itemType.VariantGroups, itemType.Code);
@@ -329,7 +328,7 @@ namespace Vintagestory.ServerMods.NoObf
             else
             {
                 // Multi item type
-                foreach (ResolvedBlockVariant variant in variants)
+                foreach (ResolvedVariant variant in variants)
                 {
                     AssetLocation fullcode = itemType.Code.Clone();
                     foreach (string code in variant.Codes.Values)
@@ -337,7 +336,6 @@ namespace Vintagestory.ServerMods.NoObf
                         fullcode.Path += "-" + code;
                     }
                     Item typedItem = baseItemFromItemType(itemType, fullcode, variant.Codes);
-                    typedItem.FillPlaceHolders(variant.Codes);
 
                     if (itemType.SkipVariants != null)
                     {
@@ -371,7 +369,7 @@ namespace Vintagestory.ServerMods.NoObf
                 jsonObject = itemType.jsonObject.DeepClone() as JObject
             };
 
-            solveByType(typedItemType.jsonObject, fullcode.Path);
+            solveByType(typedItemType.jsonObject, fullcode.Path, searchReplace);
 
             try
             {
@@ -426,7 +424,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
             item.MatterState = typedItemType.MatterState;
 
-            typedItemType.InitItem(api.ClassRegistry, item, searchReplace);
+            typedItemType.InitItem(api.World.Logger, api.ClassRegistry, item, searchReplace);
 
             return item;
         }
@@ -458,7 +456,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         void GatherBlocks(AssetLocation location, BlockType blockType, List<Block> blocks)
         {
-            List<ResolvedBlockVariant> variants = null;
+            List<ResolvedVariant> variants = null;
             try
             {
                 variants = GatherVariants(blockType.VariantGroups, location);
@@ -478,7 +476,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             else
             {
-                foreach (ResolvedBlockVariant variant in variants)
+                foreach (ResolvedVariant variant in variants)
                 {
                     AssetLocation fullcode = blockType.Code.Clone();
                     foreach (string code in variant.Codes.Values)
@@ -487,7 +485,6 @@ namespace Vintagestory.ServerMods.NoObf
                     }
 
                     Block block = baseBlockFromBlockType(blockType, fullcode, variant.Codes);
-                    block.FillPlaceHolders(api.World.Logger, variant.Codes);
 
                     if (blockType.SkipVariants != null)
                     {
@@ -527,7 +524,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             try
             {
-                solveByType(typedBlockType.jsonObject, fullcode.Path);
+                solveByType(typedBlockType.jsonObject, fullcode.Path, searchReplace);
             }
             catch (Exception e)
             {
@@ -656,7 +653,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
 
-        void solveByType(JToken json, string codePath)
+        void solveByType(JToken json, string codePath, Dictionary<string, string> searchReplace)
         {
             List<string> propertiesToRemove = new List<string>();
             Dictionary<string, JToken> propertiesToAdd = new Dictionary<string, JToken>();
@@ -691,14 +688,22 @@ namespace Vintagestory.ServerMods.NoObf
 
                 foreach (var entry in (json as JObject))
                 {
-                    solveByType(entry.Value, codePath);
+                    solveByType(entry.Value, codePath, searchReplace);
+                }
+            }
+            else if (json.Type == JTokenType.String)
+            {
+                string value = (string) (json as JValue).Value;
+                if (value.Contains("{"))
+                {
+                    (json as JValue).Value = RegistryObject.FillPlaceHolder(value, searchReplace);
                 }
             }
             else if (json is JArray)
             {
                 foreach (var child in (json as JArray))
                 {
-                    solveByType(child, codePath);
+                    solveByType(child, codePath, searchReplace);
                 }
             }
         }
@@ -715,9 +720,9 @@ namespace Vintagestory.ServerMods.NoObf
 
 
 
-        List<ResolvedBlockVariant> GatherVariants(RegistryObjectVariantGroup[] variantgroups, AssetLocation location)
+        List<ResolvedVariant> GatherVariants(RegistryObjectVariantGroup[] variantgroups, AssetLocation location)
         {
-            List<ResolvedBlockVariant> blockvariantsFinal = new List<ResolvedBlockVariant>();
+            List<ResolvedVariant> blockvariantsFinal = new List<ResolvedVariant>();
 
             if (variantgroups == null || variantgroups.Length == 0) return blockvariantsFinal;
 
@@ -744,7 +749,7 @@ namespace Vintagestory.ServerMods.NoObf
             // 3. Add up multiplicative groups
             for (int i = 0; i < variants.GetLength(0); i++)
             {
-                ResolvedBlockVariant resolved = new ResolvedBlockVariant();
+                ResolvedVariant resolved = new ResolvedVariant();
                 for (int j = 0; j < variants.GetLength(1); j++)
                 {
                     BlockVariant variant = variants[i, j];
@@ -769,7 +774,7 @@ namespace Vintagestory.ServerMods.NoObf
             return blockvariantsFinal;
         }
 
-        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedBlockVariant> blockvariantsFinal, AssetLocation filename)
+        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
         {
             if (variantGroup.Code == null)
             {
@@ -788,7 +793,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 for (int j = 0; j < states.Length; j++)
                 {
-                    ResolvedBlockVariant resolved = new ResolvedBlockVariant();
+                    ResolvedVariant resolved = new ResolvedVariant();
                     resolved.Codes.Add(type, states[j]);
                     blockvariantsFinal.Add(resolved);
                 }
@@ -852,7 +857,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
 
-        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedBlockVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             StandardWorldProperty property = GetWorldPropertyByCode(variantGroup.LoadFromProperties);
 
@@ -872,7 +877,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 foreach (WorldPropertyVariant variant in property.Variants)
                 {
-                    ResolvedBlockVariant resolved = new ResolvedBlockVariant();
+                    ResolvedVariant resolved = new ResolvedVariant();
                     resolved.Codes.Add(typename, variant.Code.Path);
                     blockvariantsFinal.Add(resolved);
                 }

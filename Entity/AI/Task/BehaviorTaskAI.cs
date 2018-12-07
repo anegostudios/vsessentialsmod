@@ -8,7 +8,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorTaskAI : EntityBehavior
     {
         public AiTaskManager taskManager;
-
+        public PathTraverserBase PathTraverser;
 
         public EntityBehaviorTaskAI(Entity entity) : base(entity)
         {
@@ -20,9 +20,11 @@ namespace Vintagestory.GameContent
         {
             if (!(entity is EntityAgent))
             {
-                entity.World.Logger.Error("The task ai currently only works on entities inheriting from. EntityLiving. Will ignore loading tasks for entity {0} ", entity.Code);
+                entity.World.Logger.Error("The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {0} ", entity.Code);
                 return;
             }
+
+            PathTraverser = new StraightLinePathTraverser(entity as EntityAgent);
 
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
             if (tasks == null) return;
@@ -31,7 +33,7 @@ namespace Vintagestory.GameContent
             {
                 string taskCode = taskConfig["code"]?.AsString();
                 Type taskType = null;
-                if (!AiTaskManager.TaskTypes.TryGetValue(taskCode, out taskType))
+                if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out taskType))
                 {
                     entity.World.Logger.Error("Task with code {0} for entity {1} does not exist. Ignoring.", taskCode, entity.Code);
                     continue;
@@ -48,7 +50,9 @@ namespace Vintagestory.GameContent
         public override void OnGameTick(float deltaTime)
         {
             // AI is only running for active entities
-            if (entity.State != EnumEntityState.Active) return;
+            if (entity.State != EnumEntityState.Active || !entity.Alive) return;
+
+            PathTraverser.OnGameTick(deltaTime);
 
             taskManager.OnGameTick(deltaTime);
 

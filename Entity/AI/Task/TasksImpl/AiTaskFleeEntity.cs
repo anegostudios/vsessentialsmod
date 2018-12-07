@@ -28,12 +28,17 @@ namespace Vintagestory.GameContent
         string[] fleeEntityCodesExact = new string[] { "player" };
         string[] fleeEntityCodesBeginsWith = new string[0];
 
+        EntityPartitioning partitionUtil;
+
+
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
         {
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
+
             base.LoadConfig(taskConfig, aiConfig);
 
             if (taskConfig["movespeed"] != null)
@@ -92,6 +97,8 @@ namespace Vintagestory.GameContent
         }
 
 
+        
+
         public override bool ShouldExecute()
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
@@ -104,7 +111,7 @@ namespace Vintagestory.GameContent
             float fearReductionFactor = Math.Max(0.01f, (50f - generation) / 50f);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
-            targetEntity = (EntityAgent)entity.World.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor*seekingRange, fearReductionFactor * seekingRange, (e) => {
+            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
 
                 for (int i = 0; i < fleeEntityCodesExact.Length; i++)
@@ -119,7 +126,6 @@ namespace Vintagestory.GameContent
                         return true;
                     }
                 }
-
 
                 for (int i = 0; i < fleeEntityCodesBeginsWith.Length; i++)
                 {
@@ -149,7 +155,7 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
 
-            entity.PathTraverser.GoTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+            pathTraverser.GoTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
             fleeStartMs = entity.World.ElapsedMilliseconds;
             stuck = false;
@@ -159,10 +165,10 @@ namespace Vintagestory.GameContent
         public override bool ContinueExecute(float dt)
         {
             updateTargetPos();
-            
-            entity.PathTraverser.CurrentTarget.X = targetPos.X;
-            entity.PathTraverser.CurrentTarget.Y = targetPos.Y;
-            entity.PathTraverser.CurrentTarget.Z = targetPos.Z;
+
+            pathTraverser.CurrentTarget.X = targetPos.X;
+            pathTraverser.CurrentTarget.Y = targetPos.Y;
+            pathTraverser.CurrentTarget.Z = targetPos.Z;
 
             if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ) > fleeingDistance * fleeingDistance)
             {
@@ -185,7 +191,7 @@ namespace Vintagestory.GameContent
 
         public override void FinishExecute(bool cancelled)
         {
-            entity.PathTraverser.Stop();
+            pathTraverser.Stop();
 
             base.FinishExecute(cancelled);
         }
@@ -198,7 +204,7 @@ namespace Vintagestory.GameContent
 
         private void OnGoalReached()
         {
-            entity.PathTraverser.Active = true;
+            pathTraverser.Active = true;
         }
     }
 }

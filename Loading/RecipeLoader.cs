@@ -121,7 +121,6 @@ namespace Vintagestory.ServerMods
                             }
 
                             rec.Output.FillPlaceHolder(val2.Key, variants[i % variants.Length]);
-                            //rec.Output.Code = rec.Output.Code.CopyWithPath(rec.Output.Code.Path.Replace("{" + val2.Key + "}", val2.Value[i]));
                         }
 
                         first = false;
@@ -153,7 +152,7 @@ namespace Vintagestory.ServerMods
 
             
             
-            api.World.Logger.Event("{0} {1}s loaded{2}", quantityRegistered, name, quantityIgnored > 0 ? string.Format(" ({0} could not be resolvled)", quantityIgnored) : "");
+            api.World.Logger.Event("{0} {1}s loaded{2}", quantityRegistered, name, quantityIgnored > 0 ? string.Format(" ({0} could not be resolved)", quantityIgnored) : "");
         }
 
         
@@ -167,7 +166,6 @@ namespace Vintagestory.ServerMods
             foreach (var val in recipes)
             {
                 GridRecipe recipe = val.Value;
-                if (!recipe.Enabled) continue;
                 if (recipe.Name == null) recipe.Name = val.Key;
                 
                 Dictionary<string, string[]> nameToCodeMapping = recipe.GetNameToCodeMapping(api.World);

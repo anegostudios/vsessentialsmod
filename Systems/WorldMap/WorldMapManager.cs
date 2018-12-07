@@ -17,6 +17,12 @@ using Vintagestory.API.Server;
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class MapLayerUpdate
+    {
+        public MapLayerData[] Maplayers;
+    }
+
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class MapLayerData
     {
         public string ForMapLayer;
@@ -95,8 +101,8 @@ namespace Vintagestory.GameContent
             base.StartClientSide(api);
 
             capi = api;
-            capi.Input.RegisterHotKey("worldmaphud", "World Map HUD (Small overlay)", GlKeys.F6, HotkeyType.GeneralControls);
-            capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GeneralControls);
+            capi.Input.RegisterHotKey("worldmaphud", "World Map HUD (Small overlay)", GlKeys.F6, HotkeyType.GUIOrOtherControls);
+            capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GUIOrOtherControls);
             capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
             capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
             capi.Event.BlockTexturesLoaded += OnLoaded;
@@ -110,10 +116,10 @@ namespace Vintagestory.GameContent
 
             clientChannel =
                 api.Network.RegisterChannel("worldmap")
-               .RegisterMessageType(typeof(MapLayerData[]))
+               .RegisterMessageType(typeof(MapLayerUpdate))
                .RegisterMessageType(typeof(OnViewChangedPacket))
                .RegisterMessageType(typeof(OnMapToggle))
-               .SetMessageHandler<MapLayerData[]>(OnMapLayerDataReceivedClient)
+               .SetMessageHandler<MapLayerUpdate>(OnMapLayerDataReceivedClient)
             ;
         }
 
@@ -126,12 +132,12 @@ namespace Vintagestory.GameContent
 
         }
 
-        private void OnMapLayerDataReceivedClient(MapLayerData[] msg)
+        private void OnMapLayerDataReceivedClient(MapLayerUpdate msg)
         {
-            for (int i = 0; i < msg.Length; i++)
+            for (int i = 0; i < msg.Maplayers.Length; i++)
             {
-                Type type = MapLayerRegistry[msg[i].ForMapLayer];
-                MapLayers.FirstOrDefault(x => x.GetType() == type)?.OnDataFromServer(msg[i].Data);
+                Type type = MapLayerRegistry[msg.Maplayers[i].ForMapLayer];
+                MapLayers.FirstOrDefault(x => x.GetType() == type)?.OnDataFromServer(msg.Maplayers[i].Data);
             }
         }
 
@@ -276,7 +282,7 @@ namespace Vintagestory.GameContent
                 ForMapLayer = MapLayerRegistry.FirstOrDefault(x => x.Value == forMapLayer.GetType()).Key
             });
 
-            clientChannel.SendPacket(maplayerdatas.ToArray());
+            clientChannel.SendPacket(new MapLayerUpdate() { Maplayers = maplayerdatas.ToArray() });
         }
 
 
@@ -292,22 +298,22 @@ namespace Vintagestory.GameContent
 
             serverChannel =
                sapi.Network.RegisterChannel("worldmap")
-               .RegisterMessageType(typeof(MapLayerData[]))
+               .RegisterMessageType(typeof(MapLayerUpdate))
                .RegisterMessageType(typeof(OnViewChangedPacket))
                .RegisterMessageType(typeof(OnMapToggle))
                .SetMessageHandler<OnMapToggle>(OnMapToggledServer)
                .SetMessageHandler<OnViewChangedPacket>(OnViewChangedServer)
-               .SetMessageHandler<MapLayerData[]>(OnMapLayerDataReceivedServer)
+               .SetMessageHandler<MapLayerUpdate>(OnMapLayerDataReceivedServer)
             ;
             
         }
 
-        private void OnMapLayerDataReceivedServer(IServerPlayer fromPlayer, MapLayerData[] msg)
+        private void OnMapLayerDataReceivedServer(IServerPlayer fromPlayer, MapLayerUpdate msg)
         {
-            for (int i = 0; i < msg.Length; i++)
+            for (int i = 0; i < msg.Maplayers.Length; i++)
             {
-                Type type = MapLayerRegistry[msg[i].ForMapLayer];
-                MapLayers.FirstOrDefault(x => x.GetType() == type)?.OnDataFromClient(msg[i].Data);
+                Type type = MapLayerRegistry[msg.Maplayers[i].ForMapLayer];
+                MapLayers.FirstOrDefault(x => x.GetType() == type)?.OnDataFromClient(msg.Maplayers[i].Data);
             }
         }
 
@@ -352,7 +358,7 @@ namespace Vintagestory.GameContent
                 ForMapLayer = MapLayerRegistry.FirstOrDefault(x => x.Value == forMapLayer.GetType()).Key
             });
 
-            serverChannel.SendPacket(maplayerdatas.ToArray(), forPlayer);
+            serverChannel.SendPacket(new MapLayerUpdate() { Maplayers = maplayerdatas.ToArray() }, forPlayer);
         }
 
         #endregion

@@ -122,9 +122,9 @@ namespace Vintagestory.GameContent
                 entity.FeetInLiquid = false;
                 entity.OnGround = false;
             }
+            
 
-            
-            
+            AdjustCollisionBoxToAnimation();
 
             // Shake the player violently when falling at high speeds
             /*if (movedy < -50)
@@ -453,6 +453,60 @@ namespace Vintagestory.GameContent
             }
 
             return stepableBox;
+        }
+
+
+
+        Matrixf tmpModelMat = new Matrixf();
+
+        /// <summary>
+        /// If an attachment point called "Center" exists, then this method
+        /// offsets the creatures collision box so that the Center attachment point is the center of the collision box.
+        /// </summary>
+        public void AdjustCollisionBoxToAnimation()
+        {
+            float[] hitboxOff = new float[4] { 0, 0, 0, 1 };
+
+            AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose("Center");
+
+            if (apap == null)
+            {
+                return;
+            }
+
+            AttachmentPoint ap = apap.AttachPoint;
+
+            float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
+            float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
+            float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
+
+            float[] ModelMat = Mat4f.Create();
+            Mat4f.Identity(ModelMat);
+            Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
+
+            double[] quat = Quaterniond.Create();
+            Quaterniond.RotateX(quat, quat, entity.Pos.Pitch + rotX * GameMath.DEG2RAD);
+            Quaterniond.RotateY(quat, quat, entity.Pos.Yaw + (rotY + 90) * GameMath.DEG2RAD);
+            Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + rotZ * GameMath.DEG2RAD);
+
+            float[] qf = new float[quat.Length];
+            for (int k = 0; k < quat.Length; k++) qf[k] = (float)quat[k];
+            Mat4f.Mul(ModelMat, ModelMat, Mat4f.FromQuat(Mat4f.Create(), qf));
+
+            float scale = entity.Properties.Client.Size;
+            Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
+            Mat4f.Translate(ModelMat, ModelMat, -0.5f, -entity.CollisionBox.Y2 / 2, -0.5f);
+
+            tmpModelMat
+                .Set(ModelMat)
+                .Mul(apap.AnimModelMatrix)
+                .Translate(ap.PosX / 16f, ap.PosY / 16f, ap.PosZ / 16f)
+            ;
+
+            float[] endVec = Mat4f.MulWithVec4(tmpModelMat.Values, hitboxOff);
+
+            entity.CollisionBox.Set(entity.OriginCollisionBox);
+            entity.CollisionBox.Translate(endVec[0], 0, endVec[2]);
         }
 
 

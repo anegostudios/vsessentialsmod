@@ -22,7 +22,9 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public EnumHabitat Habitat = EnumHabitat.Land;
         [JsonProperty]
-        public Vec2f HitBoxSize;
+        public Vec2f HitBoxSize = new Vec2f(0.5f, 0.5f);
+        [JsonProperty]
+        public Vec2f DeadHitBoxSize = new Vec2f(0.5f, 0.25f);
         [JsonProperty]
         public double EyeHeight = 0.1;
         [JsonProperty]
@@ -78,6 +80,7 @@ namespace Vintagestory.ServerMods.NoObf
                 Class = Class,
                 Habitat = Habitat,
                 HitBoxSize = HitBoxSize,
+                DeadHitBoxSize = DeadHitBoxSize,
                 CanClimb = CanClimb,
                 CanClimbAnywhere = CanClimbAnywhere,
                 FallDamage = FallDamage,
@@ -90,6 +93,7 @@ namespace Vintagestory.ServerMods.NoObf
                 IdleSoundRange = IdleSoundRange,
                 Drops = DropsCopy
             };
+
             if (Client != null)
             {
                 properties.Client = new EntityClientProperties(Client.Behaviors)
@@ -117,35 +121,6 @@ namespace Vintagestory.ServerMods.NoObf
 
             return properties;
         }
-
-
-        
-
-        /// <summary>
-        /// Fills in placeholders in the composite texture (called by the VSGameContent mod during item loading)
-        /// </summary>
-        /// <param name="searchReplace"></param>
-        public void FillPlaceHolders(Dictionary<string, string> searchReplace)
-        {
-            foreach (CompositeTexture tex in Client.Textures.Values)
-            {
-                tex.FillPlaceHolders(searchReplace);
-            }
-
-            Client.Shape?.FillPlaceHolders(searchReplace);
-            foreach (var val in searchReplace)
-            {
-                Attributes?.FillPlaceHolder(val.Key, val.Value);
-            }
-
-            if (Drops != null)
-            {
-                for (int i = 0; i < Drops.Length; i++)
-                {
-                    Drops[i].Code = RegistryObject.FillPlaceHolder(Drops[i].Code, searchReplace);
-                }
-            }
-        }
     }
 
 
@@ -168,7 +143,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public AnimationMetaData[] Animations;
 
-        public Dictionary<string, AnimationMetaData> AnimationsByMetaCode = new Dictionary<string, AnimationMetaData>();
+        public Dictionary<string, AnimationMetaData> AnimationsByMetaCode = new Dictionary<string, AnimationMetaData>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Returns the first texture in Textures dict

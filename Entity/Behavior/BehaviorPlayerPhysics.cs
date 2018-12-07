@@ -23,6 +23,8 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
+            //if (entity.World.Side == EnumAppSide.Client && (entity as EntityPlayer).PlayerUID != ((ICoreClientAPI)entity.Api).World.Player.PlayerUID) return;
+
             accumulator += deltaTime;
 
             if (accumulator > 1)
@@ -90,14 +92,14 @@ namespace Vintagestory.GameContent
                 float desiredYaw = (float)Math.Atan2(controls.WalkVector.X, controls.WalkVector.Z) - GameMath.PIHALF;
                 
                 float yawDist = GameMath.AngleRadDistance(entityplayer.WalkYaw, desiredYaw);
-                entityplayer.WalkYaw += GameMath.Clamp(yawDist, -10 * dt, 10 * dt);
+                entityplayer.WalkYaw += GameMath.Clamp(yawDist, -10 * dt * GlobalConstants.OverallSpeedMultiplier, 10 * dt * GlobalConstants.OverallSpeedMultiplier);
                 entityplayer.WalkYaw = GameMath.Mod(entityplayer.WalkYaw, GameMath.TWOPI);
 
                 if (entity.Swimming)
                 {
                     float desiredPitch = -(float)Math.Sin(pos.Pitch); // (float)controls.FlyVector.Y * GameMath.PI;
                     float pitchDist = GameMath.AngleRadDistance(entityplayer.WalkPitch, desiredPitch);
-                    entityplayer.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt, 2 * dt);
+                    entityplayer.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt * GlobalConstants.OverallSpeedMultiplier, 2 * dt * GlobalConstants.OverallSpeedMultiplier);
                     entityplayer.WalkPitch = GameMath.Mod(entityplayer.WalkPitch, GameMath.TWOPI);
 
                     //Console.WriteLine(entityplayer.WalkPitch);

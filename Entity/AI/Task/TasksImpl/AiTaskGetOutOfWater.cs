@@ -63,7 +63,7 @@ namespace Vintagestory.GameContent
             base.StartExecute();
 
             done = false;
-            entity.PathTraverser.GoTo(target, moveSpeed, OnGoalReached, OnStuck);
+            pathTraverser.GoTo(target, moveSpeed, OnGoalReached, OnStuck);
 
             //entity.world.SpawnParticles(10, ColorUtil.WhiteArgb, target.AddCopy(new Vec3f(-0.1f, -0.1f, -0.1f)), target.AddCopy(new Vec3f(0.1f, 0.1f, 0.1f)), new Vec3f(), new Vec3f(), 1f, 1f);
 
@@ -91,7 +91,7 @@ namespace Vintagestory.GameContent
         {
             base.FinishExecute(cancelled);
 
-            entity.PathTraverser.Stop();
+            pathTraverser.Stop();
         }
 
         private void OnStuck()

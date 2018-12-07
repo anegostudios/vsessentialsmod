@@ -4,7 +4,7 @@ using Vintagestory.API.Common.Entities;
 
 namespace Vintagestory.GameContent
 {
-    class EntitySkinnableShapeRenderer : EntityShapeRenderer, ITexPositionSource
+    public class EntitySkinnableShapeRenderer : EntityShapeRenderer, ITexPositionSource
     {
         TextureAtlasPosition skinTexPos;
         int skinTextureSubId;
@@ -64,7 +64,6 @@ namespace Vintagestory.GameContent
         void ReloadSkin()
         {
             TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
-
             
             LoadedTexture entityAtlas = new LoadedTexture(null) {
                 TextureId = origTexPos.atlasTextureId,
@@ -83,7 +82,9 @@ namespace Vintagestory.GameContent
                 skinTexPos.y1 * capi.EntityTextureAtlas.Size,
                 -1
             );
+
             capi.Render.GlToggleBlend(true, EnumBlendMode.Overlay);
+
 
             int[] renderOrder = new int[]
             {
@@ -111,7 +112,7 @@ namespace Vintagestory.GameContent
             {
                 int slotid = renderOrder[i];
 
-                ItemStack stack = gearInv.GetSlot(slotid)?.Itemstack;
+                ItemStack stack = gearInv[slotid]?.Itemstack;
                 if (stack == null) continue;
 
                 int itemTextureSubId = stack.Item.FirstTexture.Baked.TextureSubId;
@@ -131,7 +132,6 @@ namespace Vintagestory.GameContent
                     itemTexPos.y1 * capi.ItemTextureAtlas.Size,
                     (itemTexPos.x2 - itemTexPos.x1) * capi.ItemTextureAtlas.Size,
                     (itemTexPos.y2 - itemTexPos.y1) * capi.ItemTextureAtlas.Size,
-                    //entityTexPos.atlasNumber,
                     skinTexPos.x1 * capi.EntityTextureAtlas.Size,
                     skinTexPos.y1 * capi.EntityTextureAtlas.Size
                 );
@@ -148,6 +148,7 @@ namespace Vintagestory.GameContent
             base.Dispose();
 
             capi.Event.ReloadTextures -= ReloadSkin;
+            capi.EntityTextureAtlas.FreeTextureSpace(skinTextureSubId);
         }
     }
 }

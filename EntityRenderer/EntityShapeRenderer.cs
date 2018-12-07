@@ -20,18 +20,6 @@ namespace Vintagestory.GameContent
 
     public class EntityShapeRenderer : EntityRenderer
     {
-        static Dictionary<string, Animation[]> AnimationsByShape;
-        static bool handlerAssigned;
-        static void OnRetesselatedStatic(ICoreClientAPI capi)
-        {
-            AnimationsByShape.Clear();
-
-            foreach (EntityProperties type in capi.World.EntityTypes)
-            {
-                type.Client?.LoadShape(type, capi);
-            }
-        }
-        
         LoadedTexture nameTagTexture = null;
         LoadedTexture debugTagTexture = null;
 
@@ -40,43 +28,27 @@ namespace Vintagestory.GameContent
 
         Vec4f color = new Vec4f(1, 1, 1, 1);
         long lastDebugInfoChangeMs = 0;
-        float headYaw;
-        float bodyYaw;
-        bool opposite;
         bool isSpectator;
-        IPlayer player;
+        IClientPlayer player;
 
         public Vec3f OriginPos = new Vec3f();
         public float[] ModelMat = Mat4f.Create();
         float[] tmpMvMat = Mat4f.Create();
         Matrixf ItemModelMat = new Matrixf();
 
-        public bool rotateTpYawNow;
-        public BlendEntityAnimator curAnimator;
-
-
-        public bool HeadControl;
         public bool DoRenderHeldItem;
         public bool DisplayChatMessages;
 
-        List<MessageTexture> messageTextures = null;
+        public int AddRenderFlags;
+        public double WindWaveIntensity = 1f;
 
-        static void OnGameExit()
-        {
-            AnimationsByShape = null;
-        }
+        List<MessageTexture> messageTextures = null;
+        
 
         public EntityShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
-            HeadControl = entity is EntityPlayer;
             DoRenderHeldItem = entity is EntityPlayer;
             DisplayChatMessages = entity is EntityPlayer;
-
-            if (AnimationsByShape == null)
-            {
-                AnimationsByShape = new Dictionary<string, Animation[]>();
-                api.Event.LeaveWorld += OnGameExit;
-            }
 
             TesselateShape();
 
@@ -91,14 +63,9 @@ namespace Vintagestory.GameContent
                 api.Event.ChatMessage += OnChatMessage;
             }
             
-            if (!handlerAssigned)
-            {
-                handlerAssigned = true;
-                api.Event.ReloadShapes += () => OnRetesselatedStatic(api);
-            }
-
             api.Event.ReloadShapes += TesselateShape;
         }
+
 
         private void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
         {
@@ -114,11 +81,11 @@ namespace Vintagestory.GameContent
                         message = message.Substring((name + ": ").Length);
                     }
 
-                    LoadedTexture tex = capi.Gui.Text.GenTextTexture(
+                    LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
-                        capi.Render.GetFont(30, ElementGeometrics.StandardFontName, ColorUtil.WhiteArgbDouble),
+                        capi.Render.GetFont(30, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
                         350,
-                        new TextBackground() { color = ElementGeometrics.DialogLightBgColor, padding = 3, radius = ElementGeometrics.ElementBGRadius },
+                        new TextBackground() { FillColor = GuiStyle.DialogLightBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius },
                         EnumTextOrientation.Center
                     );
 
@@ -139,21 +106,12 @@ namespace Vintagestory.GameContent
         {
             CompositeShape compositeShape = entity.Properties.Client.Shape;
             Shape entityShape = entity.Properties.Client.LoadedShape;
+
             if (entityShape == null)
             {
                 return;
             }
-
-            ShapeElement headElement = null;
-            // Only for player entity for now
-            if (entityShape.Elements != null && HeadControl)
-            {
-                headElement = FindHead(entityShape.Elements);
-            }
-            
-            entityShape.ResolveAndLoadJoints(headElement);
-
-            
+    
             ITexPositionSource texSource = GetTextureSource();
             MeshData meshdata;
 
@@ -172,38 +130,16 @@ namespace Vintagestory.GameContent
                     meshdata.xyz[i + 1] -= 0.5f;
                     meshdata.xyz[i + 2] += 0.125f / 2;
                 }
-
-                curAnimator = new BlendEntityAnimator(entity, new Animation[0], new ShapeElement[0], new Dictionary<int, AnimationJoint>());
             } else
             {
-                string animDictkey = (entity.Code + entity.Properties.Client.Shape.Base.ToString());
-
                 try
                 {
                     capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, texSource, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
                 } catch (Exception e)
                 {
                     capi.World.Logger.Fatal("Failed tesselating entity {0} with id {1}. Entity will probably be invisible!. The teselator threw {2}", entity.Code, entity.EntityId, e);
-                    curAnimator = new BlendEntityAnimator(entity, entityShape.Animations, entityShape.Elements, entityShape.JointsById, headElement);
                     return;
                 }
-                
-
-                // We cache animations because they are cpu intensive to calculate
-                if (AnimationsByShape.ContainsKey(animDictkey))
-                {
-                    entityShape.Animations = AnimationsByShape[animDictkey];
-                } else
-                {
-                    for (int i = 0; entityShape.Animations != null && i < entityShape.Animations.Length; i++)
-                    {
-                        entityShape.Animations[i].GenerateAllFrames(entityShape.Elements, entityShape.JointsById);
-                    }
-
-                    AnimationsByShape[animDictkey] = entityShape.Animations;
-                }
-
-                curAnimator = new BlendEntityAnimator(entity, entityShape.Animations, entityShape.Elements, entityShape.JointsById, headElement);
             }
 
             meshdata.Rgba2 = null;
@@ -248,22 +184,6 @@ namespace Vintagestory.GameContent
 
 
 
-        ShapeElement FindHead(ShapeElement[] elements)
-        {
-            foreach (ShapeElement elem in elements)
-            {
-                if (elem.Name.ToLowerInvariant() == "head") return elem;
-                if (elem.Children != null)
-                {
-                    ShapeElement foundElem = FindHead(elem.Children);
-                    if (foundElem != null) return foundElem;
-                }
-
-            }
-
-            return null;
-        }
-
 
         private void UpdateDebugInfo(float dt)
         {
@@ -295,10 +215,10 @@ namespace Vintagestory.GameContent
                 text.AppendLine(val.Key +": " + val.Value.ToString());
             }
 
-            debugTagTexture = capi.Gui.Text.GenUnscaledTextTexture(
+            debugTagTexture = capi.Gui.TextTexture.GenUnscaledTextTexture(
                 text.ToString(), 
-                capi.Render.GetFont(20, ElementGeometrics.StandardFontName, ColorUtil.WhiteArgbDouble), 
-                new TextBackground() { color = ElementGeometrics.DialogDefaultBgColor, padding = 3, radius = ElementGeometrics.ElementBGRadius }
+                capi.Render.GetFont(20, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 
+                new TextBackground() { FillColor = GuiStyle.DialogDefaultBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
             );
 
             lastDebugInfoChangeMs = entity.World.ElapsedMilliseconds;
@@ -313,12 +233,12 @@ namespace Vintagestory.GameContent
             }
 
             string name = GetNameTagName();
-            if (name != null)
+            if (name != null && name.Length > 0)
             {
-                nameTagTexture = capi.Gui.Text.GenUnscaledTextTexture(
+                nameTagTexture = capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
-                    capi.Render.GetFont(30, ElementGeometrics.StandardFontName, ColorUtil.WhiteArgbDouble),
-                    new TextBackground() { color = ElementGeometrics.DialogLightBgColor, padding = 3, radius = ElementGeometrics.ElementBGRadius }
+                    capi.Render.GetFont(30, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
+                    new TextBackground() { FillColor = GuiStyle.DialogLightBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
                 );
             }
         }
@@ -329,21 +249,20 @@ namespace Vintagestory.GameContent
             return behavior?.DisplayName;
         }
 
+
         public override void BeforeRender(float dt)
         {
             if (meshRefOpaque == null && meshRefOit == null) return;
             if (capi.IsGamePaused) return;
 
-            if (HeadControl && player == null && entity is EntityPlayer)
+            if (player == null && entity is EntityPlayer)
             {
-                player = capi.World.PlayerByUid((entity as EntityPlayer).PlayerUID);
+                player = capi.World.PlayerByUid((entity as EntityPlayer).PlayerUID) as IClientPlayer;
             }
 
             isSpectator = player != null && player.WorldData.CurrentGameMode == EnumGameMode.Spectator;
             if (isSpectator) return;
-
-
-            curAnimator.FastMode = !DoRenderHeldItem && !capi.Settings.Bool["highQualityAnimations"];
+            
 
             if (DisplayChatMessages && messageTextures.Count > 0)
             {
@@ -361,73 +280,6 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-
-
-
-
-            if (HeadControl)
-            {
-                /*if (player == api.World.Player && api.Render.CameraType == EnumCameraMode.FirstPerson)
-                {
-                    AttachmentPointAndPose apap = null;
-                    curAnimator.AttachmentPointByCode.TryGetValue("Eyes", out apap);
-                    float[] tmpMat = Mat4f.Create();
-
-                    for (int i = 0; i < 16; i++) tmpMat[i] = ModelMat[i];
-                    AttachmentPoint ap = apap.AttachPoint;
-
-                    float[] mat = apap.Pose.AnimModelMatrix;
-                    Mat4f.Mul(tmpMat, tmpMat, mat);
-
-                    Mat4f.Translate(tmpMat, tmpMat, (float)ap.PosX / 16f, (float)ap.PosY / 16f, (float)ap.PosZ / 16f);
-                    Mat4f.RotateX(tmpMat, tmpMat, (float)(ap.RotationX) * GameMath.DEG2RAD);
-                    Mat4f.RotateY(tmpMat, tmpMat, (float)(ap.RotationY) * GameMath.DEG2RAD);
-                    Mat4f.RotateZ(tmpMat, tmpMat, (float)(ap.RotationZ) * GameMath.DEG2RAD);
-                    float[] vec = new float[] { 0,0,0, 0 };
-                    float[] outvec = Mat4f.MulWithVec4(tmpMat, vec);
-
-                    api.Render.CameraOffset.Translation.Set(outvec[0], outvec[1] + 1, outvec[2]);
-                }*/
-
-
-                float diff = GameMath.AngleRadDistance(bodyYaw, entity.Pos.Yaw);
-
-                if (Math.Abs(diff) > GameMath.PIHALF * 1.2f) opposite = true;
-                if (opposite)
-                {
-                    if (Math.Abs(diff) < GameMath.PIHALF * 0.9f) opposite = false;
-                    else diff = 0;
-                }
-
-                headYaw += (diff - headYaw) * dt * 6;
-                headYaw = GameMath.Clamp(headYaw, -0.75f, 0.75f);
-
-                curAnimator.HeadYaw = headYaw;
-                curAnimator.HeadPitch = GameMath.Clamp((entity.Pos.Pitch - GameMath.PI) * 0.75f, -1.2f, 1.2f);
-
-
-                if (capi.World.Player.CameraMode == EnumCameraMode.Overhead || capi.World.Player.Entity.MountedOn != null)
-                {
-                    bodyYaw = entity.Pos.Yaw;
-                } else
-                {
-                    float yawDist = GameMath.AngleRadDistance(bodyYaw, entity.Pos.Yaw);
-                    if (Math.Abs(yawDist) > 1f - (capi.World.Player.Entity.Controls.TriesToMove ? 0.99f : 0) || rotateTpYawNow)
-                    {
-                        bodyYaw += GameMath.Clamp(yawDist, -dt * 3, dt * 3);
-                        rotateTpYawNow = Math.Abs(yawDist) > 0.01f;
-                    }
-                }
-                
-
-            }
-            else
-            {
-                curAnimator.HeadYaw = entity.Pos.Yaw;
-                curAnimator.HeadPitch = entity.Pos.Pitch;
-            }
-
-            curAnimator.OnFrame(dt);
         }
 
 
@@ -437,7 +289,7 @@ namespace Vintagestory.GameContent
         {
             if (isSpectator) return;
 
-            if (HeadControl)
+            if (player != null)
             {
                 bool isSelf = capi.World.Player.Entity.EntityId == entity.EntityId;
                 loadModelMatrixForPlayer(entity, isSelf);
@@ -460,16 +312,11 @@ namespace Vintagestory.GameContent
         void RenderHeldItem(bool isShadowPass)
         {
             IRenderAPI rapi = capi.Render;
-            ItemStack stack = (entity as IEntityAgent).RightHandItemSlot?.Itemstack;
+            ItemStack stack = (entity as EntityAgent).RightHandItemSlot?.Itemstack;
 
-            BlendEntityAnimator bea = curAnimator as BlendEntityAnimator;
-            AttachmentPointAndPose apap = null;
-
-            bea.AttachmentPointByCode.TryGetValue("RightHand", out apap);
-
+            AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose("RightHand");            
             if (apap == null || stack == null) return;
             
-
             AttachmentPoint ap = apap.AttachPoint;
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(stack, EnumItemRenderTarget.HandTp);
             IStandardShaderProgram prog = null;
@@ -478,7 +325,7 @@ namespace Vintagestory.GameContent
             
             ItemModelMat
                 .Set(ModelMat)
-                .Mul(apap.Pose.AnimModelMatrix)
+                .Mul(apap.AnimModelMatrix)
                 .Translate(renderInfo.Transform.Origin.X, renderInfo.Transform.Origin.Y, renderInfo.Transform.Origin.Z)
                 .Scale(renderInfo.Transform.ScaleXYZ.X, renderInfo.Transform.ScaleXYZ.Y, renderInfo.Transform.ScaleXYZ.Z)
                 .Translate(ap.PosX / 16f + renderInfo.Transform.Translation.X, ap.PosY / 16f + renderInfo.Transform.Translation.Y, ap.PosZ / 16f + renderInfo.Transform.Translation.Z)
@@ -503,7 +350,8 @@ namespace Vintagestory.GameContent
             {
                 prog = rapi.StandardShader;
                 prog.Use();
-                prog.WaterWave = 0;
+                prog.DontWarpVertices = 0;
+                prog.AddRenderFlags = 0;
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
 
@@ -571,10 +419,13 @@ namespace Vintagestory.GameContent
             else
             {
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
+                
                 capi.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
                 capi.Render.CurrentActiveShader.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
                 capi.Render.CurrentActiveShader.UniformMatrix("modelMatrix", ModelMat);
                 capi.Render.CurrentActiveShader.UniformMatrix("viewMatrix", capi.Render.CurrentModelviewMatrix);
+                capi.Render.CurrentActiveShader.Uniform("addRenderFlags", AddRenderFlags);
+                capi.Render.CurrentActiveShader.Uniform("windWaveIntensity", (float)WindWaveIntensity);
 
                 color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
                 color[1] = ((entity.RenderColor >> 8) & 0xff) / 255f;
@@ -584,7 +435,12 @@ namespace Vintagestory.GameContent
                 capi.Render.CurrentActiveShader.Uniform("renderColor", color);
             }
 
-            capi.Render.CurrentActiveShader.UniformMatrices("elementTransforms", GlobalConstants.MaxAnimatedElements, curAnimator.Matrices);
+            capi.Render.CurrentActiveShader.UniformMatrices(
+                "elementTransforms", 
+                GlobalConstants.MaxAnimatedElements, 
+                entity.AnimManager.Animator.Matrices
+            );
+
             capi.Render.RenderMesh(meshRefOpaque);
 
             if (meshRefOit != null)
@@ -719,7 +575,7 @@ namespace Vintagestory.GameContent
 
         public void loadModelMatrix(Entity entity)
         {
-            IEntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);            
             Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.Y - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
@@ -760,7 +616,7 @@ namespace Vintagestory.GameContent
             float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
 
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
-            Mat4f.RotateY(ModelMat, ModelMat, bodyYaw + (180 + rotY) * GameMath.DEG2RAD);
+            Mat4f.RotateY(ModelMat, ModelMat, entityPlayer.BodyYaw + (180 + rotY) * GameMath.DEG2RAD);
             Mat4f.RotateZ(ModelMat, ModelMat, entityPlayer.WalkPitch + rotZ * GameMath.DEG2RAD);
 
             float scale = entity.Properties.Client.Size;
@@ -772,7 +628,7 @@ namespace Vintagestory.GameContent
 
         void loadModelMatrixForGui(Entity entity, double posX, double posY, double posZ, double yawDelta, float size)
         {
-            IEntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);
             Mat4f.Translate(ModelMat, ModelMat, (float)posX, (float)posY, (float)posZ);

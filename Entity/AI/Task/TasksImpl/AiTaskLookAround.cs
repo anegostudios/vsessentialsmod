@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -38,8 +39,8 @@ namespace Vintagestory.GameContent
 
             entity.ServerPos.Yaw = (float)GameMath.Clamp(
                 entity.World.Rand.NextDouble() * GameMath.TWOPI,
-                entity.ServerPos.Yaw - GameMath.PI / 4,
-                entity.ServerPos.Yaw + GameMath.PI / 4
+                entity.ServerPos.Yaw - GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier,
+                entity.ServerPos.Yaw + GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier
             );
             
         }

@@ -8,7 +8,7 @@ namespace Vintagestory.GameContent
     {
         public GuiDialogLogViewer(string text, ICoreClientAPI capi) : base("Log Viewer", capi)
         {
-            ElementBounds topTextBounds = ElementBounds.Fixed(ElementGeometrics.ElementToDialogPadding, 40, 900, 30);
+            ElementBounds topTextBounds = ElementBounds.Fixed(GuiStyle.ElementToDialogPadding, 40, 900, 30);
 
             ElementBounds logtextBounds = ElementBounds.Fixed(0, 0, 900, 300).FixedUnder(topTextBounds, 5);
 
@@ -28,7 +28,7 @@ namespace Vintagestory.GameContent
             
 
             // 2. Around all that is 10 pixel padding
-            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(ElementGeometrics.ElementToDialogPadding);
+            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
             bgBounds.BothSizing = ElementSizing.FitToChildren;
             bgBounds.WithChildren(insetBounds, clippingBounds, scrollbarBounds, closeButtonBounds); 
 
@@ -37,14 +37,14 @@ namespace Vintagestory.GameContent
 
 
             SingleComposer = capi.Gui
-                .CreateCompo("blockentitytexteditordialog", dialogBounds, false)
+                .CreateCompo("blockentitytexteditordialog", dialogBounds)
                 .AddDialogBG(bgBounds, true)
                 .AddDialogTitleBar(DialogTitle, OnTitleBarClose)
                 .AddStaticText("The following warnings and errors were reported during startup:", CairoFont.WhiteDetailText(), topTextBounds)
                 .BeginChildElements(bgBounds)
                     .BeginClip(clippingBounds)
                     .AddInset(insetBounds, 3)
-                    .AddDynamicText("", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, logtextBounds, 1, "text")
+                    .AddDynamicText("", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, logtextBounds, "text")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalue, scrollbarBounds, "scrollbar")
                     .AddSmallButton("Close", OnButtonClose, closeButtonBounds)

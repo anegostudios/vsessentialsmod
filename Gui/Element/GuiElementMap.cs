@@ -102,7 +102,7 @@ namespace Vintagestory.GameContent
         {
             if (IsDragingMap)
             {
-                CurrentBlockViewBounds.Translate(-args.MovementX / ZoomLevel, 0, -args.MovementY / ZoomLevel);
+                CurrentBlockViewBounds.Translate(-args.DeltaX / ZoomLevel, 0, -args.DeltaY / ZoomLevel);
             }
         }
 

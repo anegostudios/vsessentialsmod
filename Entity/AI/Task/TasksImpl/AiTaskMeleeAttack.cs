@@ -10,7 +10,7 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskMeleeAttack : AiTaskBase, IWorldIntersectionSupplier
     {
-        IEntity targetEntity;
+        Entity targetEntity;
 
         long lastCheckOrAttackMs;
 

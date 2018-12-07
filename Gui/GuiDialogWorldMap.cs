@@ -17,7 +17,7 @@ namespace Vintagestory.GameContent
 
     public class GuiDialogWorldMap : GuiDialogGeneric
     {
-        public override bool DisableWorldInteract()
+        public override bool RequiresUngrabbedMouse()
         {
             return false;
         }
@@ -59,7 +59,7 @@ namespace Vintagestory.GameContent
             ElementBounds dialogBounds =
                 ElementStdBounds.AutosizedMainDialog
                 .WithAlignment(EnumDialogArea.CenterMiddle)
-                .WithFixedAlignmentOffset(-ElementGeometrics.DialogToScreenPadding, 0);
+                .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0);
 
             if (dialogType == EnumDialogType.HUD)
             {
@@ -72,7 +72,7 @@ namespace Vintagestory.GameContent
                 dialogBounds =
                     ElementStdBounds.AutosizedMainDialog
                     .WithAlignment(EnumDialogArea.RightTop)
-                    .WithFixedAlignmentOffset(-ElementGeometrics.DialogToScreenPadding, ElementGeometrics.DialogToScreenPadding);
+                    .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, GuiStyle.DialogToScreenPadding);
             }
 
             Vec3d centerPos = capi.World.Player.Entity.Pos.XYZ;
@@ -80,7 +80,7 @@ namespace Vintagestory.GameContent
             if (SingleComposer != null) SingleComposer.Dispose();
 
             SingleComposer = capi.Gui
-                .CreateCompo("worldmap", dialogBounds, false)
+                .CreateCompo("worldmap", dialogBounds)
                 .AddDialogBG(bgBounds)
                 .AddIf(dialogType == EnumDialogType.Dialog)
                     .AddDialogTitleBar("World Map", OnTitleBarClose)
@@ -137,7 +137,7 @@ namespace Vintagestory.GameContent
 
            // Console.WriteLine("on gui opened 2");
 
-            OnMouseMove(new MouseEvent() { X = capi.Input.MouseX, Y = capi.Input.MouseY });
+            OnMouseMove(new MouseEvent(capi.Input.MouseX, capi.Input.MouseY));
 
            // Console.WriteLine("on gui opened 3");
         }

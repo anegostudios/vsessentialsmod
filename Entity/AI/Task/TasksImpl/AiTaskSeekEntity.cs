@@ -142,8 +142,9 @@ namespace Vintagestory.GameContent
         public override void StartExecute()
         {
             base.StartExecute();
+
             stuck = false;
-            entity.PathTraverser.GoTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
+            pathTraverser.GoTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
             currentFollowTime = 0;
         }
 
@@ -151,16 +152,16 @@ namespace Vintagestory.GameContent
         {
             currentFollowTime += dt;
 
-            entity.PathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
-            entity.PathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
-            entity.PathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
+            pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
+            pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
+            pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
 
             Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
             double distance = targetBox.ShortestDistanceFrom(pos);
-            
 
-            bool inCreativeMode = (targetEntity is EntityPlayer) && entity.World.PlayerByUid(((EntityPlayer)targetEntity).PlayerUID)?.WorldData?.CurrentGameMode == EnumGameMode.Creative;
+
+            bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
 
             float minDist = MinDistanceToTarget();
 
@@ -178,7 +179,7 @@ namespace Vintagestory.GameContent
         public override void FinishExecute(bool cancelled)
         {
             base.FinishExecute(cancelled);
-            entity.PathTraverser.Stop();
+            pathTraverser.Stop();
         }
 
 
@@ -202,7 +203,7 @@ namespace Vintagestory.GameContent
 
         private void OnGoalReached()
         {
-            entity.PathTraverser.Active = true;
+            pathTraverser.Active = true;
         }
     }
 }

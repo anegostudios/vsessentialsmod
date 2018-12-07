@@ -84,7 +84,7 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
 
-            entity.PathTraverser.GoTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+            pathTraverser.GoTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
 
@@ -98,17 +98,17 @@ namespace Vintagestory.GameContent
             double y = targetEntity.ServerPos.Y;
             double z = targetEntity.ServerPos.Z + targetOffset.Z;
 
-            entity.PathTraverser.CurrentTarget.X = x;
-            entity.PathTraverser.CurrentTarget.Y = y;
-            entity.PathTraverser.CurrentTarget.Z = z;
+            pathTraverser.CurrentTarget.X = x;
+            pathTraverser.CurrentTarget.Y = y;
+            pathTraverser.CurrentTarget.Z = z;
 
             if (entity.ServerPos.SquareDistanceTo(x, y, z) < maxDistance * maxDistance / 4)
             {
-                entity.PathTraverser.Stop();
+                pathTraverser.Stop();
                 return false;
             }
 
-            return targetEntity.Alive && !stuck && entity.PathTraverser.Active;
+            return targetEntity.Alive && !stuck && pathTraverser.Active;
         }
         
         private void OnStuck()

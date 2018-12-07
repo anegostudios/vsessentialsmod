@@ -56,24 +56,38 @@
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Core.cs" />
+    <Compile Include="Entity\AI\Goal-Action\Actions\AiActionGoto.cs" />
+    <Compile Include="Entity\AI\Goal-Action\AiActionBase.cs" />
+    <Compile Include="Entity\AI\Goal-Action\AiGoalBase.cs" />
+    <Compile Include="Entity\AI\Goal-Action\AIGoalManager.cs" />
+    <Compile Include="Entity\AI\Goal-Action\BehaviorGoalAI.cs" />
+    <Compile Include="Entity\AI\Goap\AIGoapAction.cs" />
+    <Compile Include="Entity\AI\Goap\AIGoal.cs" />
+    <Compile Include="Entity\AI\Goap\GoapCondition.cs" />
+    <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
+    <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
+    <Compile Include="Entity\Pathfinding\PathTraverserBase.cs" />
+    <Compile Include="Entity\Pathfinding\StraightLine.cs" />
+    <Compile Include="Entity\AI\Task\AiTaskBase.cs" />
+    <Compile Include="Entity\AI\Task\IAiTask.cs" />
+    <Compile Include="Gui\GuiDialogHandbook.cs" />
     <Compile Include="JsonExport.cs" />
     <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />
     <Compile Include="EntityRenderer\EntityItemRenderer.cs" />
     <Compile Include="EntityRenderer\EntityShapeRenderer.cs" />
     <Compile Include="EntityRenderer\EntitySkinnableShapeRenderer.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskFleeEntity.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskGetOutOfWater.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskGotoEntity.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskIdle.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskLookAround.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskLookAtEntity.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskFleeEntity.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskGetOutOfWater.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskGotoEntity.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskIdle.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskLookAround.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskLookAtEntity.cs" />
     <Compile Include="Entity\AI\Task\AiTaskManager.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskMeleeAttack.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskSeekEntity.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskSeekFoodAndEat.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskStayCloseToEntity.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskWander.cs" />
-    <Compile Include="Entity\AI\Task\Butterfly\AiTaskButterflyWander.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskMeleeAttack.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekEntity.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekFoodAndEat.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskStayCloseToEntity.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskWander.cs" />
     <Compile Include="Entity\Behavior\BehaviorAimingAccuracy.cs" />
     <Compile Include="Entity\Behavior\BehaviorBreathe.cs" />
     <Compile Include="Entity\Behavior\BehaviorCollectEntities.cs" />
@@ -81,7 +95,7 @@
     <Compile Include="Entity\Behavior\BehaviorPlaceBlock.cs" />
     <Compile Include="Entity\Behavior\BehaviorDespawn.cs" />
     <Compile Include="Entity\Behavior\BehaviorEmotionStates.cs" />
-    <Compile Include="Entity\Behavior\BehaviorGoalOriented.cs" />
+    <Compile Include="Entity\AI\Goap\BehaviorGoapAI.cs" />
     <Compile Include="Entity\Behavior\BehaviorGrow.cs" />
     <Compile Include="Entity\Behavior\BehaviorHealth.cs" />
     <Compile Include="Entity\Behavior\BehaviorHunger.cs" />
@@ -89,7 +103,7 @@
     <Compile Include="Entity\Behavior\BehaviorMultiply.cs" />
     <Compile Include="Entity\Behavior\BehaviorPlayerPhysics.cs" />
     <Compile Include="Entity\Behavior\BehaviorRepulseAgents.cs" />
-    <Compile Include="Entity\Behavior\BehaviorTaskAI.cs" />
+    <Compile Include="Entity\AI\Task\BehaviorTaskAI.cs" />
     <Compile Include="Entity\Behavior\BehaviorTiredness.cs" />
     <Compile Include="Entity\EntityBlockFalling.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityApplyGravity.cs" />
@@ -117,7 +131,9 @@
     <Compile Include="Loading\RegistryObjectType.cs" />
     <Compile Include="Loading\RegistryObjectVariantGroup.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Systems\EntityPartitioning.cs" />
     <Compile Include="Systems\ErrorReporter.cs" />
+    <Compile Include="Systems\Handbook.cs" />
     <Compile Include="Systems\LeafBlockDecay.cs" />
     <Compile Include="Systems\POIRegistry.cs" />
     <Compile Include="Systems\Weather\CloudMeshUtil.cs" />
@@ -150,6 +166,11 @@
       <Name>VintagestoryAPI</Name>
       <Private>False</Private>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Entity\AI\Goal-Action\Goals\" />
+    <Folder Include="Entity\AI\Goap\ActionImpl\" />
+    <Folder Include="Entity\AI\Goap\GoalImpl\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

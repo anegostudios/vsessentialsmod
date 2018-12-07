@@ -19,6 +19,8 @@ namespace Vintagestory.GameContent
 
         float yRotRand;
 
+        Vec3d lerpedPos = new Vec3d();
+
 
         public EntityItemRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -28,13 +30,20 @@ namespace Vintagestory.GameContent
             touchGroundMS = entityitem.itemSpawnedMilliseconds - api.World.Rand.Next(5000);
 
             yRotRand = (float)api.World.Rand.NextDouble() * GameMath.TWOPI;
+
+            lerpedPos = entity.Pos.XYZ;
         }
 
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
             IRenderAPI rapi = capi.Render;
-            IEntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
+            // the value 20 is just trial&error, should probably be something proportial to the
+            // 13ms game ticks (which is the physics frame rate)
+            lerpedPos.X += (entity.Pos.X - lerpedPos.X) * 22 * dt;
+            lerpedPos.Y += (entity.Pos.Y - lerpedPos.Y) * 22 * dt;
+            lerpedPos.Z += (entity.Pos.Z - lerpedPos.Z) * 22 * dt;
 
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(entityitem.Itemstack, EnumItemRenderTarget.Ground);
             if (renderInfo.ModelRef == null) return;
@@ -56,16 +65,17 @@ namespace Vintagestory.GameContent
                 prog.Use();
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
+                prog.DontWarpVertices = 0;
 
                 if (entity.Swimming)
                 {
-                    prog.WaterWave = entityitem.Itemstack.Collectible.MaterialDensity > 1000 ? 0 : 1;
-                    prog.WaterWaveCounter = capi.Render.WaterWaveCounter;
+                    prog.AddRenderFlags = (entityitem.Itemstack.Collectible.MaterialDensity > 1000 ? 0 : 1) << 12;
+                    prog.WaterWaveCounter = capi.Render.ShaderUniforms.WaterWaveCounter;
                     prog.Playerpos = new Vec3f((float)entityPlayer.CameraPos.X, (float)entityPlayer.CameraPos.Y, (float)entityPlayer.CameraPos.Z);
                 }
                 else
                 {
-                    prog.WaterWave = 0;
+                    prog.AddRenderFlags = 0;
                 }
 
                 BlockPos pos = entityitem.Pos.AsBlockPos;
@@ -114,13 +124,13 @@ namespace Vintagestory.GameContent
         private void LoadModelMatrix(ItemRenderInfo renderInfo, bool isShadowPass)
         {
             IRenderAPI rapi = capi.Render;
-            IEntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);
             Mat4f.Translate(ModelMat, ModelMat, 
-                (float)(entityitem.Pos.X - entityPlayer.CameraPos.X), 
-                (float)(entityitem.Pos.Y - entityPlayer.CameraPos.Y), 
-                (float)(entityitem.Pos.Z - entityPlayer.CameraPos.Z)
+                (float)(lerpedPos.X - entityPlayer.CameraPos.X), 
+                (float)(lerpedPos.Y - entityPlayer.CameraPos.Y), 
+                (float)(lerpedPos.Z - entityPlayer.CameraPos.Z)
             );            
 
             float sizeX = 0.2f * renderInfo.Transform.ScaleXYZ.X;

@@ -149,7 +149,7 @@ namespace Vintagestory.GameContent
             base.StartExecute();
 
             done = false;
-            entity.PathTraverser.GoTo(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
+            pathTraverser.GoTo(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
         }
 
         public override bool ContinueExecute(float dt)
@@ -169,14 +169,14 @@ namespace Vintagestory.GameContent
             {
                 BlockFacing facing = entity.ClimbingOnFace;
 
-                if (Math.Sign(facing.Normali.X) == Math.Sign(entity.PathTraverser.CurrentTarget.X - entity.ServerPos.X))
+                if (Math.Sign(facing.Normali.X) == Math.Sign(pathTraverser.CurrentTarget.X - entity.ServerPos.X))
                 {
-                    entity.PathTraverser.CurrentTarget.X = entity.ServerPos.X;
+                    pathTraverser.CurrentTarget.X = entity.ServerPos.X;
                 }
 
-                if (Math.Sign(facing.Normali.Z) == Math.Sign(entity.PathTraverser.CurrentTarget.Z - entity.ServerPos.Z))
+                if (Math.Sign(facing.Normali.Z) == Math.Sign(pathTraverser.CurrentTarget.Z - entity.ServerPos.Z))
                 {
-                    entity.PathTraverser.CurrentTarget.Z = entity.ServerPos.Z;
+                    pathTraverser.CurrentTarget.Z = entity.ServerPos.Z;
                 }
             }
 
@@ -189,7 +189,7 @@ namespace Vintagestory.GameContent
 
             if (cancelled)
             {
-                entity.PathTraverser.Stop();
+                pathTraverser.Stop();
             }
         }
 

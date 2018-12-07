@@ -150,6 +150,7 @@ namespace Vintagestory.GameContent
                 {
                     mapSink.RemoveMapData(mc);
                     loadedMapData.Remove(cord);
+                    mc.Dispose();
                 }
 
                 //Console.WriteLine("removed " + cord);

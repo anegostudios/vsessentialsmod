@@ -69,6 +69,12 @@ namespace Vintagestory.GameContent
 
                 EntityProperties adultType = entity.World.GetEntityType(code);
 
+                if (adultType == null)
+                {
+                    entity.World.Logger.Error("Misconfigured entity. Entity with code '{0}' is configured (via Grow behavior) to grow into '{1}', but no such entity type was registered.", entity.Code, code);
+                    return;
+                }
+
                 Cuboidf collisionBox = adultType.SpawnCollisionBox;
 
                 // Delay adult spawning if we're colliding
