@@ -124,7 +124,13 @@ namespace Vintagestory.GameContent
             }
             
 
-            AdjustCollisionBoxToAnimation();
+            // This seems to make creatures clip into the terrain. Le sigh. 
+            // Since we currently only really need it for when the creature is dead, let's just use it there
+            if (!entity.Alive)
+            {
+                AdjustCollisionBoxToAnimation();
+            }
+            
 
             // Shake the player violently when falling at high speeds
             /*if (movedy < -50)

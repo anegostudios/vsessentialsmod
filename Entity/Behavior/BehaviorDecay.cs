@@ -56,31 +56,35 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Alive && TotalHoursDead + HoursToDecay < entity.World.Calendar.TotalHours)
             {
-                if ((entity as EntityAgent).AllowDespawn) return;
-
-                (entity as EntityAgent).AllowDespawn = true;
-
-                if (typeAttributes["decayedBlock"].Exists)
-                {
-                    AssetLocation blockcode = new AssetLocation(typeAttributes["decayedBlock"].AsString());
-                    Block block = entity.World.GetBlock(blockcode);
-                    entity.World.BlockAccessor.SetBlock(block.BlockId, entity.ServerPos.AsBlockPos);
-                }
-
-                Vec3d pos = entity.LocalPos.XYZ;
-                pos.Y += entity.Properties.DeadHitBoxSize.Y / 2;
-
-                entity.World.SpawnParticles(new EntityCubeParticles(
-                    entity.World, 
-                    entity.EntityId, 
-                    pos, 0.15f, (int)(40 + entity.Properties.DeadHitBoxSize.X * 60), 0.4f, 1f
-                ));
+                DecayNow();
             }
 
             base.OnGameTick(deltaTime);
         }
 
 
+        public void DecayNow()
+        {
+            if ((entity as EntityAgent).AllowDespawn) return;
+
+            (entity as EntityAgent).AllowDespawn = true;
+
+            if (typeAttributes["decayedBlock"].Exists)
+            {
+                AssetLocation blockcode = new AssetLocation(typeAttributes["decayedBlock"].AsString());
+                Block block = entity.World.GetBlock(blockcode);
+                entity.World.BlockAccessor.SetBlock(block.BlockId, entity.ServerPos.AsBlockPos);
+            }
+
+            Vec3d pos = entity.LocalPos.XYZ;
+            pos.Y += entity.Properties.DeadHitBoxSize.Y / 2;
+
+            entity.World.SpawnParticles(new EntityCubeParticles(
+                entity.World,
+                entity.EntityId,
+                pos, 0.15f, (int)(40 + entity.Properties.DeadHitBoxSize.X * 60), 0.4f, 1f
+            ));
+        }
 
         public override void OnEntityDeath(DamageSource damageSourceForDeath)
         {

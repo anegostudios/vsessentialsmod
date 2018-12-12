@@ -20,7 +20,7 @@ namespace Vintagestory.GameContent
         {
             TaskTypes[code] = typeof(T);
             TaskCodes[typeof(T)] = code;
-        }
+        }   
 
         static AiTaskRegistry()
         {
