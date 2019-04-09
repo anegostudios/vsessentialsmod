@@ -64,8 +64,7 @@ namespace Vintagestory.API.Common
 
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
-            //stuckCounter = 0;
-            //if (entity.Controls.IsClimbing && stuckCounter > 0) Console.WriteLine(entity.EntityId + ":" + stuckCounter);
+            
             if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 20 / GlobalConstants.OverallSpeedMultiplier)
             {
                 Stop();

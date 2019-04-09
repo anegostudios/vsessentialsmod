@@ -48,7 +48,7 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.State == EnumEntityState.Inactive) // || entity.World.Side == EnumAppSide.Client
+            if (entity.State == EnumEntityState.Inactive)
             {
                 return;
             }
@@ -85,6 +85,8 @@ namespace Vintagestory.GameContent
         public void TickEntityPhysics(EntityPos pos, EntityControls controls, float dt)
         {
             IBlockAccessor blockAccessor = entity.World.BlockAccessor;
+
+            bool isAlive = entity.Alive;
 
             foreach (EntityLocomotion locomotor in Locomotors)
             {
@@ -125,8 +127,11 @@ namespace Vintagestory.GameContent
             
 
             // This seems to make creatures clip into the terrain. Le sigh. 
-            // Since we currently only really need it for when the creature is dead, let's just use it there
-            if (!entity.Alive)
+            // Since we currently only really need it for when the creature is dead, let's just use it only there
+            
+            // Also running animations for all nearby living entities is pretty CPU intensive so
+            // the AnimationManager also just ticks if the entity is in view or dead
+            if (!isAlive)
             {
                 AdjustCollisionBoxToAnimation();
             }
@@ -211,6 +216,7 @@ namespace Vintagestory.GameContent
                             if (controls.IsClimbing)
                             {
                                 entity.ClimbingOnFace = facing;
+                                entity.ClimbingOnCollBox = collBoxes[j];
                                 break;
                             }
                         }
@@ -281,7 +287,6 @@ namespace Vintagestory.GameContent
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || isStepping;
             entity.FeetInLiquid = block.IsLiquid() && ((block.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
             entity.Swimming = middleBlock.IsLiquid();
-        //    Console.WriteLine(entity.World.Side + ": "+ entity.OnGround + " / " + pos.Y);
 
             if (!onGroundBefore && entity.OnGround)
             {

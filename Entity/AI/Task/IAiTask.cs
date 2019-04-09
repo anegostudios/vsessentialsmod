@@ -66,5 +66,8 @@ namespace Vintagestory.API.Common
         /// <param name="key"></param>
         /// <param name="data"></param>
         bool Notify(string key, object data);
+
+        void OnEntityLoaded();
+        void OnEntitySpawn();
     }
 }

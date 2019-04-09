@@ -23,16 +23,13 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            //if (entity.World.Side == EnumAppSide.Client && (entity as EntityPlayer).PlayerUID != ((ICoreClientAPI)entity.Api).World.Player.PlayerUID) return;
-
             accumulator += deltaTime;
 
             if (accumulator > 1)
             {
                 accumulator = 1;
             }
-
-            //Console.WriteLine(deltaTime);
+            
 
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
@@ -101,8 +98,6 @@ namespace Vintagestory.GameContent
                     float pitchDist = GameMath.AngleRadDistance(entityplayer.WalkPitch, desiredPitch);
                     entityplayer.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt * GlobalConstants.OverallSpeedMultiplier, 2 * dt * GlobalConstants.OverallSpeedMultiplier);
                     entityplayer.WalkPitch = GameMath.Mod(entityplayer.WalkPitch, GameMath.TWOPI);
-
-                    //Console.WriteLine(entityplayer.WalkPitch);
                 } else
                 {
                     entityplayer.WalkPitch = 0;

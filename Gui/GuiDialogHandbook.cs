@@ -53,23 +53,24 @@ namespace Vintagestory.GameContent
 
         void initOverviewGui()
         {
-            ElementBounds searchFieldBounds = ElementBounds.Fixed(8, 35, 200, 30);
-            ElementBounds stackListBounds = ElementBounds.Fixed(0, 0, 400, listHeight).FixedUnder(searchFieldBounds, 10);
+            ElementBounds searchFieldBounds = ElementBounds.Fixed(GuiStyle.ElementToDialogPadding - 2, 45, 300, 30);
+            ElementBounds stackListBounds = ElementBounds.Fixed(0, 0, 400, listHeight).FixedUnder(searchFieldBounds, 5);
 
             ElementBounds clipBounds = stackListBounds.ForkBoundingParent();
-            ElementBounds insetBounds = stackListBounds.FlatCopy().FixedGrow(6).WithAddedFixedPosition(-3, -3);
+            ElementBounds insetBounds = stackListBounds.FlatCopy().FixedGrow(6).WithFixedOffset(-3, -3);
 
-            ElementBounds scrollbarBounds = insetBounds.CopyOffsetedSibling(stackListBounds.fixedWidth + 7).WithFixedWidth(20);
+            ElementBounds scrollbarBounds = insetBounds.CopyOffsetedSibling(3 + stackListBounds.fixedWidth + 7).WithFixedWidth(20);
 
             ElementBounds closeButtonBounds = ElementBounds
                 .FixedSize(0, 0)
-                .FixedUnder(clipBounds, 2 * 5)
+                .FixedUnder(clipBounds, 2 * 5 + 8)
                 .WithAlignment(EnumDialogArea.RightFixed)
                 .WithFixedPadding(20, 4)
+                .WithFixedAlignmentOffset(2, 0)
             ;
 
             // 2. Around all that is 10 pixel padding
-            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding / 2);
+            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
             bgBounds.BothSizing = ElementSizing.FitToChildren;
             bgBounds.WithChildren(insetBounds, stackListBounds, scrollbarBounds, closeButtonBounds);
 
@@ -79,8 +80,8 @@ namespace Vintagestory.GameContent
 
             overviewGui = capi.Gui
                 .CreateCompo("handbook-overview", dialogBounds)
-                .AddDialogBG(bgBounds, true)
-                .AddDialogTitleBar("Survival Handbook", OnTitleBarClose)
+                .AddShadedDialogBG(bgBounds, true)
+                .AddDialogTitleBar(Lang.Get("Survival Handbook"), OnTitleBarClose)
                 .AddTextInput(searchFieldBounds, FilterItemsBySearchText, CairoFont.WhiteSmallishText(), "searchField")
                 .BeginChildElements(bgBounds)
                     .BeginClip(clipBounds)
@@ -88,7 +89,7 @@ namespace Vintagestory.GameContent
                         .AddStacklist(stackListBounds, onLeftClickStack, stackListElements, "stacklist")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalueOverviewPage, scrollbarBounds, "scrollbar")
-                    .AddSmallButton("Close", OnButtonClose, closeButtonBounds)
+                    .AddSmallButton(Lang.Get("Close Handbook"), OnButtonClose, closeButtonBounds)
                 .EndChildElements()
                 .Compose()
             ;
@@ -100,62 +101,47 @@ namespace Vintagestory.GameContent
         }
 
         void initDetailGui() { 
-            ElementBounds textBounds = ElementBounds.Fixed(0, 35, 400, 30 + listHeight + 10);
+            ElementBounds textBounds = ElementBounds.Fixed(9, 45, 400, 30 + listHeight + 17);
             
             ElementBounds clipBounds = textBounds.ForkBoundingParent();
-            ElementBounds insetBounds = textBounds.FlatCopy().FixedGrow(6).WithAddedFixedPosition(-3, -3);
+            ElementBounds insetBounds = textBounds.FlatCopy().FixedGrow(6).WithFixedOffset(-3, -3);
 
-            ElementBounds scrollbarBounds = insetBounds.CopyOffsetedSibling(textBounds.fixedWidth + 7).WithFixedWidth(20);
+            ElementBounds scrollbarBounds = clipBounds.CopyOffsetedSibling(textBounds.fixedWidth + 7, -6, 0, 6).WithFixedWidth(20);
 
             ElementBounds closeButtonBounds = ElementBounds
                 .FixedSize(0, 0)
-                .FixedUnder(clipBounds, 2 * 5)
+                .FixedUnder(clipBounds, 2 * 5 + 5)
                 .WithAlignment(EnumDialogArea.RightFixed)
                 .WithFixedPadding(20, 4)
+                .WithFixedAlignmentOffset(-12, 1)
             ;
             ElementBounds backButtonBounds = ElementBounds
                 .FixedSize(0, 0)
-                .FixedUnder(clipBounds, 2 * 5)
+                .FixedUnder(clipBounds, 2 * 5 + 5)
                 .WithAlignment(EnumDialogArea.LeftFixed)
                 .WithFixedPadding(20, 4)
+                .WithFixedAlignmentOffset(4, 1)
             ;
             ElementBounds overviewButtonBounds = ElementBounds
                 .FixedSize(0, 0)
-                .FixedUnder(clipBounds, 2 * 5)
+                .FixedUnder(clipBounds, 2 * 5 + 5)
                 .WithAlignment(EnumDialogArea.CenterFixed)
                 .WithFixedPadding(20, 4)
+                .WithFixedAlignmentOffset(0, 1)
             ;
 
-            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding / 2);
-            bgBounds.BothSizing = ElementSizing.FitToChildren;
+            ElementBounds bgBounds = insetBounds.ForkBoundingParent(5, 40, 36, 52).WithFixedPadding(GuiStyle.ElementToDialogPadding / 2);
             bgBounds.WithChildren(insetBounds, textBounds, scrollbarBounds, backButtonBounds, closeButtonBounds);
 
             // 3. Finally Dialog
-            ElementBounds dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
+            ElementBounds dialogBounds = bgBounds.ForkBoundingParent().WithAlignment(EnumDialogArea.CenterMiddle);
+            dialogBounds.WithFixedAlignmentOffset(3, 3);
+            RichTextComponentBase[] cmps = browseHistory.Peek().Collectible.GetHandbookInfo(browseHistory.Peek(), capi, stacks, OpenDetailPageFor);
 
-            
-
-            RichTextComponentBase[] cmps = browseHistory.Peek().Collectible.GetHandbookInfo(browseHistory.Peek(), capi, stacks, OpenDetailPageFor); /*new RichTextComponent[]
-            {
-                new ItemstackComponent(selectedStack.Stack, 100, EnumFloat.Left),
-                new RichTextComponent(selectedStack.Stack.GetName()+"\n", CairoFont.WhiteSmallishText()),
-                new RichTextComponent(selectedStack.Stack.GetDescription(capi.World) + "\n", CairoFont.WhiteSmallText()),
-
-                new RichTextComponent("This text dynamically flows around the item stack graphics. But not only that, this can also do formatted stuff like ", CairoFont.WhiteDetailText()),
-                new RichTextComponent("red text", CairoFont.WhiteDetailText().WithColor(GuiStyle.ErrorTextColor)),
-                new RichTextComponent(" and ", CairoFont.WhiteDetailText()),
-                new RichTextComponent("large", CairoFont.WhiteSmallishText()),
-                new RichTextComponent("text! \\o/", CairoFont.WhiteDetailText()),
-                new RichTextComponent("\n\n", CairoFont.WhiteDetailText()),
-                new RichTextComponent("But hold, on this system can do pretty much any image/text flow, like how about adding ", CairoFont.WhiteDetailText()),
-                new LinkTextComponent("link text", CairoFont.WhiteDetailText().WithColor(GuiStyle.LinkTextColor), OnLinkClicked),
-                new RichTextComponent("or your own modded rich text element?!?!?!", CairoFont.WhiteDetailText()),
-                new RichTextComponent("\n\n\n\nSadf!", CairoFont.WhiteDetailText()),
-            };*/
 
             detailViewGui = capi.Gui
                 .CreateCompo("handbook-detail", dialogBounds)
-                .AddDialogBG(bgBounds, true)
+                .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar("Survival Handbook", OnTitleBarClose)
                 .BeginChildElements(bgBounds)
                     .BeginClip(clipBounds)
@@ -337,7 +323,7 @@ namespace Vintagestory.GameContent
             );
         }
 
-        public override void OnRender2D(float deltaTime)
+        public override void OnRenderGUI(float deltaTime)
         {
             if (browseHistory.Count == 0)
             {
@@ -348,13 +334,13 @@ namespace Vintagestory.GameContent
                 SingleComposer = detailViewGui;
             }
 
-            base.OnRender2D(deltaTime);
+            base.OnRenderGUI(deltaTime);
         }
 
 
         public override bool RequiresUngrabbedMouse()
         {
-            return false;
+            return true;
         }
 
         public override bool CaptureAllInputs()

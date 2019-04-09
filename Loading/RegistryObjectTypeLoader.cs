@@ -9,6 +9,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 using Vintagestory.ServerMods.NoObf;
 
 namespace Vintagestory.ServerMods.NoObf
@@ -23,7 +24,18 @@ namespace Vintagestory.ServerMods.NoObf
 
     public class ResolvedVariant
     {
-        public Dictionary<string, string> Codes = new Dictionary<string, string>();
+        public Dictionary<string, string> CodeParts = new Dictionary<string, string>();
+
+        public AssetLocation Code;
+
+        internal void ResolveCode(AssetLocation baseCode)
+        {
+            Code = baseCode.Clone();
+            foreach (string code in CodeParts.Values)
+            {
+                Code.Path += "-" + code;
+            }
+        }
     }
 
 
@@ -35,13 +47,13 @@ namespace Vintagestory.ServerMods.NoObf
 
         Dictionary<AssetLocation, Shape> blockShapes;
         Dictionary<AssetLocation, BlockType> blockTypes;
-
         Dictionary<AssetLocation, ItemType> itemTypes;
-
         Dictionary<AssetLocation, EntityType> entityTypes;
 
 
         ICoreServerAPI api;
+
+
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -52,11 +64,6 @@ namespace Vintagestory.ServerMods.NoObf
         public override double ExecuteOrder()
         {
             return 0.2;
-        }
-
-        public override bool AllowRuntimeReload()
-        {
-            return false;
         }
 
         public override void StartServerSide(ICoreServerAPI api)
@@ -96,6 +103,8 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     Code = location,
                     VariantGroups = blockTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                    SkipVariants = blockTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
+                    AllowedVariants = blockTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
                     Enabled = blockTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
                     jsonObject = blockTypeObject
                 });
@@ -114,6 +123,8 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     Code = location,
                     VariantGroups = itemTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                    SkipVariants = itemTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
+                    AllowedVariants = itemTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
                     Enabled = itemTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
                     jsonObject = itemTypeObject
                 });
@@ -123,11 +134,11 @@ namespace Vintagestory.ServerMods.NoObf
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
             {
                 JToken property = null;
-                JObject blockTypeObject = entry.Value;
+                JObject entityTypeObject = entry.Value;
                 AssetLocation location = null;
                 try
                 {
-                    location = blockTypeObject.GetValue("code").ToObject<AssetLocation>();
+                    location = entityTypeObject.GetValue("code").ToObject<AssetLocation>();
                     location.Domain = entry.Key.Domain;
                 }
                 catch (Exception e)
@@ -141,9 +152,11 @@ namespace Vintagestory.ServerMods.NoObf
                     entityTypes.Add(entry.Key, new EntityType()
                     {
                         Code = location,
-                        VariantGroups = blockTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                        Enabled = blockTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
-                        jsonObject = blockTypeObject
+                        VariantGroups = entityTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                        SkipVariants = entityTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
+                        AllowedVariants = entityTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
+                        Enabled = entityTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
+                        jsonObject = entityTypeObject
                     });
                 } catch (Exception e)
                 {
@@ -162,7 +175,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 if (val.Value.Code == null)
                 {
-                    api.Server.LogError("Error in worldproperties {0}, not code set", val.Key);
+                    api.Server.LogError("Error in worldproperties {0}, code is null, so I won't load it", val.Key);
                     return;
                 }
 
@@ -179,7 +192,10 @@ namespace Vintagestory.ServerMods.NoObf
             LoadBlocks();
 
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
+
+            FreeRam();
         }
+
 
         #region Entities
         void LoadEntities()
@@ -205,7 +221,7 @@ namespace Vintagestory.ServerMods.NoObf
             List<ResolvedVariant> variants = null;
             try
             {
-                variants = GatherVariants(entityType.VariantGroups, entityType.Code);
+                variants = GatherVariants(entityType.Code, entityType.VariantGroups, entityType.Code, entityType.AllowedVariants, entityType.SkipVariants);
             }
             catch (Exception e)
             {
@@ -222,26 +238,7 @@ namespace Vintagestory.ServerMods.NoObf
                 // Multi item type
                 foreach (ResolvedVariant variant in variants)
                 {
-                    AssetLocation fullcode = entityType.Code.Clone();
-                    foreach (string code in variant.Codes.Values)
-                    {
-                        fullcode.Path += "-" + code;
-                    }
-                    EntityType typedEntity = baseEntityFromEntityType(entityType, fullcode, variant.Codes);
-
-                    if (entityType.SkipVariants != null)
-                    {
-                        bool found = false;
-                        for (int i = 0; i < entityType.SkipVariants.Length; i++)
-                        {
-                            if (typedEntity.WildCardMatch(entityType.SkipVariants[i]))
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found) continue;
-                    }
+                    EntityType typedEntity = baseEntityFromEntityType(entityType, variant.Code, variant.CodeParts);
 
                     entities.Add(typedEntity);
                 }
@@ -310,7 +307,7 @@ namespace Vintagestory.ServerMods.NoObf
             List<ResolvedVariant> variants = null;
             try
             {
-                variants = GatherVariants(itemType.VariantGroups, itemType.Code);
+                variants = GatherVariants(itemType.Code, itemType.VariantGroups, itemType.Code, itemType.AllowedVariants, itemType.SkipVariants);
             }
             catch (Exception e)
             {
@@ -330,26 +327,7 @@ namespace Vintagestory.ServerMods.NoObf
                 // Multi item type
                 foreach (ResolvedVariant variant in variants)
                 {
-                    AssetLocation fullcode = itemType.Code.Clone();
-                    foreach (string code in variant.Codes.Values)
-                    {
-                        fullcode.Path += "-" + code;
-                    }
-                    Item typedItem = baseItemFromItemType(itemType, fullcode, variant.Codes);
-
-                    if (itemType.SkipVariants != null)
-                    {
-                        bool found = false;
-                        for (int i = 0; i < itemType.SkipVariants.Length; i++)
-                        {
-                            if (typedItem.WildCardMatch(itemType.SkipVariants[i]))
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found) continue;
-                    }
+                    Item typedItem = baseItemFromItemType(itemType, variant.Code, variant.CodeParts);
 
                     items.Add(typedItem);
                 }
@@ -380,7 +358,6 @@ namespace Vintagestory.ServerMods.NoObf
                 api.Server.Logger.Error("Exception thrown while trying to populate/load json data of the typed item with code {0}. Will ignore most of the attributes. Exception: {1}", typedItemType.Code, e);
             }
 
-            typedItemType.jsonObject = null;
             Item item;
 
             if (api.ClassRegistry.GetItemClass(typedItemType.Class) == null)
@@ -419,12 +396,16 @@ namespace Vintagestory.ServerMods.NoObf
             item.StorageFlags = (EnumItemStorageFlags)typedItemType.StorageFlags;
             item.RenderAlphaTest = typedItemType.RenderAlphaTest;
             item.HeldTpHitAnimation = typedItemType.HeldTpHitAnimation;
-            item.HeldTpIdleAnimation = typedItemType.HeldTpIdleAnimation;
+            item.HeldRightTpIdleAnimation = typedItemType.HeldRightTpIdleAnimation;
+            item.HeldLeftTpIdleAnimation = typedItemType.HeldLeftTpIdleAnimation;
             item.HeldTpUseAnimation = typedItemType.HeldTpUseAnimation;
             item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
             item.MatterState = typedItemType.MatterState;
 
             typedItemType.InitItem(api.World.Logger, api.ClassRegistry, item, searchReplace);
+
+            typedItemType.jsonObject = null;
+
 
             return item;
         }
@@ -459,7 +440,7 @@ namespace Vintagestory.ServerMods.NoObf
             List<ResolvedVariant> variants = null;
             try
             {
-                variants = GatherVariants(blockType.VariantGroups, location);
+                variants = GatherVariants(blockType.Code, blockType.VariantGroups, location, blockType.AllowedVariants, blockType.SkipVariants);
             }
             catch (Exception e)
             {
@@ -478,31 +459,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (ResolvedVariant variant in variants)
                 {
-                    AssetLocation fullcode = blockType.Code.Clone();
-                    foreach (string code in variant.Codes.Values)
-                    {
-                        fullcode.Path += "-" + code;
-                    }
-
-                    Block block = baseBlockFromBlockType(blockType, fullcode, variant.Codes);
-
-                    if (blockType.SkipVariants != null)
-                    {
-                        bool found = false;
-                        for (int i = 0; i < blockType.SkipVariants.Length; i++)
-                        {
-                            if (block.WildCardMatch(blockType.SkipVariants[i]))
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found)
-                        {
-                            continue;
-                        }
-                    }
-
+                    Block block = baseBlockFromBlockType(blockType, variant.Code, variant.CodeParts);
 
                     blocks.Add(block);
                 }
@@ -569,6 +526,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.Code = fullcode;
             block.Class = typedBlockType.Class;
             block.LiquidSelectable = typedBlockType.LiquidSelectable;
+            block.LiquidCode = typedBlockType.LiquidCode;
             block.WalkSpeedMultiplier = typedBlockType.WalkspeedMultiplier;
             block.DragMultiplier = typedBlockType.DragMultiplier;
             block.DrawType = typedBlockType.DrawType;
@@ -625,7 +583,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.StorageFlags = (EnumItemStorageFlags)typedBlockType.StorageFlags;
             block.RenderAlphaTest = typedBlockType.RenderAlphaTest;
             block.HeldTpHitAnimation = typedBlockType.HeldTpHitAnimation;
-            block.HeldTpIdleAnimation = typedBlockType.HeldTpIdleAnimation;
+            block.HeldRightTpIdleAnimation = typedBlockType.HeldRightTpIdleAnimation;
+            block.HeldLeftTpIdleAnimation = typedBlockType.HeldLeftTpIdleAnimation;
             block.HeldTpUseAnimation = typedBlockType.HeldTpUseAnimation;
             block.CreativeInventoryStacks = typedBlockType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedBlockType.CreativeInventoryStacks.Clone();
             block.AllowSpawnCreatureGroups = (string[])typedBlockType.AllowSpawnCreatureGroups.Clone();
@@ -720,11 +679,11 @@ namespace Vintagestory.ServerMods.NoObf
 
 
 
-        List<ResolvedVariant> GatherVariants(RegistryObjectVariantGroup[] variantgroups, AssetLocation location)
+        List<ResolvedVariant> GatherVariants(AssetLocation baseCode, RegistryObjectVariantGroup[] variantgroups, AssetLocation location, AssetLocation[] allowedVariants, AssetLocation[] skipVariants)
         {
-            List<ResolvedVariant> blockvariantsFinal = new List<ResolvedVariant>();
+            List<ResolvedVariant> variantsFinal = new List<ResolvedVariant>();
 
-            if (variantgroups == null || variantgroups.Length == 0) return blockvariantsFinal;
+            if (variantgroups == null || variantgroups.Length == 0) return variantsFinal;
 
             OrderedDictionary<string, BlockVariant[]> blockvariantsMul = new OrderedDictionary<string, BlockVariant[]>();
 
@@ -733,12 +692,17 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 if (variantgroups[i].LoadFromProperties != null)
                 {
-                    CollectFromWorldProperties(variantgroups[i], variantgroups, blockvariantsMul, blockvariantsFinal, location);
+                    CollectFromWorldProperties(variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
+                }
+
+                if (variantgroups[i].LoadFromPropertiesCombine != null)
+                {
+                    CollectFromWorldPropertiesCombine(variantgroups[i].LoadFromPropertiesCombine, variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
                 }
 
                 if (variantgroups[i].States != null)
                 {
-                    CollectFromStateList(variantgroups[i], variantgroups, blockvariantsMul, blockvariantsFinal, location);
+                    CollectFromStateList(variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
                 }
             }
 
@@ -758,20 +722,82 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         for (int k = 0; k < variant.Codes.Count; k++)
                         {
-                            resolved.Codes.Add(variant.Types[k], variant.Codes[k]);
+                            resolved.CodeParts.Add(variant.Types[k], variant.Codes[k]);
                         }
                     }
                     else
                     {
-                        resolved.Codes.Add(blockvariantsMul.GetKeyAtIndex(j), variant.Code);
+                        resolved.CodeParts.Add(blockvariantsMul.GetKeyAtIndex(j), variant.Code);
                     }
-
                 }
 
-                blockvariantsFinal.Add(resolved);
+                variantsFinal.Add(resolved);
             }
 
-            return blockvariantsFinal;
+            foreach (ResolvedVariant var in variantsFinal)
+            {
+                var.ResolveCode(baseCode);
+            }
+
+            if (skipVariants != null)
+            {
+                List<ResolvedVariant> filteredVariants = new List<ResolvedVariant>();
+
+                HashSet<AssetLocation> skipVariantsHash = new HashSet<AssetLocation>();
+                List<AssetLocation> skipVariantsWildCards = new List<AssetLocation>();
+                foreach(var val in skipVariants)
+                {
+                    if (val.IsWildCard)
+                    {
+                        skipVariantsWildCards.Add(val);
+                    } else
+                    {
+                        skipVariantsHash.Add(val);
+                    }
+                }
+
+                foreach (ResolvedVariant var in variantsFinal)
+                {
+                    if (skipVariantsHash.Contains(var.Code)) continue;
+                    if (skipVariantsWildCards.FirstOrDefault(v => WildcardUtil.Match(v, var.Code)) != null) continue;
+
+                    filteredVariants.Add(var);
+                }
+
+                variantsFinal = filteredVariants;
+            }
+
+
+            if (allowedVariants != null)
+            {
+                List<ResolvedVariant> filteredVariants = new List<ResolvedVariant>();
+
+                HashSet<AssetLocation> allowVariantsHash = new HashSet<AssetLocation>();
+                List<AssetLocation> allowVariantsWildCards = new List<AssetLocation>();
+                foreach (var val in allowedVariants)
+                {
+                    if (val.IsWildCard)
+                    {
+                        allowVariantsWildCards.Add(val);
+                    }
+                    else
+                    {
+                        allowVariantsHash.Add(val);
+                    }
+                }
+
+                foreach (ResolvedVariant var in variantsFinal)
+                {
+                    if (allowVariantsHash.Contains(var.Code) || allowVariantsWildCards.FirstOrDefault(v => WildcardUtil.Match(v, var.Code)) != null)
+                    {
+                        filteredVariants.Add(var);
+                    }
+                }
+
+                variantsFinal = filteredVariants;
+            }
+            
+            return variantsFinal;
         }
 
         private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
@@ -794,7 +820,7 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int j = 0; j < states.Length; j++)
                 {
                     ResolvedVariant resolved = new ResolvedVariant();
-                    resolved.Codes.Add(type, states[j]);
+                    resolved.CodeParts.Add(type, states[j]);
                     blockvariantsFinal.Add(resolved);
                 }
             }
@@ -856,36 +882,60 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-
         private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
-            StandardWorldProperty property = GetWorldPropertyByCode(variantGroup.LoadFromProperties);
+            CollectFromWorldPropertiesCombine(new string[] { variantGroup.LoadFromProperties }, variantGroup, variantgroups, blockvariantsMul, blockvariantsFinal, location);
+        }
 
-            if (property == null)
+        private void CollectFromWorldPropertiesCombine(string[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        {
+            if (propList.Length > 1 && variantGroup.Code == null)
             {
                 api.Server.LogError(
-                    "Error in item or block {0}, worldproperty {1} does not exist (or is empty). Ignoring.",
-                    location, variantGroup.LoadFromProperties
+                    "Error in item or block {0}, defined a variantgroup with loadFromPropertiesCombine (first element: {1}), but did not explicitly declare a code for this variant group, hence I do not know which code to use. Ignoring.",
+                    location, propList[0]
                 );
                 return;
             }
 
-            string typename = variantGroup.Code == null ? property.Code.Path : variantGroup.Code;
-
-            if (variantGroup.Combine == EnumCombination.Add)
+            foreach (var val in propList)
             {
+                StandardWorldProperty property = GetWorldPropertyByCode(val);
 
-                foreach (WorldPropertyVariant variant in property.Variants)
+                if (property == null)
                 {
-                    ResolvedVariant resolved = new ResolvedVariant();
-                    resolved.Codes.Add(typename, variant.Code.Path);
-                    blockvariantsFinal.Add(resolved);
+                    api.Server.LogError(
+                        "Error in item or block {0}, worldproperty {1} does not exist (or is empty). Ignoring.",
+                        location, variantGroup.LoadFromProperties
+                    );
+                    return;
                 }
-            }
 
-            if (variantGroup.Combine == EnumCombination.Multiply)
-            {
-                blockvariantsMul.Add(typename, worldPropertiesVariants[property.Code]);
+                string typename = variantGroup.Code == null ? property.Code.Path : variantGroup.Code;
+
+                if (variantGroup.Combine == EnumCombination.Add)
+                {
+
+                    foreach (WorldPropertyVariant variant in property.Variants)
+                    {
+                        ResolvedVariant resolved = new ResolvedVariant();
+                        resolved.CodeParts.Add(typename, variant.Code.Path);
+                        blockvariantsFinal.Add(resolved);
+                    }
+                }
+
+                if (variantGroup.Combine == EnumCombination.Multiply)
+                {
+                    BlockVariant[] variants = null;
+                    if (blockvariantsMul.TryGetValue(typename, out variants))
+                    {
+                        blockvariantsMul[typename] = variants.Append(worldPropertiesVariants[property.Code]);
+                    } else
+                    {
+                        blockvariantsMul.Add(typename, worldPropertiesVariants[property.Code]);
+                    }
+                    
+                }
             }
         }
 
@@ -921,5 +971,16 @@ namespace Vintagestory.ServerMods.NoObf
             return multipliedProperties;
         }
 
+
+
+        private void FreeRam()
+        {
+            blockShapes = null;
+            blockTypes = null;
+            itemTypes = null;
+            entityTypes = null;
+            worldProperties = null;
+            worldPropertiesVariants = null;
+        }
     }
 }

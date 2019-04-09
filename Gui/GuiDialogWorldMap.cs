@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
 
             SingleComposer = capi.Gui
                 .CreateCompo("worldmap", dialogBounds)
-                .AddDialogBG(bgBounds)
+                .AddShadedDialogBG(bgBounds, false)
                 .AddIf(dialogType == EnumDialogType.Dialog)
                     .AddDialogTitleBar("World Map", OnTitleBarClose)
                     .AddInset(mapBounds, 2)
@@ -129,17 +129,12 @@ namespace Vintagestory.GameContent
         public override void OnGuiOpened()
         {
             base.OnGuiOpened();
-            //Console.WriteLine("on gui opened 1");
 
             if (mapElem != null) mapElem.chunkViewBoundsBefore = new Cuboidi();
             mapComponents.Clear();
             mapElem.EnsureMapFullyLoaded();
 
-           // Console.WriteLine("on gui opened 2");
-
             OnMouseMove(new MouseEvent(capi.Input.MouseX, capi.Input.MouseY));
-
-           // Console.WriteLine("on gui opened 3");
         }
 
 
@@ -209,7 +204,6 @@ namespace Vintagestory.GameContent
             {
                 double x = args.X - SingleComposer.Bounds.absX;
                 double y = args.Y - SingleComposer.Bounds.absY - GuiElement.scaled(30); // no idea why the 30 :/
-                //Console.WriteLine("{0}/{1}", args.X, args.Y);
 
                 StringBuilder hoverText = new StringBuilder();
                 mapElem.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref hoveredWorldPos);
@@ -240,9 +234,9 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnRender2D(float deltaTime)
+        public override void OnRenderGUI(float deltaTime)
         {
-            base.OnRender2D(deltaTime);
+            base.OnRenderGUI(deltaTime);
             capi.Render.CheckGlError("map-rend2d");
         }
 

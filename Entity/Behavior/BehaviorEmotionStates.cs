@@ -26,7 +26,7 @@ namespace Vintagestory.GameContent
 
         public string[] NotifyEntityCodes = new string[0];
         public float NotifyChances = 0;
-        public float NotifyRange = 0;
+        public float NotifyRange = 8;
     }
 
     public class EntityBehaviorEmotionStates : EntityBehavior
@@ -79,6 +79,22 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
+            if (TryTriggerState("alarmherdondamage") && damageSource.SourceEntity != null && (entity as EntityAgent).HerdId > 0)
+            {
+                EmotionState state = availableStates["alarmherdondamage"];
+                entity.World.GetNearestEntity(entity.ServerPos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
+                {
+                    EntityAgent agent = e as EntityAgent;
+                    if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == (entity as EntityAgent).HerdId)
+                    {
+                        agent.GetBehavior<EntityBehaviorEmotionStates>().TryTriggerState("aggressiveondamage");
+                    }
+
+                    return false;
+                });
+            }
+
+
             if (TryTriggerState("aggressiveondamage"))
             {
                 if (TryTriggerState("aggressivealarmondamage"))
@@ -97,6 +113,8 @@ namespace Vintagestory.GameContent
                 }
                 return;
             }
+
+
 
         }
 

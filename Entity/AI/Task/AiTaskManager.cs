@@ -161,5 +161,21 @@ namespace Vintagestory.GameContent
                 task.OnStateChanged(beforeState);
             }
         }
+
+        internal void OnEntitySpawn()
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                task.OnEntitySpawn();
+            }
+        }
+
+        internal void OnEntityLoaded()
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                task.OnEntityLoaded();
+            }
+        }
     }
 }

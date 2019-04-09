@@ -11,6 +11,8 @@ namespace Vintagestory.GameContent
         public float airMovingStrength = 0.05f;
         double wallDragFactor = 0.3f;
 
+        float airMovingStrengthFalling;
+
         internal override void Initialize(EntityProperties properties)
         {
             JsonObject physics = properties?.Attributes?["physics"];
@@ -19,11 +21,13 @@ namespace Vintagestory.GameContent
                 wallDragFactor = 0.3 * (float)physics["wallDragFactor"].AsDouble(1);
                 airMovingStrength = (float)physics["airMovingStrength"].AsDouble(0.05);
             }
+
+            airMovingStrengthFalling = airMovingStrength / 4;
         }
 
         public override bool Applicable(Entity entity, EntityPos pos, EntityControls controls)
         {
-            return controls.IsFlying || (!entity.Collided && !entity.FeetInLiquid);
+            return (controls.IsFlying || (!entity.Collided && !entity.FeetInLiquid)) && entity.Alive;
         }
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
@@ -47,7 +51,17 @@ namespace Vintagestory.GameContent
 
                 } else
                 {
-                    pos.Motion.Add(controls.WalkVector.X * airMovingStrength, controls.WalkVector.Y * airMovingStrength, controls.WalkVector.Z * airMovingStrength);
+                    float strength = airMovingStrength;
+                    if (!controls.Jump && entity is EntityPlayer)
+                    {
+                        strength = airMovingStrengthFalling;
+                        pos.Motion.X *= (float)System.Math.Pow(0.98f, dt * 33);
+                        pos.Motion.Z *= (float)System.Math.Pow(0.98f, dt * 33);
+                    }
+
+                    pos.Motion.Add(controls.WalkVector.X * strength, controls.WalkVector.Y * strength, controls.WalkVector.Z * strength);
+
+                    
                 }
                 
             }

@@ -173,8 +173,8 @@ namespace Vintagestory.GameContent
 
         private void Event_OnEntityDespawn(Entity entity, EntityDespawnReason reason)
         {
-            int lgx = (int)(entity.Pos.X / gridSizeInBlocks) % partitionsLength;
-            int lgz = (int)(entity.Pos.Z / gridSizeInBlocks) % partitionsLength;
+            int lgx = (int)(entity.LocalPos.X / gridSizeInBlocks) % partitionsLength;
+            int lgz = (int)(entity.LocalPos.Z / gridSizeInBlocks) % partitionsLength;
             int gridIndex = lgz * partitionsLength + lgx;
 
             GridAndChunkIndex indexes;
@@ -182,9 +182,10 @@ namespace Vintagestory.GameContent
             {
                 GridIndexByEntityId.Remove(entity.EntityId);
             }
+            else return;
 
             EntityPartitionChunk partition = null;
-            if (Partitions.TryGetValue(entity.InChunkIndex3d, out partition))
+            if (Partitions.TryGetValue(indexes.ChunkIndex, out partition))
             {
                 partition.Entities[indexes.GridIndex].Remove(entity); 
             }            

@@ -88,7 +88,7 @@ namespace Vintagestory.GameContent
 
         private void OnSaveGameSaving()
         {
-            sapi.WorldManager.StoreData("weatherState", SerializerUtil.Serialize(new WeatherState()
+            sapi.WorldManager.SaveGame.StoreData("weatherState", SerializerUtil.Serialize(new WeatherState()
             {
                 NewPatternIndex = weatherSim.NewPattern.Index,
                 OldPatternIndex = weatherSim.OldPattern.Index,
@@ -109,13 +109,20 @@ namespace Vintagestory.GameContent
             {
                 try
                 {
-                    WeatherState storedstate = SerializerUtil.Deserialize<WeatherState>(sapi.WorldManager.GetData("weatherState"));
-                    weatherSim.NewPattern = weatherSim.Patterns[storedstate.NewPatternIndex];
-                    weatherSim.OldPattern = weatherSim.Patterns[storedstate.OldPatternIndex];
-                    weatherSim.Weight = storedstate.Weight;
-                    weatherSim.TransitionDelay = storedstate.TransitionDelay;
-                    weatherSim.Transitioning = storedstate.Transitioning;
-
+                    byte[] data = sapi.WorldManager.SaveGame.GetData("weatherState");
+                    if (data == null)
+                    {
+                        weatherSim.LoadRandomPattern();
+                    }
+                    else
+                    {
+                        WeatherState storedstate = SerializerUtil.Deserialize<WeatherState>(data);
+                        weatherSim.NewPattern = weatherSim.Patterns[storedstate.NewPatternIndex];
+                        weatherSim.OldPattern = weatherSim.Patterns[storedstate.OldPatternIndex];
+                        weatherSim.Weight = storedstate.Weight;
+                        weatherSim.TransitionDelay = storedstate.TransitionDelay;
+                        weatherSim.Transitioning = storedstate.Transitioning;
+                    }
                 } catch (Exception)
                 {
                     weatherSim.LoadRandomPattern();
@@ -243,7 +250,7 @@ namespace Vintagestory.GameContent
 
         private void cmdWeatherClient(int groupId, CmdArgs args)
         {
-            capi.ShowChatNotification(
+            capi.ShowChatMessage(
                 string.Format("{0}% {1}, {2}% {3}", (int)(100 * weatherSim.Weight), weatherSim.NewPattern.GetWeatherName(), (int)(100 - 100 * weatherSim.Weight), weatherSim.OldPattern.GetWeatherName())
             );
         }
@@ -256,7 +263,7 @@ namespace Vintagestory.GameContent
 
             if (args.Length == 0)
             {
-                capi.ShowChatNotification(string.Format("Current view distance: {0}", cloudRenderer.CloudTileLength * renderer.CloudTileSize));
+                capi.ShowChatMessage(string.Format("Current view distance: {0}", cloudRenderer.CloudTileLength * renderer.CloudTileSize));
                 return;
             }
 
@@ -268,11 +275,11 @@ namespace Vintagestory.GameContent
                 renderer.InitCloudTiles(dist);
                 renderer.UpdateCloudTiles();
                 renderer.LoadCloudModel();
-                capi.ShowChatNotification(string.Format("New view distance {0} set.", dist));
+                capi.ShowChatMessage(string.Format("New view distance {0} set.", dist));
             }
             catch (Exception)
             {
-                capi.ShowChatNotification("Exception when parsing params");
+                capi.ShowChatMessage("Exception when parsing params");
             }
 
         }
@@ -283,7 +290,7 @@ namespace Vintagestory.GameContent
             if (args.Length > 0)
             {
                 capi.Ambient.Base.CloudBrightness.Value = float.Parse(args[0]);
-                capi.ShowChatNotification("Cloud brightness set");
+                capi.ShowChatMessage("Cloud brightness set");
             }
         }
 
@@ -292,7 +299,7 @@ namespace Vintagestory.GameContent
             if (args.Length > 0)
             {
                 capi.Ambient.Base.CloudDensity.Value = float.Parse(args[0]);
-                capi.ShowChatNotification("New cloud densities set");
+                capi.ShowChatMessage("New cloud densities set");
             }
         }
     }

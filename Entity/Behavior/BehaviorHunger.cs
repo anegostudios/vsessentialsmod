@@ -258,7 +258,7 @@ namespace Vintagestory.GameContent
                 {
                     SaturationLossDelayGrain -= 10 * satLossMultiplier;
                     isondelay = true;
-                }
+                } else
                 {
                     GrainLevel = Math.Max(0, GrainLevel - Math.Max(0.5f, 0.001f * GrainLevel) * satLossMultiplier);
                 }
@@ -396,7 +396,7 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
-            if (damageSource.Type == EnumDamageType.Heal && damageSource.Source == EnumDamageSource.Respawn)
+            if (damageSource.Type == EnumDamageType.Heal && damageSource.Source == EnumDamageSource.Revive)
             {
                 SaturationLossDelayFruit = 60;
                 SaturationLossDelayVegetable = 60;

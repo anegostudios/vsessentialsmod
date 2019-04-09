@@ -72,8 +72,27 @@ namespace Vintagestory.GameContent
             if (typeAttributes["decayedBlock"].Exists)
             {
                 AssetLocation blockcode = new AssetLocation(typeAttributes["decayedBlock"].AsString());
-                Block block = entity.World.GetBlock(blockcode);
-                entity.World.BlockAccessor.SetBlock(block.BlockId, entity.ServerPos.AsBlockPos);
+                Block decblock = entity.World.GetBlock(blockcode);
+
+                BlockPos bonepos = entity.ServerPos.AsBlockPos;
+                Block exblock = entity.World.BlockAccessor.GetBlock(bonepos);
+
+                if (exblock.IsReplacableBy(decblock))
+                {
+                    entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos);
+                } else
+                {
+                    foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
+                    {
+                        exblock = entity.World.BlockAccessor.GetBlock(bonepos.AddCopy(facing));
+                        if (exblock.IsReplacableBy(decblock) && !exblock.IsLiquid())
+                        {
+                            entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos.AddCopy(facing));
+                            break;
+                        }
+                    }
+                }
+                
             }
 
             Vec3d pos = entity.LocalPos.XYZ;

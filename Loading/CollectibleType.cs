@@ -80,7 +80,13 @@ namespace Vintagestory.ServerMods.NoObf
         public string HeldTpHitAnimation = "breakhand";
 
         [JsonProperty]
-        public string HeldTpIdleAnimation;
+        public string HeldRightTpIdleAnimation;
+
+        [JsonProperty]
+        public string HeldLeftTpIdleAnimation;
+
+        [JsonProperty("heldTpIdleAnimation")]
+        private string HeldOldTpIdleAnimation;
 
         [JsonProperty]
         public string HeldTpUseAnimation = "placeblock";
@@ -102,6 +108,11 @@ namespace Vintagestory.ServerMods.NoObf
             if (Texture != null)
             {
                 Textures["all"] = Texture;
+            }
+
+            if (HeldOldTpIdleAnimation != null && HeldRightTpIdleAnimation == null)
+            {
+                HeldRightTpIdleAnimation = HeldOldTpIdleAnimation;
             }
         }
     }

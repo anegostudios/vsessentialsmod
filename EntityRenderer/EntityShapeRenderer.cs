@@ -18,9 +18,13 @@ namespace Vintagestory.GameContent
         public long receivedTime;
     }
 
+    
     public class EntityShapeRenderer : EntityRenderer
     {
         LoadedTexture nameTagTexture = null;
+        int renderRange = 999;
+        bool showNameTagOnlyWhenTargeted = false;
+
         LoadedTexture debugTagTexture = null;
 
         MeshRef meshRefOpaque;
@@ -43,7 +47,8 @@ namespace Vintagestory.GameContent
         public double WindWaveIntensity = 1f;
 
         List<MessageTexture> messageTextures = null;
-        
+        NameTagRendererDelegate nameTagRenderHandler;
+
 
         public EntityShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -51,6 +56,7 @@ namespace Vintagestory.GameContent
             DisplayChatMessages = entity is EntityPlayer;
 
             TesselateShape();
+            nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
@@ -64,6 +70,7 @@ namespace Vintagestory.GameContent
             }
             
             api.Event.ReloadShapes += TesselateShape;
+
         }
 
 
@@ -232,15 +239,10 @@ namespace Vintagestory.GameContent
                 nameTagTexture = null;
             }
 
-            string name = GetNameTagName();
-            if (name != null && name.Length > 0)
-            {
-                nameTagTexture = capi.Gui.TextTexture.GenUnscaledTextTexture(
-                    name,
-                    capi.Render.GetFont(30, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
-                    new TextBackground() { FillColor = GuiStyle.DialogLightBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
-                );
-            }
+            int? range = entity.GetBehavior<EntityBehaviorNameTag>()?.RenderRange;
+            renderRange = range == null ? 999 : (int)range;
+            showNameTagOnlyWhenTargeted = entity.GetBehavior<EntityBehaviorNameTag>()?.ShowOnlyWhenTargeted == true;
+            nameTagTexture = nameTagRenderHandler(capi, entity);
         }
 
         public string GetNameTagName()
@@ -304,17 +306,18 @@ namespace Vintagestory.GameContent
 
             if (DoRenderHeldItem)
             {
-                RenderHeldItem(isShadowPass);
+                RenderHeldItem(isShadowPass, false);
+                RenderHeldItem(isShadowPass, true);
             }
         }
 
 
-        void RenderHeldItem(bool isShadowPass)
+        void RenderHeldItem(bool isShadowPass, bool right)
         {
             IRenderAPI rapi = capi.Render;
-            ItemStack stack = (entity as EntityAgent).RightHandItemSlot?.Itemstack;
+            ItemStack stack = right ? (entity as EntityAgent).RightHandItemSlot?.Itemstack : (entity as EntityAgent).LeftHandItemSlot?.Itemstack;
 
-            AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose("RightHand");            
+            AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
             if (apap == null || stack == null) return;
             
             AttachmentPoint ap = apap.AttachPoint;
@@ -500,7 +503,8 @@ namespace Vintagestory.GameContent
 
             float offY = 0;
 
-            if (nameTagTexture != null)
+            double dist = entityPlayer.Pos.SquareDistanceTo(entity.Pos);
+            if (nameTagTexture != null && (!showNameTagOnlyWhenTargeted || capi.World.Player.CurrentEntitySelection?.Entity == entity) && renderRange * renderRange > dist)
             {
                 float posx = (float)pos.X - cappedScale * nameTagTexture.Width / 2;
                 float posy = rapi.FrameHeight - (float)pos.Y + (nameTagTexture.Height * Math.Max(0, scale - 1));
@@ -604,6 +608,8 @@ namespace Vintagestory.GameContent
         public void loadModelMatrixForPlayer(Entity entity, bool isSelf)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityAgent eagent = entity as EntityAgent;
+            EntityPlayer eplr = entity as EntityPlayer;
 
             Mat4f.Identity(ModelMat);
 
@@ -615,9 +621,12 @@ namespace Vintagestory.GameContent
             float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
             float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
 
+            float bodyYaw = eagent == null ? 0 : eagent.BodyYaw;
+            float bodyPitch = eplr == null ? 0 : eplr.WalkPitch;
+
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
-            Mat4f.RotateY(ModelMat, ModelMat, entityPlayer.BodyYaw + (180 + rotY) * GameMath.DEG2RAD);
-            Mat4f.RotateZ(ModelMat, ModelMat, entityPlayer.WalkPitch + rotZ * GameMath.DEG2RAD);
+            Mat4f.RotateY(ModelMat, ModelMat, bodyYaw + (180 + rotY) * GameMath.DEG2RAD);
+            Mat4f.RotateZ(ModelMat, ModelMat, bodyPitch + rotZ * GameMath.DEG2RAD);
 
             float scale = entity.Properties.Client.Size;
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });

@@ -164,7 +164,7 @@ namespace Vintagestory.GameContent
 
         private void OnSaveGameGettingSaved()
         {
-            sapi.WorldManager.StoreData("playerMapMarkers", JsonUtil.ToBytes(Waypoints));
+            sapi.WorldManager.SaveGame.StoreData("playerMapMarkers", JsonUtil.ToBytes(Waypoints));
         }
         
 
@@ -206,13 +206,21 @@ namespace Vintagestory.GameContent
             texture = null;
         }
 
+        public override void Dispose()
+        {
+            texture?.Dispose();
+            texture = null;
+
+            base.Dispose();
+        }
+
         public override void OnLoaded()
         {
             if (sapi != null)
             {
                 try
                 {
-                    byte[] data = sapi.WorldManager.GetData("playerMapMarkers");
+                    byte[] data = sapi.WorldManager.SaveGame.GetData("playerMapMarkers");
                     if (data != null) Waypoints = JsonUtil.FromBytes<List<Waypoint>>(data);
                 } catch (Exception e)
                 {

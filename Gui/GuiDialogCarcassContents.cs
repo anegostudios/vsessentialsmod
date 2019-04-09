@@ -18,7 +18,9 @@ namespace Vintagestory.GameContent
 
         InventoryGeneric inv;
         EntityAgent owningEntity;
-        
+
+        protected double FloatyDialogPosition => 0.6;
+        protected double FloatyDialogAlign => 0.8;
 
         public GuiDialogCarcassContents(InventoryGeneric inv, EntityAgent owningEntity, ICoreClientAPI capi) : base(capi)
         {
@@ -43,7 +45,7 @@ namespace Vintagestory.GameContent
             SingleComposer =
                 capi.Gui
                 .CreateCompo("carcasscontents" + owningEntity.EntityId, dialogBounds)
-                .AddDialogBG(bgBounds, true)
+                .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar("Contents", OnTitleBarClose)
                 .BeginChildElements(bgBounds)
                     .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
@@ -75,6 +77,43 @@ namespace Vintagestory.GameContent
             capi.Network.SendPacketClient(capi.World.Player.InventoryManager.CloseInventory(inv));
             SingleComposer.GetSlotGrid("slots").OnGuiClosed(capi);
         }
-        
+
+        // TODO: Fix code duplication from GuiDialogBlockEntity
+        /// <summary>
+        /// Render's the object in Orthographic mode.
+        /// </summary>
+        /// <param name="deltaTime">The time elapsed.</param>
+        public override void OnRenderGUI(float deltaTime)
+        {
+            if (capi.Settings.Bool["immersiveMouseMode"])
+            {
+                EntityPlayer entityPlayer = capi.World.Player.Entity;
+
+                double offX = owningEntity.CollisionBox.X2 - owningEntity.OriginCollisionBox.X2;
+                double offZ = owningEntity.CollisionBox.Z2 - owningEntity.OriginCollisionBox.Z2;
+
+                Vec3d aboveHeadPos = new Vec3d(owningEntity.Pos.X + offX, owningEntity.Pos.Y + FloatyDialogPosition, owningEntity.Pos.Z + offZ);
+                Vec3d pos = MatrixToolsd.Project(aboveHeadPos, capi.Render.PerspectiveProjectionMat, capi.Render.PerspectiveViewMat, capi.Render.FrameWidth, capi.Render.FrameHeight);
+
+                // Z negative seems to indicate that the name tag is behind us \o/
+                if (pos.Z < 0) return;
+
+                SingleComposer.Bounds.Alignment = EnumDialogArea.None;
+                SingleComposer.Bounds.fixedOffsetX = 0;
+                SingleComposer.Bounds.fixedOffsetY = 0;
+                SingleComposer.Bounds.absFixedX = pos.X - SingleComposer.Bounds.OuterWidth / 2;
+                SingleComposer.Bounds.absFixedY = capi.Render.FrameHeight - pos.Y - SingleComposer.Bounds.OuterHeight * FloatyDialogAlign;
+                SingleComposer.Bounds.absMarginX = 0;
+                SingleComposer.Bounds.absMarginY = 0;
+            }
+
+            base.OnRenderGUI(deltaTime);
+        }
+
+        public override bool RequiresUngrabbedMouse()
+        {
+            return false;
+        }
     }
+
 }

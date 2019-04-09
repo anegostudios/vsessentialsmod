@@ -27,7 +27,20 @@ namespace Vintagestory.GameContent
 
         public BlockEntity removedBlockentity;
 
+        byte[] lightHsv;
+
         public EntityBlockFalling() { }
+
+        public override float MaterialDensity => 99999;
+        
+        public override byte[] LightHsv
+        {
+            get
+            {
+                return lightHsv;
+            }
+        }
+
 
         public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos)
         {
@@ -59,6 +72,8 @@ namespace Vintagestory.GameContent
 
             // Need to capture this now before we remove the block and start to fall
             drops = Block.GetDrops(api.World, initialPos, null);
+
+            lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
         }
 
         /// <summary>

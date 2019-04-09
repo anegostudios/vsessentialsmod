@@ -62,7 +62,13 @@ namespace Vintagestory.GameContent
         private void onDropsModified()
         {
             TreeAttribute tree = entity.WatchedAttributes["harvestableInv"] as TreeAttribute;
-            if (tree != null) inv.FromTreeAttributes(tree);
+            if (tree != null)
+            {
+                inv.FromTreeAttributes(tree);
+            }
+
+            // Maybe fixes meat reappearing non nun full harvested animals? (reported by Its Ragnar! on discord)
+            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.XYZ.AsBlockPos).MarkModified();
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
@@ -78,7 +84,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnInteract(EntityAgent byEntity, IItemSlot itemslot, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled)
+        public override void OnInteract(EntityAgent byEntity, ItemSlot itemslot, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled)
         {
             if (!IsHarvested || byEntity.Pos.SquareDistanceTo(entity.Pos) > 5)
             {
@@ -89,10 +95,11 @@ namespace Vintagestory.GameContent
             IPlayer player = entity.World.PlayerByUid(entityplr.PlayerUID);
             player.InventoryManager.OpenInventory(inv);
 
-            if (entity.World.Side == EnumAppSide.Client)
+            if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
                 dlg = new GuiDialogCarcassContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI);
                 dlg.TryOpen();
+                dlg.OnClosed += () => dlg = null;
             }
         }
 
@@ -113,7 +120,8 @@ namespace Vintagestory.GameContent
             if (entity.WatchedAttributes.GetBool("harvested", false)) return;
 
             entity.WatchedAttributes.SetBool("harvested", true);
-            entity.WatchedAttributes.MarkPathDirty("harvested");
+
+            if (entity.World.Side == EnumAppSide.Client) return;
 
             List<ItemStack> todrop = new List<ItemStack>();
 
@@ -141,12 +149,13 @@ namespace Vintagestory.GameContent
             inv.ToTreeAttributes(tree);
             entity.WatchedAttributes["harvestableInv"] = tree;
             entity.WatchedAttributes.MarkPathDirty("harvestableInv");
+            entity.WatchedAttributes.MarkPathDirty("harvested");
         }
 
 
         public override string PropertyName()
         {
-            return "harvetable";
+            return "harvestable";
         }
     }
 }

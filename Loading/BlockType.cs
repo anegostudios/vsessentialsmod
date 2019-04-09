@@ -114,6 +114,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public int LiquidLevel;
         [JsonProperty]
+        public string LiquidCode;
+        [JsonProperty]
         public float WalkspeedMultiplier = 1f;
         [JsonProperty]
         public float DragMultiplier = 1f;

@@ -24,17 +24,48 @@ namespace Vintagestory.GameContent
         NatFloat wanderRange = NatFloat.createStrongerInvexp(3, 30);
         BlockPos tmpPos = new BlockPos();
 
+        public bool StayCloseToSpawn;
+        public Vec3d SpawnPosition;
+        public double MaxDistanceToSpawn;
+        public bool TeleportWhenOutOfRange = true;
+        public double TeleportInGameHours = 1;
+
+        long lastTimeInRangeMs;
 
         public AiTaskWander(EntityAgent entity) : base(entity)
         {
-            
+        }
+
+        public override void OnEntityLoaded()
+        {
+
+        }
+
+        public override void OnEntitySpawn()
+        {
+            entity.Attributes.SetDouble("spawnX", entity.ServerPos.X);
+            entity.Attributes.SetDouble("spawnY", entity.ServerPos.Y);
+            entity.Attributes.SetDouble("spawnZ", entity.ServerPos.Z);
+            SpawnPosition = entity.ServerPos.XYZ;
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            
+            SpawnPosition = new Vec3d(entity.Attributes.GetDouble("spawnX"), entity.Attributes.GetDouble("spawnY"), entity.Attributes.GetDouble("spawnZ"));
+
+            float wanderRangeMin=3, wanderRangeMax=30;
+
+            if (taskConfig["maxDistanceToSpawn"].Exists)
+            {
+                StayCloseToSpawn = true;
+                MaxDistanceToSpawn = taskConfig["maxDistanceToSpawn"].AsDouble(10);
+
+                TeleportWhenOutOfRange = taskConfig["teleportWhenOutOfRange"].AsBool(true);
+                TeleportInGameHours = taskConfig["teleportInGameHours"].AsDouble(1);
+            }
+
             if (taskConfig["targetDistance"] != null)
             {
                 targetDistance = taskConfig["targetDistance"].AsFloat(0.12f);
@@ -49,6 +80,17 @@ namespace Vintagestory.GameContent
             {
                 wanderChance = taskConfig["wanderChance"].AsFloat(0.015f);
             }
+
+            if (taskConfig["wanderRangeMin"] != null)
+            {
+                wanderRangeMin = taskConfig["wanderRangeMin"].AsFloat(3);
+            }
+            if (taskConfig["wanderRangeMax"] != null)
+            {
+                wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
+            }
+            wanderRange = NatFloat.createStrongerInvexp(wanderRangeMin, wanderRangeMax);
+
 
             if (taskConfig["maxHeight"] != null)
             {
@@ -70,9 +112,31 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            if (rand.NextDouble() > wanderChance) return false;
+            if (rand.NextDouble() > wanderChance) return false;            
 
-            List<Vec3d> goodtargets = new List<Vec3d>();
+            double dist = entity.ServerPos.XYZ.SquareDistanceTo(SpawnPosition);
+            if (StayCloseToSpawn)
+            {
+                long ellapsedMs = entity.World.ElapsedMilliseconds;
+
+                if (dist > MaxDistanceToSpawn * MaxDistanceToSpawn)
+                {
+                    // If after 2 minutes still not at spawn and no player nearby, teleport
+                    if (ellapsedMs - lastTimeInRangeMs > 1000 * 60 * 2 && entity.World.GetNearestEntity(entity.ServerPos.XYZ, 15, 15, (e) => e is EntityPlayer) == null)
+                    {
+                        entity.TeleportTo(SpawnPosition);
+                    }
+
+                    MainTarget = SpawnPosition.Clone();
+                    return true;
+                } else
+                {
+                    lastTimeInRangeMs = ellapsedMs;
+                }
+            }
+            
+
+            List <Vec3d> goodtargets = new List<Vec3d>();
 
             int tries = 9;
             while (tries-- > 0)
@@ -83,9 +147,13 @@ namespace Vintagestory.GameContent
                 float dy = wanderRange.nextFloat() * (rand.Next(2) * 2 - 1);
                 float dz = wanderRange.nextFloat() * (rand.Next(2) * 2 - 1);
 
-                
                 MainTarget = entity.ServerPos.XYZ.Add(dx, dy, dz);
                 MainTarget.Y = Math.Min(MainTarget.Y, terrainYPos + maxHeight);
+
+                if (StayCloseToSpawn && MainTarget.SquareDistanceTo(SpawnPosition) > MaxDistanceToSpawn * MaxDistanceToSpawn)
+                {
+                    continue;
+                }
 
                 tmpPos.X = (int)MainTarget.X;
                 tmpPos.Z = (int)MainTarget.Z;

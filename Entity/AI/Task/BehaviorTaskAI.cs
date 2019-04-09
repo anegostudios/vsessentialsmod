@@ -2,6 +2,7 @@
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
@@ -15,6 +16,19 @@ namespace Vintagestory.GameContent
             taskManager = new AiTaskManager(entity);
         }
 
+        public override void OnEntitySpawn()
+        {
+            base.OnEntitySpawn();
+
+            taskManager.OnEntitySpawn();
+        }
+
+        public override void OnEntityLoaded()
+        {
+            base.OnEntityLoaded();
+
+            taskManager.OnEntityLoaded();
+        }
 
         public override void Initialize(EntityProperties properties, JsonObject aiconfig)
         {
@@ -23,7 +37,7 @@ namespace Vintagestory.GameContent
                 entity.World.Logger.Error("The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {0} ", entity.Code);
                 return;
             }
-
+            
             PathTraverser = new StraightLinePathTraverser(entity as EntityAgent);
 
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();

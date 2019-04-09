@@ -78,7 +78,7 @@ namespace Vintagestory.GameContent
             EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
             if (bh != null && !bh.ShouldEat) return false;
 
-            IPointOfInterest nearestPoi = porregistry.GetNearestPoi(entity.ServerPos.XYZ, 32, (poi) =>
+            IPointOfInterest nearestPoi = porregistry.GetNearestPoi(entity.ServerPos.XYZ, 48, (poi) =>
             {
                 if (poi.Type != "food") return false;
 

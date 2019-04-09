@@ -68,7 +68,7 @@ namespace Vintagestory.GameContent
 
         ICoreClientAPI capi;
         IShaderProgram prog;
-        internal FastPositionalRandom brightnessRand;
+        internal LCGRandom brightnessRand;
 
         public double RenderOrder => 0.35;
         public int RenderRange => 9999;
@@ -88,7 +88,7 @@ namespace Vintagestory.GameContent
             LoadShader();
 
             rand = new Random(capi.World.Seed);
-            brightnessRand = new FastPositionalRandom(rand.Next());
+            brightnessRand = new LCGRandom(rand.Next());
 
             double time = capi.World.Calendar.TotalHours * 60;
             windOffsetX += 2f * time;
@@ -136,26 +136,54 @@ namespace Vintagestory.GameContent
             InitCustomDataBuffers(updateMesh);
         }
 
+        bool rebuild = false;
 
         #region Render, Tick
         public void OnGameTick(float deltaTime)
         {
             if (!renderClouds) return;
+
+            rebuild = false;
+
             deltaTime *= capi.World.Calendar.SpeedOfTime / 60f;
-            if (deltaTime <= 0) return;
-            UpdateWindAndClouds(deltaTime);
+            if (deltaTime > 0)
+            {
+                UpdateWindAndClouds(deltaTime);
+            }
+
+            int currentTilePosX = (int)(capi.World.Player.Entity.Pos.X) / CloudTileSize;
+            int currentTilePosZ = (int)(capi.World.Player.Entity.Pos.Z) / CloudTileSize;
+
+            // Player has entered a new cloud tile position
+            if (tilePosX != currentTilePosX || tilePosZ != currentTilePosZ)
+            {
+                MoveCloudTiles(tilePosX - currentTilePosX, tilePosZ - currentTilePosZ);
+                tilePosX = currentTilePosX;
+                tilePosZ = currentTilePosZ;
+
+                rebuild = true;
+            }
+
+            
+
+            if (rebuild)
+            {
+                UpdateCloudTiles();
+                UpdateBufferContents(updateMesh);
+                capi.Render.UpdateMesh(cloudTilesMeshRef, updateMesh);
+            }
         }
+
 
         internal void UpdateWindAndClouds(float deltaTime)
         {
-            bool rebuild = false;
-
             if (windChangeTimer - capi.ElapsedMilliseconds < 0)
             {
                 windChangeTimer = capi.ElapsedMilliseconds + rand.Next(20000, 120000);
                 windDirectionX = (float)rand.NextDouble() * 5f;
                 windDirectionZ = (float)rand.NextDouble() * 0.2f;
             }
+            
 
             // Wind speed direction change smoothing 
             windSpeedX = windSpeedX + (windDirectionX - windSpeedX) * deltaTime;
@@ -183,42 +211,24 @@ namespace Vintagestory.GameContent
             if (capi.ElapsedMilliseconds - densityChangeTimer > 25)
             {
                 densityChangeTimer = capi.ElapsedMilliseconds;
-                rebuild = true;
+                
 
                 if (Math.Abs(blendedCloudDensity - capi.Ambient.BlendedCloudDensity) > 0.01)
                 {
                     blendedCloudDensity = blendedCloudDensity + (capi.Ambient.BlendedCloudDensity - blendedCloudDensity) * deltaTime;
-                    
+                    rebuild = true;
                 }
 
                 if (Math.Abs(blendedGlobalCloudBrightness - capi.Ambient.BlendedCloudBrightness) > 0.01)
                 {
                     blendedGlobalCloudBrightness =
                         GameMath.Clamp(blendedGlobalCloudBrightness + (capi.Ambient.BlendedCloudBrightness - blendedGlobalCloudBrightness) * deltaTime, 0, 1);
-                    
+                    rebuild = true;
                 }
             }
 
 
-            int currentTilePosX = (int)(capi.World.Player.Entity.Pos.X) / CloudTileSize;
-            int currentTilePosZ = (int)(capi.World.Player.Entity.Pos.Z) / CloudTileSize;
-
-            // Player has entered a new cloud tile position
-            if (tilePosX != currentTilePosX || tilePosZ != currentTilePosZ)
-            {
-                MoveCloudTiles(tilePosX - currentTilePosX, tilePosZ - currentTilePosZ);
-                tilePosX = currentTilePosX;
-                tilePosZ = currentTilePosZ;
-                
-                rebuild = true;
-            }
-
-            if (rebuild)
-            {
-                UpdateCloudTiles();
-                UpdateBufferContents(updateMesh);
-                capi.Render.UpdateMesh(cloudTilesMeshRef, updateMesh);
-            }
+            
         }
 
 
@@ -229,7 +239,9 @@ namespace Vintagestory.GameContent
 
             if (!renderClouds || capi.Render.FrameWidth == 0) return;
 
-   
+            double partialTileOffsetX = capi.World.Player.Entity.Pos.X % CloudTileSize;
+            double partialTileOffsetZ = capi.World.Player.Entity.Pos.Z % CloudTileSize;
+
 
             prog.Use();
             prog.Uniform("sunPosition", capi.World.Calendar.SunPositionNormalized);
@@ -243,9 +255,9 @@ namespace Vintagestory.GameContent
             prog.Uniform("sunColor", sunCol);
             prog.Uniform("dayLight", Math.Max(0, capi.World.Calendar.DayLightStrength + capi.World.Calendar.MoonLightStrength - 0.15f));
             prog.Uniform("windOffset", new Vec3f(
-                (float)(GameMath.Mod((float)capi.World.Player.Entity.Pos.X, CloudTileSize)),
+                (float)(windOffsetX - partialTileOffsetX),
                 0,
-                (float)(GameMath.Mod((float)capi.World.Player.Entity.Pos.Z, CloudTileSize))
+                (float)(windOffsetZ - partialTileOffsetZ)
             ));
             prog.Uniform("globalCloudBrightness", blendedGlobalCloudBrightness);
             prog.Uniform("rgbaFogIn", capi.Ambient.BlendedFogColor);
@@ -276,8 +288,6 @@ namespace Vintagestory.GameContent
                 mvMatd[13] = 0;
                 mvMatd[14] = 0;
 
-                double partialTileOffsetX = capi.World.Player.Entity.Pos.X % CloudTileSize;
-                double partialTileOffsetZ = capi.World.Player.Entity.Pos.Z % CloudTileSize;
 
                 Mat4d.Translate(mvMatd, mvMatd, new double[] {
                     windOffsetX - partialTileOffsetX,
@@ -316,7 +326,7 @@ namespace Vintagestory.GameContent
             // Min amount of cloud tiles = 5*5
             // Also we'll display clouds triple as far as block view distance
 
-            CloudTileLength = Math.Max(20, viewDistance / CloudTileSize);
+            CloudTileLength = GameMath.Clamp(viewDistance / CloudTileSize, 20, 200);
 
             QuantityCloudTiles = CloudTileLength * CloudTileLength;
             cloudTiles = new CloudTile[QuantityCloudTiles];

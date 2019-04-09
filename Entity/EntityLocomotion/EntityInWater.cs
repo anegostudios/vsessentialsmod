@@ -2,6 +2,7 @@
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
@@ -21,7 +22,7 @@ namespace Vintagestory.GameContent
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
             
-            if (entity.Swimming)
+            if (entity.Swimming && entity.Alive)
             {
                 if ((controls.TriesToMove || controls.Jump) && entity.World.ElapsedMilliseconds - lastPush > 2000)
                 {
@@ -46,16 +47,35 @@ namespace Vintagestory.GameContent
                     yMot = controls.FlyVector.Y * (1 + push) * 0.03f;
                 }
 
-
                 pos.Motion.Add(
                     controls.FlyVector.X * (1+push) * 0.03f, 
                     yMot,
                     controls.FlyVector.Z * (1 + push) * 0.03f
                 );
-
-
             }
 
+
+            Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+            string lastcodepart = block.LastCodePart(1);
+
+            if (lastcodepart != null)
+            {
+                Vec3i normali = Cardinal.FromInitial(lastcodepart)?.Normali;
+                if (normali != null)
+                {
+                    pos.Motion.Add(
+                        normali.X * 0.001f,
+                        0,
+                        normali.Z * 0.001f
+                    );
+                } else
+                {
+                    if (lastcodepart == "d")
+                    {
+                        pos.Motion.Add(0, -0.003f, 0);
+                    }
+                }
+            }
             
             // http://fooplot.com/plot/kg6l1ikyx2
             /*float x = entity.Pos.Motion.Length();

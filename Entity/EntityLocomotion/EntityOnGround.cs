@@ -32,7 +32,7 @@ namespace Vintagestory.GameContent
         {
             Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y - 0.05f), (int)pos.Z);           
 
-            if (!entity.Swimming)
+            if (!entity.Swimming && entity.Alive)
             {
                 double multiplier = (entity as EntityAgent).GetWalkSpeedMultiplier(groundDragFactor);
 
@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
                 pos.Motion.Add(motionDelta.X, 0, motionDelta.Z);
             }
 
-            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500)
+            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive)
             {
                 lastJump = entity.World.ElapsedMilliseconds;
                 

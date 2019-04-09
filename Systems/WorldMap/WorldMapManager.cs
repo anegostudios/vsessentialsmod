@@ -112,6 +112,11 @@ namespace Vintagestory.GameContent
             {
                 isShuttingDown = true;
                 worldMapDlg?.Dispose();
+
+                foreach (var layer in MapLayers)
+                {
+                    layer?.Dispose();
+                }
             };
 
             clientChannel =

@@ -33,6 +33,11 @@ namespace Vintagestory.ServerMods.NoObf
 
         public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, Dictionary<string, string> searchReplace)
         {
+            if (Shape != null && !Shape.VoxelizeTexture && jsonObject["guiTransform"]?["rotate"] == null)
+            {
+                GuiTransform.Rotate = true;
+            }
+
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);
 
             List<string> toRemove = new List<string>();

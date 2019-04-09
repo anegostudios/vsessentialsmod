@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
             // Clipping bounds for textarea
             ElementBounds clippingBounds = logtextBounds.ForkBoundingParent();
 
-            ElementBounds insetBounds = logtextBounds.FlatCopy().FixedGrow(6).WithAddedFixedPosition(-3, -3);
+            ElementBounds insetBounds = logtextBounds.FlatCopy().FixedGrow(6).WithFixedOffset(-3, -3);
 
             ElementBounds scrollbarBounds = insetBounds.CopyOffsetedSibling(logtextBounds.fixedWidth + 7).WithFixedWidth(20);
 
@@ -38,7 +38,7 @@ namespace Vintagestory.GameContent
 
             SingleComposer = capi.Gui
                 .CreateCompo("blockentitytexteditordialog", dialogBounds)
-                .AddDialogBG(bgBounds, true)
+                .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar(DialogTitle, OnTitleBarClose)
                 .AddStaticText("The following warnings and errors were reported during startup:", CairoFont.WhiteDetailText(), topTextBounds)
                 .BeginChildElements(bgBounds)

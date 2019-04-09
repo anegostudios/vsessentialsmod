@@ -56,7 +56,7 @@ namespace Vintagestory.GameContent
                 return;
             }
             
-            AssetLocation blockCode = block.WildCardPop(
+            AssetLocation blockCode = block.WildCardReplace(
                 new AssetLocation(fromCode), 
                 new AssetLocation(toCode)
             );

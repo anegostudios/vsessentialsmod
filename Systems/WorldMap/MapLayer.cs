@@ -120,6 +120,11 @@ namespace Vintagestory.GameContent
 
         }
 
+        public virtual void Dispose()
+        {
+
+        }
+
         
     }
 

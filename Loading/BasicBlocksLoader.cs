@@ -20,11 +20,6 @@ namespace Vintagestory.ServerMods
             return side == EnumAppSide.Server;
         }
 
-        public override bool AllowRuntimeReload()
-        {
-            return false;
-        }
-        
         public override double ExecuteOrder()
         {
             return 0.1;
@@ -36,10 +31,9 @@ namespace Vintagestory.ServerMods
             api = manager;
 
             noSound = new BlockSounds();
-      
+
             #region Block types
-            
-            api.RegisterBlock(new Block()
+            Block block = new Block()
             {
                 Code = new AssetLocation("mantle"),
                 Textures = new Dictionary<string, CompositeTexture> {
@@ -50,9 +44,19 @@ namespace Vintagestory.ServerMods
                 BlockMaterial = EnumBlockMaterial.Stone,
                 Replaceable = 0,
                 Resistance = 31337,
-                Sounds = noSound,
+                RequiredMiningTier = 196,
+                Sounds = new BlockSounds()
+                {
+                    Walk = new AssetLocation("sounds/walk/stone"),
+                    ByTool = new Dictionary<EnumTool, BlockSounds>()
+                    {
+                        { EnumTool.Pickaxe, new BlockSounds() { Hit = new AssetLocation("sounds/block/rock-hit-pickaxe"), Break = new AssetLocation("sounds/block/rock-hit-pickaxe") } }
+                    }
+                },
                 CreativeInventoryTabs = new string[] { "general" }
-            });
+            };
+
+            api.RegisterBlock(block);
 
             #endregion
 

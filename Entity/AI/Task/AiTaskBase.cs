@@ -152,5 +152,15 @@ namespace Vintagestory.API.Common
         {
             return false;
         }
+
+        public virtual void OnEntityLoaded()
+        {
+            
+        }
+
+        public virtual void OnEntitySpawn()
+        {
+            
+        }
     }
 }

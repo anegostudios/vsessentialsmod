@@ -13,13 +13,18 @@ namespace Vintagestory.ServerMods.NoObf
     [JsonObject(MemberSerialization.OptIn)]
     public abstract class RegistryObjectType
     {
+        public bool Enabled = true;
+        public JObject jsonObject;
         public AssetLocation Code;
         public RegistryObjectVariantGroup[] VariantGroups;
+
+        [JsonProperty]
         public AssetLocation[] SkipVariants;
 
-        public bool Enabled = true;
+        [JsonProperty]
+        public AssetLocation[] AllowedVariants;
 
-        public JObject jsonObject;
+        public HashSet<AssetLocation> AllowedVariantsQuickLookup = new HashSet<AssetLocation>();
 
         [JsonProperty]
         public string Class;
@@ -52,14 +57,14 @@ namespace Vintagestory.ServerMods.NoObf
 
             string pattern = Regex.Escape(wildCard.Path).Replace(@"\*", @"(.*)");
 
-            return Regex.IsMatch(Code.Path, @"^" + pattern + @"$");
+            return Regex.IsMatch(Code.Path, @"^" + pattern + @"$", RegexOptions.IgnoreCase);
         }
 
         public static bool WildCardMatch(string wildCard, string text)
         {
             if (wildCard == text) return true;
             string pattern = Regex.Escape(wildCard).Replace(@"\*", @"(.*)");
-            return Regex.IsMatch(text, @"^" + pattern + @"$");
+            return Regex.IsMatch(text, @"^" + pattern + @"$", RegexOptions.IgnoreCase);
         }
 
         public static bool WildCardMatches(string blockCode, List<string> wildCards, out string matchingWildcard)
@@ -82,7 +87,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             string pattern = Regex.Escape(wildCard.Path).Replace(@"\*", @"(.*)");
 
-            return Regex.IsMatch(blockCode.Path, @"^" + pattern + @"$");
+            return Regex.IsMatch(blockCode.Path, @"^" + pattern + @"$", RegexOptions.IgnoreCase);
         }
 
         public static bool WildCardMatches(AssetLocation blockCode, List<AssetLocation> wildCards, out AssetLocation matchingWildcard)
