@@ -33,8 +33,7 @@ namespace Vintagestory.GameContent
 
             float x = (float)(map.Bounds.renderX + viewPos.X);
             float y = (float)(map.Bounds.renderY + viewPos.Y);
-
-            //api.Render.GlToggleBlend(true, EnumBlendMode.PremultipliedAlpha);
+            
             ICoreClientAPI api = map.Api;
 
             if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");

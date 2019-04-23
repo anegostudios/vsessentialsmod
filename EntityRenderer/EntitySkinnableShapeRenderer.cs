@@ -97,9 +97,9 @@ namespace Vintagestory.GameContent
                 (int)EnumCharacterDressType.Emblem,
                 (int)EnumCharacterDressType.Neck,
                 (int)EnumCharacterDressType.Head,
-                (int)EnumCharacterDressType.Ring,
                 (int)EnumCharacterDressType.Hand,
                 (int)EnumCharacterDressType.Arm,
+                (int)EnumCharacterDressType.Face
             };
 
             if (gearInv == null && eagent?.GearInventory != null)
@@ -124,7 +124,6 @@ namespace Vintagestory.GameContent
                     Width = capi.ItemTextureAtlas.Size,
                     Height = capi.ItemTextureAtlas.Size
                 };
-                
 
                 capi.EntityTextureAtlas.RenderTextureIntoAtlas(
                     itemAtlas,

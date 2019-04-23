@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace Vintagestory.ServerMods.NoObf
@@ -17,6 +18,14 @@ namespace Vintagestory.ServerMods.NoObf
         public JObject jsonObject;
         public AssetLocation Code;
         public RegistryObjectVariantGroup[] VariantGroups;
+
+        /// <summary>
+        /// Variant values as resolved from blocktype/itemtype or entitytype
+        /// </summary>
+        public Dictionary<string, string> Variant = new Dictionary<string, string>();
+
+        [JsonProperty]
+        public WorldInteraction[] Interactions;
 
         [JsonProperty]
         public AssetLocation[] SkipVariants;

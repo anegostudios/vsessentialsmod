@@ -36,30 +36,49 @@ namespace Vintagestory.GameContent
 
             api.Input.RegisterHotKey("handbook", "Show VS Handbook", GlKeys.H, HotkeyType.GUIOrOtherControls);
             api.Input.SetHotKeyHandler("handbook", OnHelpHotkey);
+
+            api.Event.LevelFinalize += Event_LevelFinalize;
+            api.RegisterLinkProtocol("handbook", onHandBookLinkClicked);
+        }
+
+        private void onHandBookLinkClicked(LinkTextComponent comp)
+        {
+            string target = comp.Href.Substring("handbook://".Length);
+            if (!dialog.IsOpened()) dialog.TryOpen();
+
+            dialog.OpenDetailPageFor(target);
+        }
+
+        private void Event_LevelFinalize()
+        {
+            dialog = new GuiDialogHandbook(capi);
         }
 
         private bool OnHelpHotkey(KeyCombination key)
         {
-            if (dialog != null)
+            if (dialog.IsOpened())
             {
                 dialog.TryClose();
-                dialog = null;
             } else
             {
-                dialog = new GuiDialogHandbook(capi);
-                dialog.OnClosed += () => dialog = null;
-
                 dialog.TryOpen();
+                // dunno why
+                dialog.ignoreNextKeyPress = true;
 
                 if (capi.World.Player.InventoryManager.CurrentHoveredSlot?.Itemstack != null)
                 {
-                    dialog.OpenDetailPageFor(capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack);
+                    string pageCode = HandbookStacklistElement.PageCodeForCollectible(capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack.Collectible); 
+
+                    dialog.OpenDetailPageFor(pageCode);
                 }
 
                 if (capi.World.Player.Entity.Controls.Sneak && capi.World.Player.CurrentBlockSelection != null)
                 {
                     Block block = capi.World.BlockAccessor.GetBlock(capi.World.Player.CurrentBlockSelection.Position);
-                    dialog.OpenDetailPageFor(new ItemStack(block));
+
+                    string pageCode = HandbookStacklistElement.PageCodeForCollectible(block);
+
+                    dialog.OpenDetailPageFor(pageCode);
                 }
             }
 

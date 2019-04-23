@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
 
             bool shouldTest = tick++ % 30 == 0;
 
-            if (shouldTest && (LightLevelOk() || PlayerDistanceOk()))
+            if (shouldTest && (LightLevelOk() || PlayerInRange()))
             {
                 DeathTime = 0;
                 return;
@@ -56,13 +56,13 @@ namespace Vintagestory.GameContent
         }
 
 
-        public bool PlayerDistanceOk()
+        public bool PlayerInRange()
         {
             if (minPlayerDistance == null) return false;
 
             IPlayer player = entity.World.NearestPlayer(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
 
-            return player?.Entity != null && player.Entity.Pos.SquareDistanceTo(entity.ServerPos.XYZ) < minPlayerDistance * minPlayerDistance;
+            return player?.Entity != null && player.Entity.ServerPos.SquareDistanceTo(entity.ServerPos.XYZ) < minPlayerDistance * minPlayerDistance;
         }
 
         public bool LightLevelOk()

@@ -108,6 +108,10 @@ namespace Vintagestory.GameContent
             capi.Event.BlockTexturesLoaded += OnLoaded;
             capi.Event.LevelFinalize += OnLvlFinalize;
 
+            capi.Settings.AddWatcher<bool>("showMinimapHud", (on) => {
+                ToggleMap(EnumDialogType.HUD);
+            });
+
             capi.Event.LeaveWorld += () =>
             {
                 isShuttingDown = true;
@@ -130,7 +134,7 @@ namespace Vintagestory.GameContent
 
         private void OnLvlFinalize()
         {
-            if (capi != null && (capi.Settings.Bool["hudOpened"] || !capi.Settings.Bool.Exists("hudOpened")) && (worldMapDlg == null || !worldMapDlg.IsOpened()))
+            if (capi != null && (capi.Settings.Bool["showMinimapHud"] || !capi.Settings.Bool.Exists("showMinimapHud")) && (worldMapDlg == null || !worldMapDlg.IsOpened()))
             {
                 ToggleMap(EnumDialogType.HUD);
             }
@@ -198,7 +202,7 @@ namespace Vintagestory.GameContent
             {
                 if (!isDlgOpened)
                 {
-                    if (asType == EnumDialogType.HUD) capi.Settings.Bool["hudOpened"] = true;
+                    if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
 
                     worldMapDlg.Open(asType);
                     return;
@@ -213,9 +217,9 @@ namespace Vintagestory.GameContent
 
                     if (asType == EnumDialogType.HUD)
                     {
-                        capi.Settings.Bool["hudOpened"] = false;
+                        capi.Settings.Bool["showMinimapHud"] = false;
                     }
-                    else if (capi.Settings.Bool["hudOpened"])
+                    else if (capi.Settings.Bool["showMinimapHud"])
                     {
                         worldMapDlg.Open(EnumDialogType.HUD);
                         return;
@@ -242,7 +246,7 @@ namespace Vintagestory.GameContent
             };
 
             worldMapDlg.Open(asType);
-            if (asType == EnumDialogType.HUD) capi.Settings.Bool["hudOpened"] = true;
+            if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
         }
 
 

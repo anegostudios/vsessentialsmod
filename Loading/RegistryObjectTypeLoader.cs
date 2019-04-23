@@ -249,17 +249,18 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        EntityType baseEntityFromEntityType(EntityType entityType, AssetLocation fullcode, Dictionary<string, string> searchReplace)
+        EntityType baseEntityFromEntityType(EntityType entityType, AssetLocation fullcode, Dictionary<string, string> variant)
         {
             EntityType newEntityType = new EntityType()
             {
                 Code = fullcode,
                 VariantGroups = entityType.VariantGroups,
                 Enabled = entityType.Enabled,
-                jsonObject = entityType.jsonObject.DeepClone() as JObject
+                jsonObject = entityType.jsonObject.DeepClone() as JObject,
+                Variant = new Dictionary<string, string>(variant)
             };
 
-            solveByType(newEntityType.jsonObject, fullcode.Path, searchReplace);
+            solveByType(newEntityType.jsonObject, fullcode.Path, variant);
 
             try
             {
@@ -337,17 +338,18 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        Item baseItemFromItemType(ItemType itemType, AssetLocation fullcode, Dictionary<string, string> searchReplace)
+        Item baseItemFromItemType(ItemType itemType, AssetLocation fullcode, Dictionary<string, string> variant)
         {
             ItemType typedItemType = new ItemType()
             {
                 Code = itemType.Code,
                 VariantGroups = itemType.VariantGroups,
+                Variant = new Dictionary<string, string>(variant),
                 Enabled = itemType.Enabled,
                 jsonObject = itemType.jsonObject.DeepClone() as JObject
             };
 
-            solveByType(typedItemType.jsonObject, fullcode.Path, searchReplace);
+            solveByType(typedItemType.jsonObject, fullcode.Path, variant);
 
             try
             {
@@ -372,6 +374,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
             item.Code = fullcode;
+            item.Variant = typedItemType.Variant;
             item.Class = typedItemType.Class;
             item.Textures = typedItemType.Textures;
             item.MaterialDensity = typedItemType.MaterialDensity;
@@ -402,7 +405,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
             item.MatterState = typedItemType.MatterState;
 
-            typedItemType.InitItem(api.World.Logger, api.ClassRegistry, item, searchReplace);
+            typedItemType.InitItem(api.World.Logger, api.ClassRegistry, item, variant);
 
             typedItemType.jsonObject = null;
 
@@ -469,19 +472,20 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        Block baseBlockFromBlockType(BlockType blockType, AssetLocation fullcode, Dictionary<string, string> searchReplace)
+        Block baseBlockFromBlockType(BlockType blockType, AssetLocation fullcode, Dictionary<string, string> variant)
         {
             BlockType typedBlockType = new BlockType()
             {
                 Code = blockType.Code,
                 VariantGroups = blockType.VariantGroups,
+                Variant = new Dictionary<string, string>(variant),
                 Enabled = blockType.Enabled,
                 jsonObject = blockType.jsonObject.DeepClone() as JObject
             };
 
             try
             {
-                solveByType(typedBlockType.jsonObject, fullcode.Path, searchReplace);
+                solveByType(typedBlockType.jsonObject, fullcode.Path, variant);
             }
             catch (Exception e)
             {
@@ -524,6 +528,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
             block.Code = fullcode;
+            block.Variant = typedBlockType.Variant;
             block.Class = typedBlockType.Class;
             block.LiquidSelectable = typedBlockType.LiquidSelectable;
             block.LiquidCode = typedBlockType.LiquidCode;
@@ -605,7 +610,7 @@ namespace Vintagestory.ServerMods.NoObf
                 }
             }
 
-            typedBlockType.InitBlock(api.ClassRegistry, api.World.Logger, block, searchReplace);
+            typedBlockType.InitBlock(api.ClassRegistry, api.World.Logger, block, variant);
 
             return block;
         }

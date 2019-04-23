@@ -129,9 +129,9 @@ namespace Vintagestory.GameContent
                 val.Value?.Dispose();
             }
 
-            ownTexture.Dispose();
+            ownTexture?.Dispose();
             ownTexture = null;
-            otherTexture.Dispose();
+            otherTexture?.Dispose();
             otherTexture = null;
 
             MapComps.Clear();
