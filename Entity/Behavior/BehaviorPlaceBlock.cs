@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
         internal AssetLocation[] BlockCodes
         {
             get {
-                string[] codes = attributes["blockCodes"].AsStringArray(new string[0]);
+                string[] codes = attributes["blockCodes"].AsArray(new string[0]);
                 AssetLocation[] locs = new AssetLocation[codes.Length];
                 for (int i = 0; i < locs.Length; i++) locs[i] = new AssetLocation(codes[i]);
                 return locs;
@@ -85,6 +85,7 @@ namespace Vintagestory.GameContent
         private void CheckShouldPlace(float dt)
         {
             if (!entity.Alive) return;
+            if (entity.Swimming || entity.FeetInLiquid) return; // Quick fix for chicken laying eggs in water
 
             callbackId = entity.World.RegisterCallback(CheckShouldPlace, 3000);
 

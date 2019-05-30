@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -22,7 +23,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// <summary>
         /// Variant values as resolved from blocktype/itemtype or entitytype
         /// </summary>
-        public Dictionary<string, string> Variant = new Dictionary<string, string>();
+        public OrderedDictionary<string, string> Variant = new OrderedDictionary<string, string>();
 
         [JsonProperty]
         public WorldInteraction[] Interactions;

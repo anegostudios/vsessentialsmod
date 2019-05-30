@@ -68,6 +68,39 @@ namespace Vintagestory.GameContent
             ActiveTasksBySlot[slot] = task;
         }
 
+        public T GetTask<T>() where T : IAiTask
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                if (task is T)
+                {
+                    return (T)task;
+                }
+            }
+
+            return default(T);
+        }
+
+        public void ExecuteTask<T>() where T : IAiTask
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                if (task is T)
+                {
+                    int slot = task.Slot;
+
+                    if (ActiveTasksBySlot[slot] != null)
+                    {
+                        ActiveTasksBySlot[slot].FinishExecute(true);
+                    }
+
+                    ActiveTasksBySlot[slot] = task;
+                    task.StartExecute();
+                    OnTaskStarted?.Invoke(task);
+                }
+            }
+        }
+
 
         public void StopTask(Type taskType)
         {
@@ -122,7 +155,11 @@ namespace Vintagestory.GameContent
                     IAiTask task = ActiveTasksBySlot[i];
                     if (task == null) continue;
                     if (j++ > 0) tasks += ", ";
-                    tasks += AiTaskRegistry.TaskCodes[task.GetType()] + "("+task.Priority+")";
+
+                    string code = ""+task.GetType();
+                    AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out code);
+
+                    tasks += code + "("+task.Priority+")";
                 }
                 entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
             }
@@ -175,6 +212,14 @@ namespace Vintagestory.GameContent
             foreach (IAiTask task in Tasks)
             {
                 task.OnEntityLoaded();
+            }
+        }
+
+        internal void OnEntityDespawn(EntityDespawnReason reason)
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                task.OnEntityDespawn(reason);
             }
         }
     }

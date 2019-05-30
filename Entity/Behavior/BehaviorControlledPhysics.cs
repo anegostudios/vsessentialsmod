@@ -72,7 +72,7 @@ namespace Vintagestory.GameContent
 
         public virtual void GameTick(Entity entity, float dt) {
             EntityControls controls = ((EntityAgent)entity).Controls;
-            TickEntityPhysics(entity.ServerPos, controls, dt);
+            TickEntityPhysics(entity.ServerPos, controls, dt);  // this was entity.ServerPos - wtf? - apparently needed so they don't glitch through terrain o.O
             if (entity.World is IServerWorldAccessor)
             {
                 entity.Pos.SetFrom(entity.ServerPos);
@@ -105,7 +105,6 @@ namespace Vintagestory.GameContent
                 pos.Motion.Z = 0;
                 return;
             }
-
 
             pos.Motion.X = GameMath.Clamp(pos.Motion.X, -10, 10);
             pos.Motion.Y = GameMath.Clamp(pos.Motion.Y, -10, 10);
@@ -238,8 +237,8 @@ namespace Vintagestory.GameContent
 
             collisionTester.ApplyTerrainCollision(entity, pos, ref outposition, !(entity is EntityPlayer));
 
-            bool isStepping = HandleSteppingOnBlocks(pos, controls);
-
+            controls.IsStepping = HandleSteppingOnBlocks(pos, controls);
+            
             HandleSneaking(pos, controls, dt);
 
 
@@ -277,14 +276,18 @@ namespace Vintagestory.GameContent
                 pos.Motion.Z = 0;
             }
 
+            float offX = entity.CollisionBox.X2 - entity.OriginCollisionBox.X2;
+            float offZ = entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2;
+
+            int posX = (int)(pos.X + offX);
+            int posZ = (int)(pos.Z + offZ);
+
+            Block block = blockAccess.GetBlock(posX, (int)(pos.Y), posZ);
+            Block aboveblock = blockAccess.GetBlock(posX, (int)(pos.Y + 1), posZ);
+            Block middleBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.CollisionBox.Y1 + entity.CollisionBox.Y2 * 0.66f), posZ);
 
 
-            Block block = blockAccess.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-            Block aboveblock = blockAccess.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
-            Block middleBlock = blockAccess.GetBlock((int)pos.X, (int)(pos.Y + entity.CollisionBox.Y1 + entity.CollisionBox.Y2 * 0.66f), (int)pos.Z);
-
-
-            entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || isStepping;
+            entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
             entity.FeetInLiquid = block.IsLiquid() && ((block.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
             entity.Swimming = middleBlock.IsLiquid();
 

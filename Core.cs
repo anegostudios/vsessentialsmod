@@ -133,6 +133,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("deaddecay", typeof(EntityBehaviorDeadDecay));
             api.RegisterEntityBehaviorClass("floatupwhenstuck", typeof(EntityBehaviorFloatUpWhenStuck));
             api.RegisterEntityBehaviorClass("harvestable", typeof(EntityBehaviorHarvestable));
+            api.RegisterEntityBehaviorClass("reviveondeath", typeof(EntityBehaviorReviveOnDeath));
         }
 
 

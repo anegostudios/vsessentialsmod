@@ -56,7 +56,14 @@ namespace Vintagestory.GameContent
             DisplayChatMessages = entity is EntityPlayer;
 
             TesselateShape();
-            nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
+
+            // For players the player data is not there yet, so we load the thing later
+            if (!(entity is EntityPlayer))
+            {
+                nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
+            }
+
+            
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
@@ -84,9 +91,14 @@ namespace Vintagestory.GameContent
                 {
                     string name = GetNameTagName();
                     if (name != null && message.StartsWith(name + ": "))
-                    {
+                    { 
                         message = message.Substring((name + ": ").Length);
                     }
+                    if (name != null && message.StartsWith("<strong>" + name + ":</strong>"))
+                    {
+                        message = message.Substring(("<strong>" + name + ":</strong>").Length);
+                    }
+                    
 
                     LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
@@ -233,6 +245,7 @@ namespace Vintagestory.GameContent
 
         private void OnNameChanged()
         {
+            if (nameTagRenderHandler == null) return;
             if (nameTagTexture != null)
             {
                 nameTagTexture.Dispose();
@@ -242,7 +255,7 @@ namespace Vintagestory.GameContent
             int? range = entity.GetBehavior<EntityBehaviorNameTag>()?.RenderRange;
             renderRange = range == null ? 999 : (int)range;
             showNameTagOnlyWhenTargeted = entity.GetBehavior<EntityBehaviorNameTag>()?.ShowOnlyWhenTargeted == true;
-            nameTagTexture = nameTagRenderHandler(capi, entity);
+            nameTagTexture = nameTagRenderHandler.Invoke(capi, entity);
         }
 
         public string GetNameTagName()
@@ -260,6 +273,9 @@ namespace Vintagestory.GameContent
             if (player == null && entity is EntityPlayer)
             {
                 player = capi.World.PlayerByUid((entity as EntityPlayer).PlayerUID) as IClientPlayer;
+
+                nameTagRenderHandler = capi.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
+                OnNameChanged();
             }
 
             isSpectator = player != null && player.WorldData.CurrentGameMode == EnumGameMode.Spectator;
@@ -299,12 +315,12 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                loadModelMatrix(entity);
+                loadModelMatrix(entity, dt);
                 Vec3d camPos = capi.World.Player.Entity.CameraPos;
                 OriginPos.Set((float)(entity.Pos.X - camPos.X), (float)(entity.Pos.Y - camPos.Y), (float)(entity.Pos.Z - camPos.Z));
             }
 
-            if (DoRenderHeldItem)
+            if (DoRenderHeldItem && !entity.AnimManager.ActiveAnimationsByAnimCode.ContainsKey("lie"))
             {
                 RenderHeldItem(isShadowPass, false);
                 RenderHeldItem(isShadowPass, true);
@@ -488,9 +504,12 @@ namespace Vintagestory.GameContent
             {
                 aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.5, entity.Pos.Z);
             }
-            
 
-            
+            double offX = entity.CollisionBox.X2 - entity.OriginCollisionBox.X2;
+            double offZ = entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2;
+            aboveHeadPos.Add(offX, 0, offZ);
+
+
             Vec3d pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
 
             // Z negative seems to indicate that the name tag is behind us \o/
@@ -576,8 +595,9 @@ namespace Vintagestory.GameContent
         }
 
 
+        double stepPitch;
 
-        public void loadModelMatrix(Entity entity)
+        public void loadModelMatrix(Entity entity, float dt)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
@@ -589,11 +609,46 @@ namespace Vintagestory.GameContent
             float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
 
             Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
+            IWorldAccessor world = entity.World;
+
+            // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
+            if (entity is EntityAgent)
+            {
+                if (entity.Properties.Habitat != EnumHabitat.Air)
+                {
+                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !(entity as EntityAgent).Controls.IsClimbing)
+                    {
+                        stepPitch = Math.Max(-0.5, stepPitch - 2 * dt);
+                    }
+                    else
+                    {
+                        if (stepPitch < 0)
+                        {
+                            stepPitch = Math.Min(0, stepPitch + 2 * dt);
+                        }
+                        else
+                        {
+                            if (!entity.OnGround && !entity.Swimming)
+                            {
+                                stepPitch = Math.Min(0.5, stepPitch + 3 * dt);
+                            }
+                            else
+                            {
+                                stepPitch = Math.Max(0, stepPitch - 2 * dt);
+                            }
+                        }
+                    }
+                } else
+                {
+                    stepPitch = GameMath.Clamp(entity.Pos.Y - entity.ServerPos.Y + 0.1, 0, 0.3) - GameMath.Clamp(entity.ServerPos.Y - entity.Pos.Y - 0.1, 0, 0.3);
+                }
+            }
+            
 
             double[] quat = Quaterniond.Create();
-            Quaterniond.RotateX(quat, quat, entity.Pos.Pitch + rotX * GameMath.DEG2RAD);
+            Quaterniond.RotateX(quat, quat, entity.Pos.Pitch+ rotX * GameMath.DEG2RAD);
             Quaterniond.RotateY(quat, quat, entity.Pos.Yaw + (rotY + 90) * GameMath.DEG2RAD);
-            Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + rotZ * GameMath.DEG2RAD);
+            Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + stepPitch + rotZ * GameMath.DEG2RAD);
             
             float[] qf = new float[quat.Length];
             for (int i = 0; i < quat.Length; i++) qf[i] = (float)quat[i];

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
@@ -110,10 +111,37 @@ namespace Vintagestory.GameContent
             base.OnRenderGUI(deltaTime);
         }
 
-        public override bool RequiresUngrabbedMouse()
+        Vec3d entityPos = new Vec3d();
+
+        public override void OnFinalizeFrame(float dt)
         {
-            return false;
+            base.OnFinalizeFrame(dt);
+
+            entityPos.Set(owningEntity.Pos.X, owningEntity.Pos.Y, owningEntity.Pos.Z);
+            entityPos.Add(owningEntity.CollisionBox.X2 - owningEntity.OriginCollisionBox.X2, 0, owningEntity.CollisionBox.Z2 - owningEntity.OriginCollisionBox.Z2);
+
+            if (!IsInRangeOfBlock())
+            {
+                // Because we cant do it in here
+                capi.Event.RegisterCallback((deltatime) => TryClose(), 0);
+            }
         }
+
+        /// <summary>
+        /// Checks if the player is in range of the block.
+        /// </summary>
+        /// <param name="pos">The block's position.</param>
+        /// <returns>In range or no?</returns>
+        public virtual bool IsInRangeOfBlock()
+        {
+            Vec3d playerEye = capi.World.Player.Entity.Pos.XYZ.Add(0, capi.World.Player.Entity.EyeHeight, 0);
+            double dist = GameMath.Sqrt(playerEye.SquareDistanceTo(entityPos));
+
+            return dist <= capi.World.Player.WorldData.PickingRange;
+        }
+
+
+        public override bool PrefersUngrabbedMouse => false;
     }
 
 }

@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 
 namespace Vintagestory.API.Common
 {
@@ -69,5 +70,6 @@ namespace Vintagestory.API.Common
 
         void OnEntityLoaded();
         void OnEntitySpawn();
+        void OnEntityDespawn(EntityDespawnReason reason);
     }
 }

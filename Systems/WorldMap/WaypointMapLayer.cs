@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
         ICoreServerAPI sapi;
 
         // Client side
-        List<Waypoint> ownWaypoints = new List<Waypoint>();
+        public List<Waypoint> ownWaypoints = new List<Waypoint>();
         List<MapComponent> wayPointComponents = new List<MapComponent>();
 
         LoadedTexture texture;
@@ -70,7 +70,7 @@ namespace Vintagestory.GameContent
                 case "add":
                     if (args.Length == 0)
                     {
-                        player.SendMessage(groupId, Lang.Get("Syntax: /waypoint add [color] [title]\nColor may be a known .net color or hex number"), EnumChatType.CommandError);
+                        player.SendMessage(groupId, Lang.Get("Syntax: /waypoint add [color] [title]\nColor may be a hex value or a known .net color  (you can google for that to get a list)"), EnumChatType.CommandError);
                         return;
                     }
 
@@ -81,8 +81,15 @@ namespace Vintagestory.GameContent
 
                     if (colorstring.StartsWith("#"))
                     {
-                        int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
-                        parsedColor = System.Drawing.Color.FromArgb(argb);
+                        try
+                        {
+                            int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
+                            parsedColor = System.Drawing.Color.FromArgb(argb);
+                        } catch (FormatException)
+                        {
+                            player.SendMessage(groupId, Lang.Get("Not a valid color. Use a hex value (e.g. #FF00FF) or a know .net color (e.g. red, but you can google for that to get a list)"), EnumChatType.CommandError);
+                            return;
+                        }
                     } else
                     {
                         parsedColor = System.Drawing.Color.FromName(colorstring);
@@ -275,10 +282,7 @@ namespace Vintagestory.GameContent
                 hisMarkers.Add(marker);
             }
 
-            if (hisMarkers.Count == 0) return;
-
             mapSink.SendMapDataToClient(this, toPlayer, SerializerUtil.Serialize(hisMarkers));
-
         }
 
 

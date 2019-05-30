@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
@@ -67,16 +68,17 @@ namespace Vintagestory.GameContent
 
                 if (capi.World.Player.InventoryManager.CurrentHoveredSlot?.Itemstack != null)
                 {
-                    string pageCode = HandbookStacklistElement.PageCodeForCollectible(capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack.Collectible); 
+                    string pageCode = GuiHandbookItemStackPage.PageCodeForStack(capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack); 
 
                     dialog.OpenDetailPageFor(pageCode);
                 }
 
                 if (capi.World.Player.Entity.Controls.Sneak && capi.World.Player.CurrentBlockSelection != null)
                 {
-                    Block block = capi.World.BlockAccessor.GetBlock(capi.World.Player.CurrentBlockSelection.Position);
+                    BlockPos pos = capi.World.Player.CurrentBlockSelection.Position;
+                    ItemStack stack = capi.World.BlockAccessor.GetBlock(pos).OnPickBlock(capi.World, pos);
 
-                    string pageCode = HandbookStacklistElement.PageCodeForCollectible(block);
+                    string pageCode = GuiHandbookItemStackPage.PageCodeForStack(stack);
 
                     dialog.OpenDetailPageFor(pageCode);
                 }
@@ -84,6 +86,12 @@ namespace Vintagestory.GameContent
 
             return true;
         }
-        
+
+        public override void Dispose()
+        {
+            base.Dispose();
+            dialog?.Dispose();
+        }
+
     }
 }

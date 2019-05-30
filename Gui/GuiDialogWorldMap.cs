@@ -17,10 +17,7 @@ namespace Vintagestory.GameContent
 
     public class GuiDialogWorldMap : GuiDialogGeneric
     {
-        public override bool RequiresUngrabbedMouse()
-        {
-            return false;
-        }
+        public override bool PrefersUngrabbedMouse => true;
 
         EnumDialogType dialogType = EnumDialogType.HUD;
         public override EnumDialogType DialogType => dialogType; 
@@ -50,7 +47,7 @@ namespace Vintagestory.GameContent
         private void ComposeDialog()
         {
             ElementBounds mapBounds = ElementBounds.Fixed(0, 28, 1200, 800);
-            ElementBounds layerList = mapBounds.RightCopy().WithFixedSize(10, 350);
+            ElementBounds layerList = mapBounds.RightCopy().WithFixedSize(1, 350);
 
             ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(3);
             bgBounds.BothSizing = ElementSizing.FitToChildren;

@@ -12,34 +12,35 @@ namespace Vintagestory.ServerMods
 {
     public class JsonExport : ModSystem
     {
+        ICoreServerAPI api;
+
         public override bool ShouldLoad(EnumAppSide forSide)
         {
             return forSide == EnumAppSide.Server;
         }
 
-        ICoreServerAPI api;
+        
         public override void StartServerSide(ICoreServerAPI api)
         {
             base.StartServerSide(api);
 
-           // api.Event.ServerRunPhase(EnumServerRunPhase.RunGame, onRunGame);
-
+            api.RegisterCommand("jsonexport", "Export items and blocks as json files", "", CmdExport, Privilege.controlserver);
+           
             this.api = api;
         }
 
-        private void onRunGame()
-        {
-            
+        private void CmdExport(IServerPlayer player, int groupId, CmdArgs args)
+        {   
             StringBuilder sql = new StringBuilder();
             sql.Append("[");
-
+            int cnt = 0;
             for (int i = 0; i < api.World.Blocks.Length; i++)
             {
                 Block block = api.World.Blocks[i];
 
                 if (block == null || block.Code == null) continue;
 
-                if (i > 0) sql.Append(",");
+                if (cnt > 0) sql.Append(",");
                 sql.Append("{");
                 sql.Append(string.Format("\"name\": \"{0}\", ", new ItemStack(block).GetName()));
                 sql.Append(string.Format("\"code\": \"{0}\", ", block.Code));
@@ -47,11 +48,38 @@ namespace Vintagestory.ServerMods
                 sql.Append(string.Format("\"shape\": \"{0}\", ", block.Shape.Base.Path));
                 sql.Append(string.Format("\"tool\": \"{0}\"", block.Tool));
                 sql.Append("}");
+                cnt++;
             }
 
             sql.Append("]");
 
             File.WriteAllText("blocks.json", sql.ToString());
+
+
+
+            sql = new StringBuilder();
+            sql.Append("[");
+            cnt = 0;
+
+            for (int i = 0; i < api.World.Items.Length; i++)
+            {
+                Item item = api.World.Items[i];
+
+                if (item == null || item.Code == null) continue;
+
+                if (cnt > 0) sql.Append(",");
+                sql.Append("{");
+                sql.Append(string.Format("\"name\": \"{0}\", ", new ItemStack(item).GetName()));
+                sql.Append(string.Format("\"code\": \"{0}\", ", item.Code));
+                sql.Append(string.Format("\"shape\": \"{0}\", ", item.Shape?.Base?.Path));
+                sql.Append(string.Format("\"tool\": \"{0}\"", item.Tool));
+                sql.Append("}");
+                cnt++;
+            }
+
+            sql.Append("]");
+
+            File.WriteAllText("items.json", sql.ToString());
         }
     }
 }

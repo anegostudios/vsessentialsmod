@@ -221,7 +221,10 @@ namespace Vintagestory.GameContent
 
             chunkViewBoundsBefore = chunkviewBounds.Clone();
 
-            viewChanged(nowVisible, nowHidden);
+            if (nowHidden.Count > 0 || nowVisible.Count > 0)
+            {
+                viewChanged(nowVisible, nowHidden);
+            }
         }
 
 

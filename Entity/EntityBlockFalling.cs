@@ -16,6 +16,7 @@ namespace Vintagestory.GameContent
     {
         private int ticksAlive;
         int lingerTicks;
+        bool hasLanded;
 
         public bool InitialBlockRemoved;
 
@@ -157,11 +158,12 @@ namespace Vintagestory.GameContent
                 if (IsReplaceableBlock(finalPos))
                 {
                     UpdateBlock(false, finalPos);
+                    hasLanded = true;
                 }
                 else
                 {
                     // Space is occupied by maybe a torch or some other block we shouldn't replace
-                    DropItems(finalPos);
+                    if (!hasLanded) DropItems(finalPos);
                 }
             }
 

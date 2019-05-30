@@ -203,7 +203,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, Dictionary<string, string> searchReplace)
+        public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, OrderedDictionary<string, string> searchReplace)
         {
             BlockBehaviorType[] behaviorTypes = Behaviors;
 
@@ -311,7 +311,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
         }
 
-        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, Dictionary<string, string> searchReplace)
+        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, OrderedDictionary<string, string> searchReplace)
         {
             List<string> tabs = new List<string>();
 

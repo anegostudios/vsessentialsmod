@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent
 
         bool done;
         float moveSpeed = 0.03f;
-        float wanderChance = 0.015f;
+        float wanderChance = 0.02f;
         float maxHeight = 7f;
         float? preferredLightLevel;
         float targetDistance = 0.12f;

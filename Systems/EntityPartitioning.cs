@@ -60,6 +60,7 @@ namespace Vintagestory.GameContent
         int chunkMapSizeX;
         int chunkMapSizeZ;
 
+
         /// <summary>
         /// Updated every frame. The largest hitbox length of all loaded entities.
         /// </summary>
@@ -162,7 +163,7 @@ namespace Vintagestory.GameContent
             else didChange = true;
 
 
-            if (didChange)
+            if (didChange && gridIndex > 0) // Grindindex can be negative when a entity is outside world bounds 
             {
                 partition.Entities[gridIndex].Add(entity);
                 GridIndexByEntityId[entity.EntityId] = new GridAndChunkIndex(lgz * partitionsLength + lgx, entity.InChunkIndex3d);
@@ -219,8 +220,8 @@ namespace Vintagestory.GameContent
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
-        /// <param name="callback"></param>
-        public void WalkEntities(Vec3d centerPos, double radius, API.Common.Action<Entity> callback)
+        /// <param name="callback">Return false to stop the walk</param>
+        public void WalkEntities(Vec3d centerPos, double radius, API.Common.ActionConsumable<Entity> callback)
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
@@ -235,6 +236,9 @@ namespace Vintagestory.GameContent
             IWorldChunk chunk = null;
             EntityPartitionChunk partitionChunk = null;
 
+            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            int gridZMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
@@ -242,6 +246,8 @@ namespace Vintagestory.GameContent
                 {
                     for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                     {
+                        if (gridX < 0 || gridY < 0 || gridZ < 0 || gridX >= gridXMax || gridY >= gridYMax || gridZ >= gridZMax) continue;
+
                         int cx = gridX * gridSizeInBlocks / chunkSize;
                         int cy = gridY * gridSizeInBlocks / chunkSize;
                         int cz = gridZ * gridSizeInBlocks / chunkSize;
@@ -269,7 +275,10 @@ namespace Vintagestory.GameContent
                             double distSq = entities[i].LocalPos.SquareDistanceTo(centerPos);
                             if (distSq <= radiusSq)
                             {
-                                callback(entities[i]);
+                                if (!callback(entities[i]))
+                                {
+                                    return;
+                                }
                             }
                         }
                     }
@@ -297,7 +306,10 @@ namespace Vintagestory.GameContent
             int cxBefore = -99, cyBefore = -99, czBefore = -99;
             IWorldChunk chunk = null;
             EntityPartitionChunk partitionChunk = null;
-            
+
+            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            int gridZMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
@@ -305,6 +317,8 @@ namespace Vintagestory.GameContent
                 {
                     for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                     {
+                        if (gridX < 0 || gridY < 0 || gridZ < 0 || gridX >= gridXMax || gridY >= gridYMax || gridZ >= gridZMax) continue;
+
                         int cx = gridX * gridSizeInBlocks / chunkSize;
                         int cy = gridY * gridSizeInBlocks / chunkSize;
                         int cz = gridZ * gridSizeInBlocks / chunkSize;
@@ -325,7 +339,6 @@ namespace Vintagestory.GameContent
                         int lgx = gridX % partitionsLength;
                         int lgz = gridZ % partitionsLength;
                         
-
                         List<Entity> entities = partitionChunk.Entities[lgz * partitionsLength + lgx];
                         for (int i = 0; i < entities.Count; i++)
                         {

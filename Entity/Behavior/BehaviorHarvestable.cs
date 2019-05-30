@@ -10,15 +10,29 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorHarvestable : EntityBehavior
     {
-        BlockDropItemStack[] jsonDrops;
+        protected BlockDropItemStack[] jsonDrops;
 
-        InventoryGeneric inv;
-        GuiDialogCarcassContents dlg;
+        protected InventoryGeneric inv;
+        protected GuiDialogCarcassContents dlg;
+
+        protected float dropQuantityMultiplier
+        {
+            get
+            {
+                return entity.WatchedAttributes.GetFloat("dropQuantityMultiplier", 1);
+            }
+            set 
+            {
+                entity.WatchedAttributes.SetFloat("dropQuantityMultiplier", value);
+            }
+        }
+
 
         public float HarvestDuration
         {
@@ -68,7 +82,7 @@ namespace Vintagestory.GameContent
             }
 
             // Maybe fixes meat reappearing non nun full harvested animals? (reported by Its Ragnar! on discord)
-            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.XYZ.AsBlockPos).MarkModified();
+            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.XYZ.AsBlockPos)?.MarkModified();
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
@@ -94,11 +108,15 @@ namespace Vintagestory.GameContent
             EntityPlayer entityplr = byEntity as EntityPlayer;
             IPlayer player = entity.World.PlayerByUid(entityplr.PlayerUID);
             player.InventoryManager.OpenInventory(inv);
-
+            
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
                 dlg = new GuiDialogCarcassContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI);
-                dlg.TryOpen();
+                if (dlg.TryOpen())
+                {
+                    (entity.World.Api as ICoreClientAPI).Network.SendPacketClient(inv.Open(player));
+                }
+                
                 dlg.OnClosed += () => dlg = null;
             }
         }
@@ -112,18 +130,39 @@ namespace Vintagestory.GameContent
                 handled = EnumHandling.PreventSubsequent;
                 return;
             }
+            if (packetid == 1012)
+            {
+                player.InventoryManager.OpenInventory(inv);
+            }
+        }
+
+        public override void OnEntityDeath(DamageSource damageSourceForDeath)
+        {
+            base.OnEntityDeath(damageSourceForDeath);
+
+            DamageSource dmgSource = entity.DespawnReason.damageSourceForDeath;
+
+            if (dmgSource != null && !(dmgSource.SourceEntity is EntityPlayer))
+            {
+                dropQuantityMultiplier *= 0.5f;
+            }
+            if (dmgSource != null && dmgSource.Source == EnumDamageSource.Fall)
+            {
+                dropQuantityMultiplier *= 0.5f;
+            }
         }
 
 
         public void SetHarvested(IPlayer byPlayer, float dropQuantityMultiplier = 1f)
         {
-            if (entity.WatchedAttributes.GetBool("harvested", false)) return;
+            if (entity.World.Side == EnumAppSide.Client || entity.WatchedAttributes.GetBool("harvested", false)) return;
+
+           // entity.World.Logger.VerboseDebug("setharvested begin");
 
             entity.WatchedAttributes.SetBool("harvested", true);
 
-            if (entity.World.Side == EnumAppSide.Client) return;
-
             List<ItemStack> todrop = new List<ItemStack>();
+            
 
             for (int i = 0; i < jsonDrops.Length; i++)
             {
@@ -131,12 +170,14 @@ namespace Vintagestory.GameContent
 
                 jsonDrops[i].Resolve(entity.World, "BehaviorHarvestable");
 
-                ItemStack stack = jsonDrops[i].GetNextItemStack(dropQuantityMultiplier);
+                ItemStack stack = jsonDrops[i].GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier);
                 if (stack == null) continue;
 
                 todrop.Add(stack);
                 if (jsonDrops[i].LastDrop) break;
             }
+
+           // entity.World.Logger.VerboseDebug("setharvested drops resolved");
 
             ItemStack[] resolvedDrops = todrop.ToArray();
 
@@ -150,6 +191,41 @@ namespace Vintagestory.GameContent
             entity.WatchedAttributes["harvestableInv"] = tree;
             entity.WatchedAttributes.MarkPathDirty("harvestableInv");
             entity.WatchedAttributes.MarkPathDirty("harvested");
+
+            //entity.World.Logger.VerboseDebug("setharvested done");
+        }
+
+
+        WorldInteraction[] interactions = null;
+
+        public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player, ref EnumHandling handled)
+        {
+            interactions = ObjectCacheUtil.GetOrCreate(world.Api, "harvestableEntityInteractions", () =>
+            {
+                List<ItemStack> knifeStacklist = new List<ItemStack>();
+
+                foreach (Item item in world.Items)
+                {
+                    if (item.Code == null) continue;
+
+                    if (item.Tool == EnumTool.Knife)
+                    {
+                        knifeStacklist.Add(new ItemStack(item));
+                    }
+                }
+
+                return new WorldInteraction[] {
+                    new WorldInteraction()
+                    {
+                        ActionLangCode = "blockhelp-creature-harvest",
+                        MouseButton = EnumMouseButton.Right,
+                        HotKeyCode = "sneak",
+                        Itemstacks = knifeStacklist.ToArray()
+                    }
+                };
+            });
+
+            return !entity.Alive && !IsHarvested ? interactions : null;
         }
 
 

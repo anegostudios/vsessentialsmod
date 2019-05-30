@@ -24,7 +24,7 @@ namespace Vintagestory.ServerMods.NoObf
 
     public class ResolvedVariant
     {
-        public Dictionary<string, string> CodeParts = new Dictionary<string, string>();
+        public OrderedDictionary<string, string> CodeParts = new OrderedDictionary<string, string>();
 
         public AssetLocation Code;
 
@@ -232,7 +232,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             // Single item type
             if (variants.Count == 0)
-                entities.Add(baseEntityFromEntityType(entityType, entityType.Code.Clone(), new Dictionary<string, string>()));
+                entities.Add(baseEntityFromEntityType(entityType, entityType.Code.Clone(), new OrderedDictionary<string, string>()));
             else
             {
                 // Multi item type
@@ -249,7 +249,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        EntityType baseEntityFromEntityType(EntityType entityType, AssetLocation fullcode, Dictionary<string, string> variant)
+        EntityType baseEntityFromEntityType(EntityType entityType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
         {
             EntityType newEntityType = new EntityType()
             {
@@ -257,7 +257,7 @@ namespace Vintagestory.ServerMods.NoObf
                 VariantGroups = entityType.VariantGroups,
                 Enabled = entityType.Enabled,
                 jsonObject = entityType.jsonObject.DeepClone() as JObject,
-                Variant = new Dictionary<string, string>(variant)
+                Variant = new OrderedDictionary<string, string>(variant)
             };
 
             solveByType(newEntityType.jsonObject, fullcode.Path, variant);
@@ -320,7 +320,7 @@ namespace Vintagestory.ServerMods.NoObf
             // Single item type
             if (variants.Count == 0)
             {
-                Item item = baseItemFromItemType(itemType, itemType.Code.Clone(), new Dictionary<string, string>());
+                Item item = baseItemFromItemType(itemType, itemType.Code.Clone(), new OrderedDictionary<string, string>());
                 items.Add(item);
             }
             else
@@ -338,13 +338,13 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        Item baseItemFromItemType(ItemType itemType, AssetLocation fullcode, Dictionary<string, string> variant)
+        Item baseItemFromItemType(ItemType itemType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
         {
             ItemType typedItemType = new ItemType()
             {
                 Code = itemType.Code,
                 VariantGroups = itemType.VariantGroups,
-                Variant = new Dictionary<string, string>(variant),
+                Variant = new OrderedDictionary<string, string>(variant),
                 Enabled = itemType.Enabled,
                 jsonObject = itemType.jsonObject.DeepClone() as JObject
             };
@@ -455,7 +455,7 @@ namespace Vintagestory.ServerMods.NoObf
             // Single block type
             if (variants.Count == 0)
             {
-                Block block = baseBlockFromBlockType(blockType, blockType.Code.Clone(), new Dictionary<string, string>());
+                Block block = baseBlockFromBlockType(blockType, blockType.Code.Clone(), new OrderedDictionary<string, string>());
                 blocks.Add(block);
             }
             else
@@ -472,13 +472,13 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        Block baseBlockFromBlockType(BlockType blockType, AssetLocation fullcode, Dictionary<string, string> variant)
+        Block baseBlockFromBlockType(BlockType blockType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
         {
             BlockType typedBlockType = new BlockType()
             {
                 Code = blockType.Code,
                 VariantGroups = blockType.VariantGroups,
-                Variant = new Dictionary<string, string>(variant),
+                Variant = new OrderedDictionary<string, string>(variant),
                 Enabled = blockType.Enabled,
                 jsonObject = blockType.jsonObject.DeepClone() as JObject
             };
@@ -617,7 +617,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
 
-        void solveByType(JToken json, string codePath, Dictionary<string, string> searchReplace)
+        void solveByType(JToken json, string codePath, OrderedDictionary<string, string> searchReplace)
         {
             List<string> propertiesToRemove = new List<string>();
             Dictionary<string, JToken> propertiesToAdd = new Dictionary<string, JToken>();
@@ -628,11 +628,13 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     if (entry.Key.EndsWith("byType", System.StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var byTypeProperty in entry.Value.ToObject<Dictionary<string, JToken>>())
+                        foreach (var byTypeProperty in entry.Value.ToObject<OrderedDictionary<string, JToken>>())
                         {
                             if (BlockType.WildCardMatch(byTypeProperty.Key, codePath))
                             {
-                                propertiesToAdd.Add(entry.Key.Substring(0, entry.Key.Length - "byType".Length), byTypeProperty.Value);
+                                JToken typedToken = byTypeProperty.Value;
+                                solveByType(typedToken, codePath, searchReplace);
+                                propertiesToAdd.Add(entry.Key.Substring(0, entry.Key.Length - "byType".Length), typedToken);
                                 break;
                             }
                         }

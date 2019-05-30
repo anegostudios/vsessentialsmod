@@ -30,6 +30,13 @@ namespace Vintagestory.GameContent
             taskManager.OnEntityLoaded();
         }
 
+        public override void OnEntityDespawn(EntityDespawnReason reason)
+        {
+            base.OnEntityDespawn(reason);
+
+            taskManager.OnEntityDespawn(reason);
+        }
+
         public override void Initialize(EntityProperties properties, JsonObject aiconfig)
         {
             if (!(entity is EntityAgent))

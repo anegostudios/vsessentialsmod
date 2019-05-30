@@ -77,7 +77,7 @@ namespace Vintagestory.GameContent
                 BlockPos bonepos = entity.ServerPos.AsBlockPos;
                 Block exblock = entity.World.BlockAccessor.GetBlock(bonepos);
 
-                if (exblock.IsReplacableBy(decblock))
+                if (exblock.IsReplacableBy(decblock) && !exblock.IsLiquid())
                 {
                     entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos);
                 } else

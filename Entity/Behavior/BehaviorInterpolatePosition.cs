@@ -31,12 +31,15 @@ namespace Vintagestory.GameContent
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             // Lag. Stop extrapolation (extrapolation begins after 200ms)
-            if (entity.World.ElapsedMilliseconds - serverPosReceivedMs > 400)
+            if (entity.World.ElapsedMilliseconds - serverPosReceivedMs > 400 && entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.03f))
             {
                 return;
             }
+            // Don't interpolate for ourselves
+            if (entity == ((IClientWorldAccessor)entity.World).Player.Entity) return;
 
-          
+
+
             double percent = 4 * deltaTime;
 
             posDiffX = entity.ServerPos.X - entity.Pos.X;
@@ -54,7 +57,7 @@ namespace Vintagestory.GameContent
             entity.Pos.X += GameMath.Clamp(posDiffX, -signPX * percent * posDiffX, signPX * percent * posDiffX);
             entity.Pos.Y += GameMath.Clamp(posDiffY, -signPY * percent * posDiffY, signPY * percent * posDiffY);
             entity.Pos.Z += GameMath.Clamp(posDiffZ, -signPZ * percent * posDiffZ, signPZ * percent * posDiffZ);
-
+            
             int signR = Math.Sign(rollDiff);
             int signY = Math.Sign(yawDiff);
             int signP = Math.Sign(pitchDiff);
@@ -75,8 +78,7 @@ namespace Vintagestory.GameContent
         {
             // Don't interpolate for ourselves
             if (entity == ((IClientWorldAccessor)entity.World).Player.Entity) return;
-
-
+            
             serverPosReceivedMs = entity.World.ElapsedMilliseconds;
             handled = EnumHandling.PreventDefault;
 

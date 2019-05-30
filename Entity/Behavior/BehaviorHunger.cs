@@ -154,7 +154,16 @@ namespace Vintagestory.GameContent
             entity.World.UnregisterGameTickListener(listenerId);
         }
 
-        public override void OnEntityReceiveSaturation(float saturation, EnumFoodCategory foodCat = EnumFoodCategory.Unknown, float saturationLossDelay = 10)
+        /// <summary>
+        /// Consumes some of the entities saturation or shortens the delay before saturation is reduced
+        /// </summary>
+        /// <param name="amount"></param>
+        public virtual void ConsumeSaturation(float amount)
+        {
+            ReduceSaturation(amount / 10f);
+        }
+
+        public override void OnEntityReceiveSaturation(float saturation, EnumFoodCategory foodCat = EnumFoodCategory.Unknown, float saturationLossDelay = 10, float nutritionGainMultiplier = 1f)
         {
             float maxsat = MaxSaturation;
             bool full = Saturation >= maxsat;
@@ -164,27 +173,27 @@ namespace Vintagestory.GameContent
             switch (foodCat)
             {
                 case EnumFoodCategory.Fruit:
-                    if (!full) FruitLevel = Math.Min(maxsat, FruitLevel + saturation / 2.5f);
+                    if (!full) FruitLevel = Math.Min(maxsat, FruitLevel + saturation / 2.5f * nutritionGainMultiplier);
                     SaturationLossDelayFruit = Math.Max(SaturationLossDelayFruit, saturationLossDelay);
                     break;
 
                 case EnumFoodCategory.Vegetable:
-                    if (!full) VegetableLevel = Math.Min(maxsat, VegetableLevel + saturation / 2.5f);
+                    if (!full) VegetableLevel = Math.Min(maxsat, VegetableLevel + saturation / 2.5f * nutritionGainMultiplier);
                     SaturationLossDelayVegetable = Math.Max(SaturationLossDelayVegetable, saturationLossDelay);
                     break;
 
                 case EnumFoodCategory.Protein:
-                    if (!full) ProteinLevel = Math.Min(maxsat, ProteinLevel + saturation / 2.5f);
+                    if (!full) ProteinLevel = Math.Min(maxsat, ProteinLevel + saturation / 2.5f * nutritionGainMultiplier);
                     SaturationLossDelayProtein = Math.Max(SaturationLossDelayProtein, saturationLossDelay);
                     break;
 
                 case EnumFoodCategory.Grain:
-                    if (!full) GrainLevel = Math.Min(maxsat, GrainLevel + saturation / 2.5f);
+                    if (!full) GrainLevel = Math.Min(maxsat, GrainLevel + saturation / 2.5f * nutritionGainMultiplier);
                     SaturationLossDelayGrain = Math.Max(SaturationLossDelayGrain, saturationLossDelay);
                     break;
 
                 case EnumFoodCategory.Dairy:
-                    if (!full) DairyLevel = Math.Min(maxsat, DairyLevel + saturation / 2.5f);
+                    if (!full) DairyLevel = Math.Min(maxsat, DairyLevel + saturation / 2.5f * nutritionGainMultiplier);
                     SaturationLossDelayDairy = Math.Max(SaturationLossDelayDairy, saturationLossDelay);
                     break;
             }
@@ -221,77 +230,90 @@ namespace Vintagestory.GameContent
             {
                 bool isStandingStill = (entity.World.ElapsedMilliseconds - lastMoveMs) > 3000;
                 float satLossMultiplier = isStandingStill ? 1 / 3f : 1f;
-
                 if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f;
 
+                satLossMultiplier *= (8 + sprintCounter / 15f) / 10f;
 
-                bool isondelay = false;
+                bool isondelay = ReduceSaturation(satLossMultiplier);
 
-                if (SaturationLossDelayFruit > 0)
-                {
-                    SaturationLossDelayFruit -= 10 * satLossMultiplier;
-                    isondelay = true;
-                } else
-                {
-                    FruitLevel = Math.Max(0, FruitLevel - Math.Max(0.5f, 0.001f * FruitLevel * satLossMultiplier));
-                }
-
-                if (SaturationLossDelayVegetable > 0)
-                {
-                    SaturationLossDelayVegetable -= 10 * satLossMultiplier;
-                    isondelay = true;
-                } else
-                {
-                    VegetableLevel = Math.Max(0, VegetableLevel - Math.Max(0.5f, 0.001f * VegetableLevel * satLossMultiplier));
-                }
-
-                if (SaturationLossDelayProtein > 0)
-                {
-                    SaturationLossDelayProtein -= 10 * satLossMultiplier;
-                    isondelay = true;
-                } else
-                {
-                    ProteinLevel = Math.Max(0, ProteinLevel - Math.Max(0.5f, 0.001f * ProteinLevel) * satLossMultiplier);
-                }
-
-                if (SaturationLossDelayGrain > 0)
-                {
-                    SaturationLossDelayGrain -= 10 * satLossMultiplier;
-                    isondelay = true;
-                } else
-                {
-                    GrainLevel = Math.Max(0, GrainLevel - Math.Max(0.5f, 0.001f * GrainLevel) * satLossMultiplier);
-                }
-
-                if (SaturationLossDelayDairy > 0)
-                {
-                    SaturationLossDelayDairy -= 10 * satLossMultiplier;
-                    isondelay = true;
-                } else
-                {
-                    DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier);
-                }
-
-                UpdateNutrientHealthBoost();
-
-                if (isondelay)
-                {
-                    hungerCounter -= 10;
-                    return;
-                }
-
-                float prevSaturation = Saturation;
-                float satLoss = (8 + sprintCounter / 15f) * satLossMultiplier;
-
-                if (prevSaturation > 0)
-                {
-                    Saturation = Math.Max(0, prevSaturation - satLoss);
-                    sprintCounter = 0;
-                }
-
-                hungerCounter -= 10;    
+                hungerCounter -= 10;
+                sprintCounter = 0;
             }
         }
+
+        private bool ReduceSaturation(float satLossMultiplier)
+        {
+            bool isondelay = false;
+
+            if (SaturationLossDelayFruit > 0)
+            {
+                SaturationLossDelayFruit -= 10 * satLossMultiplier;
+                isondelay = true;
+            }
+            else
+            {
+                FruitLevel = Math.Max(0, FruitLevel - Math.Max(0.5f, 0.001f * FruitLevel * satLossMultiplier));
+            }
+
+            if (SaturationLossDelayVegetable > 0)
+            {
+                SaturationLossDelayVegetable -= 10 * satLossMultiplier;
+                isondelay = true;
+            }
+            else
+            {
+                VegetableLevel = Math.Max(0, VegetableLevel - Math.Max(0.5f, 0.001f * VegetableLevel * satLossMultiplier));
+            }
+
+            if (SaturationLossDelayProtein > 0)
+            {
+                SaturationLossDelayProtein -= 10 * satLossMultiplier;
+                isondelay = true;
+            }
+            else
+            {
+                ProteinLevel = Math.Max(0, ProteinLevel - Math.Max(0.5f, 0.001f * ProteinLevel) * satLossMultiplier);
+            }
+
+            if (SaturationLossDelayGrain > 0)
+            {
+                SaturationLossDelayGrain -= 10 * satLossMultiplier;
+                isondelay = true;
+            }
+            else
+            {
+                GrainLevel = Math.Max(0, GrainLevel - Math.Max(0.5f, 0.001f * GrainLevel) * satLossMultiplier);
+            }
+
+            if (SaturationLossDelayDairy > 0)
+            {
+                SaturationLossDelayDairy -= 10 * satLossMultiplier;
+                isondelay = true;
+            }
+            else
+            {
+                DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier);
+            }
+
+            UpdateNutrientHealthBoost();
+
+            if (isondelay)
+            {
+                hungerCounter -= 10;
+                return true;
+            }
+
+            float prevSaturation = Saturation;
+
+            if (prevSaturation > 0)
+            {
+                Saturation = Math.Max(0, prevSaturation - satLossMultiplier * 10);
+                sprintCounter = 0;
+            }
+
+            return false;
+        }
+
 
 
         public void UpdateNutrientHealthBoost()

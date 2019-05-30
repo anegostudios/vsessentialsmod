@@ -77,7 +77,7 @@ namespace Vintagestory.ServerMods.NoObf
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
-                Variant = new Dictionary<string, string>(Variant),
+                Variant = new OrderedDictionary<string, string>(Variant),
                 Class = Class,
                 Habitat = Habitat,
                 HitBoxSize = HitBoxSize,

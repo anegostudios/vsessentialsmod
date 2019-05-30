@@ -31,7 +31,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public EnumTool? Tool = null;
 
-        public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, Dictionary<string, string> searchReplace)
+        public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, OrderedDictionary<string, string> searchReplace)
         {
             if (Shape != null && !Shape.VoxelizeTexture && jsonObject["guiTransform"]?["rotate"] == null)
             {

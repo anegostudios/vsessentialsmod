@@ -39,7 +39,7 @@ using Vintagestory.API.Config;
 [assembly: InternalsVisibleTo("VSSurvivalModTests")]
 
 [assembly: ModInfo("Essentials", "game",
-    Version = GameVersion.ShortGameVersion,
+    Version = GameVersion.NetworkVersion, // So that players with newer versions of the game can still connect
     Description = "Game Essentials (Json assets loader, World map, weather, player entity, entity ai, entity behaviors, physics simulation, etc.)",
     Authors = new[] { "Tyron" },
-    RequiredOnClient = false)]
+    RequiredOnClient = true)]

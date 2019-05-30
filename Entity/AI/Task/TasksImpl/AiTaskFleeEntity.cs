@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
         Vec3d targetPos;
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
-        float executionChance = 0.04f;
+        float executionChance = 0.07f;
         float fleeingDistance = 31f;
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
@@ -53,7 +53,7 @@ namespace Vintagestory.GameContent
 
             if (taskConfig["executionChance"] != null)
             {
-                executionChance = taskConfig["executionChance"].AsFloat(0.04f);
+                executionChance = taskConfig["executionChance"].AsFloat(0.07f);
             }
 
             if (taskConfig["minDayLight"] != null)
@@ -108,7 +108,7 @@ namespace Vintagestory.GameContent
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0.01f, (50f - generation) / 50f);
+            float fearReductionFactor = Math.Max(0.01f, (30f - generation) / 30f);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {

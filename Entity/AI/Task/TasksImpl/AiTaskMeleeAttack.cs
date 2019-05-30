@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
         long lastCheckOrAttackMs;
 
         float damage = 2f;
-        float minHorDist = 1.5f;
+        float minDist = 1.5f;
         float minVerDist = 1f;
 
 
@@ -46,7 +46,7 @@ namespace Vintagestory.GameContent
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
 
-            this.minHorDist = taskConfig["minHorDist"].AsFloat(1.5f);
+            this.minDist = taskConfig["minDist"].AsFloat(2f);
             this.minVerDist = taskConfig["minVerDist"].AsFloat(1f);
 
             if (taskConfig["entityCodes"] != null)
@@ -141,7 +141,7 @@ namespace Vintagestory.GameContent
                 Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
                 double dist = targetBox.ShortestDistanceFrom(pos);
                 double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
-                if (dist >= 2 || vertDist >= 1) return false;
+                if (dist >= minDist || vertDist >= minVerDist) return false;
 
                 Vec3d rayTraceFrom = entity.ServerPos.XYZ;
                 rayTraceFrom.Y += 1 / 32f;
