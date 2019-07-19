@@ -102,7 +102,14 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            dialog = new GuiDialogLogViewer(string.Join("\n", logEntries), capi);
+            List<string> printedEntries = logEntries;
+            if (logEntries.Count > 180)
+            {
+                printedEntries = logEntries.Take(140).ToList();
+                printedEntries.Add(string.Format("...{0} more", logEntries.Count - 0));
+            }
+
+            dialog = new GuiDialogLogViewer(string.Join("\n", printedEntries), capi);
             dialog.TryOpen();
         }
 

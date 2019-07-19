@@ -140,7 +140,7 @@ namespace Vintagestory.GameContent
         {
             base.OnEntityDeath(damageSourceForDeath);
 
-            DamageSource dmgSource = entity.DespawnReason.damageSourceForDeath;
+            DamageSource dmgSource = entity.DespawnReason?.damageSourceForDeath;
 
             if (dmgSource != null && !(dmgSource.SourceEntity is EntityPlayer))
             {

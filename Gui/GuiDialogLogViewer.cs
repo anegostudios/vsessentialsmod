@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
 
 
             SingleComposer = capi.Gui
-                .CreateCompo("blockentitytexteditordialog", dialogBounds)
+                .CreateCompo("dialogviewer", dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar(DialogTitle, OnTitleBarClose)
                 .AddStaticText("The following warnings and errors were reported during startup:", CairoFont.WhiteDetailText(), topTextBounds)
