@@ -34,7 +34,7 @@ namespace Vintagestory.ServerMods
             StringBuilder sql = new StringBuilder();
             sql.Append("[");
             int cnt = 0;
-            for (int i = 0; i < api.World.Blocks.Length; i++)
+            for (int i = 0; i < api.World.Blocks.Count; i++)
             {
                 Block block = api.World.Blocks[i];
 
@@ -61,7 +61,7 @@ namespace Vintagestory.ServerMods
             sql.Append("[");
             cnt = 0;
 
-            for (int i = 0; i < api.World.Items.Length; i++)
+            for (int i = 0; i < api.World.Items.Count; i++)
             {
                 Item item = api.World.Items[i];
 

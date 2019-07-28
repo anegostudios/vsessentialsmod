@@ -119,8 +119,8 @@ namespace Vintagestory.GameContent
             {
                 entity.WatchedAttributes.SetAttribute("hunger", hungerTree = new TreeAttribute());
 
-                Saturation = typeAttributes["currentsaturation"].AsFloat(1200);
-                MaxSaturation = typeAttributes["maxsaturation"].AsFloat(1200);
+                Saturation = typeAttributes["currentsaturation"].AsFloat(1500);
+                MaxSaturation = typeAttributes["maxsaturation"].AsFloat(1500);
 
                 SaturationLossDelayFruit = 0;
                 SaturationLossDelayVegetable = 0;
@@ -153,6 +153,12 @@ namespace Vintagestory.GameContent
 
             entity.World.UnregisterGameTickListener(listenerId);
         }
+
+        public override void DidAttack(DamageSource source, EntityAgent targetEntity, ref EnumHandling handled)
+        {
+            ConsumeSaturation(3f);
+        }
+
 
         /// <summary>
         /// Consumes some of the entities saturation or shortens the delay before saturation is reduced
@@ -211,7 +217,7 @@ namespace Vintagestory.GameContent
                 EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
                 if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
 
-                if (plr.Controls.TriesToMove || plr.Controls.Jump)
+                if (plr.Controls.TriesToMove || plr.Controls.Jump || plr.Controls.LeftMouseDown || plr.Controls.RightMouseDown)
                 {
                     lastMoveMs = entity.World.ElapsedMilliseconds;
                 }
@@ -232,7 +238,7 @@ namespace Vintagestory.GameContent
                 float satLossMultiplier = isStandingStill ? 1 / 3f : 1f;
                 if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f;
 
-                satLossMultiplier *= (8 + sprintCounter / 15f) / 10f;
+                satLossMultiplier *= 1.1f * (8 + sprintCounter / 15f) / 10f;
 
                 bool isondelay = ReduceSaturation(satLossMultiplier);
 
@@ -252,7 +258,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                FruitLevel = Math.Max(0, FruitLevel - Math.Max(0.5f, 0.001f * FruitLevel * satLossMultiplier));
+                FruitLevel = Math.Max(0, FruitLevel - Math.Max(0.5f, 0.001f * FruitLevel) * satLossMultiplier * 0.5f);
             }
 
             if (SaturationLossDelayVegetable > 0)
@@ -262,7 +268,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                VegetableLevel = Math.Max(0, VegetableLevel - Math.Max(0.5f, 0.001f * VegetableLevel * satLossMultiplier));
+                VegetableLevel = Math.Max(0, VegetableLevel - Math.Max(0.5f, 0.001f * VegetableLevel) * satLossMultiplier * 0.5f);
             }
 
             if (SaturationLossDelayProtein > 0)
@@ -272,7 +278,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                ProteinLevel = Math.Max(0, ProteinLevel - Math.Max(0.5f, 0.001f * ProteinLevel) * satLossMultiplier);
+                ProteinLevel = Math.Max(0, ProteinLevel - Math.Max(0.5f, 0.001f * ProteinLevel) * satLossMultiplier * 0.5f);
             }
 
             if (SaturationLossDelayGrain > 0)
@@ -282,7 +288,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                GrainLevel = Math.Max(0, GrainLevel - Math.Max(0.5f, 0.001f * GrainLevel) * satLossMultiplier);
+                GrainLevel = Math.Max(0, GrainLevel - Math.Max(0.5f, 0.001f * GrainLevel) * satLossMultiplier * 0.5f);
             }
 
             if (SaturationLossDelayDairy > 0)
@@ -292,7 +298,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier);
+                DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier * 0.5f);
             }
 
             UpdateNutrientHealthBoost();

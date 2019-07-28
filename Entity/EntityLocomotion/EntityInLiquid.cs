@@ -7,7 +7,7 @@ using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
-    public class EntityInWater : EntityLocomotion
+    public class EntityInLiquid : EntityLocomotion
     {
         public long lastWaterJump = 0;
         public long lastPush = 0;
@@ -21,7 +21,6 @@ namespace Vintagestory.GameContent
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
-            
             if (entity.Swimming && entity.Alive)
             {
                 if ((controls.TriesToMove || controls.Jump) && entity.World.ElapsedMilliseconds - lastPush > 2000)
@@ -55,26 +54,10 @@ namespace Vintagestory.GameContent
             }
 
 
-            Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-            string lastcodepart = block.LastCodePart(1);
-
-            if (lastcodepart != null)
+            Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+            if (block.PushVector != null)
             {
-                Vec3i normali = Cardinal.FromInitial(lastcodepart)?.Normali;
-                if (normali != null)
-                {
-                    pos.Motion.Add(
-                        normali.X * 0.001f,
-                        0,
-                        normali.Z * 0.001f
-                    );
-                } else
-                {
-                    if (lastcodepart == "d")
-                    {
-                        pos.Motion.Add(0, -0.003f, 0);
-                    }
-                }
+                pos.Motion.Add(block.PushVector);
             }
             
             // http://fooplot.com/plot/kg6l1ikyx2

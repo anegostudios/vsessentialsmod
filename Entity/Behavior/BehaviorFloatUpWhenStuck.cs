@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
         {
             if (counter++ > 10 || stuckInBlock)
             {
-                if (onlyWhenDead && entity.Alive) return;
+                if ((onlyWhenDead && entity.Alive) || entity.Properties.CanClimbAnywhere) return;
 
                 stuckInBlock = false;
                 counter = 0;

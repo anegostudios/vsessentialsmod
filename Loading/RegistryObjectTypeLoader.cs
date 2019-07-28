@@ -69,15 +69,10 @@ namespace Vintagestory.ServerMods.NoObf
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.api = api;
-            worldProperties = new Dictionary<AssetLocation, StandardWorldProperty>();
 
-            foreach (var entry in api.Assets.GetMany<StandardWorldProperty>(api.Server.Logger, "worldproperties/"))
-            {
-                AssetLocation loc = entry.Key.Clone();
-                loc.Path = loc.Path.Replace("worldproperties/", "");
-                loc.RemoveEnding();
-                worldProperties.Add(loc, entry.Value);
-            }
+            LoadWorldProperties();
+
+
 
             blockShapes = api.Assets.GetMany<Shape>(api.Server.Logger, "shapes/block/");
 
@@ -165,6 +160,32 @@ namespace Vintagestory.ServerMods.NoObf
                 }
             }
 
+            
+            LoadEntities();
+            LoadItems();
+            LoadBlocks();
+
+            api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
+
+            FreeRam();
+        }
+
+        private void LoadWorldProperties()
+        {
+            worldProperties = new Dictionary<AssetLocation, StandardWorldProperty>();
+
+            foreach (var entry in api.Assets.GetMany<StandardWorldProperty>(api.Server.Logger, "worldproperties/"))
+            {
+                AssetLocation loc = entry.Key.Clone();
+                loc.Path = loc.Path.Replace("worldproperties/", "");
+                loc.RemoveEnding();
+                
+                entry.Value.Code.Domain = entry.Key.Domain;
+
+                worldProperties.Add(loc, entry.Value);
+            }
+
+
             worldPropertiesVariants = new Dictionary<AssetLocation, BlockVariant[]>();
             foreach (var val in worldProperties)
             {
@@ -186,14 +207,6 @@ namespace Vintagestory.ServerMods.NoObf
                     worldPropertiesVariants[val.Value.Code][i] = new BlockVariant() { Code = variants[i].Code.Path };
                 }
             }
-
-            LoadEntities();
-            LoadItems();
-            LoadBlocks();
-
-            api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
-
-            FreeRam();
         }
 
 
@@ -387,6 +400,7 @@ namespace Vintagestory.ServerMods.NoObf
             if (typedItemType.Attributes != null) item.Attributes = typedItemType.Attributes;
             item.CombustibleProps = typedItemType.CombustibleProps;
             item.NutritionProps = typedItemType.NutritionProps;
+            item.TransitionableProps = typedItemType.TransitionableProps;
             item.GrindingProps = typedItemType.GrindingProps;
             item.Shape = typedItemType.Shape;
             item.Tool = typedItemType.Tool;
@@ -527,6 +541,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
             }
 
+
+
             block.Code = fullcode;
             block.Variant = typedBlockType.Variant;
             block.Class = typedBlockType.Class;
@@ -542,7 +558,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.VertexFlags = typedBlockType.VertexFlags?.Clone() ?? new VertexFlags(0);
             block.Resistance = typedBlockType.Resistance;
             block.BlockMaterial = typedBlockType.BlockMaterial;
-            block.Shape = typedBlockType.Shape;
+            block.Shape = typedBlockType.Shape?.Clone();
+            block.ShapeInventory = typedBlockType.ShapeInventory?.Clone();
             block.TexturesInventory = typedBlockType.TexturesInventory;
             block.Textures = typedBlockType.Textures;
             block.TintIndex = typedBlockType.TintIndex;
@@ -554,7 +571,6 @@ namespace Vintagestory.ServerMods.NoObf
             block.FpHandTransform = typedBlockType.FpHandTransform;
             block.TpHandTransform = typedBlockType.TpHandTransform;
             block.GroundTransform = typedBlockType.GroundTransform;
-            block.ShapeInventory = typedBlockType.ShapeInventory;
             block.RenderPass = typedBlockType.RenderPass;
             block.ParticleProperties = typedBlockType.ParticleProperties;
             block.Climbable = typedBlockType.Climbable;
@@ -569,6 +585,7 @@ namespace Vintagestory.ServerMods.NoObf
                 block.Attributes = typedBlockType.Attributes.Clone();
             }
             block.NutritionProps = typedBlockType.NutritionProps;
+            block.TransitionableProps = typedBlockType.TransitionableProps;
             block.GrindingProps = typedBlockType.GrindingProps;
             block.LiquidLevel = typedBlockType.LiquidLevel;
             block.AttackPower = typedBlockType.AttackPower;
@@ -676,10 +693,10 @@ namespace Vintagestory.ServerMods.NoObf
         #endregion
 
 
-        public StandardWorldProperty GetWorldPropertyByCode(string code)
+        public StandardWorldProperty GetWorldPropertyByCode(AssetLocation code)
         {
             StandardWorldProperty property = null;
-            worldProperties.TryGetValue(new AssetLocation(code), out property);
+            worldProperties.TryGetValue(code, out property);
             return property;
         }
 
@@ -693,6 +710,7 @@ namespace Vintagestory.ServerMods.NoObf
             if (variantgroups == null || variantgroups.Length == 0) return variantsFinal;
 
             OrderedDictionary<string, BlockVariant[]> blockvariantsMul = new OrderedDictionary<string, BlockVariant[]>();
+
 
             // 1. Collect all types
             for (int i = 0; i < variantgroups.Length; i++)
@@ -746,6 +764,7 @@ namespace Vintagestory.ServerMods.NoObf
                 var.ResolveCode(baseCode);
             }
 
+            
             if (skipVariants != null)
             {
                 List<ResolvedVariant> filteredVariants = new List<ResolvedVariant>();
@@ -891,10 +910,10 @@ namespace Vintagestory.ServerMods.NoObf
 
         private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
-            CollectFromWorldPropertiesCombine(new string[] { variantGroup.LoadFromProperties }, variantGroup, variantgroups, blockvariantsMul, blockvariantsFinal, location);
+            CollectFromWorldPropertiesCombine(new AssetLocation[] { variantGroup.LoadFromProperties }, variantGroup, variantgroups, blockvariantsMul, blockvariantsFinal, location);
         }
 
-        private void CollectFromWorldPropertiesCombine(string[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldPropertiesCombine(AssetLocation[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             if (propList.Length > 1 && variantGroup.Code == null)
             {

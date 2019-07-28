@@ -111,7 +111,7 @@ namespace Vintagestory.GameContent
                     
 
                     Waypoints.Add(waypoint);
-                    player.SendMessage(groupId, Lang.Get("Ok, waypoint added"), EnumChatType.CommandSuccess);
+                    player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", Waypoints.Count-1), EnumChatType.CommandSuccess);
                     ResendWaypoints(player);
                     break;
 

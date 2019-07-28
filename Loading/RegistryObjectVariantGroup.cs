@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -6,8 +7,8 @@ namespace Vintagestory.ServerMods.NoObf
 {
     public class RegistryObjectVariantGroup
     {
-        public string LoadFromProperties;
-        public string[] LoadFromPropertiesCombine;
+        public AssetLocation LoadFromProperties;
+        public AssetLocation[] LoadFromPropertiesCombine;
         public string Code;
         public string[] States;
         public EnumCombination Combine = EnumCombination.Multiply;

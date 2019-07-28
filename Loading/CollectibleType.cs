@@ -65,6 +65,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public FoodNutritionProperties NutritionProps = null;
         [JsonProperty]
+        public TransitionableProperties[] TransitionableProps = null;
+        [JsonProperty]
         public GrindingProperties GrindingProps = null;
 
         [JsonProperty]

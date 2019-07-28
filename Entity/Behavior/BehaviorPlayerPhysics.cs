@@ -33,7 +33,7 @@ namespace Vintagestory.GameContent
 
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
-                ((EntityPlayer)entity).PhysicsUpdateWatcher?.Invoke(accumulator - GlobalConstants.PhysicsFrameTime);
+                entity.PhysicsUpdateWatcher?.Invoke(accumulator - GlobalConstants.PhysicsFrameTime);
                 GameTick(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
@@ -41,6 +41,8 @@ namespace Vintagestory.GameContent
 
         public override void GameTick(Entity entity, float dt)
         {
+            
+
             EntityPlayer entityplayer = entity as EntityPlayer;
             EntityControls controls = entityplayer.Controls;
 

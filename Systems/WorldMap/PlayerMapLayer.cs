@@ -124,6 +124,13 @@ namespace Vintagestory.GameContent
 
         public override void OnMapClosedClient()
         {
+            Dispose();
+            MapComps.Clear();
+        }
+
+
+        public override void Dispose()
+        {
             foreach (var val in MapComps)
             {
                 val.Value?.Dispose();
@@ -133,12 +140,9 @@ namespace Vintagestory.GameContent
             ownTexture = null;
             otherTexture?.Dispose();
             otherTexture = null;
-
-            MapComps.Clear();
         }
-        
 
-        
-        
+
+
     }
 }

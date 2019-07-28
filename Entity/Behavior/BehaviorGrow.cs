@@ -24,7 +24,7 @@ namespace Vintagestory.GameContent
 
         internal AssetLocation[] AdultEntityCodes
         {
-            get { return AssetLocation.toLocations(typeAttributes["adultEntityCodes"].AsStringArray(new string[0])); }
+            get { return AssetLocation.toLocations(typeAttributes["adultEntityCodes"].AsArray<string>(new string[0])); }
         }
 
         internal double TimeSpawned

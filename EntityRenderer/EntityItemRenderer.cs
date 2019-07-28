@@ -20,11 +20,14 @@ namespace Vintagestory.GameContent
         float yRotRand;
 
         Vec3d lerpedPos = new Vec3d();
+        ItemSlot inslot;
 
 
         public EntityItemRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
             entityitem = (EntityItem)entity;
+            inslot = entityitem.Slot;
+
             scaleRand = (float)api.World.Rand.NextDouble() / 20f - 1/40f;
 
             touchGroundMS = entityitem.itemSpawnedMilliseconds - api.World.Rand.Next(5000);
@@ -39,17 +42,18 @@ namespace Vintagestory.GameContent
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
-            // the value 20 is just trial&error, should probably be something proportial to the
+            // the value 22 is just trial&error, should probably be something proportial to the
             // 13ms game ticks (which is the physics frame rate)
             lerpedPos.X += (entity.Pos.X - lerpedPos.X) * 22 * dt;
             lerpedPos.Y += (entity.Pos.Y - lerpedPos.Y) * 22 * dt;
             lerpedPos.Z += (entity.Pos.Z - lerpedPos.Z) * 22 * dt;
 
-            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(entityitem.Itemstack, EnumItemRenderTarget.Ground);
+            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground);
             if (renderInfo.ModelRef == null) return;
+            inslot.Itemstack.Collectible.OnBeforeRender(capi, inslot.Itemstack, EnumItemRenderTarget.Ground, ref renderInfo);
 
             IStandardShaderProgram prog = null;
-            LoadModelMatrix(renderInfo, isShadowPass);
+            LoadModelMatrix(renderInfo, isShadowPass, dt);
             
             if (isShadowPass)
             {
@@ -77,6 +81,17 @@ namespace Vintagestory.GameContent
                 {
                     prog.AddRenderFlags = 0;
                 }
+
+                prog.OverlayOpacity = renderInfo.OverlayOpacity;
+                if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
+                {
+                    prog.Tex2dOverlay2D = renderInfo.OverlayTexture.TextureId;
+                    prog.OverlayTextureSize = renderInfo.OverlayTexture.Width;
+                    prog.BaseTextureSize = renderInfo.TextureWidth;
+                    TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(entityitem.Itemstack);
+                    prog.BaseUvOrigin = new Vec2f(texPos.x1, texPos.y1);
+                }
+
 
                 BlockPos pos = entityitem.Pos.AsBlockPos;
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
@@ -121,7 +136,10 @@ namespace Vintagestory.GameContent
         }
 
 
-        private void LoadModelMatrix(ItemRenderInfo renderInfo, bool isShadowPass)
+        float xangle, yangle, zangle;
+
+
+        private void LoadModelMatrix(ItemRenderInfo renderInfo, bool isShadowPass, float dt)
         {
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
@@ -140,21 +158,31 @@ namespace Vintagestory.GameContent
 
 
             long ellapseMs = capi.World.ElapsedMilliseconds;
-            if (entity.Collided || entity.Swimming || capi.IsGamePaused) touchGroundMS = ellapseMs;
+            bool freefall = !(entity.Collided || entity.Swimming || capi.IsGamePaused);
+            if (!freefall) touchGroundMS = ellapseMs;
 
-            float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
-            float angleMs = Math.Max(ellapseMs - touchGroundMS, 0) * easeIn;
+            if (entity.Collided)
+            {
+                xangle *= 0.55f;
+                yangle *= 0.55f;
+                zangle *= 0.55f;
+            } else
+            {
+                float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
+                float angleGain = freefall ? 1000 * dt / 7 * easeIn : 0;
 
+                yangle += angleGain;
+                xangle += angleGain;
+                zangle += angleGain;
+            }
 
-            float yangle = angleMs / 7f;
-            float xangle = angleMs / 7f;
-            float zangle = angleMs / 7f;
 
             float dx = 0, dz = 0;
 
             if (entity.Swimming)
             {
                 float diff = 1;
+                
                 if (entityitem.Itemstack.Collectible.MaterialDensity > 1000)
                 {
                     dx = GameMath.Sin((float)(ellapseMs / 1000.0)) / 50;

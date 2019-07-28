@@ -113,8 +113,8 @@ namespace Vintagestory.GameContent
 
         private void onGameGettingSaved()
         {
-            sapi.WorldManager.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue));
-            sapi.WorldManager.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue));
+            sapi.WorldManager.SaveGame.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue));
+            sapi.WorldManager.SaveGame.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue));
         }
 
         private void onSaveGameLoaded()
@@ -129,7 +129,7 @@ namespace Vintagestory.GameContent
         {      
             try
             {
-                byte[] data = sapi.WorldManager.GetData(name);
+                byte[] data = sapi.WorldManager.SaveGame.GetData(name);
                 if (data != null)
                 {
                     return SerializerUtil.Deserialize<HashSet<BlockPos>>(data);

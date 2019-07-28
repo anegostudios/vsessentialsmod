@@ -103,7 +103,7 @@ namespace Vintagestory.API.Common
             controls.WalkVector.Mul(movingSpeed * GlobalConstants.OverallSpeedMultiplier);
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
-            if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingOnFace != null)
+            if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingOnFace != null && entity.Alive)
             {
                 BlockFacing facing = entity.ClimbingOnFace;
                 if (Math.Sign(facing.Normali.X) == Math.Sign(controls.WalkVector.X))

@@ -11,6 +11,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorHealth : EntityBehavior
     {
         ITreeAttribute healthTree;
+        int cnt;
 
         public float Health
         {
@@ -83,8 +84,6 @@ namespace Vintagestory.GameContent
             
 
             UpdateMaxHealth();
-
-            
         }
 
         
@@ -98,7 +97,29 @@ namespace Vintagestory.GameContent
                     Type = EnumDamageType.Gravity
                 }, 4);
             }
+
+            if (cnt++ > 30)
+            {
+                cnt -= 30;
+                if (Health < MaxHealth)
+                {
+                    float recoverySpeed = 0.01f;
+
+                    EntityBehaviorHunger ebh = entity.GetBehavior<EntityBehaviorHunger>();
+
+                    if (ebh != null)
+                    {
+                        ebh.ConsumeSaturation(2f);
+                        // When below 75% satiety, autoheal starts dropping
+                        recoverySpeed = GameMath.Min(0.01f * ebh.Saturation / ebh.MaxSaturation * 1/0.75f, 0, 0.01f);
+                    }
+
+                    Health = Math.Min(Health + recoverySpeed, MaxHealth);
+                }
+            }
         }
+
+
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
@@ -132,6 +153,7 @@ namespace Vintagestory.GameContent
                 }
             }
         }
+
 
 
         public override void OnFallToGround(Vec3d positionBeforeFalling, double withYMotion)

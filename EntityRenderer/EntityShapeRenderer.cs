@@ -34,6 +34,7 @@ namespace Vintagestory.GameContent
         long lastDebugInfoChangeMs = 0;
         bool isSpectator;
         IClientPlayer player;
+        float bodyYawLerped = 0;
 
         public Vec3f OriginPos = new Vec3f();
         public float[] ModelMat = Mat4f.Create();
@@ -54,7 +55,7 @@ namespace Vintagestory.GameContent
         {
             DoRenderHeldItem = entity is EntityPlayer;
             DisplayChatMessages = entity is EntityPlayer;
-
+            
             TesselateShape();
 
             // For players the player data is not there yet, so we load the thing later
@@ -96,13 +97,13 @@ namespace Vintagestory.GameContent
                     }
                     if (name != null && message.StartsWith("<strong>" + name + ":</strong>"))
                     {
-                        message = message.Substring(("<strong>" + name + ":</strong>").Length);
+                        message = message.Substring(("<strong>" + name + ":</strong>").Length).TrimStart();
                     }
                     
 
                     LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
-                        capi.Render.GetFont(30, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
+                        new CairoFont(25, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
                         350,
                         new TextBackground() { FillColor = GuiStyle.DialogLightBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius },
                         EnumTextOrientation.Center
@@ -236,7 +237,7 @@ namespace Vintagestory.GameContent
 
             debugTagTexture = capi.Gui.TextTexture.GenUnscaledTextTexture(
                 text.ToString(), 
-                capi.Render.GetFont(20, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 
+                new CairoFont(20, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 
                 new TextBackground() { FillColor = GuiStyle.DialogDefaultBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
             );
 
@@ -290,12 +291,12 @@ namespace Vintagestory.GameContent
                     messageTextures.RemoveAt(messageTextures.Count - 1);
                     tex.tex.Dispose();
 
-                    if (messageTextures.Count > 0)
+                    /*if (messageTextures.Count > 0)
                     {
                         tex = messageTextures[messageTextures.Count - 1];
                         long msvisible = tex.receivedTime + 3500 + 100 * (tex.message.Length - 10) - capi.World.ElapsedMilliseconds;
                         tex.receivedTime += Math.Max(0, 1000 - msvisible);
-                    }
+                    }*/
                 }
             }
         }
@@ -310,7 +311,7 @@ namespace Vintagestory.GameContent
             if (player != null)
             {
                 bool isSelf = capi.World.Player.Entity.EntityId == entity.EntityId;
-                loadModelMatrixForPlayer(entity, isSelf);
+                loadModelMatrixForPlayer(entity, isSelf, dt);
                 if (isSelf) OriginPos.Set(0, 0, 0);
             }
             else
@@ -331,13 +332,14 @@ namespace Vintagestory.GameContent
         void RenderHeldItem(bool isShadowPass, bool right)
         {
             IRenderAPI rapi = capi.Render;
-            ItemStack stack = right ? (entity as EntityAgent).RightHandItemSlot?.Itemstack : (entity as EntityAgent).LeftHandItemSlot?.Itemstack;
+            ItemSlot slot = right ? (entity as EntityAgent).RightHandItemSlot : (entity as EntityAgent).LeftHandItemSlot;
+            ItemStack stack = slot?.Itemstack;
 
             AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
             if (apap == null || stack == null) return;
             
             AttachmentPoint ap = apap.AttachPoint;
-            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(stack, EnumItemRenderTarget.HandTp);
+            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTp);
             IStandardShaderProgram prog = null;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
@@ -373,6 +375,16 @@ namespace Vintagestory.GameContent
                 prog.AddRenderFlags = 0;
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
+
+                prog.OverlayOpacity = renderInfo.OverlayOpacity;
+                if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
+                {
+                    prog.Tex2dOverlay2D = renderInfo.OverlayTexture.TextureId;
+                    prog.OverlayTextureSize = renderInfo.OverlayTexture.Width;
+                    prog.BaseTextureSize = renderInfo.TextureWidth;
+                    TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(stack);
+                    prog.BaseUvOrigin = new Vec2f(texPos.x1, texPos.y1);
+                }
 
                 BlockPos pos = entity.Pos.AsBlockPos;
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
@@ -492,6 +504,7 @@ namespace Vintagestory.GameContent
         public override void DoRender2D(float dt)
         {
             if (isSpectator || (nameTagTexture == null && debugTagTexture == null)) return;
+            if ((entity as EntityPlayer)?.ServerControls.Sneak == true) return;
 
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
@@ -612,11 +625,11 @@ namespace Vintagestory.GameContent
             IWorldAccessor world = entity.World;
 
             // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
-            if (entity is EntityAgent)
+            if (entity is EntityAgent && !entity.Properties.CanClimbAnywhere)
             {
                 if (entity.Properties.Habitat != EnumHabitat.Air)
                 {
-                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !(entity as EntityAgent).Controls.IsClimbing)
+                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !(entity as EntityAgent).Controls.IsClimbing && !entity.FeetInLiquid && !entity.Swimming)
                     {
                         stepPitch = Math.Max(-0.5, stepPitch - 2 * dt);
                     }
@@ -628,7 +641,7 @@ namespace Vintagestory.GameContent
                         }
                         else
                         {
-                            if (!entity.OnGround && !entity.Swimming)
+                            if (!entity.OnGround && !entity.FeetInLiquid && !entity.Swimming)
                             {
                                 stepPitch = Math.Min(0.5, stepPitch + 3 * dt);
                             }
@@ -659,8 +672,9 @@ namespace Vintagestory.GameContent
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, -entity.CollisionBox.Y2 / 2, -0.5f);
         }
 
+        
 
-        public void loadModelMatrixForPlayer(Entity entity, bool isSelf)
+        public void loadModelMatrixForPlayer(Entity entity, bool isSelf, float dt)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
             EntityAgent eagent = entity as EntityAgent;
@@ -675,8 +689,16 @@ namespace Vintagestory.GameContent
             float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
             float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
             float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
+            float bodyYaw = 0;
 
-            float bodyYaw = eagent == null ? 0 : eagent.BodyYaw;
+            if (eagent != null)
+            {
+                float yawDist = GameMath.AngleRadDistance(bodyYawLerped, eagent.BodyYaw);
+                bodyYawLerped += GameMath.Clamp(yawDist, -dt * 8, dt * 8);
+                bodyYaw = bodyYawLerped;
+            }
+
+
             float bodyPitch = eplr == null ? 0 : eplr.WalkPitch;
 
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);

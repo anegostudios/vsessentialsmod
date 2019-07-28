@@ -2,6 +2,7 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -17,11 +18,18 @@ namespace Vintagestory.GameContent
         protected int atlasTextureId;
         protected Matrixf ModelMat = new Matrixf();
 
+        double accum;
+        Vec3d prevPos = new Vec3d();
+        Vec3d curPos = new Vec3d();
+        long ellapsedMsPhysics;
+        internal bool DoRender;
+
         public EntityBlockFallingRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
             this.blockFallingEntity = (EntityBlockFalling)entity;
             this.block = blockFallingEntity.Block;
-            
+
+            entity.PhysicsUpdateWatcher = OnPhysicsTick;
 
             if (blockFallingEntity.removedBlockentity is IBlockShapeSupplier)
             {
@@ -30,14 +38,27 @@ namespace Vintagestory.GameContent
 
             if (this.meshRef == null)
             {
-                this.meshRef = api.Render.UploadMesh(api.TesselatorManager.GetDefaultBlockMesh(block));
+                MeshData mesh = api.TesselatorManager.GetDefaultBlockMesh(block);
+                byte[] rgba2 = mesh.Rgba2;
+                mesh.Rgba2 = null; // Don't need rba2 but also need to restore that stuff afterwards
+                this.meshRef = api.Render.UploadMesh(mesh);
+                mesh.Rgba2 = rgba2;
             }
             
-
             int textureSubId = block.FirstTextureInventory.Baked.TextureSubId;
             this.atlasTextureId = api.BlockTextureAtlas.Positions[textureSubId].atlasTextureId;
+
+            prevPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
         }
 
+
+        public void OnPhysicsTick(float nextAccum)
+        {
+            this.accum = nextAccum;
+            prevPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
+
+            ellapsedMsPhysics = capi.ElapsedMilliseconds;
+        }
 
         public void AddMeshData(MeshData data)
         {
@@ -55,16 +76,14 @@ namespace Vintagestory.GameContent
             // TODO: ADD
             if (isShadowPass) return;
 
-            if (!blockFallingEntity.InitialBlockRemoved) return;
+            if (!DoRender || !blockFallingEntity.InitialBlockRemoved) return;
 
-            float x = (float)entity.Pos.X + entity.CollisionBox.X1;
-            float y = (float)entity.Pos.Y + entity.CollisionBox.Y1;
-            float z = (float)entity.Pos.Z + entity.CollisionBox.Z1;
+            curPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
 
-            RenderFallingBlockEntity(x, y, z);
+            RenderFallingBlockEntity();
         }
 
-        private void RenderFallingBlockEntity(float x, float y, float z)
+        private void RenderFallingBlockEntity()
         {
             IRenderAPI rapi = capi.Render;
 
@@ -72,12 +91,22 @@ namespace Vintagestory.GameContent
             
             rapi.GlToggleBlend(true, EnumBlendMode.Standard);
 
+            
+            accum += (capi.ElapsedMilliseconds - ellapsedMsPhysics) / 1000f;
+            ellapsedMsPhysics = capi.ElapsedMilliseconds;
+
+            double alpha = accum / GlobalConstants.PhysicsFrameTime;
+            
             IStandardShaderProgram prog = rapi.PreparedStandardShader((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
             Vec3d camPos = capi.World.Player.Entity.CameraPos;
             prog.Tex2D = atlasTextureId;
             prog.ModelMatrix = ModelMat
                 .Identity()
-                .Translate(x - camPos.X, y - camPos.Y, z - camPos.Z)
+                .Translate(
+                    prevPos.X + (curPos.X - prevPos.X) * alpha - camPos.X, 
+                    prevPos.Y + (curPos.Y - prevPos.Y) * alpha - camPos.Y, 
+                    prevPos.Z + (curPos.Z - prevPos.Z) * alpha - camPos.Z
+                )
                 .Values
             ;
             prog.ViewMatrix = rapi.CameraMatrixOriginf;

@@ -79,15 +79,13 @@ namespace Vintagestory.GameContent
             
             rpi.GlToggleBlend(true, EnumBlendMode.Standard);
             
-            rpi.GlPushMatrix();
-            rpi.GlLoadMatrix(rpi.CameraMatrixOrigin);
 
             Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)pos.X, (int)pos.Y, (int)pos.Z);
 
             prog.Uniform("rgbaLightIn", lightrgbs);
             //prog.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
             prog.UniformMatrix("modelMatrix", ModelMat);
-            prog.UniformMatrix("viewMatrix", capi.Render.CurrentModelviewMatrix);
+            prog.UniformMatrix("viewMatrix", rpi.CameraMatrixOriginf);
             prog.Uniform("addRenderFlags", 0);
             prog.Uniform("windWaveIntensity", (float)0);
 
@@ -108,8 +106,6 @@ namespace Vintagestory.GameContent
             );
 
             capi.Render.RenderMesh(meshref);
-
-            rpi.GlPopMatrix();
 
             prog.Stop();
             prevProg?.Use();

@@ -138,7 +138,7 @@ namespace Vintagestory.GameContent
 
         public override void Update(float dt, ref float accuracy)
         {
-            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * 1.1, 1.5), 0, 0.9f);
+            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * 1.1, 1.5), 0, 0.93f);
 
             accuracy -= GameMath.Clamp((SecondsSinceAimStart - 1.75f) / 3, 0, 0.3f);
 

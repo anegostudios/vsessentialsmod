@@ -102,14 +102,14 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetBool("isPregnant", value); }
         }
 
-        bool requiresFood = true;
+        bool eatAnyway = false;
 
         public bool ShouldEat
         {
             get
             {
                 return 
-                    !requiresFood || 
+                    eatAnyway || 
                     (
                         !IsPregnant 
                         && GetSaturation() < PortionsEatenForMultiply 
@@ -131,7 +131,7 @@ namespace Vintagestory.GameContent
             this.attributes = attributes;
 
 
-            requiresFood = attributes["requiresFood"].AsBool(true);
+            eatAnyway = attributes["eatAnyway"].AsBool(false);
 
 
             multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");

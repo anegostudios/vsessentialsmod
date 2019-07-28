@@ -23,10 +23,11 @@ namespace Vintagestory.GameContent
         Cuboidf smallerCollisionBox = new Cuboidf();
 
 
+
         public EntityBehaviorControlledPhysics(Entity entity) : base(entity)
         {
             Locomotors.Add(new EntityOnGround());
-            Locomotors.Add(new EntityInWater());
+            Locomotors.Add(new EntityInLiquid());
             Locomotors.Add(new EntityInAir());
             Locomotors.Add(new EntityApplyGravity());
             Locomotors.Add(new EntityMotionDrag());
@@ -62,6 +63,7 @@ namespace Vintagestory.GameContent
             
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
+                entity.PhysicsUpdateWatcher?.Invoke(accumulator - GlobalConstants.PhysicsFrameTime);
                 GameTick(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
@@ -202,7 +204,7 @@ namespace Vintagestory.GameContent
                     {
                         tmpPos.Set((int)pos.X + facing.Normali.X, (int)pos.Y + dy, (int)pos.Z + facing.Normali.Z);
                         Block nblock = blockAccess.GetBlock(tmpPos);
-                        if (!nblock.Climbable && !entity.Properties.CanClimbAnywhere) continue;
+                        if (!nblock.Climbable && !(entity.Properties.CanClimbAnywhere && entity.Alive)) continue;
 
                         Cuboidf[] collBoxes = nblock.GetCollisionBoxes(blockAccess, tmpPos);
                         if (collBoxes == null) continue;

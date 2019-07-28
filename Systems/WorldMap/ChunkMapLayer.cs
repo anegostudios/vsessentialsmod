@@ -11,7 +11,7 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    // We probably want to just transmit these maps as ushort[] blockids through the mapchunks (maybe rainheightmap suffices already?)
+    // We probably want to just transmit these maps as int[] blockids through the mapchunks (maybe rainheightmap suffices already?)
     // make a property block.BlockColor for the blocks color
     // and have the chunk intmap cached client side
 
@@ -198,7 +198,7 @@ namespace Vintagestory.GameContent
                 MapUtil.PosInt2d(i, chunksize, localpos);
 
                 chunksTmp[cy].Unpack();
-                ushort blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
+                int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
                 Block block = api.World.Blocks[blockId];
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);

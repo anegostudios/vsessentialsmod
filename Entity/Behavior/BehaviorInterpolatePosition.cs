@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
 
 
 
-            double percent = 4 * deltaTime;
+            double percent = 8 * deltaTime;
 
             posDiffX = entity.ServerPos.X - entity.Pos.X;
             posDiffY = entity.ServerPos.Y - entity.Pos.Y;

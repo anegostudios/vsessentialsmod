@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -113,9 +114,12 @@ namespace Vintagestory.GameContent
             if (remove)
             {
                 World.BlockAccessor.SetBlock(0, pos);
+                World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(true));
             } else
             {
                 World.BlockAccessor.SetBlock(Block.BlockId, pos);
+                World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(false));
+
                 if (blockEntityAttributes != null)
                 {
                     BlockEntity be = World.BlockAccessor.GetBlockEntity(pos);
@@ -134,6 +138,12 @@ namespace Vintagestory.GameContent
             NotifyNeighborsOfBlockChange(pos);
         }
 
+        private void OnChunkRetesselated(bool on)
+        {
+            EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
+            if (renderer != null) renderer.DoRender = on;
+        }
+
         private void NotifyNeighborsOfBlockChange(BlockPos pos)
         {
             foreach (BlockFacing facing in BlockFacing.ALLFACES)
@@ -150,14 +160,17 @@ namespace Vintagestory.GameContent
             ItemStack stack = (drops == null || drops.Length == 0) ? new ItemStack(block) : drops[0];
             World.SpawnCubeParticles(LocalPos.XYZ, stack, CollisionBox.X2 - CollisionBox.X1, 10);
 
-            if (World is IServerWorldAccessor)
-            {
-                BlockPos finalPos = ServerPos.AsBlockPos;
-                Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
+            BlockPos finalPos = ServerPos.AsBlockPos;
+            Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
 
+            if (Api.Side == EnumAppSide.Server)
+            {
                 if (IsReplaceableBlock(finalPos))
                 {
                     UpdateBlock(false, finalPos);
+
+                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
+
                     hasLanded = true;
                 }
                 else
@@ -168,6 +181,21 @@ namespace Vintagestory.GameContent
             }
 
             lingerTicks = 2;
+        }
+
+
+        public override void OnReceivedServerPacket(int packetid, byte[] data)
+        {
+            base.OnReceivedServerPacket(packetid, data);
+
+            if (packetid == 1234)
+            {
+                EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
+                if (renderer != null)
+                {
+                    World.BlockAccessor.MarkBlockDirty(Pos.AsBlockPos, () => OnChunkRetesselated(false));
+                }
+            }
         }
 
         private bool IsReplaceableBlock(BlockPos pos)

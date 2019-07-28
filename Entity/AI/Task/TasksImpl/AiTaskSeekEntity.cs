@@ -53,7 +53,7 @@ namespace Vintagestory.GameContent
 
             if (taskConfig["entityCodes"] != null)
             {
-                string[] codes = taskConfig["entityCodes"].AsStringArray(new string[] { "player" });
+                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
 
                 List<string> exact = new List<string>();
                 List<string> beginswith = new List<string>();

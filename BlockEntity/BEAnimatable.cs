@@ -12,36 +12,75 @@ namespace Vintagestory.GameContent
 {
     public class BlockEntityAnimatable : BlockEntity, IBlockShapeSupplier
     {
-        protected BEAnimatableRenderer render;
-
-        protected Dictionary<string, AnimationMetaData> activeAnimationsByAnimCode = new Dictionary<string, AnimationMetaData>();
-
-        AnimatorBase animator;
-
-
+        protected BlockEntityAnimationUtil animUtil;
 
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
+
+            animUtil = new BlockEntityAnimationUtil(api, this);
         }
 
 
         public override void OnBlockUnloaded()
         {
             base.OnBlockUnloaded();
-            render?.Unregister();
+            animUtil.Dispose();
         }
 
         public override void OnBlockBroken()
         {
             base.OnBlockBroken();
-            render?.Unregister();
+            animUtil.Dispose();
         }
 
         public override void OnBlockRemoved()
         {
             base.OnBlockRemoved();
-            render?.Unregister();
+            animUtil.Dispose();
+        }
+
+        
+
+        public override void FromTreeAtributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
+        {
+            base.FromTreeAtributes(tree, worldAccessForResolve);
+        }
+
+        public override void ToTreeAttributes(ITreeAttribute tree)
+        {
+            base.ToTreeAttributes(tree);
+        }
+
+
+
+        public virtual bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
+        {
+            if (animUtil.activeAnimationsByAnimCode.Count > 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+
+
+    public class BlockEntityAnimationUtil
+    {
+        public AnimatorBase animator;
+
+        public BEAnimatableRenderer render;
+
+        public Dictionary<string, AnimationMetaData> activeAnimationsByAnimCode = new Dictionary<string, AnimationMetaData>();
+
+        ICoreAPI api;
+        BlockEntity be;
+        public BlockEntityAnimationUtil(ICoreAPI api, BlockEntity be)
+        {
+            this.api = api;
+            this.be = be;
         }
 
         public void InitializeAnimator(string cacheDictKey, Vec3f rotation = null)
@@ -50,7 +89,7 @@ namespace Vintagestory.GameContent
 
             ICoreClientAPI capi = api as ICoreClientAPI;
 
-            Block block = api.World.BlockAccessor.GetBlock(pos);
+            Block block = api.World.BlockAccessor.GetBlock(be.pos);
 
             ITexPositionSource texSource = capi.Tesselator.GetTexSource(block);
             MeshData meshdata;
@@ -68,63 +107,40 @@ namespace Vintagestory.GameContent
             InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
         }
 
+
         public void InitializeAnimator(string cacheDictKey, Vec3f rotation, Shape blockShape, MeshRef meshref, params string[] requireJointsForElements)
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
             animator = BlockEntityAnimationUtil.GetAnimator(api, cacheDictKey, blockShape, requireJointsForElements);
-            
-            render = new BEAnimatableRenderer(api as ICoreClientAPI, pos, rotation, animator, activeAnimationsByAnimCode, meshref);
-        }
-        
 
-        public override void FromTreeAtributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
-        {
-            base.FromTreeAtributes(tree, worldAccessForResolve);
+            render = new BEAnimatableRenderer(api as ICoreClientAPI, be.pos, rotation, animator, activeAnimationsByAnimCode, meshref);
         }
-
-        public override void ToTreeAttributes(ITreeAttribute tree)
-        {
-            base.ToTreeAttributes(tree);
-        }
-
 
         public void StartAnimation(AnimationMetaData meta)
         {
             if (!activeAnimationsByAnimCode.ContainsKey(meta.Code))
             {
                 activeAnimationsByAnimCode[meta.Code] = meta;
+                api.World.BlockAccessor.MarkBlockDirty(be.pos, () => render.ShouldRender = true);
             }
-
-            api.World.BlockAccessor.MarkBlockDirty(pos, () => render.ShouldRender = true);
         }
+
+
 
         public void StopAnimation(string code)
         {
-            activeAnimationsByAnimCode.Remove(code);
-
-            if (activeAnimationsByAnimCode.Count == 0)
+            if (activeAnimationsByAnimCode.Remove(code))
             {
-                api.World.BlockAccessor.MarkBlockDirty(pos, () => render.ShouldRender = false);
+
+                if (activeAnimationsByAnimCode.Count == 0)
+                {
+                    api.World.BlockAccessor.MarkBlockDirty(be.pos, () => render.ShouldRender = false);
+                }
             }
         }
 
-        public bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
-        {
-            if (activeAnimationsByAnimCode.Count > 0)
-            {
-                return true;
-            }
 
-            return false;
-        }
-    }
-
-
-
-    public class BlockEntityAnimationUtil
-    {
-        
         public static AnimatorBase GetAnimator(ICoreAPI api, string cacheDictKey, Shape blockShape, params string[] requireJointsForElements)
         {
             if (blockShape == null)
@@ -186,6 +202,11 @@ namespace Vintagestory.GameContent
                 elements[i].CacheInverseTransformMatrix();
                 CacheInvTransforms(elements[i].Children);
             }
+        }
+
+        internal void Dispose()
+        {
+            render?.Unregister();
         }
     }
 }

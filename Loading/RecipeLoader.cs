@@ -40,6 +40,9 @@ namespace Vintagestory.ServerMods
             api.World.Logger.StoryEvent(Lang.Get("Molded forms..."));
             LoadRecipes<KnappingRecipe>("knapping recipe", "recipes/knapping", (r) => api.RegisterKnappingRecipe(r));
             api.World.Logger.StoryEvent(Lang.Get("Simple tools..."));
+
+            LoadRecipes<BarrelRecipe>("barrel recipe", "recipes/barrel", (r) => api.RegisterBarrelRecipe(r));
+            //api.World.Logger.StoryEvent(Lang.Get("Simple tools..."));
         }
 
 
@@ -117,9 +120,23 @@ namespace Vintagestory.ServerMods
                             if (first) subRecipes.Add(rec = recipe.Clone());
                             else rec = subRecipes[i];
 
-                            if (rec.Ingredient.Name == variantCode)
+                            if (rec.Ingredients != null)
                             {
-                                rec.Ingredient.Code = rec.Ingredient.Code.CopyWithPath(rec.Ingredient.Code.Path.Replace("*", variants[i % variants.Length]));
+                                foreach (var ingred in rec.Ingredients)
+                                {
+                                    if (ingred.Name == variantCode)
+                                    {
+                                        ingred.Code = ingred.Code.CopyWithPath(ingred.Code.Path.Replace("*", variants[i % variants.Length]));
+                                    }
+                                }
+                            }
+                            else
+                            {
+
+                                if (rec.Ingredient.Name == variantCode)
+                                {
+                                    rec.Ingredient.Code = rec.Ingredient.Code.CopyWithPath(rec.Ingredient.Code.Path.Replace("*", variants[i % variants.Length]));
+                                }
                             }
 
                             rec.Output.FillPlaceHolder(val2.Key, variants[i % variants.Length]);

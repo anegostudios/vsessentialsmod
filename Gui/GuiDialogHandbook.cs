@@ -352,10 +352,8 @@ namespace Vintagestory.GameContent
                     }
                     else*/
                     {                       
-                        GuiHandbookItemStackPage elem = new GuiHandbookItemStackPage()
+                        GuiHandbookItemStackPage elem = new GuiHandbookItemStackPage(capi, stack)
                         {
-                            Stack = stack,
-                            TextCache = stack.GetName() + " " + stack.GetDescription(capi.World, false),
                             Visible = true
                         };
 

@@ -155,11 +155,14 @@ namespace Vintagestory.GameContent
 
         public void SetHarvested(IPlayer byPlayer, float dropQuantityMultiplier = 1f)
         {
-            if (entity.World.Side == EnumAppSide.Client || entity.WatchedAttributes.GetBool("harvested", false)) return;
+            //entity.World.Logger.Debug("setharvested begin " + entity.World.Side);
 
-           // entity.World.Logger.VerboseDebug("setharvested begin");
+            if (entity.WatchedAttributes.GetBool("harvested", false)) return;
 
             entity.WatchedAttributes.SetBool("harvested", true);
+
+            if (entity.World.Side == EnumAppSide.Client) return;
+
 
             List<ItemStack> todrop = new List<ItemStack>();
             
@@ -177,7 +180,7 @@ namespace Vintagestory.GameContent
                 if (jsonDrops[i].LastDrop) break;
             }
 
-           // entity.World.Logger.VerboseDebug("setharvested drops resolved");
+            //entity.World.Logger.Debug("setharvested drops resolved");
 
             ItemStack[] resolvedDrops = todrop.ToArray();
 
@@ -185,6 +188,8 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < resolvedDrops.Length; i++)
             {
                 inv[i].Itemstack = resolvedDrops[i];
+
+                //entity.World.Logger.Debug("drop {0} is {1}", i, resolvedDrops[i]?.GetName());
             }
 
             inv.ToTreeAttributes(tree);
@@ -192,7 +197,7 @@ namespace Vintagestory.GameContent
             entity.WatchedAttributes.MarkPathDirty("harvestableInv");
             entity.WatchedAttributes.MarkPathDirty("harvested");
 
-            //entity.World.Logger.VerboseDebug("setharvested done");
+            //entity.World.Logger.Debug("setharvested done");
         }
 
 

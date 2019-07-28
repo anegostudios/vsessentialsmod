@@ -30,6 +30,15 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug + Flatworld|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>..\bin\Debug\Mods\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\Lib\Newtonsoft.Json.dll</HintPath>
@@ -113,7 +122,7 @@
     <Compile Include="Entity\EntityBlockFalling.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityApplyGravity.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityInAir.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityInWater.cs" />
+    <Compile Include="Entity\EntityLocomotion\EntityInLiquid.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityLocomotion.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityMotionDrag.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityOnGround.cs" />
