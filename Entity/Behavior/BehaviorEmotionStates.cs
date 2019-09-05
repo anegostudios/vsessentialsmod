@@ -26,7 +26,7 @@ namespace Vintagestory.GameContent
 
         public string[] NotifyEntityCodes = new string[0];
         public float NotifyChances = 0;
-        public float NotifyRange = 8;
+        public float NotifyRange = 12;
     }
 
     public class EntityBehaviorEmotionStates : EntityBehavior

@@ -99,7 +99,10 @@ namespace Vintagestory.GameContent
                     {
                         message = message.Substring(("<strong>" + name + ":</strong>").Length).TrimStart();
                     }
-                    
+
+                    message = message.Replace("&lt;", "<").Replace("&gt;", ">");
+
+
 
                     LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
@@ -222,6 +225,12 @@ namespace Vintagestory.GameContent
 
             if (debugTagTexture != null)
             {
+                // Don't refresh if player is more than 10 blocks away, so its less laggy
+                if (showDebuginfo && capi.World.Player.Entity.Pos.SquareDistanceTo(entity.Pos) > 15 * 15 && debugTagTexture.Width > 10)
+                {
+                    return;
+                }
+
                 debugTagTexture.Dispose();
                 debugTagTexture = null;
             }
@@ -390,9 +399,9 @@ namespace Vintagestory.GameContent
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
                 int temp = (int)stack.Collectible.GetTemperature(capi.World, stack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
-                lightrgbs[0] += 2 * glowColor[0];
-                lightrgbs[1] += 2 * glowColor[1];
-                lightrgbs[2] += 2 * glowColor[2];
+                lightrgbs[0] += glowColor[0];
+                lightrgbs[1] += glowColor[1];
+                lightrgbs[2] += glowColor[2];
 
                 prog.ExtraGlow = GameMath.Clamp((temp - 500) / 3, 0, 255);
                 prog.RgbaAmbientIn = rapi.AmbientColor;
@@ -440,7 +449,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
         {
-            if (isSpectator || meshRefOpaque == null) return;
+            if (isSpectator || (meshRefOpaque == null && meshRefOit == null)) return;
 
             if (isShadowPass)
             {
@@ -472,7 +481,10 @@ namespace Vintagestory.GameContent
                 entity.AnimManager.Animator.Matrices
             );
 
-            capi.Render.RenderMesh(meshRefOpaque);
+            if (meshRefOpaque != null)
+            {
+                capi.Render.RenderMesh(meshRefOpaque);
+            }
 
             if (meshRefOit != null)
             {
@@ -485,19 +497,27 @@ namespace Vintagestory.GameContent
         {
             /*if (isSpectator || meshRefOit == null) return;
 
-            Vec4f lightrgbs = api.Render.GetLightRGBs((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
-            api.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
-            api.Render.CurrentActiveShader.UniformMatrix("modelMatrix", ModelMat);
-            api.Render.CurrentActiveShader.UniformMatrix("viewMatrix", api.Render.CurrentModelviewMatrix);
+            Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
+            capi.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
+            //capi.Render.CurrentActiveShader.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
+            capi.Render.CurrentActiveShader.UniformMatrix("modelMatrix", ModelMat);
+            capi.Render.CurrentActiveShader.UniformMatrix("viewMatrix", capi.Render.CurrentModelviewMatrix);
+            capi.Render.CurrentActiveShader.Uniform("addRenderFlags", AddRenderFlags);
+            capi.Render.CurrentActiveShader.Uniform("windWaveIntensity", (float)WindWaveIntensity);
 
             color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
             color[1] = ((entity.RenderColor >> 8) & 0xff) / 255f;
             color[2] = ((entity.RenderColor >> 0) & 0xff) / 255f;
             color[3] = ((entity.RenderColor >> 24) & 0xff) / 255f;
 
-            api.Render.CurrentActiveShader.Uniform("renderColor", color);
-            api.Render.CurrentActiveShader.UniformMatrices("elementTransforms", GlobalConstants.MaxAnimatedElements, curAnimator.Matrices);
-            api.Render.RenderMesh(meshRefOit);*/
+            capi.Render.CurrentActiveShader.Uniform("renderColor", color);
+            capi.Render.CurrentActiveShader.UniformMatrices(
+                "elementTransforms",
+                GlobalConstants.MaxAnimatedElements,
+                entity.AnimManager.Animator.Matrices
+            );
+
+            capi.Render.RenderMesh(meshRefOit);*/
         }
 
 

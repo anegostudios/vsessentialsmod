@@ -97,9 +97,9 @@ namespace Vintagestory.GameContent
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
                 int temp = (int)entityitem.Itemstack.Collectible.GetTemperature(capi.World, entityitem.Itemstack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
-                lightrgbs[0] += 2 * glowColor[0];
-                lightrgbs[1] += 2 * glowColor[1];
-                lightrgbs[2] += 2 * glowColor[2];
+                lightrgbs[0] += glowColor[0];
+                lightrgbs[1] += glowColor[1];
+                lightrgbs[2] += glowColor[2];
 
                 prog.ExtraGlow = GameMath.Clamp((temp - 500) / 3, 0, 255);
                 prog.RgbaAmbientIn = rapi.AmbientColor;

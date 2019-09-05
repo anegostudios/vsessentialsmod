@@ -8,6 +8,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
@@ -35,6 +36,38 @@ namespace Vintagestory.GameContent
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
+            if (api.Side == EnumAppSide.Server)
+            {
+                (api as ICoreServerAPI).Event.DidPlaceBlock += Event_DidPlaceBlock;
+            }
+
+        }
+
+        private void Event_DidPlaceBlock(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel, ItemStack withItemStack)
+        {
+            IMapChunk mapchunk = api.World.BlockAccessor.GetMapChunkAtBlockPos(blockSel.Position);
+            if (mapchunk == null) return;
+
+            int lx = blockSel.Position.X % chunksize;
+            int lz = blockSel.Position.Z % chunksize;
+
+            int y = mapchunk.RainHeightMap[lz * chunksize + lx];
+            int ly = y % chunksize;
+
+            
+            int cy = y / chunksize;
+
+            IWorldChunk chunk = api.World.BlockAccessor.GetChunkAtBlockPos(blockSel.Position.X, y, blockSel.Position.Z);
+            chunk.Unpack();
+            int blockId = chunk.Blocks[(ly * chunksize + lz) * chunksize + lx];
+
+            if (blockId == 0)
+            {
+                int cx = blockSel.Position.X / chunksize;
+                int cz = blockSel.Position.Z / chunksize;
+                api.World.Logger.Notification("Huh. Found air block in rain map at chunk pos {0}/{1}. That seems invalid, will regenerate rain map", cx, cz);
+                rebuildRainmap(cx, cz);
+            }
         }
 
         private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, bool isNewChunk)
@@ -68,6 +101,19 @@ namespace Vintagestory.GameContent
             {
                 chunksToGen.Clear();
             }
+        }
+
+        public override void Dispose()
+        {
+            if (loadedMapData != null)
+            {
+                foreach (MapComponent cmp in loadedMapData.Values)
+                {
+                    cmp?.Dispose();
+                }
+            }
+
+            base.Dispose();
         }
 
         public override void OnOffThreadTick()
@@ -188,6 +234,8 @@ namespace Vintagestory.GameContent
                 if (chunksTmp[cy] == null) return null;
             }
 
+          //  bool didRegen = false;
+
 
             for (int i = 0; i < texDataTmp.Length; i++)
             {
@@ -202,7 +250,6 @@ namespace Vintagestory.GameContent
                 Block block = api.World.Blocks[blockId];
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
-                //Block block = api.World.BlockAccessor.GetBlock(tmpPos);
                 
                 texDataTmp[i] = block.GetColor(capi, tmpPos) | 255 << 24;
             }
@@ -210,6 +257,57 @@ namespace Vintagestory.GameContent
             for (int cy = 0; cy < chunksTmp.Length; cy++) chunksTmp[cy] = null;
 
             return texDataTmp;
+        }
+
+
+        
+        
+
+        void rebuildRainmap(int cx, int cz)
+        {
+            ICoreServerAPI sapi = api as ICoreServerAPI;
+
+            int ymax = sapi.WorldManager.MapSizeY / sapi.WorldManager.ChunkSize;
+
+            IServerChunk[] column = new IServerChunk[ymax];
+            int chunksize = sapi.WorldManager.ChunkSize;
+
+            IMapChunk mapchunk = null;
+
+            for (int cy = 0; cy < ymax; cy++)
+            {
+                column[cy] = sapi.WorldManager.GetChunk(cx, cy, cz);
+                column[cy]?.Unpack();
+
+                mapchunk = column[cy]?.MapChunk;
+            }
+
+            if (mapchunk == null) return;
+
+            for (int dx = 0; dx < chunksize; dx++)
+            {
+                for (int dz = 0; dz < chunksize; dz++)
+                {
+                    for (int dy = sapi.WorldManager.MapSizeY - 1; dy >= 0; dy--)
+                    {
+                        IServerChunk chunk = column[dy / chunksize];
+                        if (chunk == null) continue;
+
+                        int index = ((dy % chunksize) * chunksize + dz) * chunksize + dx;
+                        Block block = sapi.World.Blocks[chunk.Blocks[index]];
+
+                        if (!block.RainPermeable || dy == 0)
+                        {
+                            mapchunk.RainHeightMap[dz * chunksize + dx] = (ushort)dy;
+                            break;
+                        }
+                    }
+                }
+            }
+
+
+            sapi.WorldManager.ResendMapChunk(cx, cz, true);
+            mapchunk.MarkDirty();
         }
 
     }

@@ -123,7 +123,7 @@ namespace Vintagestory.GameContent
 
             capi.Shader.RegisterFileShaderProgram("clouds", prog);
 
-            prog.PrepareUniformLocations("zNear", "zFar", "sunPosition", "sunColor", "dayLight", "windOffset", "playerPos", "globalCloudBrightness", "rgbaFogIn", "fogMinIn", "fogDensityIn", "flatFogDensity", "flatFogStart", "projectionMatrix", "modelViewMatrix", "shadowDistanceFar", "toShadowMapSpaceMatrixFar", "shadowDistanceNear", "toShadowMapSpaceMatrixNear", "pointLights", "pointLightColors", "pointLightQuantity", "cloudTileSize", "cloudsLength");
+            //prog.PrepareUniformLocations("zNear", "zFar", "sunPosition", "sunColor", "dayLight", "windOffset", "playerPos", "globalCloudBrightness", "rgbaFogIn", "fogMinIn", "fogDensityIn", "flatFogDensity", "flatFogStart", "projectionMatrix", "modelViewMatrix", "shadowDistanceFar", "toShadowMapSpaceMatrixFar", "shadowDistanceNear", "toShadowMapSpaceMatrixNear", "pointLights", "pointLightColors", "pointLightQuantity", "cloudTileSize", "cloudsLength");
 
             return prog.Compile();
         }

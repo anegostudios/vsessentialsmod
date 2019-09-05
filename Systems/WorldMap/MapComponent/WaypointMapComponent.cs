@@ -20,9 +20,11 @@ namespace Vintagestory.GameContent
         Vec2f viewPos = new Vec2f();
         Vec4f color = new Vec4f();
         Waypoint waypoint;
+        int waypointIndex;
 
-        public WaypointMapComponent(Waypoint waypoint, LoadedTexture texture, ICoreClientAPI capi) : base(capi)
+        public WaypointMapComponent(int waypointIndex, Waypoint waypoint, LoadedTexture texture, ICoreClientAPI capi) : base(capi)
         {
+            this.waypointIndex = waypointIndex;
             this.waypoint = waypoint;
             this.Texture = texture;
             ColorUtil.ToRGBAVec4f(waypoint.Color, ref color);
@@ -82,7 +84,8 @@ namespace Vintagestory.GameContent
             
             if (Math.Abs(viewPos.X - mouseX) < 5 && Math.Abs(viewPos.Y - mouseY) < 5)
             {
-                hoverText.Append("Waypoint '" + waypoint.Title + "'");
+                string text = Lang.Get("Waypoint {0}", waypointIndex) + "\n" + waypoint.Title;
+                hoverText.Append(text);
             }
         }
     }

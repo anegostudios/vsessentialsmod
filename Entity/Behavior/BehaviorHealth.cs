@@ -109,9 +109,10 @@ namespace Vintagestory.GameContent
 
                     if (ebh != null)
                     {
-                        ebh.ConsumeSaturation(2f);
                         // When below 75% satiety, autoheal starts dropping
-                        recoverySpeed = GameMath.Min(0.01f * ebh.Saturation / ebh.MaxSaturation * 1/0.75f, 0, 0.01f);
+                        recoverySpeed = GameMath.Clamp(0.01f * ebh.Saturation / ebh.MaxSaturation * 1/0.75f, 0, 0.01f);
+
+                        ebh.ConsumeSaturation(150f * recoverySpeed);
                     }
 
                     Health = Math.Min(Health + recoverySpeed, MaxHealth);

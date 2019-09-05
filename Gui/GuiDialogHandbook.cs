@@ -170,7 +170,7 @@ namespace Vintagestory.GameContent
             dialogBounds.WithFixedAlignmentOffset(3, 3);
             RichTextComponentBase[] cmps = browseHistory.Peek().GetPageText(capi, allstacks, OpenDetailPageFor);
 
-
+            detailViewGui?.Dispose();
             detailViewGui = capi.Gui
                 .CreateCompo("handbook-detail", dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
@@ -200,18 +200,21 @@ namespace Vintagestory.GameContent
             return true;
         }
 
-        public void OpenDetailPageFor(string pageCode)
+        public bool OpenDetailPageFor(string pageCode)
         {
             capi.Gui.PlaySound("menubutton_press");
 
             int num;
             if (pageNumberByPageCode.TryGetValue(pageCode, out num)) {
                 GuiHandbookPage elem = listElements[num];
-                if (browseHistory.Count > 0 && elem == browseHistory.Peek()) return;// stack.Equals(capi.World, browseHistory.Peek(), GlobalConstants.IgnoredStackAttributes)) return;
+                if (browseHistory.Count > 0 && elem == browseHistory.Peek()) return true;// stack.Equals(capi.World, browseHistory.Peek(), GlobalConstants.IgnoredStackAttributes)) return;
 
                 browseHistory.Push(elem);
                 initDetailGui();
+                return true;
             }
+
+            return false;
         }
 
         private void OnLinkClicked()

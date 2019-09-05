@@ -116,13 +116,14 @@ namespace Vintagestory.ServerMods.NoObf
         {
             if (jsonPatch.SideType != EnumAppSide.Universal && jsonPatch.SideType != api.Side) return;
 
-            var path = jsonPatch.File.Path;
-            if (!path.EndsWith(".json")) path += ".json";
-
-            var asset = api.Assets.TryGet(path);
+            var loc = jsonPatch.File.Clone();
+            if (!loc.Path.EndsWith(".json")) loc.Path += ".json";
+            
+            var asset = api.Assets.TryGet(loc);
             if (asset == null)
             {
-                api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, path);
+                api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                
                 notFound++;
                 return;
             }

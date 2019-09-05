@@ -7,6 +7,7 @@ using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -25,11 +26,24 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                return entity.WatchedAttributes.GetFloat("dropQuantityMultiplier", 1);
-            }
-            set 
-            {
-                entity.WatchedAttributes.SetFloat("dropQuantityMultiplier", value);
+                if (entity.WatchedAttributes.HasAttribute("deathReason"))
+                {
+                    EnumDamageSource dmgSource = (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason");
+
+                    if (dmgSource == EnumDamageSource.Fall)
+                    {
+                        return 0.5f;
+                    }
+                }
+
+                string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
+
+                if (deathByEntityLangCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer"))
+                {
+                    return 0.4f;
+                }
+
+                return 1f;
             }
         }
 
@@ -132,23 +146,14 @@ namespace Vintagestory.GameContent
             }
             if (packetid == 1012)
             {
-                player.InventoryManager.OpenInventory(inv);
-            }
-        }
-
-        public override void OnEntityDeath(DamageSource damageSourceForDeath)
-        {
-            base.OnEntityDeath(damageSourceForDeath);
-
-            DamageSource dmgSource = entity.DespawnReason?.damageSourceForDeath;
-
-            if (dmgSource != null && !(dmgSource.SourceEntity is EntityPlayer))
-            {
-                dropQuantityMultiplier *= 0.5f;
-            }
-            if (dmgSource != null && dmgSource.Source == EnumDamageSource.Fall)
-            {
-                dropQuantityMultiplier *= 0.5f;
+                if (!IsHarvested)
+                {
+                    entity.WatchedAttributes.MarkPathDirty("harvested");
+                } else
+                {
+                    player.InventoryManager.OpenInventory(inv);
+                }
+                
             }
         }
 
@@ -233,6 +238,33 @@ namespace Vintagestory.GameContent
             return !entity.Alive && !IsHarvested ? interactions : null;
         }
 
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+            if (!entity.Alive)
+            {
+                if (entity.WatchedAttributes.HasAttribute("deathReason"))
+                {
+                    EnumDamageSource dmgSource = (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason");
+
+                    if (dmgSource == EnumDamageSource.Fall)
+                    {
+                        infotext.AppendLine(Lang.Get("Looks crushed. Won't be able to harvest as much from this carcass."));
+                    }
+                }
+                
+                string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
+
+                if (deathByEntityLangCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer")) {
+                    infotext.AppendLine(Lang.Get("Looks eaten by another creature. Won't be able to harvest as much from this carcass."));
+                }
+            }
+
+            base.GetInfoText(infotext);
+        }
+
+
+        
 
         public override string PropertyName()
         {

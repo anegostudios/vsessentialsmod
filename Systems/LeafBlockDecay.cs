@@ -39,7 +39,7 @@ namespace Vintagestory.GameContent
 
             api.Event.SaveGameLoaded += onSaveGameLoaded;
             api.Event.GameWorldSave += onGameGettingSaved;
-            api.Event.RegisterEventBusListener(onLeafDecayEventReceived, 0.5, " ");
+            api.Event.RegisterEventBusListener(onLeafDecayEventReceived, 0.5, "testForDecay");
             api.Event.RegisterGameTickListener(processReadyToDecayQueue, leafRemovalInterval);
         }
 

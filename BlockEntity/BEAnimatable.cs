@@ -98,7 +98,7 @@ namespace Vintagestory.GameContent
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);
             BlockEntityAnimationUtil.CacheInvTransforms(shape.Elements);
-            shape.ResolveAndLoadJoints(); //requireJointsForElements
+            shape.ResolveAndLoadJoints();
 
             capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
 
@@ -112,7 +112,7 @@ namespace Vintagestory.GameContent
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
-            animator = BlockEntityAnimationUtil.GetAnimator(api, cacheDictKey, blockShape, requireJointsForElements);
+            animator = GetAnimator(api, cacheDictKey, blockShape, requireJointsForElements);
 
             render = new BEAnimatableRenderer(api as ICoreClientAPI, be.pos, rotation, animator, activeAnimationsByAnimCode, meshref);
         }

@@ -260,7 +260,7 @@ namespace Vintagestory.ServerMods
 
                 foreach (GridRecipe subRecipe in subRecipes)
                 {
-                    if (!subRecipe.ResolveIngredients(api.World)) return;
+                    if (!subRecipe.ResolveIngredients(api.World)) continue;
                     api.RegisterCraftingRecipe(subRecipe);
                 }
 

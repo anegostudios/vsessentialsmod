@@ -68,74 +68,82 @@ namespace Vintagestory.GameContent
             switch (cmd)
             {
                 case "add":
-                    if (args.Length == 0)
                     {
-                        player.SendMessage(groupId, Lang.Get("Syntax: /waypoint add [color] [title]\nColor may be a hex value or a known .net color  (you can google for that to get a list)"), EnumChatType.CommandError);
-                        return;
-                    }
-
-                    string colorstring = args.PopWord();
-                    string title = args.PopAll();
-
-                    System.Drawing.Color parsedColor;
-
-                    if (colorstring.StartsWith("#"))
-                    {
-                        try
+                        if (args.Length == 0)
                         {
-                            int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
-                            parsedColor = System.Drawing.Color.FromArgb(argb);
-                        } catch (FormatException)
-                        {
-                            player.SendMessage(groupId, Lang.Get("Not a valid color. Use a hex value (e.g. #FF00FF) or a know .net color (e.g. red, but you can google for that to get a list)"), EnumChatType.CommandError);
+                            player.SendMessage(groupId, Lang.Get("command-waypoint-syntax"), EnumChatType.CommandError);
                             return;
                         }
-                    } else
-                    {
-                        parsedColor = System.Drawing.Color.FromName(colorstring);
+
+                        string colorstring = args.PopWord();
+                        string title = args.PopAll();
+
+                        System.Drawing.Color parsedColor;
+
+                        if (colorstring.StartsWith("#"))
+                        {
+                            try
+                            {
+                                int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
+                                parsedColor = System.Drawing.Color.FromArgb(argb);
+                            }
+                            catch (FormatException)
+                            {
+                                player.SendMessage(groupId, Lang.Get("command-waypoint-invalidcolor"), EnumChatType.CommandError);
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            parsedColor = System.Drawing.Color.FromName(colorstring);
+                        }
+
+                        if (title == null || title.Length == 0)
+                        {
+                            player.SendMessage(groupId, Lang.Get("command-waypoint-notext"), EnumChatType.CommandError);
+                            return;
+                        }
+
+                        Waypoint waypoint = new Waypoint()
+                        {
+                            Color = parsedColor.ToArgb() | (255 << 24),
+                            OwningPlayerUid = player.PlayerUID,
+                            Position = player.Entity.ServerPos.XYZ,
+                            Title = title
+                        };
+
+
+                        Waypoints.Add(waypoint);
+
+                        Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
+
+                        player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", ownwpaypoints.Length - 1), EnumChatType.CommandSuccess);
+                        ResendWaypoints(player);
+                        break;
                     }
-
-                    if (title == null || title.Length == 0)
-                    {
-                        player.SendMessage(groupId, Lang.Get("No text supplied. Syntax: /waypoint add [color] [title]\nColor may be a known .net color or hex number"), EnumChatType.CommandError);
-                        return;
-                    }
-
-                    Waypoint waypoint = new Waypoint()
-                    {
-                        Color = parsedColor.ToArgb() | (255 << 24),
-                        OwningPlayerUid = player.PlayerUID,
-                        Position = player.Entity.ServerPos.XYZ,
-                        Title = title
-                    };
-                    
-
-                    Waypoints.Add(waypoint);
-                    player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", Waypoints.Count-1), EnumChatType.CommandSuccess);
-                    ResendWaypoints(player);
-                    break;
-
 
                 case "remove":
-                    int? id = args.PopInt();
-                    Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
-
-                    if (ownwpaypoints.Length == 0)
                     {
-                        player.SendMessage(groupId, Lang.Get("You have no waypoints to delete"), EnumChatType.CommandError);
-                        return;
-                    }
+                        int? id = args.PopInt();
+                        Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
 
-                    if (id == null || id < 0 || id > ownwpaypoints.Length)
-                    {
-                        player.SendMessage(groupId, Lang.Get("Invalid waypoint number, valid ones are 0..{0}", ownwpaypoints.Length - 1), EnumChatType.CommandSuccess);
-                        return;
-                    }
+                        if (ownwpaypoints.Length == 0)
+                        {
+                            player.SendMessage(groupId, Lang.Get("You have no waypoints to delete"), EnumChatType.CommandError);
+                            return;
+                        }
 
-                    Waypoints.Remove(ownwpaypoints[(int)id]);
-                    RebuildMapComponents();
-                    ResendWaypoints(player);
-                    player.SendMessage(groupId, Lang.Get("Ok, deleted waypoint."), EnumChatType.CommandSuccess);
+                        if (id == null || id < 0 || id > ownwpaypoints.Length)
+                        {
+                            player.SendMessage(groupId, Lang.Get("Invalid waypoint number, valid ones are 0..{0}", ownwpaypoints.Length - 1), EnumChatType.CommandSuccess);
+                            return;
+                        }
+
+                        Waypoints.Remove(ownwpaypoints[(int)id]);
+                        RebuildMapComponents();
+                        ResendWaypoints(player);
+                        player.SendMessage(groupId, Lang.Get("Ok, deleted waypoint."), EnumChatType.CommandSuccess);
+                    }
                     break;
 
 
@@ -260,10 +268,9 @@ namespace Vintagestory.GameContent
 
             wayPointComponents.Clear();
 
-
-            foreach (Waypoint wp in ownWaypoints)
+            for (int i = 0; i < ownWaypoints.Count; i++)
             {
-                WaypointMapComponent comp = new WaypointMapComponent(wp, texture, api as ICoreClientAPI);  
+                WaypointMapComponent comp = new WaypointMapComponent(i, ownWaypoints[i], texture, api as ICoreClientAPI);  
 
                 wayPointComponents.Add(comp);
                 mapSink.AddMapData(comp);

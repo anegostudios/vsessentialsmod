@@ -68,9 +68,13 @@ namespace Vintagestory.GameContent
 
                 if (capi.World.Player.InventoryManager.CurrentHoveredSlot?.Itemstack != null)
                 {
-                    string pageCode = GuiHandbookItemStackPage.PageCodeForStack(capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack); 
+                    ItemStack stack = capi.World.Player.InventoryManager.CurrentHoveredSlot.Itemstack;
+                    string pageCode = GuiHandbookItemStackPage.PageCodeForStack(stack); 
 
-                    dialog.OpenDetailPageFor(pageCode);
+                    if (!dialog.OpenDetailPageFor(pageCode))
+                    {
+                        dialog.OpenDetailPageFor(GuiHandbookItemStackPage.PageCodeForStack(new ItemStack(stack.Collectible)));
+                    }
                 }
 
                 if (capi.World.Player.Entity.Controls.Sneak && capi.World.Player.CurrentBlockSelection != null)
@@ -80,7 +84,10 @@ namespace Vintagestory.GameContent
 
                     string pageCode = GuiHandbookItemStackPage.PageCodeForStack(stack);
 
-                    dialog.OpenDetailPageFor(pageCode);
+                    if (!dialog.OpenDetailPageFor(pageCode))
+                    {
+                        dialog.OpenDetailPageFor(GuiHandbookItemStackPage.PageCodeForStack(new ItemStack(stack.Collectible)));
+                    }
                 }
             }
 

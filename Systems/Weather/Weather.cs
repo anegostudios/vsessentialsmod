@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
@@ -37,6 +38,7 @@ namespace Vintagestory.GameContent
 
         public WeatherSimulation weatherSim;
 
+        protected NormalizedSimplexNoise windNoise;
 
 
         public int CloudTileLength
@@ -63,7 +65,29 @@ namespace Vintagestory.GameContent
         {
             base.Start(api);
             this.api = api;
+            }
+
+        public double GetWindSpeed(BlockPos pos)
+        {
+            double noise = windNoise.Noise(pos.X / 10.0, api.World.Calendar.TotalHours, pos.Z / 10.0);
+            double strength = GameMath.Clamp(2*(noise - 0.4), 0, 1);
+            
+            if (pos.Y > api.World.SeaLevel)
+            {
+                // Greater wind at greater heights
+                strength *= Math.Max(1, (pos.Y - api.World.SeaLevel) / 100.0);
+
+            } else
+            {
+                // Much muuuch lower winds at lower heights
+                strength /= 1 + (api.World.SeaLevel - pos.Y) / 4;
+            }
+
+            //Console.WriteLine(api.World.Side + ": " + strength);// + " / " + api.World.Calendar.TotalHours);
+
+            return strength;
         }
+
 
         public override void StartServerSide(ICoreServerAPI api)
         {
@@ -195,6 +219,9 @@ namespace Vintagestory.GameContent
 
         private void InitWeatherSim()
         {
+            windNoise = NormalizedSimplexNoise.FromDefaultOctaves(5, 0.1, 0.8, api.World.Seed + 2323182);
+
+
             weatherSim = new WeatherSimulation(this);
             if (api.Side == EnumAppSide.Client)
             {
