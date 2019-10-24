@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -10,15 +11,19 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public class BlockEntityAnimatable : BlockEntity
+    public class BEBehaviorAnimatable : BlockEntityBehavior
     {
-        protected BlockEntityAnimationUtil animUtil;
-
-        public override void Initialize(ICoreAPI api)
+        public BEBehaviorAnimatable(BlockEntity blockentity) : base(blockentity)
         {
-            base.Initialize(api);
+        }
 
-            animUtil = new BlockEntityAnimationUtil(api, this);
+        public BlockEntityAnimationUtil animUtil;
+
+        public override void Initialize(ICoreAPI api, JsonObject properties)
+        {
+            base.Initialize(api, properties);
+
+            animUtil = new BlockEntityAnimationUtil(api, Blockentity);
         }
 
 
@@ -40,7 +45,7 @@ namespace Vintagestory.GameContent
             animUtil.Dispose();
         }
 
-        
+
 
         public override void FromTreeAtributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
         {
@@ -64,6 +69,7 @@ namespace Vintagestory.GameContent
             return false;
         }
     }
+
 
 
 
@@ -179,7 +185,7 @@ namespace Vintagestory.GameContent
                     new ClientAnimator(() => 1, blockShape.Animations, blockShape.Elements, blockShape.JointsById) :
                     new ServerAnimator(() => 1, blockShape.Animations, blockShape.Elements, blockShape.JointsById)
                 ;
-                
+
                 animCache[cacheDictKey] = new AnimCacheEntry()
                 {
                     Animations = blockShape.Animations,

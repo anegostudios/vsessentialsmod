@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -15,13 +16,19 @@ namespace Vintagestory.GameContent
         float seekingRange = 25f;
         float maxFollowTime = 60;
         
-        bool stuck = false;
+        bool stopNow = false;
         string[] seekEntityCodesExact = new string[] { "player" };
         string[] seekEntityCodesBeginsWith = new string[0];
 
         float currentFollowTime = 0;
 
         bool alarmHerd = false;
+        bool leapAtTarget = false;
+
+        bool siegeMode;
+
+        long finishedMs;
+        bool jumpAnimOn;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
@@ -51,6 +58,11 @@ namespace Vintagestory.GameContent
                 alarmHerd = taskConfig["alarmHerd"].AsBool(false);
             }
 
+            if (taskConfig["leapAtTarget"] != null)
+            {
+                leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
+            }
+
             if (taskConfig["entityCodes"] != null)
             {
                 string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
@@ -73,8 +85,17 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
+            if (rand.NextDouble() > 0.04f) return false;
+
+            if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
+            {
+                entity.AnimManager.StopAnimation("jump");
+            }
+
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
-            if (rand.NextDouble() > 0.03f) return false;
+
+
+
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
@@ -143,18 +164,89 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
-            stuck = false;
-            pathTraverser.GoTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
+            stopNow = false;
+            siegeMode = false;
+
+            bool giveUpWhenNoPath = targetPos.SquareDistanceTo(entity.Pos.XYZ) < 12 * 12;
+            int searchDepth = 3500;
+            // 1 in 20 times we do an expensive search
+            if (world.Rand.NextDouble() < 0.05) 
+            {
+                searchDepth = 10000;
+            }
+
+            if (!pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth, true))
+            {
+                // If we cannot find a path to the target, let's circle it!
+                float angle = (float)Math.Atan2(entity.ServerPos.X - targetPos.X, entity.ServerPos.Z - targetPos.Z);
+
+                double randAngle = angle + 0.5 + world.Rand.NextDouble() / 2;
+                
+                double distance = 4 + world.Rand.NextDouble() * 6;
+
+                double dx = GameMath.Sin(randAngle) * distance; 
+                double dz = GameMath.Cos(randAngle) * distance;
+                targetPos = targetPos.AddCopy(dx, 0, dz);
+
+                int tries = 0;
+                bool ok = false;
+                BlockPos tmp = new BlockPos((int)targetPos.X, (int)targetPos.Y, (int)targetPos.Z);
+
+                int dy = 0;
+                while (tries < 5)
+                {
+                    // Down ok?
+                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y - dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, new Vec3d(tmp.X + 0.5, tmp.Y - dy + 1, tmp.Z + 0.5), false))
+                    {
+                        ok = true;
+                        targetPos.Y -= dy;
+                        targetPos.Y++;
+                        siegeMode = true;
+                        break;
+                    }
+
+                    // Down ok?
+                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y + dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, new Vec3d(tmp.X + 0.5, tmp.Y + dy + 1, tmp.Z + 0.5), false))
+                    {
+                        ok = true;
+                        targetPos.Y += dy;
+                        targetPos.Y++;
+                        siegeMode = true;
+                        break;
+
+                    }
+
+                    tries++;
+                    dy++;
+                }
+
+
+
+                ok = ok && pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth);
+
+                stopNow = !ok;
+            }
+
             currentFollowTime = 0;
         }
 
+
+        long jumpedMS = 0;
         public override bool ContinueExecute(float dt)
         {
             currentFollowTime += dt;
 
-            pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
-            pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
-            pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
+            if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
+            {
+                entity.AnimManager.StopAnimation("jump");
+            }
+
+            if (!siegeMode)
+            {
+                pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
+                pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
+                pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
+            }
 
             Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
@@ -162,6 +254,28 @@ namespace Vintagestory.GameContent
 
 
             bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
+
+            if (!inCreativeMode && leapAtTarget)
+            {
+                bool recentlyJumped = entity.World.ElapsedMilliseconds - jumpedMS < 3000;
+
+                if (distance > 0.5 && distance < 4 && !recentlyJumped && targetEntity.ServerPos.Y + 0.1 >= entity.ServerPos.Y) 
+                {
+                    entity.ServerPos.Motion.Add((targetEntity.ServerPos.X - entity.ServerPos.X) / 20, GameMath.Max(0.15, (targetEntity.ServerPos.Y - entity.ServerPos.Y) / 20), (targetEntity.ServerPos.Z - entity.ServerPos.Z) / 20);
+                    jumpedMS = entity.World.ElapsedMilliseconds;
+                    entity.AnimManager.StopAnimation("walk");
+                    entity.AnimManager.StopAnimation("run");
+                    entity.AnimManager.StartAnimation(new AnimationMetaData() { Animation = "jump", Code = "jump" }.Init());
+                    finishedMs = entity.World.ElapsedMilliseconds;
+                    jumpAnimOn = true;
+                }
+
+                if (recentlyJumped && !entity.Collided && distance < 0.5)
+                {
+                    entity.ServerPos.Motion /= 2;
+                }
+            }
+
 
             float minDist = MinDistanceToTarget();
 
@@ -171,14 +285,17 @@ namespace Vintagestory.GameContent
                 distance > minDist &&
                 targetEntity.Alive &&
                 !inCreativeMode &&
-                !stuck
+                !stopNow
             ;
         }
+
+        
 
 
         public override void FinishExecute(bool cancelled)
         {
             base.FinishExecute(cancelled);
+            finishedMs = entity.World.ElapsedMilliseconds;
             pathTraverser.Stop();
         }
 
@@ -198,12 +315,19 @@ namespace Vintagestory.GameContent
 
         private void OnStuck()
         {
-            stuck = true;   
+            stopNow = true;   
         }
 
         private void OnGoalReached()
         {
-            pathTraverser.Active = true;
+            if (!siegeMode)
+            {
+                pathTraverser.Active = true;
+            } else
+            {
+                stopNow = true;
+            }
+
         }
     }
 }

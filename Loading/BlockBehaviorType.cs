@@ -17,4 +17,5 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonConverter(typeof(JsonObjectConverter))]
         public JsonObject properties;
     }
+
 }

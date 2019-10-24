@@ -112,7 +112,7 @@ namespace Vintagestory.GameContent
                 .BeginChildElements(bgBounds)
                     .BeginClip(clipBounds)
                         .AddInset(insetBounds, 3)
-                        .AddList(stackListBounds, onLeftClickListElement, listElements, "stacklist")
+                        .AddHandbookStackList(stackListBounds, onLeftClickListElement, listElements, "stacklist")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalueOverviewPage, scrollbarBounds, "scrollbar")
                     .AddSmallButton(Lang.Get("Close Handbook"), OnButtonClose, closeButtonBounds)
@@ -121,7 +121,7 @@ namespace Vintagestory.GameContent
             ;
 
             overviewGui.GetScrollbar("scrollbar").SetHeights(
-                (float)listHeight, (float)overviewGui.GetList("stacklist").insideBounds.fixedHeight
+                (float)listHeight, (float)overviewGui.GetHandbookStackList("stacklist").insideBounds.fixedHeight
             );
         }
 
@@ -244,7 +244,7 @@ namespace Vintagestory.GameContent
 
         private void OnNewScrollbarvalueOverviewPage(float value)
         {
-            GuiElementList stacklist = overviewGui.GetList("stacklist");
+            GuiElementHandbookList stacklist = overviewGui.GetHandbookStackList("stacklist");
 
             stacklist.insideBounds.fixedY = 3 - value;
             stacklist.insideBounds.CalcWorldBounds();
@@ -382,7 +382,7 @@ namespace Vintagestory.GameContent
                 listElements[i].Visible = text.Length == 0 || listElements[i].MatchesText(text);
             }
 
-            GuiElementList stacklist = overviewGui.GetList("stacklist");
+            GuiElementHandbookList stacklist = overviewGui.GetHandbookStackList("stacklist");
             stacklist.CalcTotalHeight();
             overviewGui.GetScrollbar("scrollbar").SetHeights(
                 (float)listHeight, (float)stacklist.insideBounds.fixedHeight

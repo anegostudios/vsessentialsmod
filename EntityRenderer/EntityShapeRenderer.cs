@@ -8,6 +8,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -21,25 +22,25 @@ namespace Vintagestory.GameContent
     
     public class EntityShapeRenderer : EntityRenderer
     {
-        LoadedTexture nameTagTexture = null;
-        int renderRange = 999;
-        bool showNameTagOnlyWhenTargeted = false;
+        protected LoadedTexture nameTagTexture = null;
+        protected int renderRange = 999;
+        protected bool showNameTagOnlyWhenTargeted = false;
 
-        LoadedTexture debugTagTexture = null;
+        protected LoadedTexture debugTagTexture = null;
 
-        MeshRef meshRefOpaque;
-        MeshRef meshRefOit;
+        protected MeshRef meshRefOpaque;
+        protected MeshRef meshRefOit;
 
-        Vec4f color = new Vec4f(1, 1, 1, 1);
-        long lastDebugInfoChangeMs = 0;
-        bool isSpectator;
-        IClientPlayer player;
-        float bodyYawLerped = 0;
+        protected Vec4f color = new Vec4f(1, 1, 1, 1);
+        protected long lastDebugInfoChangeMs = 0;
+        protected bool isSpectator;
+        protected IClientPlayer player;
+        protected float bodyYawLerped = 0;
 
         public Vec3f OriginPos = new Vec3f();
         public float[] ModelMat = Mat4f.Create();
-        float[] tmpMvMat = Mat4f.Create();
-        Matrixf ItemModelMat = new Matrixf();
+        protected float[] tmpMvMat = Mat4f.Create();
+        protected Matrixf ItemModelMat = new Matrixf();
 
         public bool DoRenderHeldItem;
         public bool DisplayChatMessages;
@@ -47,12 +48,32 @@ namespace Vintagestory.GameContent
         public int AddRenderFlags;
         public double WindWaveIntensity = 1f;
 
-        List<MessageTexture> messageTextures = null;
-        NameTagRendererDelegate nameTagRenderHandler;
+        protected List<MessageTexture> messageTextures = null;
+        protected NameTagRendererDelegate nameTagRenderHandler;
+
+        protected bool hasArmorExtras;
+        protected EntityAgent eagent;
+
+        protected Dictionary<string, CompositeTexture> extraTexturesByTextureName
+        {
+            get
+            {
+                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTextures", () => new Dictionary<string, CompositeTexture>());
+            }
+        }
+        protected HashSet<AssetLocation> extraTextureLocations
+        {
+            get
+            {
+                return ObjectCacheUtil.GetOrCreate(capi, "extraTextureLocations", () => new HashSet<AssetLocation>());
+            }
+        }
 
 
         public EntityShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
+            eagent = entity as EntityAgent;
+
             DoRenderHeldItem = entity is EntityPlayer;
             DisplayChatMessages = entity is EntityPlayer;
             
@@ -63,8 +84,6 @@ namespace Vintagestory.GameContent
             {
                 nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
             }
-
-            
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
@@ -78,11 +97,10 @@ namespace Vintagestory.GameContent
             }
             
             api.Event.ReloadShapes += TesselateShape;
-
         }
 
 
-        private void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
+        protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
         {
             if (data != null && data.StartsWith("From:") && entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 20*20 && message.Length > 0)
             {
@@ -125,7 +143,7 @@ namespace Vintagestory.GameContent
 
 
 
-        public void TesselateShape()
+        public virtual void TesselateShape()
         {
             CompositeShape compositeShape = entity.Properties.Client.Shape;
             Shape entityShape = entity.Properties.Client.LoadedShape;
@@ -134,7 +152,12 @@ namespace Vintagestory.GameContent
             {
                 return;
             }
-    
+
+            if (eagent != null)
+            {
+                entityShape = addArmorToShape(entityShape, compositeShape.Base.ToString());
+            }
+
             ITexPositionSource texSource = GetTextureSource();
             MeshData meshdata;
 
@@ -196,19 +219,162 @@ namespace Vintagestory.GameContent
             
         }
 
+        protected Shape addArmorToShape(Shape entityShape, string shapePathForLogging)
+        {
+            IInventory inv = eagent.GearInventory;
+            hasArmorExtras = false;
+
+            if (inv == null) return entityShape;
+
+            foreach (var slot in inv)
+            {
+                if (slot.Empty || slot.Itemstack.Collectible.Attributes?["armorShape"].Exists != true) continue;
+
+                if (!hasArmorExtras)
+                {
+                    // So we don't affect other players models
+                    Shape newShape = new Shape()
+                    {
+                        Elements = entityShape.CloneElements(),
+                        Animations = entityShape.Animations,
+                        AnimationsByCrc32 = entityShape.AnimationsByCrc32,
+                        AttachmentPointsByCode = entityShape.AttachmentPointsByCode,
+                        JointsById = entityShape.JointsById,
+                        TextureWidth = entityShape.TextureWidth,
+                        TextureHeight = entityShape.TextureHeight,
+                        Textures = entityShape.Textures,
+                    };
+
+                    newShape.ResolveAndLoadJoints("head");
+
+                    entityShape = newShape;
+                }
+
+                hasArmorExtras = true;
+
+                CompositeShape compArmorShape = slot.Itemstack.Collectible.Attributes["armorShape"].AsObject<CompositeShape>(null, slot.Itemstack.Collectible.Code.Domain);
+                AssetLocation shapePath = shapePath = compArmorShape.Base.CopyWithPath("shapes/" + compArmorShape.Base.Path + ".json");
+
+                string[] disableElements = slot.Itemstack.Collectible.Attributes["disableElements"].AsArray<string>(null);
+                if (disableElements != null)
+                {
+                    foreach (var val in disableElements)
+                    {
+                        entityShape.RemoveElementByName(val);
+                    }
+                }
+
+                IAsset asset = capi.Assets.TryGet(shapePath);
+
+                if (asset == null)
+                {
+                    capi.World.Logger.Warning("Entity armor shape {0} defined in {1} {2} not found, was supposed to be at {3}. Armor piece will be invisible.", compArmorShape.Base, slot.Itemstack.Class, slot.Itemstack.Collectible.Code, shapePath);
+                    return null;
+                }
+
+                Shape armorShape;
+
+                try
+                {
+                    armorShape = asset.ToObject<Shape>();
+                }
+                catch (Exception e)
+                {
+                    capi.World.Logger.Warning("Exception thrown when trying to load entity armor shape {0} defined in {1} {2}. Armor piece will be invisible. Exception: {3}", compArmorShape.Base, slot.Itemstack.Class, slot.Itemstack.Collectible.Code, e);
+                    return null;
+                }
+
+                bool added = false;
+                foreach (var val in armorShape.Elements)
+                {
+                    ShapeElement elem;
+
+                    if (val.StepParentName != null)
+                    {
+                        elem = entityShape.GetElementByName(val.StepParentName, StringComparison.InvariantCultureIgnoreCase);
+                        if (elem == null)
+                        {
+                            capi.World.Logger.Warning("Entity armor shape {0} defined in {1} {2} requires step parent element with name {3}, but no such element was found in shape {3}. Will not be visible.", compArmorShape.Base, slot.Itemstack.Class, slot.Itemstack.Collectible.Code, val.StepParentName, shapePathForLogging);
+                            continue;
+                        }
+                    } else
+                    {
+                        capi.World.Logger.Warning("Entity armor shape element {0} in shape {1} defined in {2} {3} did not define a step parent element. Will not be visible.", val.Name, compArmorShape.Base, slot.Itemstack.Class, slot.Itemstack.Collectible.Code);
+                        continue;
+                    }
+
+                    if (elem.Children == null)
+                    {
+                        elem.Children = new ShapeElement[] { val };
+                    }
+                    else
+                    {
+                        elem.Children = elem.Children.Append(val);
+                    }
+                    val.SetJointIdRecursive(elem.JointId);
+                    
+
+                    added = true;
+                }
+
+                if (added && armorShape.Textures != null)
+                {
+                    foreach (var val in armorShape.Textures)
+                    {
+                        CompositeTexture ctex = new CompositeTexture() { Base = val.Value };
+                        //ctex.Bake(capi.Assets);
+                        /*if (ctex.Baked.BakedVariants != null)
+                        {
+                            for (int i = 0; i < ctex.Baked.BakedVariants.Length; i++)
+                            {
+                                AddTextureLocation(new AssetLocationAndSource(ctex.Baked.BakedVariants[i].BakedName, "Shape file " + clientConf.Shape.Base));
+                            }
+                            continue;
+                        }*/
+
+                        AssetLocation armorTexLoc = val.Value;
+                        var textLocs = extraTextureLocations;
+
+                        if (!textLocs.Contains(armorTexLoc))
+                        {
+                            var textDict = extraTexturesByTextureName;
+                            int textureSubId = 0;
+                            TextureAtlasPosition texpos;
+
+                            IAsset texAsset = capi.Assets.TryGet(val.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png"));
+                            if (asset != null)
+                            {
+                                BitmapRef bmp = texAsset.ToBitmap(capi);
+                                capi.EntityTextureAtlas.InsertTexture(bmp, out textureSubId, out texpos);
+                            } else
+                            {
+                                capi.World.Logger.Warning("Entity armor shape {0} defined texture {1}, not no such texture found.", shapePath, val.Value);
+                            }
+
+                            ctex.Baked = new BakedCompositeTexture() { BakedName = val.Value, TextureSubId = textureSubId };
+
+                            textDict.Add(val.Key, ctex);
+                            textLocs.Add(armorTexLoc);
+                        }
+                    }
+                }
+            }
+
+            return entityShape;
+        }
 
         protected virtual ITexPositionSource GetTextureSource()
         {
             int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
-            return capi.Tesselator.GetTextureSource(entity, altTexNumber);
+            return capi.Tesselator.GetTextureSource(entity, extraTexturesByTextureName, altTexNumber);
         }
-        
-        
 
 
 
 
-        private void UpdateDebugInfo(float dt)
+
+
+        protected void UpdateDebugInfo(float dt)
         {
             OnDebugInfoChanged();
 
@@ -217,7 +383,7 @@ namespace Vintagestory.GameContent
 
 
 
-        private void OnDebugInfoChanged()
+        protected void OnDebugInfoChanged()
         {
             bool showDebuginfo = capi.Settings.Bool["showEntityDebugInfo"];
 
@@ -253,7 +419,7 @@ namespace Vintagestory.GameContent
             lastDebugInfoChangeMs = entity.World.ElapsedMilliseconds;
         }
 
-        private void OnNameChanged()
+        protected void OnNameChanged()
         {
             if (nameTagRenderHandler == null) return;
             if (nameTagTexture != null)
@@ -325,11 +491,20 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                loadModelMatrix(entity, dt);
+                loadModelMatrix(entity, dt, isShadowPass);
                 Vec3d camPos = capi.World.Player.Entity.CameraPos;
                 OriginPos.Set((float)(entity.Pos.X - camPos.X), (float)(entity.Pos.Y - camPos.Y), (float)(entity.Pos.Z - camPos.Z));
             }
 
+            if (isShadowPass)
+            {
+                DoRender3DAfterOIT(dt, true);
+            }
+        }
+
+
+        public override void DoRender3DAfterOIT(float dt, bool isShadowPass)
+        {
             if (DoRenderHeldItem && !entity.AnimManager.ActiveAnimationsByAnimCode.ContainsKey("lie"))
             {
                 RenderHeldItem(isShadowPass, false);
@@ -338,10 +513,10 @@ namespace Vintagestory.GameContent
         }
 
 
-        void RenderHeldItem(bool isShadowPass, bool right)
+        protected void RenderHeldItem(bool isShadowPass, bool right)
         {
             IRenderAPI rapi = capi.Render;
-            ItemSlot slot = right ? (entity as EntityAgent).RightHandItemSlot : (entity as EntityAgent).LeftHandItemSlot;
+            ItemSlot slot = right ? eagent.RightHandItemSlot : eagent.LeftHandItemSlot;
             ItemStack stack = slot?.Itemstack;
 
             AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
@@ -532,10 +707,10 @@ namespace Vintagestory.GameContent
 
             if (capi.World.Player.Entity.EntityId == entity.EntityId) {
                 if (rapi.CameraType == EnumCameraMode.FirstPerson) return;
-                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X, entityPlayer.CameraPos.Y + entity.CollisionBox.Y2 + 0.5, entityPlayer.CameraPos.Z);
+                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X, entityPlayer.CameraPos.Y + entity.CollisionBox.Y2 + 0.2, entityPlayer.CameraPos.Z);
             } else
             {
-                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.5, entity.Pos.Z);
+                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.2, entity.Pos.Z);
             }
 
             double offX = entity.CollisionBox.X2 - entity.OriginCollisionBox.X2;
@@ -559,7 +734,7 @@ namespace Vintagestory.GameContent
             if (nameTagTexture != null && (!showNameTagOnlyWhenTargeted || capi.World.Player.CurrentEntitySelection?.Entity == entity) && renderRange * renderRange > dist)
             {
                 float posx = (float)pos.X - cappedScale * nameTagTexture.Width / 2;
-                float posy = rapi.FrameHeight - (float)pos.Y + (nameTagTexture.Height * Math.Max(0, scale - 1));
+                float posy = rapi.FrameHeight - (float)pos.Y - (nameTagTexture.Height * Math.Max(0, cappedScale));
 
                 rapi.Render2DTexture(
                     nameTagTexture.TextureId, posx, posy, cappedScale * nameTagTexture.Width, cappedScale * nameTagTexture.Height, 20
@@ -569,7 +744,7 @@ namespace Vintagestory.GameContent
             if (debugTagTexture != null)
             {
                 float posx = (float)pos.X - cappedScale * debugTagTexture.Width / 2;
-                float posy = rapi.FrameHeight - (float)pos.Y - (debugTagTexture.Height * Math.Max(0, cappedScale));
+                float posy = rapi.FrameHeight - (float)pos.Y - ((nameTagTexture.Height + debugTagTexture.Height) * Math.Max(0, cappedScale));
 
                 rapi.Render2DTexture(
                     debugTagTexture.TextureId, posx, posy - offY, cappedScale * debugTagTexture.Width, cappedScale * debugTagTexture.Height, 20
@@ -630,7 +805,7 @@ namespace Vintagestory.GameContent
 
         double stepPitch;
 
-        public void loadModelMatrix(Entity entity, float dt)
+        public void loadModelMatrix(Entity entity, float dt, bool isShadowPass)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
@@ -645,29 +820,29 @@ namespace Vintagestory.GameContent
             IWorldAccessor world = entity.World;
 
             // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
-            if (entity is EntityAgent && !entity.Properties.CanClimbAnywhere)
+            if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass)
             {
                 if (entity.Properties.Habitat != EnumHabitat.Air)
                 {
-                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !(entity as EntityAgent).Controls.IsClimbing && !entity.FeetInLiquid && !entity.Swimming)
+                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !eagent.Controls.IsClimbing && !entity.FeetInLiquid && !entity.Swimming)
                     {
-                        stepPitch = Math.Max(-0.5, stepPitch - 2 * dt);
+                        stepPitch = Math.Max(-0.5, stepPitch - 3 * dt);
                     }
                     else
                     {
                         if (stepPitch < 0)
                         {
-                            stepPitch = Math.Min(0, stepPitch + 2 * dt);
+                            stepPitch = Math.Min(0, stepPitch + 3 * dt);
                         }
                         else
                         {
                             if (!entity.OnGround && !entity.FeetInLiquid && !entity.Swimming)
                             {
-                                stepPitch = Math.Min(0.5, stepPitch + 3 * dt);
+                                stepPitch = Math.Min(0.5, stepPitch + 4.5f * dt);
                             }
                             else
                             {
-                                stepPitch = Math.Max(0, stepPitch - 2 * dt);
+                                stepPitch = Math.Max(0, stepPitch - 3 * dt);
                             }
                         }
                     }
@@ -697,7 +872,6 @@ namespace Vintagestory.GameContent
         public void loadModelMatrixForPlayer(Entity entity, bool isSelf, float dt)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
-            EntityAgent eagent = entity as EntityAgent;
             EntityPlayer eplr = entity as EntityPlayer;
 
             Mat4f.Identity(ModelMat);
@@ -732,7 +906,7 @@ namespace Vintagestory.GameContent
 
 
 
-        void loadModelMatrixForGui(Entity entity, double posX, double posY, double posZ, double yawDelta, float size)
+        protected void loadModelMatrixForGui(Entity entity, double posX, double posY, double posZ, double yawDelta, float size)
         {
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 

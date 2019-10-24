@@ -36,7 +36,7 @@ namespace Vintagestory.GameContent
 
             entity.Itemstack.StackSize--;
             if (entity.Itemstack.StackSize <= 0) entity.Die();
-            return 0.5f;
+            return 1f;
         }
 
         public bool IsSuitableFor(Entity entity)
@@ -190,7 +190,7 @@ namespace Vintagestory.GameContent
             nowStuck = false;
             soundPlayed = false;
             eatTimeNow = 0;
-            pathTraverser.GoTo(targetPoi.Position, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
+            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 1000);
         }
 
         public override bool ContinueExecute(float dt)

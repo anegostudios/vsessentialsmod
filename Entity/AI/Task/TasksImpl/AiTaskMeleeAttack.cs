@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -51,7 +52,7 @@ namespace Vintagestory.GameContent
 
             if (taskConfig["entityCodes"] != null)
             {
-                string[] codes = taskConfig["entityCodes"].AsStringArray(new string[] { "player" });
+                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
 
                 List<string> exact = new List<string>();
                 List<string> beginswith = new List<string>();
@@ -91,27 +92,25 @@ namespace Vintagestory.GameContent
                         if (e.Code.Path == "player")
                         {
                             IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            return 
+                            bool okplayer =
                                 player == null ||
                                 (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing);
+
+                            return okplayer && hasDirectContact(e);
                         }
-                        return true;
+
+                        if (hasDirectContact(e))
+                        {
+                            return true;
+                        }
                     }
                 }
 
 
                 for (int i = 0; i < seekEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWith(seekEntityCodesBeginsWith[i]))
+                    if (e.Code.Path.StartsWith(seekEntityCodesBeginsWith[i]) && hasDirectContact(e))
                     {
-                        if (e.Code.Path == "player")
-                        {
-                            IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            return
-                                player == null ||
-                                (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing);
-                        }
-
                         return true;
                     }
                 }
@@ -137,44 +136,13 @@ namespace Vintagestory.GameContent
 
             if (!damageInflicted)
             {
-                Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-                Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
-                double dist = targetBox.ShortestDistanceFrom(pos);
-                double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
-                if (dist >= minDist || vertDist >= minVerDist) return false;
-
-                Vec3d rayTraceFrom = entity.ServerPos.XYZ;
-                rayTraceFrom.Y += 1 / 32f;
-                Vec3d rayTraceTo = targetEntity.ServerPos.XYZ;
-                rayTraceTo.Y += 1 / 32f;
-                bool directContact = false;
-
-                entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-                directContact = blockSel == null;
-
-                if (!directContact)
-                {
-                    rayTraceFrom.Y += entity.CollisionBox.Y2 * 7/16f;
-                    rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
-                    entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-                    directContact = blockSel == null;
-                }
-
-                if (!directContact)
-                {
-                    rayTraceFrom.Y += entity.CollisionBox.Y2 * 7 / 16f;
-                    rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
-                    entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-                    directContact = blockSel == null;
-                }
-
-                if (!directContact) return false;
+                if (!hasDirectContact(targetEntity)) return false;
 
                 bool alive = targetEntity.Alive;
                 
                 ((EntityAgent)targetEntity).ReceiveDamage(
                     new DamageSource() { Source = EnumDamageSource.Entity, SourceEntity = entity, Type = EnumDamageType.BluntAttack },
-                    damage
+                    damage * GlobalConstants.CreatureDamageModifier
                 );
 
                 if (alive && !targetEntity.Alive)
@@ -187,6 +155,46 @@ namespace Vintagestory.GameContent
 
             if (lastCheckOrAttackMs + attackDurationMs > entity.World.ElapsedMilliseconds) return true;
             return false;
+        }
+
+
+
+        bool hasDirectContact(Entity targetEntity)
+        {
+            Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
+            double dist = targetBox.ShortestDistanceFrom(pos);
+            double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
+            if (dist >= minDist || vertDist >= minVerDist) return false;
+
+            Vec3d rayTraceFrom = entity.ServerPos.XYZ;
+            rayTraceFrom.Y += 1 / 32f;
+            Vec3d rayTraceTo = targetEntity.ServerPos.XYZ;
+            rayTraceTo.Y += 1 / 32f;
+            bool directContact = false;
+
+            entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
+            directContact = blockSel == null;
+
+            if (!directContact)
+            {
+                rayTraceFrom.Y += entity.CollisionBox.Y2 * 7 / 16f;
+                rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
+                entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
+                directContact = blockSel == null;
+            }
+
+            if (!directContact)
+            {
+                rayTraceFrom.Y += entity.CollisionBox.Y2 * 7 / 16f;
+                rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
+                entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
+                directContact = blockSel == null;
+            }
+
+            if (!directContact) return false;
+
+            return true;
         }
 
 

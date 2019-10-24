@@ -54,20 +54,24 @@ namespace Vintagestory.GameContent
             if (ws.api.Side == EnumAppSide.Client)
             {
                 ws.capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", BlendedAmbient);
+                BlendedAmbient.FogColor = (ws.api as ICoreClientAPI).Ambient.Base.FogColor.Clone();
             }
 
             WeatherPattern ClearSky = new WeatherPatternClearSky(ws, "ClearSky", 1);
+            ClearSky.Code = "clearsky";
             ClearSky.Ambient.FogDensity = new WeightedFloat(2 / 2000f, 1);
 
             WeatherPattern CumulusClouds = new WeatherPattern(ws, "Cumulus Clouds", 1)
             {
                 CloudDensityNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
                 CloudDensityOffsetNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
-                CloudOffsetYNoise = new SimplexNoise(new double[] { 2 }, new double[] { 1.5 }, rand.Next())
+                CloudOffsetYNoise = new SimplexNoise(new double[] { 2 }, new double[] { 1.5 }, rand.Next()),
+                Code = "cumulus"
             };
 
             WeatherPattern StratusClouds = CumulusClouds.Clone();
             StratusClouds.Name = "Stratus Clouds";
+            StratusClouds.Code = "stratus";
             StratusClouds.Ambient.FlatFogYPos = new WeightedFloat(25, 1);
             StratusClouds.Ambient.FlatFogDensity = new WeightedFloat(6 / 250f, 1);
             StratusClouds.Ambient.FogDensity = new WeightedFloat(10 / 2000f, 1);
@@ -75,6 +79,7 @@ namespace Vintagestory.GameContent
 
             WeatherPattern CumulusCloudsWithFlatMist = CumulusClouds.Clone();
             CumulusCloudsWithFlatMist.Name = "Cumulus Clouds + Flat dense Mist";
+            CumulusCloudsWithFlatMist.Code = "cumulusflatmist";
             CumulusCloudsWithFlatMist.Ambient.FlatFogYPos = new WeightedFloat(5, 1);
             CumulusCloudsWithFlatMist.Ambient.FlatFogDensity = new WeightedFloat(-100/250f, 1);
             CumulusCloudsWithFlatMist.BeginUse += () =>
@@ -88,6 +93,7 @@ namespace Vintagestory.GameContent
 
             WeatherPattern CumulusCloudsWithTallMist = CumulusClouds.Clone();
             CumulusCloudsWithTallMist.Name = "Cumulus Clouds + Tall dense Mist";
+            CumulusCloudsWithTallMist.Code = "cumulustallmist";
             CumulusCloudsWithTallMist.Ambient.FlatFogYPos = new WeightedFloat(40, 1);
             CumulusCloudsWithTallMist.Ambient.FlatFogDensity = new WeightedFloat(-30 / 250f, 1);
             CumulusCloudsWithTallMist.BeginUse += () => {
@@ -99,22 +105,30 @@ namespace Vintagestory.GameContent
 
             WeatherPattern CumulusCloudsWithFog = CumulusClouds.Clone();
             CumulusCloudsWithFog.Name = "Cumulus Clouds + Fog";
+            CumulusCloudsWithFog.Code = "cumulusfog";
             CumulusCloudsWithFog.Ambient.FogDensity = new WeightedFloat(40 / 2000f, 1);
-            CumulusCloudsWithFog.BeginUse += () => { CumulusCloudsWithFog.Ambient.FogDensity.Value = (10 + 30 * (float)rand.NextDouble()) / 2000f; };
+            CumulusCloudsWithFog.BeginUse += () => {
+                float f = (10 + 30 * (float)rand.NextDouble()) / 2000f;
+                CumulusCloudsWithFog.Ambient.FogDensity.Value = f;
+                CumulusCloudsWithFog.Ambient.SceneBrightness.Value = 1 - f * 20;
+                CumulusCloudsWithFog.Ambient.SceneBrightness.Weight = 0.4f;
+            };
             CumulusCloudsWithFog.Chance = 0.35f;
 
             WeatherPattern NimboStratusClouds = new WeatherPattern(ws, "Nimbostratus Clouds", 1)
             {
                 CloudDensityNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
                 CloudDensityOffsetNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
-                CloudOffsetYNoise = new SimplexNoise(new double[] { 2 }, new double[] { 1.5 }, rand.Next())
+                CloudOffsetYNoise = new SimplexNoise(new double[] { 2 }, new double[] { 1.5 }, rand.Next()),
+                Code = "nimbostratus"
             };
 
             WeatherPattern AltoCumulusClouds = new WeatherPattern(ws, "Altocumulus Clouds", 1)
             {
                 CloudDensityNoise = new SimplexNoise(new double[] { 3 }, new double[] { 10 }, rand.Next()),
                 CloudDensityOffsetNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
-                CloudOffsetYNoise = new SimplexNoise(new double[] { 1 }, new double[] { 1.5 }, rand.Next())
+                CloudOffsetYNoise = new SimplexNoise(new double[] { 1 }, new double[] { 1.5 }, rand.Next()),
+                Code = "altocumulus"
             };
             
 
@@ -122,7 +136,8 @@ namespace Vintagestory.GameContent
             {
                 CloudDensityNoise = new SimplexNoise(new double[] { 3 }, new double[] { 10 }, rand.Next()),
                 CloudDensityOffsetNoise = new SimplexNoise(new double[] { 4 }, new double[] { 1.5 }, rand.Next()),
-                CloudOffsetYNoise = new SimplexNoise(new double[] { 1 }, new double[] { 1.5 }, rand.Next())
+                CloudOffsetYNoise = new SimplexNoise(new double[] { 1 }, new double[] { 1.5 }, rand.Next()),
+                Code = "cirrocumulus"
             };
             CirroCumulusClouds.CloudYOffset = 100;
 
@@ -217,6 +232,30 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public bool SetWeatherPattern(string code)
+        {
+            WeatherPattern pattern = Patterns.FirstOrDefault(p => p.Code == code);
+            if (pattern == null) return false;
+
+            OldPattern = NewPattern;
+            NewPattern = pattern;
+            Weight = 1;
+            Transitioning = false;
+            TransitionDelay = 0;
+            if (NewPattern != OldPattern) NewPattern.OnBeginUse();
+
+            ws.serverChannel.BroadcastPacket(new WeatherState()
+            {
+                NewPatternIndex = NewPattern.Index,
+                OldPatternIndex = OldPattern.Index,
+                TransitionDelay = 0,
+                Transitioning = false,
+                Weight = Weight
+            });
+
+            return true;
+        }
+
         public void TriggerTransition()
         {
             TriggerTransition(30 + (float)rand.NextDouble() * 60 * 60 / ws.api.World.Calendar.SpeedOfTime);
@@ -237,7 +276,8 @@ namespace Vintagestory.GameContent
                 NewPatternIndex = NewPattern.Index,
                 OldPatternIndex = OldPattern.Index,
                 TransitionDelay = TransitionDelay,
-                Transitioning = true
+                Transitioning = true,
+                Weight = Weight
             });
         }
        
@@ -262,7 +302,8 @@ namespace Vintagestory.GameContent
 
         public double GetBlendedCloudDensityAt(int dx, int dz)
         {
-            return ws.capi.Ambient.BlendedCloudDensity + NewPattern.GetCloudDensityAt(dx, dz) * Weight + OldPattern.GetCloudDensityAt(dx, dz) * (1 - Weight);
+            float generalDensityMod = ws.capi.Ambient.BlendedCloudDensity;
+            return generalDensityMod * (NewPattern.GetCloudDensityAt(dx, dz) * Weight + OldPattern.GetCloudDensityAt(dx, dz) * (1 - Weight));
         }
 
         public double GetBlendedCloudOffsetYAt(int dx, int dz)
@@ -285,7 +326,7 @@ namespace Vintagestory.GameContent
 
         public override double GetCloudDensityAt(int dx, int dz)
         {
-            return -3;
+            return 0;
         }
 
         public override double GetCloudOffsetYAt(int dx, int dz)

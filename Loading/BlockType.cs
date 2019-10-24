@@ -12,6 +12,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -37,6 +38,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public BlockBehaviorType[] Behaviors = new BlockBehaviorType[0];
         [JsonProperty]
+        public BlockEntityBehaviorType[] EntityBehaviors = new BlockEntityBehaviorType[0];
+        [JsonProperty]
         public EnumDrawType DrawType = EnumDrawType.JSON;
         [JsonProperty]
         public EnumRandomizeAxes RandomizeAxes = EnumRandomizeAxes.XYZ;
@@ -60,7 +63,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public Dictionary<string, bool> SideAo;
         [JsonProperty]
-        public Dictionary<string, bool> NeighbourSideAo;
+        public Dictionary<string, bool> EmitSideAo;
         [JsonProperty]
         public Dictionary<string, bool> SideSolid;
 
@@ -190,7 +193,13 @@ namespace Vintagestory.ServerMods.NoObf
             ResolveStringBoolDictFaces(SideSolid);
             ResolveStringBoolDictFaces(SideOpaque);
             ResolveStringBoolDictFaces(SideAo);
-            ResolveStringBoolDictFaces(NeighbourSideAo);
+
+            if (EmitSideAo == null)
+            {
+                EmitSideAo = new Dictionary<string, bool>() { { "all", LightAbsorption > 0 } };
+            }
+
+            ResolveStringBoolDictFaces(EmitSideAo);
 
             TintIndex = GameMath.Clamp(TintIndex, 0, 2);
 
@@ -277,9 +286,9 @@ namespace Vintagestory.ServerMods.NoObf
                     block.SideAo[facing.Index] = SideAo[facing.Code];
                 }
 
-                if (NeighbourSideAo != null && NeighbourSideAo.ContainsKey(facing.Code))
+                if (EmitSideAo != null && EmitSideAo.ContainsKey(facing.Code))
                 {
-                    block.NeighbourSideAo[facing.Index] = NeighbourSideAo[facing.Code];
+                    block.EmitSideAo[facing.Index] = EmitSideAo[facing.Code];
                 }
 
                 if (SideSolid != null && SideSolid.ContainsKey(facing.Code))
@@ -321,7 +330,8 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     string blockCode = RegistryObject.FillPlaceHolder(val.Value[i], searchReplace);
 
-                    if (WildCardMatch(blockCode, code.Path))
+                    if (WildcardUtil.Match(blockCode, code.Path))
+                    //if (WildCardMatch(blockCode, code.Path))
                     {
                         string tabCode = val.Key;
                         tabs.Add(tabCode);

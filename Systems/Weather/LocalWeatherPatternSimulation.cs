@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
     
     public class WeatherPatternSimulation
     {
-        int worldSeed;
+        //int worldSeed;
         IWorldAccessor world;
         NormalizedSimplexNoise[] NoiseGens;
 
@@ -26,12 +26,11 @@ namespace Vintagestory.GameContent
 
         public WeatherPatternSimulation(int worldSeed, IWorldAccessor world)
         {
-            this.worldSeed = worldSeed;
+            //this.worldSeed = worldSeed;
             this.world = world;
 
             chunksize = world.BlockAccessor.ChunkSize;
 
-            //NoiseGens = new NormalizedPerlinNoise[Enum.GetValues(typeof(EnumWeatherPattern)).Length];
             for (int i = 0; i < NoiseGens.Length; i++)
             {
                 NoiseGens[i] = NormalizedSimplexNoise.FromDefaultOctaves(3, 0.1, 0.8, worldSeed + i + 1231212);

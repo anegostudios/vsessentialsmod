@@ -24,12 +24,6 @@ namespace Vintagestory.ServerMods.NoObf
             GroundTransform = ModelTransform.ItemDefaultGround();
         }
 
-        [JsonProperty]
-        public int Durability;
-        [JsonProperty]
-        public EnumItemDamageSource[] DamagedBy;
-        [JsonProperty]
-        public EnumTool? Tool = null;
 
         public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, OrderedDictionary<string, string> searchReplace)
         {

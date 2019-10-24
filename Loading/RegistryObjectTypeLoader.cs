@@ -6,6 +6,7 @@ using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -395,7 +396,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.FpHandTransform = typedItemType.FpHandTransform;
             item.TpHandTransform = typedItemType.TpHandTransform;
             item.GroundTransform = typedItemType.GroundTransform;
-            item.DamagedBy = typedItemType.DamagedBy;
+            item.DamagedBy = (EnumItemDamageSource[])typedItemType.DamagedBy?.Clone();
             item.MaxStackSize = typedItemType.MaxStackSize;
             if (typedItemType.Attributes != null) item.Attributes = typedItemType.Attributes;
             item.CombustibleProps = typedItemType.CombustibleProps;
@@ -548,8 +549,12 @@ namespace Vintagestory.ServerMods.NoObf
             block.Class = typedBlockType.Class;
             block.LiquidSelectable = typedBlockType.LiquidSelectable;
             block.LiquidCode = typedBlockType.LiquidCode;
+            block.BlockEntityBehaviors = (BlockEntityBehaviorType[])typedBlockType.EntityBehaviors?.Clone() ?? new BlockEntityBehaviorType[0];
             block.WalkSpeedMultiplier = typedBlockType.WalkspeedMultiplier;
             block.DragMultiplier = typedBlockType.DragMultiplier;
+            block.Durability = typedBlockType.Durability;
+            block.DamagedBy = (EnumItemDamageSource[])typedBlockType.DamagedBy?.Clone();
+            block.Tool = typedBlockType.Tool;
             block.DrawType = typedBlockType.DrawType;
             block.Replaceable = typedBlockType.Replaceable;
             block.Fertility = typedBlockType.Fertility;
@@ -647,7 +652,8 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         foreach (var byTypeProperty in entry.Value.ToObject<OrderedDictionary<string, JToken>>())
                         {
-                            if (BlockType.WildCardMatch(byTypeProperty.Key, codePath))
+                            if (WildcardUtil.Match(byTypeProperty.Key, codePath))
+                            //if (BlockType.WildCardMatch(byTypeProperty.Key, codePath))
                             {
                                 JToken typedToken = byTypeProperty.Value;
                                 solveByType(typedToken, codePath, searchReplace);

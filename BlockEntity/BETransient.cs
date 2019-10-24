@@ -16,11 +16,9 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(api);
 
-            Block block = api.World.BlockAccessor.GetBlock(pos);
-
             if (transitionAtTotalDays <= 0)
             {
-                float hours = block.Attributes["inGameHours"].AsFloat(24);
+                float hours = Block.Attributes["inGameHours"].AsFloat(24);
                 transitionAtTotalDays = api.World.Calendar.TotalDays + hours / 24;
             }
 
@@ -32,9 +30,9 @@ namespace Vintagestory.GameContent
 
         public void CheckTransition(float dt)
         {
-            if (transitionAtTotalDays > api.World.Calendar.TotalDays) return;
+            if (transitionAtTotalDays > Api.World.Calendar.TotalDays) return;
 
-            Block block = api.World.BlockAccessor.GetBlock(pos);
+            Block block = Api.World.BlockAccessor.GetBlock(Pos);
             Block tblock;
 
             if (block.Attributes == null) return;
@@ -49,10 +47,10 @@ namespace Vintagestory.GameContent
 
             if (fromCode == null || !toCode.Contains("*"))
             {
-                tblock = api.World.GetBlock(new AssetLocation(toCode));
+                tblock = Api.World.GetBlock(new AssetLocation(toCode));
                 if (tblock == null) return;
 
-                api.World.BlockAccessor.SetBlock(tblock.BlockId, pos);
+                Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos);
                 return;
             }
             
@@ -61,10 +59,10 @@ namespace Vintagestory.GameContent
                 new AssetLocation(toCode)
             );
 
-            tblock = api.World.GetBlock(blockCode);
+            tblock = Api.World.GetBlock(blockCode);
             if (tblock == null) return;
 
-            api.World.BlockAccessor.SetBlock(tblock.BlockId, pos);
+            Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos);
         }
 
         public override void FromTreeAtributes(ITreeAttribute tree, IWorldAccessor worldForResolving)
@@ -83,11 +81,11 @@ namespace Vintagestory.GameContent
 
         public bool WasPlacedAtTotalHours(double totalHoursUntilPlace)
         {
-            Block block = api.World.BlockAccessor.GetBlock(pos);
+            Block block = Api.World.BlockAccessor.GetBlock(Pos);
             float hours = block.Attributes["inGameHours"].AsFloat(24);
-            transitionAtTotalDays = totalHoursUntilPlace / api.World.Calendar.HoursPerDay + hours / 24;
+            transitionAtTotalDays = totalHoursUntilPlace / Api.World.Calendar.HoursPerDay + hours / 24;
 
-            return transitionAtTotalDays > api.World.Calendar.TotalDays;
+            return transitionAtTotalDays > Api.World.Calendar.TotalDays;
         }
     }
 }

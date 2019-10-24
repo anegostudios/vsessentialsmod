@@ -2,6 +2,7 @@
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.Essentials;
 
 namespace Vintagestory.GameContent
 {
@@ -24,7 +25,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            PathTraverser = new StraightLinePathTraverser(entity as EntityAgent);
+            PathTraverser = new StraightLineTraverser(entity as EntityAgent);
 
             JsonObject[] goals = aiconfig["aigoals"]?.AsArray();
             if (goals == null) return;

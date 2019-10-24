@@ -84,7 +84,7 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
 
-            pathTraverser.GoTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+            pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, false, 1000, true);
 
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
 

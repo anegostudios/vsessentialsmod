@@ -18,7 +18,8 @@ namespace Vintagestory.GameContent
         internal MeshRef quadModel;
         public LoadedTexture Texture;
 
-        Vec2f viewPos = new Vec2f();        
+        Vec2f viewPos = new Vec2f();
+        Matrixf mvMat = new Matrixf();
 
         public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity) : base(capi)
         {
@@ -46,19 +47,18 @@ namespace Vintagestory.GameContent
             prog.Uniform("noTexture", 0f);
             prog.BindTexture2D("tex2d", Texture.TextureId, 0);
 
-            api.Render.GlPushMatrix();
-            api.Render.GlTranslate(x, y, 60);
-            api.Render.GlScale(Texture.Width, Texture.Height, 0);
-            api.Render.GlScale(0.5f, 0.5f, 0);
-            //api.Render.GlTranslate(1f, 1f, 0);
-            api.Render.GlRotate(-entity.Pos.Yaw * GameMath.RAD2DEG + 90, 0, 0, 1);
+            mvMat
+                .Set(api.Render.CurrentModelviewMatrix)
+                .Translate(x, y, 60)
+                .Scale(Texture.Width, Texture.Height, 0)
+                .Scale(0.5f, 0.5f, 0)
+                .RotateZ(-entity.Pos.Yaw + 90 * GameMath.DEG2RAD)
+            ;
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
-            prog.UniformMatrix("modelViewMatrix", api.Render.CurrentModelviewMatrix);
-
+            prog.UniformMatrix("modelViewMatrix", mvMat.Values);
 
             api.Render.RenderMesh(quadModel);
-            api.Render.GlPopMatrix();
         }
 
         public override void Dispose()

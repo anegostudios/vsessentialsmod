@@ -48,7 +48,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
             stuck = false;
-            pathTraverser.GoTo(targetEntity.ServerPos.XYZ, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
+            pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck);
             currentFollowTime = 0;
         }
 

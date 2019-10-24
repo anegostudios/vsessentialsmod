@@ -91,14 +91,14 @@ namespace Vintagestory.GameContent
         public override void StartClientSide(ICoreClientAPI api)
         {
             this.capi = api;
-            api.Event.RegisterGameTickListener(OnClientTick, 16);
+            api.Event.RegisterGameTickListener(OnClientTick, 32);
         }
 
 
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.sapi = api;
-            api.Event.RegisterGameTickListener(OnServerTick, 16);
+            api.Event.RegisterGameTickListener(OnServerTick, 32);
         }
 
         private void OnClientTick(float dt)
@@ -132,14 +132,18 @@ namespace Vintagestory.GameContent
 
         private void PartitionEntity(Entity entity)
         {
-            int lgx = (int)(entity.LocalPos.X / gridSizeInBlocks) % partitionsLength;
-            int lgz = (int)(entity.LocalPos.Z / gridSizeInBlocks) % partitionsLength;
+            EntityPos pos = entity.LocalPos;
+
+            int lgx = (int)(pos.X / gridSizeInBlocks) % partitionsLength;
+            int lgz = (int)(pos.Z / gridSizeInBlocks) % partitionsLength;
             int gridIndex = lgz * partitionsLength + lgx;
             
+            long nowInChunkIndex3d = MapUtil.Index3dL((int)pos.X / chunkSize, (int)pos.Y / chunkSize, (int)pos.Z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
+
             EntityPartitionChunk partition = null;
-            if (!Partitions.TryGetValue(entity.InChunkIndex3d, out partition))
+            if (!Partitions.TryGetValue(nowInChunkIndex3d, out partition))
             {
-                Partitions[entity.InChunkIndex3d] = partition = new EntityPartitionChunk();
+                Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
             }
 
             bool didChange = false;
@@ -147,7 +151,7 @@ namespace Vintagestory.GameContent
             GridAndChunkIndex indexes;
             if (GridIndexByEntityId.TryGetValue(entity.EntityId, out indexes))
             {
-                if (indexes.ChunkIndex != entity.InChunkIndex3d)
+                if (indexes.ChunkIndex != nowInChunkIndex3d)
                 {
                     EntityPartitionChunk oldpartition = null;
                     Partitions.TryGetValue(indexes.ChunkIndex, out oldpartition);
@@ -166,7 +170,7 @@ namespace Vintagestory.GameContent
             if (didChange && gridIndex > 0) // Grindindex can be negative when a entity is outside world bounds 
             {
                 partition.Entities[gridIndex].Add(entity);
-                GridIndexByEntityId[entity.EntityId] = new GridAndChunkIndex(lgz * partitionsLength + lgx, entity.InChunkIndex3d);
+                GridIndexByEntityId[entity.EntityId] = new GridAndChunkIndex(lgz * partitionsLength + lgx, nowInChunkIndex3d);
             }
         }
 
@@ -174,16 +178,11 @@ namespace Vintagestory.GameContent
 
         private void Event_OnEntityDespawn(Entity entity, EntityDespawnReason reason)
         {
-            int lgx = (int)(entity.LocalPos.X / gridSizeInBlocks) % partitionsLength;
-            int lgz = (int)(entity.LocalPos.Z / gridSizeInBlocks) % partitionsLength;
-            int gridIndex = lgz * partitionsLength + lgx;
-
             GridAndChunkIndex indexes;
             if (GridIndexByEntityId.TryGetValue(entity.EntityId, out indexes))
             {
                 GridIndexByEntityId.Remove(entity.EntityId);
-            }
-            else return;
+            } else return;
 
             EntityPartitionChunk partition = null;
             if (Partitions.TryGetValue(indexes.ChunkIndex, out partition))
@@ -198,7 +197,7 @@ namespace Vintagestory.GameContent
             Entity nearestEntity = null;
             double nearestDistance = 999999;
 
-            WalkEntityPartitions(position, radius, (e) =>
+            WalkEntities(position, radius, (e) =>
             {
                 double dist = e.LocalPos.SquareDistanceTo(position);
 
@@ -207,6 +206,8 @@ namespace Vintagestory.GameContent
                     nearestDistance = dist;
                     nearestEntity = e;
                 }
+
+                return true;
             });
 
             return nearestEntity;
@@ -232,7 +233,7 @@ namespace Vintagestory.GameContent
 
             double radiusSq = radius * radius;
 
-            int cxBefore = -99, cyBefore = -99, czBefore = -99;
+            long indexBefore = -1;
             IWorldChunk chunk = null;
             EntityPartitionChunk partitionChunk = null;
 
@@ -254,16 +255,14 @@ namespace Vintagestory.GameContent
 
                         long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
 
-                        if (cx != cxBefore || cy != cyBefore || cz != czBefore)
+                        if (index3d != indexBefore)
                         {
                             chunk = api.World.BlockAccessor.GetChunk(cx, cy, cz);
                             Partitions.TryGetValue(index3d, out partitionChunk);
+                            indexBefore = index3d;
                         }
-                        if (chunk == null || chunk.Entities == null || partitionChunk == null) continue;
 
-                        cxBefore = cx;
-                        cyBefore = cy;
-                        czBefore = cz;
+                        if (chunk == null || chunk.Entities == null || partitionChunk == null) continue;
 
                         int lgx = gridX % partitionsLength;
                         int lgz = gridZ % partitionsLength;

@@ -65,7 +65,7 @@ namespace Vintagestory.GameContent
         {
             base.Start(api);
             this.api = api;
-            }
+        }
 
         public double GetWindSpeed(BlockPos pos)
         {
@@ -207,8 +207,11 @@ namespace Vintagestory.GameContent
             if (msg.Transitioning)
             {
                 weatherSim.Weight = 0;
-                
-                if (weatherSim.NewPattern != weatherSim.OldPattern) weatherSim.NewPattern.OnBeginUse();
+            }
+
+            if (weatherSim.NewPattern != weatherSim.OldPattern)
+            {
+                weatherSim.NewPattern.OnBeginUse();
             }
         }
 
@@ -263,7 +266,20 @@ namespace Vintagestory.GameContent
             if (arg == "c")
             {
                 weatherSim.TriggerTransition(1f);
-                player.SendMessage(groupId, "Ok selected another weatherpattern", EnumChatType.CommandSuccess);
+                player.SendMessage(groupId, "Ok selected another weather pattern", EnumChatType.CommandSuccess);
+                return;
+            }
+
+            if (arg == "set")
+            {
+                string code = args.PopWord();
+                if (weatherSim.SetWeatherPattern(code))
+                {
+                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                } else
+                {
+                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
+                }
                 return;
             }
 

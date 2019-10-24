@@ -9,6 +9,8 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -20,13 +22,31 @@ namespace Vintagestory.ServerMods.NoObf
         Move
     }
 
+    public class PatchCondition
+    {
+        public string When;
+        public string IsValue;
+        public bool useValue;
+    }
+
     public class JsonPatch
     {
         public EnumJsonPatchOp Op;
         public AssetLocation File;
         public string FromPath;
         public string Path;
-        public EnumAppSide SideType = EnumAppSide.Universal;
+
+        [Obsolete("Use Side instead")]
+        public EnumAppSide? SideType
+        {
+            get { return Side; }
+            set { Side = value; }
+        }
+
+        public EnumAppSide? Side = EnumAppSide.Universal;
+
+
+        public PatchCondition Condition;
 
         [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
         public JsonObject Value;
@@ -35,6 +55,7 @@ namespace Vintagestory.ServerMods.NoObf
     public class ModJsonPatchLoader : ModSystem
     {
         ICoreAPI api;
+        ITreeAttribute worldConfig;
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -49,12 +70,20 @@ namespace Vintagestory.ServerMods.NoObf
         public override void Start(ICoreAPI api)
         {
             this.api = api;
+            
+            worldConfig = api.World.Config;
+            if (worldConfig == null)
+            {
+                worldConfig = new TreeAttribute();
+            }
+
             List<IAsset> entries = api.Assets.GetMany("patches/");
 
             int appliedCount = 0;
             int notfoundCount = 0;
             int errorCount = 0;
             int totalCount = 0;
+            int unmetConditionCount = 0;
 
             foreach (IAsset asset in entries)
             {
@@ -69,8 +98,28 @@ namespace Vintagestory.ServerMods.NoObf
 
                 for (int j = 0; patches != null && j < patches.Length; j++)
                 {
+                    JsonPatch patch = patches[j];
+                    if (patch.Condition != null)
+                    {
+                        IAttribute attr = worldConfig[patch.Condition.When];
+                        if (attr == null) continue;
+
+                        if (patch.Condition.useValue)
+                        {
+                            patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken()));
+                        }
+                        else
+                        {
+                            if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                unmetConditionCount++;
+                                continue;
+                            }
+                        }
+                    }
+
                     totalCount++;
-                    ApplyPatch(j, asset.Location, patches[j], ref appliedCount, ref notfoundCount, ref errorCount);
+                    ApplyPatch(j, asset.Location, patch, ref appliedCount, ref notfoundCount, ref errorCount);
                 }
             }
 
@@ -96,6 +145,11 @@ namespace Vintagestory.ServerMods.NoObf
                     sb.Append(Lang.Get(", missing files on {0} patches", notfoundCount));
                 }
 
+                if (unmetConditionCount > 0)
+                {
+                    sb.Append(Lang.Get(", unmet conditions on {0} patches", unmetConditionCount));
+                }
+
                 if (errorCount > 0)
                 {
                     sb.Append(Lang.Get(", had errors on {0} patches", errorCount));
@@ -114,16 +168,44 @@ namespace Vintagestory.ServerMods.NoObf
 
         private void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
         {
-            if (jsonPatch.SideType != EnumAppSide.Universal && jsonPatch.SideType != api.Side) return;
+
+            EnumAppSide targetSide = jsonPatch.Side == null ? jsonPatch.File.Category.SideType : (EnumAppSide)jsonPatch.Side;
+
+            if (targetSide != EnumAppSide.Universal && jsonPatch.Side != api.Side) return;
 
             var loc = jsonPatch.File.Clone();
+
+            if (jsonPatch.File.Path.EndsWith("*"))
+            {
+                List<IAsset> assets = api.Assets.GetMany(jsonPatch.File.Path.TrimEnd('*'), jsonPatch.File.Domain, false);
+                foreach (var val in assets)
+                {
+                    jsonPatch.File = val.Location;
+                    ApplyPatch(patchIndex, patchSourcefile, jsonPatch, ref applied, ref notFound, ref errorCount);
+                }
+
+                jsonPatch.File = loc;
+
+                return;
+            }
+
+
+
             if (!loc.Path.EndsWith(".json")) loc.Path += ".json";
             
             var asset = api.Assets.TryGet(loc);
             if (asset == null)
             {
-                api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
-                
+                EnumAppSide catSide = jsonPatch.File.Category.SideType;
+                if (catSide != EnumAppSide.Universal && api.Side != catSide)
+                {
+                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
+                } else
+                {
+                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                }
+
+
                 notFound++;
                 return;
             }
@@ -196,6 +278,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             applied++;
         }
-        
+
+
     }
 }

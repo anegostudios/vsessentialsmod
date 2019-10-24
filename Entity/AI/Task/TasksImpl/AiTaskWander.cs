@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API;
+using Vintagestory.API.Server;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Client;
 
 namespace Vintagestory.GameContent
 {
@@ -21,7 +23,9 @@ namespace Vintagestory.GameContent
 
         bool awaitReached = true;
 
-        NatFloat wanderRange = NatFloat.createStrongerInvexp(3, 30);
+        NatFloat wanderRangeHorizontal = NatFloat.createStrongerInvexp(3, 40);
+        NatFloat wanderRangeVertical = NatFloat.createStrongerInvexp(3, 10);
+
         BlockPos tmpPos = new BlockPos();
 
         public bool StayCloseToSpawn;
@@ -31,6 +35,19 @@ namespace Vintagestory.GameContent
         public double TeleportInGameHours = 1;
 
         long lastTimeInRangeMs;
+
+        public float WanderRangeMul
+        {
+            get { return entity.Attributes.GetFloat("wanderRangeMul", 1); }
+            set { entity.Attributes.SetFloat("wanderRangeMul", value); }
+        }
+
+        public int FailedConsecutivePathfinds
+        {
+            get { return entity.Attributes.GetInt("failedConsecutivePathfinds", 0); }
+            set { entity.Attributes.SetInt("failedConsecutivePathfinds", value); }
+        }
+
 
         public AiTaskWander(EntityAgent entity) : base(entity)
         {
@@ -89,7 +106,7 @@ namespace Vintagestory.GameContent
             {
                 wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
             }
-            wanderRange = NatFloat.createStrongerInvexp(wanderRangeMin, wanderRangeMax);
+            wanderRangeHorizontal = NatFloat.createStrongerInvexp(wanderRangeMin, wanderRangeMax);
 
 
             if (taskConfig["maxHeight"] != null)
@@ -109,6 +126,170 @@ namespace Vintagestory.GameContent
             }
             
         }
+
+
+        // Requirements:
+        // - ✔ Try to not move a lot vertically
+        // - ✔ If territorial: Stay close to the spawn point
+        // - ✔ If air habitat: Don't go above maxHeight blocks above surface
+        // - ✔ If land habitat: Don't walk into water, prefer surface
+        // - ~~If cave habitat: Prefer caves~~
+        // - ✔ If water habitat: Don't walk onto land
+        // - ✔ Try not to fall from very large heights. Try not to fall from any large heights if entity has FallDamage
+        // - ✔ Prefer preferredLightLevel
+        // - ✔ If land habitat: Must be above a block the entity can stand on
+        // - ✔ if failed searches is high, reduce wander range
+        public Vec3d loadNextWanderTarget()
+        {
+            EnumHabitat habitat = entity.Properties.Habitat;
+            bool canFallDamage = entity.Properties.FallDamage;
+            bool territorial = StayCloseToSpawn;
+            int tries = 9;
+            Vec4d bestTarget = null;
+            Vec4d curTarget = new Vec4d();
+            BlockPos tmpPos = new BlockPos();
+
+            if (FailedConsecutivePathfinds > 10)
+            {
+                WanderRangeMul = Math.Max(0.1f, WanderRangeMul * 0.9f);
+            } else
+            {
+                WanderRangeMul = Math.Min(1, WanderRangeMul * 1.1f);
+                if (rand.NextDouble() < 0.05) WanderRangeMul = Math.Min(1, WanderRangeMul * 1.5f);
+            }
+
+            float wRangeMul = WanderRangeMul;
+            double dx, dy, dz;
+
+            while (tries-- > 0)
+            {
+                dx = wanderRangeHorizontal.nextFloat() * (rand.Next(2) * 2 - 1) * wRangeMul;
+                dy = wanderRangeVertical.nextFloat() * (rand.Next(2) * 2 - 1) * wRangeMul;
+                dz = wanderRangeHorizontal.nextFloat() * (rand.Next(2) * 2 - 1) * wRangeMul;
+
+                curTarget.X = entity.ServerPos.X + dx;
+                curTarget.Y = entity.ServerPos.Y + dy;
+                curTarget.Z = entity.ServerPos.Z + dz;
+                curTarget.W = 1;
+
+                if (StayCloseToSpawn)
+                {
+                    double distToEdge = curTarget.SquareDistanceTo(SpawnPosition) / (MaxDistanceToSpawn * MaxDistanceToSpawn);
+                    // Prefer staying close to spawn
+                    curTarget.W = 1 - distToEdge;
+                }
+
+                Block block;
+
+
+                switch (habitat)
+                {
+                    case EnumHabitat.Air:
+                        int rainMapY = world.BlockAccessor.GetRainMapHeightAt((int)curTarget.X, (int)curTarget.Z);
+                        // Don't fly above max height
+                        curTarget.Y = Math.Min(curTarget.Y, rainMapY + maxHeight);
+
+                        // Cannot be in water
+                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (!block.IsLiquid()) curTarget.W = 0;
+                        break;
+
+                    case EnumHabitat.Land:
+                        curTarget.Y = moveDownToFloor((int)curTarget.X, curTarget.Y, (int)curTarget.Z);
+                        // No floor found
+                        if (curTarget.Y < 0) curTarget.W = 0;
+                        else
+                        {
+                            // Does not like water
+                            block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                            if (!block.IsLiquid()) curTarget.W /= 2;
+
+                            // Lets make a straight line plot to see if we would fall off a cliff
+                            bool stop = false;
+                            bool willFall = false;
+
+                            float angleHor = (float)Math.Atan2(dx, dz) + GameMath.PIHALF;
+                            Vec3d target1BlockAhead = curTarget.XYZ.Ahead(1, 0, angleHor);
+                            Vec3d startAhead = entity.ServerPos.XYZ.Ahead(1, 0, angleHor); // Otherwise they are forever stuck if they stand over the edge
+
+                            int prevY = (int)startAhead.Y;
+
+
+
+                            GameMath.BresenHamPlotLine2d((int)startAhead.X, (int)startAhead.Z, (int)target1BlockAhead.X, (int)target1BlockAhead.Z, (x, z) =>
+                            {
+                                if (stop) return;
+
+                                double nowY = moveDownToFloor(x, prevY, z);
+
+                                if (nowY < 0 || prevY - nowY > 4)
+                                {
+                                    willFall = true;
+                                    stop = true;
+                                }
+                                if (nowY - prevY > 2)
+                                {
+                                    stop = true;
+                                }
+                            });
+
+                            if (willFall) curTarget.W = 0;
+                        }
+                        break;
+
+                    case EnumHabitat.Sea:
+                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (!block.IsLiquid()) curTarget.W = 0;
+                        break;
+                }
+
+
+               if (preferredLightLevel != null)
+                {
+                    tmpPos.Set((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                    int lightdiff = Math.Abs((int)preferredLightLevel - entity.World.BlockAccessor.GetLightLevel(tmpPos, EnumLightLevelType.MaxLight));
+
+                    curTarget.W /= Math.Max(1, lightdiff);
+                }
+
+                if (bestTarget == null || curTarget.W > bestTarget.W)
+                {
+                    bestTarget = curTarget;
+                }
+            }
+
+
+            /*bestTarget.Y = 15;
+            dx = bestTarget.X - entity.ServerPos.X;
+            dz = bestTarget.Z - entity.ServerPos.Z;
+            Vec3d sadf = bestTarget.XYZ.Ahead(1, 0, (float)Math.Atan2(dx, dz) + GameMath.PIHALF);
+
+            (entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 10, new List<BlockPos>() { new BlockPos((int)bestTarget.X, (int)bestTarget.Y, (int)bestTarget.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 0, 80) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+            (entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 11, new List<BlockPos>() { new BlockPos((int)sadf.X, (int)sadf.Y, (int)sadf.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 255, 180) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);*/
+
+
+            if (bestTarget.W > 0)
+            {
+                FailedConsecutivePathfinds -= 3;
+                return bestTarget.XYZ;
+            }
+
+            FailedConsecutivePathfinds++;
+            return null;
+        }
+
+        private double moveDownToFloor(int x, double y, int z)
+        {
+            int tries = 5;
+            while (tries-- > 0)
+            {
+                Block block = world.BlockAccessor.GetBlock(x, (int)(y--), z);
+                if (block.SideSolid[BlockFacing.UP.Index]) return y;
+            }
+
+            return -1;
+        }
+
 
         public override bool ShouldExecute()
         {
@@ -134,81 +315,11 @@ namespace Vintagestory.GameContent
                     lastTimeInRangeMs = ellapsedMs;
                 }
             }
-            
 
-            List <Vec3d> goodtargets = new List<Vec3d>();
 
-            int tries = 9;
-            while (tries-- > 0)
-            {
-                int terrainYPos = entity.World.BlockAccessor.GetTerrainMapheightAt(tmpPos);
+            MainTarget = loadNextWanderTarget();
 
-                float dx = wanderRange.nextFloat() * (rand.Next(2) * 2 - 1);
-                float dy = wanderRange.nextFloat() * (rand.Next(2) * 2 - 1);
-                float dz = wanderRange.nextFloat() * (rand.Next(2) * 2 - 1);
-
-                MainTarget = entity.ServerPos.XYZ.Add(dx, dy, dz);
-                MainTarget.Y = Math.Min(MainTarget.Y, terrainYPos + maxHeight);
-
-                if (StayCloseToSpawn && MainTarget.SquareDistanceTo(SpawnPosition) > MaxDistanceToSpawn * MaxDistanceToSpawn)
-                {
-                    continue;
-                }
-
-                tmpPos.X = (int)MainTarget.X;
-                tmpPos.Z = (int)MainTarget.Z;
-                
-                if ((entity.Controls.IsClimbing && !entity.Properties.FallDamage) || (entity.Properties.Habitat != EnumHabitat.Land))
-                {
-                    if (entity.Properties.Habitat == EnumHabitat.Sea)
-                    {
-                        Block block = entity.World.BlockAccessor.GetBlock(tmpPos);
-                        return block.IsLiquid();
-                    }
-
-                    return true;
-                }
-                else
-                {
-                    int yDiff = (int)entity.ServerPos.Y - terrainYPos;
-
-                    double slopeness = yDiff / Math.Max(1, GameMath.Sqrt(MainTarget.HorizontalSquareDistanceTo(entity.ServerPos.XYZ)) - 2);
-
-                    tmpPos.Y = terrainYPos;
-                    Block block = entity.World.BlockAccessor.GetBlock(tmpPos);
-                    Block belowblock = entity.World.BlockAccessor.GetBlock(tmpPos.X, tmpPos.Y - 1, tmpPos.Z);
-
-                    bool canStep = block.CollisionBoxes == null || block.CollisionBoxes.Max((cuboid) => cuboid.Y2) <= 1f;
-                    bool canStand = belowblock.CollisionBoxes != null && belowblock.CollisionBoxes.Length > 0;
-
-                    if (slopeness < 3 && canStand && canStep)
-                    {
-                        if (preferredLightLevel == null) return true;
-                        goodtargets.Add(MainTarget);
-                    }
-                }
-            }
-
-            int smallestdiff = 999;
-            Vec3d bestTarget = null;
-            for (int i = 0; i < goodtargets.Count; i++)
-            {
-                int lightdiff = Math.Abs((int)preferredLightLevel - entity.World.BlockAccessor.GetLightLevel(goodtargets[i].AsBlockPos, EnumLightLevelType.MaxLight));
-
-                if (lightdiff < smallestdiff)
-                {
-                    smallestdiff = lightdiff;
-                    bestTarget = goodtargets[i];
-                }
-            }
-
-            if (bestTarget != null)
-            {
-                MainTarget = bestTarget;
-                return true;
-            }
-
-            return false;
+            return MainTarget != null;
         }
 
 
@@ -217,11 +328,20 @@ namespace Vintagestory.GameContent
             base.StartExecute();
 
             done = false;
-            pathTraverser.GoTo(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
+            /*int searchDepth = 999;
+            // 1 in 20 times we do an expensive search
+            if (world.Rand.NextDouble() < 0.05)
+            {
+                searchDepth = 4999;
+            }*/
+            bool ok = pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);//, true, searchDepth);
+
+
         }
 
         public override bool ContinueExecute(float dt)
         {
+
   //          if (!awaitReached) return false;
 
             /*entity.World.SpawnParticles(
@@ -270,5 +390,7 @@ namespace Vintagestory.GameContent
         {
             done = true;
         }
+
+        
     }
 }

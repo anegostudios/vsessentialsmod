@@ -155,46 +155,47 @@ namespace Vintagestory.GameContent
             float sizeY = 0.2f * renderInfo.Transform.ScaleXYZ.Y;
             float sizeZ = 0.2f * renderInfo.Transform.ScaleXYZ.Z;
 
-
-
-            long ellapseMs = capi.World.ElapsedMilliseconds;
-            bool freefall = !(entity.Collided || entity.Swimming || capi.IsGamePaused);
-            if (!freefall) touchGroundMS = ellapseMs;
-
-            if (entity.Collided)
-            {
-                xangle *= 0.55f;
-                yangle *= 0.55f;
-                zangle *= 0.55f;
-            } else
-            {
-                float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
-                float angleGain = freefall ? 1000 * dt / 7 * easeIn : 0;
-
-                yangle += angleGain;
-                xangle += angleGain;
-                zangle += angleGain;
-            }
-
-
             float dx = 0, dz = 0;
 
-            if (entity.Swimming)
+
+            if (!isShadowPass)
             {
-                float diff = 1;
-                
-                if (entityitem.Itemstack.Collectible.MaterialDensity > 1000)
+                long ellapseMs = capi.World.ElapsedMilliseconds;
+                bool freefall = !(entity.Collided || entity.Swimming || capi.IsGamePaused);
+                if (!freefall) touchGroundMS = ellapseMs;
+
+                if (entity.Collided)
                 {
-                    dx = GameMath.Sin((float)(ellapseMs / 1000.0)) / 50;
-                    dz = -GameMath.Sin((float)(ellapseMs / 3000.0)) / 50;
-                    diff = 0.1f;
+                    xangle *= 0.55f;
+                    yangle *= 0.55f;
+                    zangle *= 0.55f;
+                }
+                else
+                {
+                    float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
+                    float angleGain = freefall ? 1000 * dt / 7 * easeIn : 0;
+
+                    yangle += angleGain;
+                    xangle += angleGain;
+                    zangle += angleGain;
                 }
 
-                xangle = GameMath.Sin((float)(ellapseMs / 1000.0)) * 8 * diff;
-                yangle = GameMath.Cos((float)(ellapseMs / 2000.0)) * 3 * diff;
-                zangle = -GameMath.Sin((float)(ellapseMs / 3000.0)) * 8 * diff;
-            }
+                if (entity.Swimming)
+                {
+                    float diff = 1;
 
+                    if (entityitem.Itemstack.Collectible.MaterialDensity > 1000)
+                    {
+                        dx = GameMath.Sin((float)(ellapseMs / 1000.0)) / 50;
+                        dz = -GameMath.Sin((float)(ellapseMs / 3000.0)) / 50;
+                        diff = 0.1f;
+                    }
+
+                    xangle = GameMath.Sin((float)(ellapseMs / 1000.0)) * 8 * diff;
+                    yangle = GameMath.Cos((float)(ellapseMs / 2000.0)) * 3 * diff;
+                    zangle = -GameMath.Sin((float)(ellapseMs / 3000.0)) * 8 * diff;
+                }
+            }
 
 
             Mat4f.Translate(ModelMat, ModelMat, dx + renderInfo.Transform.Translation.X, renderInfo.Transform.Translation.Y, dz +  renderInfo.Transform.Translation.Z);

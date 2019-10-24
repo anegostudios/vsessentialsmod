@@ -24,7 +24,14 @@ namespace Vintagestory.GameContent
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
                     CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble),
-                    new TextBackground() { FillColor = GuiStyle.DialogLightBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
+                    new TextBackground() { 
+                        FillColor = GuiStyle.DialogLightBgColor, 
+                        Padding = 3, 
+                        Radius = GuiStyle.ElementBGRadius, 
+                        Shade = true,
+                        BorderColor = GuiStyle.DialogBorderColor,
+                        BorderWidth = 3,
+                    }
                 );
             }
 
@@ -78,7 +85,15 @@ namespace Vintagestory.GameContent
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
                     CairoFont.WhiteMediumText().WithColor(new double[] { 254/255.0, 197/255.0, 0, 1 }),
-                    new TextBackground() { FillColor = GuiStyle.DialogDefaultBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
+                    new TextBackground()
+                    {
+                        FillColor = GuiStyle.DialogLightBgColor,
+                        Padding = 3,
+                        Radius = GuiStyle.ElementBGRadius,
+                        Shade = true,
+                        BorderColor = GuiStyle.DialogBorderColor,
+                        BorderWidth = 3,
+                    }
                 );
             }
 
@@ -96,7 +111,15 @@ namespace Vintagestory.GameContent
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
                     CairoFont.WhiteMediumText().WithColor(new double[] { 135 / 255.0, 179 / 255.0, 148 / 255.0, 1 } ),
-                    new TextBackground() { FillColor = GuiStyle.DialogDefaultBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
+                    new TextBackground()
+                    {
+                        FillColor = GuiStyle.DialogLightBgColor,
+                        Padding = 3,
+                        Radius = GuiStyle.ElementBGRadius,
+                        Shade = true,
+                        BorderColor = GuiStyle.DialogBorderColor,
+                        BorderWidth = 3,
+                    }
                 );
             }
 
@@ -114,7 +137,15 @@ namespace Vintagestory.GameContent
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
                     CairoFont.WhiteMediumText().WithColor(new double[] { 14 / 255.0, 114 / 255.0, 57 / 255.0, 1 }),
-                    new TextBackground() { FillColor = GuiStyle.DialogDefaultBgColor, Padding = 3, Radius = GuiStyle.ElementBGRadius }
+                    new TextBackground()
+                    {
+                        FillColor = GuiStyle.DialogLightBgColor,
+                        Padding = 3,
+                        Radius = GuiStyle.ElementBGRadius,
+                        Shade = true,
+                        BorderColor = GuiStyle.DialogBorderColor,
+                        BorderWidth = 3,
+                    }
                 );
             }
 

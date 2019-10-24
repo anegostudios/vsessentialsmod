@@ -31,9 +31,10 @@ namespace Vintagestory.GameContent
 
             entity.PhysicsUpdateWatcher = OnPhysicsTick;
 
-            if (blockFallingEntity.removedBlockentity is IBlockShapeSupplier)
+            if (!blockFallingEntity.InitialBlockRemoved)
             {
-                (blockFallingEntity.removedBlockentity as IBlockShapeSupplier).OnTesselation(this, capi.Tesselator);
+                BlockEntity be = api.World.BlockAccessor.GetBlockEntity(blockFallingEntity.initialPos);
+                be?.OnTesselation(this, capi.Tesselator);
             }
 
             if (this.meshRef == null)
@@ -62,11 +63,13 @@ namespace Vintagestory.GameContent
 
         public void AddMeshData(MeshData data)
         {
+            data.Rgba2 = null;
             this.meshRef = capi.Render.UploadMesh(data);
         }
 
         public void AddMeshData(MeshData data, int tintColor)
         {
+            data.Rgba2 = null;
             this.meshRef = capi.Render.UploadMesh(data);
         }
 

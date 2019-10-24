@@ -18,6 +18,7 @@ namespace Vintagestory.GameContent
 
         public float ChanceOfWeatherChange = 0.001f;
 
+        public string Code;
         public string Name;
 
         public AmbientModifier Ambient = new AmbientModifier().EnsurePopulated();
@@ -106,7 +107,7 @@ namespace Vintagestory.GameContent
 
         public virtual double GetCloudDensityAt(int dx, int dz)
         {
-            return GameMath.Clamp(CloudDensityNoiseCache[dx, dz] + densityOffset + OverallDensityOffset, 0, 1);
+            return GameMath.Clamp(CloudDensityNoiseCache[dx, dz] + densityOffset/*+ OverallDensityOffset*/, 0, 1);
         }
 
         public virtual double GetCloudOffsetYAt(int dx, int dz)

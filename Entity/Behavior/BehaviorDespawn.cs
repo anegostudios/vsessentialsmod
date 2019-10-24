@@ -10,7 +10,8 @@ namespace Vintagestory.GameContent
         float? belowLightLevel = null;
 
         float minSeconds = 30;
-        int tick = 0;
+
+        float accumSeconds;
 
         public float DeathTime
         {
@@ -38,11 +39,13 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Alive) return;
 
-            bool shouldTest = tick++ % 30 == 0;
+            accumSeconds += deltaTime;
 
-            if (shouldTest && (LightLevelOk() || PlayerInRange()))
+            if (accumSeconds > 1 && (LightLevelOk() || PlayerInRange()))
             {
                 DeathTime = 0;
+                accumSeconds = 0;
+                deltaTime = 0;
                 return;
             }
 

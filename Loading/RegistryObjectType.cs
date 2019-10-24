@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -70,18 +71,19 @@ namespace Vintagestory.ServerMods.NoObf
             return Regex.IsMatch(Code.Path, @"^" + pattern + @"$", RegexOptions.IgnoreCase);
         }
 
-        public static bool WildCardMatch(string wildCard, string text)
+        /*public static bool WildCardMatch(string wildCard, string text)
         {
             if (wildCard == text) return true;
             string pattern = Regex.Escape(wildCard).Replace(@"\*", @"(.*)");
             return Regex.IsMatch(text, @"^" + pattern + @"$", RegexOptions.IgnoreCase);
-        }
+        }*/
 
         public static bool WildCardMatches(string blockCode, List<string> wildCards, out string matchingWildcard)
         {
             foreach (string wildcard in wildCards)
             {
-                if (WildCardMatch(wildcard, blockCode))
+                if (WildcardUtil.Match(wildcard, blockCode))
+                //if (WildCardMatch(wildcard, blockCode))
                 {
                     matchingWildcard = wildcard;
                     return true;

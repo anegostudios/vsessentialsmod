@@ -198,6 +198,12 @@ namespace Vintagestory.GameContent
         {
             bool isDlgOpened = worldMapDlg != null && worldMapDlg.IsOpened();
 
+            if (!capi.World.Config.GetBool("allowMap", true))
+            {
+                if (isDlgOpened) worldMapDlg.TryClose();
+                return;
+            }
+
             if (worldMapDlg != null)
             {
                 if (!isDlgOpened)

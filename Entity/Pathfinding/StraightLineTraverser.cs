@@ -1,17 +1,18 @@
 ﻿using System;
+using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
-namespace Vintagestory.API.Common
+namespace Vintagestory.Essentials
 {
-    public class StraightLinePathTraverser : PathTraverserBase
+    public class StraightLineTraverser : PathTraverserBase
     {
         float minTurnAnglePerSec;
         float maxTurnAnglePerSec;
         float curTurnRadPerSec;
         Vec3f targetVec = new Vec3f();
 
-        public StraightLinePathTraverser(EntityAgent entity) : base(entity)
+        public StraightLineTraverser(EntityAgent entity) : base(entity)
         {
             if (entity?.Properties.Server?.Attributes?.GetTreeAttribute("pathfinder") != null)
             {
@@ -31,15 +32,16 @@ namespace Vintagestory.API.Common
             curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
 
             stuckCounter = 0;
-            
+
             return true;
         }
 
-
+        Vec3d prevPos = new Vec3d();
 
         public override void OnGameTick(float dt)
         {
             if (!Active) return;
+
 
             // For land dwellers only check horizontal distance
             double sqDistToTarget = 
@@ -58,15 +60,17 @@ namespace Vintagestory.API.Common
 
             bool stuck =
                 (entity.CollidedVertically && entity.Controls.IsClimbing) ||
-                (entity.ServerPos.Motion.LengthSq() < 0.001 * 0.001) ||
+                (entity.ServerPos.SquareDistanceTo(prevPos) < 0.005 * 0.005) ||  // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
                 (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0)
             ;
 
+            prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
             
             if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 20 / GlobalConstants.OverallSpeedMultiplier)
             {
+                //entity.World.SpawnParticles(10, ColorUtil.WhiteArgb, prevPos, prevPos, new Vec3f(0, 0, 0), new Vec3f(0, -1, 0), 1, 1);
                 Stop();
                 OnStuck?.Invoke();
                 return;

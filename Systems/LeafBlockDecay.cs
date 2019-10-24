@@ -113,8 +113,11 @@ namespace Vintagestory.GameContent
 
         private void onGameGettingSaved()
         {
-            sapi.WorldManager.SaveGame.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue));
-            sapi.WorldManager.SaveGame.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue));
+            lock (checkDecayLock)
+            {
+                sapi.WorldManager.SaveGame.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue));
+                sapi.WorldManager.SaveGame.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue));
+            }
         }
 
         private void onSaveGameLoaded()

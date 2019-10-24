@@ -27,6 +27,13 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public float AttackPower = 0.5f;
         [JsonProperty]
+        public int Durability;
+        [JsonProperty]
+        public EnumItemDamageSource[] DamagedBy;
+        [JsonProperty]
+        public EnumTool? Tool = null;
+
+        [JsonProperty]
         public float AttackRange = GlobalConstants.DefaultAttackRange;
         [JsonProperty]
         public Dictionary<EnumBlockMaterial, float> MiningSpeed;
@@ -88,7 +95,9 @@ namespace Vintagestory.ServerMods.NoObf
         public string HeldLeftTpIdleAnimation;
 
         [JsonProperty("heldTpIdleAnimation")]
+#pragma warning disable IDE0044 // Add readonly modifier
         private string HeldOldTpIdleAnimation;
+#pragma warning restore IDE0044 // Add readonly modifier
 
         [JsonProperty]
         public string HeldTpUseAnimation = "placeblock";

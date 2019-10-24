@@ -62,8 +62,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
     <Compile Include="BlockEntityRenderer\BEAnimatableRenderer.cs" />
-    <Compile Include="BlockEntity\BEAnimatable.cs" />
+    <Compile Include="BlockEntity\BEGeneric.cs" />
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Core.cs" />
@@ -79,8 +80,13 @@
     <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
     <Compile Include="Entity\Behavior\BehaviorHarvestable.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
+    <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
+    <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
+    <Compile Include="Entity\Pathfinding\Astar\PathNode.cs" />
+    <Compile Include="Entity\Pathfinding\PathFindDebug.cs" />
     <Compile Include="Entity\Pathfinding\PathTraverserBase.cs" />
-    <Compile Include="Entity\Pathfinding\StraightLine.cs" />
+    <Compile Include="Entity\Pathfinding\Astar\WaypointsTraverser.cs" />
+    <Compile Include="Entity\Pathfinding\StraightLineTraverser.cs" />
     <Compile Include="Entity\AI\Task\AiTaskBase.cs" />
     <Compile Include="Entity\AI\Task\IAiTask.cs" />
     <Compile Include="Gui\GuiDialogCarcassContents.cs" />

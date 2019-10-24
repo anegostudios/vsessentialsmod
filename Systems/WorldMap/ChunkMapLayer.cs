@@ -33,6 +33,8 @@ namespace Vintagestory.GameContent
         public override string Title => "Terrain";
         public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
 
+
+
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
@@ -70,9 +72,9 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, bool isNewChunk)
+        private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
-            if (isNewChunk || !mapSink.IsOpened) return;
+            if (reason == EnumChunkDirtyReason.NewlyCreated || !mapSink.IsOpened) return;
 
             if (!loadedMapData.ContainsKey(new Vec2i(chunkCoord.X, chunkCoord.Z))) return;
 
@@ -219,6 +221,7 @@ namespace Vintagestory.GameContent
             return cmp;
         }
 
+        
 
         public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc)
         {
@@ -234,8 +237,15 @@ namespace Vintagestory.GameContent
                 if (chunksTmp[cy] == null) return null;
             }
 
-          //  bool didRegen = false;
+            // Prefetch map chunks
+            IMapChunk[] mapChunks = new IMapChunk[]
+            {
+                capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y - 1),
+                capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y),
+                capi.World.BlockAccessor.GetMapChunk(chunkPos.X, chunkPos.Y - 1)            
+            };
 
+            //  bool didRegen = false;
 
             for (int i = 0; i < texDataTmp.Length; i++)
             {
@@ -244,6 +254,54 @@ namespace Vintagestory.GameContent
                 if (cy >= chunksTmp.Length) continue;
 
                 MapUtil.PosInt2d(i, chunksize, localpos);
+                int lx = localpos.X;
+                int lz = localpos.Y;
+
+                float b = 1;
+                int leftTop, rightTop, leftBot;
+
+                IMapChunk leftTopMapChunk = mc;
+                IMapChunk rightTopMapChunk = mc;
+                IMapChunk leftBotMapChunk = mc;
+
+                int topX = lx - 1;
+                int botX = lx;
+                int leftZ = lz - 1;
+                int rightZ = lz;
+
+                if (topX < 0 && leftZ < 0)
+                {     
+                    leftTopMapChunk = mapChunks[0];
+                    rightTopMapChunk = mapChunks[1];
+                    leftBotMapChunk = mapChunks[2];
+                } else
+                {
+                    if (topX < 0)
+                    {
+                        leftTopMapChunk = mapChunks[1];
+                        rightTopMapChunk = mapChunks[1];
+                    }
+                    if (leftZ < 0)
+                    {
+                        leftTopMapChunk = mapChunks[2];
+                        leftBotMapChunk = mapChunks[2];
+                    }
+                }
+
+                topX = GameMath.Mod(topX, chunksize);
+                leftZ = GameMath.Mod(leftZ, chunksize);
+
+                leftTop = leftTopMapChunk == null ? 0 : Math.Sign(y - leftTopMapChunk.RainHeightMap[leftZ * chunksize + topX]);
+                rightTop = rightTopMapChunk == null ? 0 : Math.Sign(y - rightTopMapChunk.RainHeightMap[rightZ * chunksize + topX]);
+                leftBot = leftBotMapChunk == null ? 0 : Math.Sign(y - leftBotMapChunk.RainHeightMap[leftZ * chunksize + botX]);
+
+                float slopeness = (leftTop + rightTop + leftBot);
+
+                if (slopeness > 0) b = 1.2f;
+                if (slopeness < 0) b = 0.8f;
+
+                //b = 1;
+
 
                 chunksTmp[cy].Unpack();
                 int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
@@ -251,7 +309,7 @@ namespace Vintagestory.GameContent
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
                 
-                texDataTmp[i] = block.GetColor(capi, tmpPos) | 255 << 24;
+                texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(block.GetColor(capi, tmpPos), b) | 255 << 24;
             }
 
             for (int cy = 0; cy < chunksTmp.Length; cy++) chunksTmp[cy] = null;

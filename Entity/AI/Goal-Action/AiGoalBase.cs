@@ -34,7 +34,7 @@ namespace Vintagestory.API.Common
 
         protected PathTraverserBase pathTraverser;
 
-        AiActionBase[] actions;
+        //AiActionBase[] actions;
         Queue<AiActionBase> activeActions = new Queue<AiActionBase>();
 
 
@@ -82,10 +82,10 @@ namespace Vintagestory.API.Common
 
             
 
-            for (int i = 0; i < actions.Length; i++)
+            /*for (int i = 0; i < actions.Length; i++)
             {
                 
-            }
+            }*/
 
             return ShouldExecute();
         }

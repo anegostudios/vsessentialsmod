@@ -63,7 +63,7 @@ namespace Vintagestory.GameContent
             base.StartExecute();
 
             done = false;
-            pathTraverser.GoTo(target, moveSpeed, OnGoalReached, OnStuck);
+            pathTraverser.WalkTowards(target, moveSpeed, 0.5f, OnGoalReached, OnStuck);
 
             //entity.world.SpawnParticles(10, ColorUtil.WhiteArgb, target.AddCopy(new Vec3f(-0.1f, -0.1f, -0.1f)), target.AddCopy(new Vec3f(0.1f, 0.1f, 0.1f)), new Vec3f(), new Vec3f(), 1f, 1f);
 
@@ -80,8 +80,10 @@ namespace Vintagestory.GameContent
 
             if (rand.NextDouble() < 0.1f)
             {
-                Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
-                if (block.CollisionBoxes != null && block.CollisionBoxes.Length > 0 && !entity.FeetInLiquid) return false;
+                if (!entity.FeetInLiquid) return false;
+
+                //Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
+                //if (block.CollisionBoxes != null && block.CollisionBoxes.Length > 0 && !entity.FeetInLiquid) return false;
             }
 
             return !done;

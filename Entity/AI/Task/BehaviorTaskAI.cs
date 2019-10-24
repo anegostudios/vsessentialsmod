@@ -3,6 +3,7 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.Essentials;
 
 namespace Vintagestory.GameContent
 {
@@ -44,8 +45,9 @@ namespace Vintagestory.GameContent
                 entity.World.Logger.Error("The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {0} ", entity.Code);
                 return;
             }
-            
-            PathTraverser = new StraightLinePathTraverser(entity as EntityAgent);
+
+            //PathTraverser = new StraightLineTraverser(entity as EntityAgent);
+            PathTraverser = new WaypointsTraverser(entity as EntityAgent);
 
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
             if (tasks == null) return;
@@ -75,9 +77,11 @@ namespace Vintagestory.GameContent
 
             PathTraverser.OnGameTick(deltaTime);
 
+            entity.World.FrameProfiler.Mark("entity-ai-pathing");
+
             taskManager.OnGameTick(deltaTime);
 
-            entity.World.FrameProfiler.Mark("entity-ai");
+            entity.World.FrameProfiler.Mark("entity-ai-tasks");
         }
 
 
@@ -86,6 +90,8 @@ namespace Vintagestory.GameContent
             taskManager.OnStateChanged(beforeState);
         }
 
+
+        
 
         public override void Notify(string key, object data)
         {

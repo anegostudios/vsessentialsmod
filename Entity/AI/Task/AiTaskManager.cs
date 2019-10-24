@@ -66,6 +66,8 @@ namespace Vintagestory.GameContent
         {
             task.StartExecute();
             ActiveTasksBySlot[slot] = task;
+
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
         }
 
         public T GetTask<T>() where T : IAiTask
@@ -99,6 +101,8 @@ namespace Vintagestory.GameContent
                     OnTaskStarted?.Invoke(task);
                 }
             }
+
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-start-execg");
         }
 
 
@@ -111,6 +115,8 @@ namespace Vintagestory.GameContent
                     task.FinishExecute(true);
                 }
             }
+
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-fin-exec");
         }
 
         public void OnGameTick(float dt)
@@ -129,10 +135,14 @@ namespace Vintagestory.GameContent
                     ActiveTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
+
+                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
                 }
             }
 
             
+
+
             for (int i = 0; i < ActiveTasksBySlot.Length; i++)
             {
                 IAiTask task = ActiveTasksBySlot[i];
@@ -143,7 +153,12 @@ namespace Vintagestory.GameContent
                     task.FinishExecute(false);
                     ActiveTasksBySlot[i] = null;
                 }
+
+                //entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-" + task.GetType());
             }
+
+
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-exec");
 
 
             if (entity.World.EntityDebugMode)
@@ -222,5 +237,7 @@ namespace Vintagestory.GameContent
                 task.OnEntityDespawn(reason);
             }
         }
+
+        
     }
 }

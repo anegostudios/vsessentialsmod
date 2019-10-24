@@ -18,7 +18,7 @@ namespace Vintagestory.GameContent
 
         internal List<EntityLocomotion> Locomotors = new List<EntityLocomotion>();
 
-        protected float stepHeight = 0.6f;
+        public float stepHeight = 0.6f;
 
         Cuboidf smallerCollisionBox = new Cuboidf();
 

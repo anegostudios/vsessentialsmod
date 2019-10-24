@@ -31,7 +31,7 @@ namespace Vintagestory.GameContent
 
         CloudTile[] cloudTilesTmp = new CloudTile[0];
 
-        public int CloudTileSize = 30;
+        public int CloudTileSize = 50;
 
         internal float blendedCloudDensity = 0;//-1.3f;
         internal float blendedGlobalCloudBrightness = 0;//0.85f;
@@ -68,13 +68,14 @@ namespace Vintagestory.GameContent
 
         ICoreClientAPI capi;
         IShaderProgram prog;
-        internal LCGRandom brightnessRand;
+        
 
         public double RenderOrder => 0.35;
         public int RenderRange => 9999;
 
         WeatherSimulation weatherSim;
-
+        int cnt = 0;
+        
 
         public CloudRenderer(ICoreClientAPI capi, WeatherSimulation weatherSim)
         {
@@ -88,7 +89,7 @@ namespace Vintagestory.GameContent
             LoadShader();
 
             rand = new Random(capi.World.Seed);
-            brightnessRand = new LCGRandom(rand.Next());
+            
 
             double time = capi.World.Calendar.TotalHours * 60;
             windOffsetX += 2f * time;
@@ -101,7 +102,7 @@ namespace Vintagestory.GameContent
             windOffsetZ %= CloudTileSize;
 
 
-            InitCloudTiles((9 * capi.World.Player.WorldData.DesiredViewDistance));
+            InitCloudTiles((8 * capi.World.Player.WorldData.DesiredViewDistance));
             LoadCloudModel();
 
             
@@ -123,14 +124,12 @@ namespace Vintagestory.GameContent
 
             capi.Shader.RegisterFileShaderProgram("clouds", prog);
 
-            //prog.PrepareUniformLocations("zNear", "zFar", "sunPosition", "sunColor", "dayLight", "windOffset", "playerPos", "globalCloudBrightness", "rgbaFogIn", "fogMinIn", "fogDensityIn", "flatFogDensity", "flatFogStart", "projectionMatrix", "modelViewMatrix", "shadowDistanceFar", "toShadowMapSpaceMatrixFar", "shadowDistanceNear", "toShadowMapSpaceMatrixNear", "pointLights", "pointLightColors", "pointLightQuantity", "cloudTileSize", "cloudsLength");
-
             return prog.Compile();
         }
 
         private void OnViewDistanceChanged(int newValue)
         {
-            InitCloudTiles((9 * capi.World.Player.WorldData.DesiredViewDistance));
+            InitCloudTiles((8 * capi.World.Player.WorldData.DesiredViewDistance));
             UpdateCloudTiles();
             LoadCloudModel();
             InitCustomDataBuffers(updateMesh);
@@ -145,6 +144,7 @@ namespace Vintagestory.GameContent
 
             rebuild = false;
 
+            deltaTime = Math.Min(deltaTime, 1);
             deltaTime *= capi.World.Calendar.SpeedOfTime / 60f;
             if (deltaTime > 0)
             {
@@ -166,13 +166,17 @@ namespace Vintagestory.GameContent
 
             
 
-            if (rebuild)
+            if (rebuild || cnt++ > 10)
             {
                 UpdateCloudTiles();
                 UpdateBufferContents(updateMesh);
                 capi.Render.UpdateMesh(cloudTilesMeshRef, updateMesh);
+                cnt = 0;
             }
+
+            capi.World.FrameProfiler.Mark("gt-clouds");
         }
+
 
 
         internal void UpdateWindAndClouds(float deltaTime)
@@ -183,7 +187,6 @@ namespace Vintagestory.GameContent
                 windDirectionX = (float)rand.NextDouble() * 5f;
                 windDirectionZ = (float)rand.NextDouble() * 0.2f;
             }
-            
 
             // Wind speed direction change smoothing 
             windSpeedX = windSpeedX + (windDirectionX - windSpeedX) * deltaTime;
@@ -232,7 +235,7 @@ namespace Vintagestory.GameContent
         }
 
 
-
+        Matrixf mvMat = new Matrixf();
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             capi.Render.GlMatrixModeModelView();
@@ -278,40 +281,26 @@ namespace Vintagestory.GameContent
             prog.Uniform("flatFogDensity", capi.Ambient.BlendedFlatFogDensity);
             prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader);
 
+
+            mvMat
+                .Set(capi.Render.MvMatrix.Top)
+                .FollowPlayer()
+                .Translate(
+                    windOffsetX - partialTileOffsetX,
+                    (int)(1 * capi.World.BlockAccessor.MapSizeY) + 0.5 - capi.World.Player.Entity.Pos.Y,
+                    windOffsetZ - partialTileOffsetZ
+                )
+            ;
+
+            prog.UniformMatrix("modelViewMatrix", mvMat.Values);
+            capi.Render.RenderMeshInstanced(cloudTilesMeshRef, QuantityCloudTiles);
             
 
-
-            capi.Render.GlPushMatrix();
-            {
-                double[] mvMatd = capi.Render.MvMatrix.Top;
-                mvMatd[12] = 0;
-                mvMatd[13] = 0;
-                mvMatd[14] = 0;
-
-
-                Mat4d.Translate(mvMatd, mvMatd, new double[] {
-                    windOffsetX - partialTileOffsetX,
-                    (int)(0.8627 * capi.World.BlockAccessor.MapSizeY) + 0.5 - capi.World.Player.Entity.Pos.Y,
-                    windOffsetZ - partialTileOffsetZ
-                });
-
-                // Basic model view matrix
-                float[] mvMatf = new float[16];
-                for (int i = 0; i < 16; i++) mvMatf[i] = (float)mvMatd[i];
-
-                prog.UniformMatrix("modelViewMatrix", mvMatf);
-                capi.Render.RenderMeshInstanced(cloudTilesMeshRef, QuantityCloudTiles);
-            }
-            capi.Render.GlPopMatrix();
-
-
             // Very slightly rotate all the clouds so it looks better when they pass through blocks 
-
             // Putting this line before translate = Clouds no longer centered around the player
             // Putting it after the translate = Clouds hop by a few pixels on every reload
             // Need to find a correct solution for this
             // Mat4.Rotate(mv, mv, 0.04f, new float[] { 0, 1, 0 });
-
             
             prog.Stop();
             
@@ -340,7 +329,8 @@ namespace Vintagestory.GameContent
                     cloudTiles[i++] = new CloudTile()
                     {
                         XOffset = x,
-                        ZOffset = z
+                        ZOffset = z,
+                        brightnessRand = new LCGRandom(rand.Next())
                     };
                 }
             }
@@ -372,59 +362,65 @@ namespace Vintagestory.GameContent
             cloudTilesTmp = tmp;
         }
 
+        ParallelOptions _pOptions = new ParallelOptions { MaxDegreeOfParallelism = 16 };
         public void UpdateCloudTiles()
         {
             weatherSim.EnsureNoiseCacheIsFresh();
-            byte zero = 0;
-            int end = CloudTileLength - 2;
 
             // Load density from perlin noise
-            for (int dx = 0; dx < CloudTileLength; dx++)
+            int cnt = CloudTileLength * CloudTileLength;
+            for (int i = 0; i < cnt; i++)
             {
-                for (int dz = 0; dz < CloudTileLength; dz++)
-                {
-                    int x = (tilePosX + dx - CloudTileLength / 2 - tileOffsetX);
-                    int z = (tilePosZ + dz - CloudTileLength / 2 - tileOffsetZ);
-                    brightnessRand.InitPositionSeed(x, z);
-                    double density = weatherSim.GetBlendedCloudDensityAt(dx, dz);
-                    
-                    CloudTile cloudTile = cloudTiles[dx * CloudTileLength + dz];
+                int dx = i % CloudTileLength;
+                int dz = i / CloudTileLength;
 
-                    cloudTile.MaxDensity = (byte)GameMath.Clamp((int)((64 * 255 * density * 3)) / 64, 0, 255);
-                    cloudTile.Brightness = (byte)(235 + brightnessRand.NextInt(21));
-                    cloudTile.YOffset = (float)weatherSim.GetBlendedCloudOffsetYAt(dx, dz);
-                }
+                int x = (tilePosX + dx - CloudTileLength / 2 - tileOffsetX);
+                int z = (tilePosZ + dz - CloudTileLength / 2 - tileOffsetZ);
+                CloudTile cloudTile = cloudTiles[dx * CloudTileLength + dz];
+                cloudTile.brightnessRand.InitPositionSeed(x, z);
+                double density = weatherSim.GetBlendedCloudDensityAt(dx, dz);
+
+
+                cloudTile.MaxDensity = (byte)GameMath.Clamp((int)((64 * 255 * density * 3)) / 64, 0, 255);
+                cloudTile.Brightness = (byte)(225 + cloudTile.brightnessRand.NextInt(31));
+                cloudTile.YOffset = (float)weatherSim.GetBlendedCloudOffsetYAt(dx, dz);
             }
+       
+            int end = CloudTileLength - 2;
 
-            
             // Has to be done after all densities have updated
-            for (int dx = 0; dx < CloudTileLength; dx++)
+            for (int i = 0; i < cnt; i++)
             {
-                for (int dz = 0; dz < CloudTileLength; dz++)
-                {
-                    CloudTile cloud = cloudTiles[dx * CloudTileLength + dz];
+                int dx = i % CloudTileLength;
+                int dz = i / CloudTileLength;
 
-                    byte northDensity = dz < 1 ? zero : cloudTiles[dx * CloudTileLength + dz - 1].MaxDensity;
-                    byte southDensity = dz >= end ? zero : cloudTiles[dx * CloudTileLength + dz + 1].MaxDensity;
-                    byte eastDensity = dx >= end ? zero : cloudTiles[(dx + 1) * CloudTileLength + dz].MaxDensity;
-                    byte westDensity = dx < 1 ? zero : cloudTiles[(dx - 1) * CloudTileLength + dz].MaxDensity;
+                CloudTile cloud = cloudTiles[dx * CloudTileLength + dz];
 
-                    int changeVal = northDensity == 0 || cloud.MaxDensity - northDensity > 5 ? 1 : -1;
-                    cloud.NorthFaceDensity = (byte)GameMath.Clamp((cloud.NorthFaceDensity + changeVal), 0, cloud.MaxDensity);
+                int northMaxDensity = dz < 1 ? 0 : cloudTiles[dx * CloudTileLength + dz - 1].MaxDensity;
+                int eastMaxDensity = dx >= end ? 0 : cloudTiles[(dx + 1) * CloudTileLength + dz].MaxDensity;
+                int southMaxDensity = dz >= end ? 0 : cloudTiles[dx * CloudTileLength + dz + 1].MaxDensity;
+                int westMaxDensity = dx < 1 ? 0 : cloudTiles[(dx - 1) * CloudTileLength + dz].MaxDensity;
 
-                    changeVal = eastDensity == 0 || cloud.MaxDensity - eastDensity > 5 ? 1 : -1;
-                    cloud.EastFaceDensity = (byte)GameMath.Clamp((cloud.EastFaceDensity + changeVal), 0, cloud.MaxDensity);
+                int northTargetDensity = northMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
+                int eastTargetDensity = eastMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
+                int southTargetDensity = southMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
+                int westTargetDensity = westMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
 
-                    changeVal = southDensity == 0 || cloud.MaxDensity - southDensity > 5 ? 1 : -1;
-                    cloud.SouthFaceDensity = (byte)GameMath.Clamp((cloud.SouthFaceDensity + changeVal), 0, cloud.MaxDensity);
+                int changeVal = GameMath.Clamp(northTargetDensity - cloud.NorthFaceDensity, -1, 1);
+                cloud.NorthFaceDensity += (byte)changeVal;
 
-                    changeVal = westDensity == 0 || cloud.MaxDensity - westDensity > 5 ? 1 : -1;
-                    cloud.WestFaceDensity = (byte)GameMath.Clamp((cloud.WestFaceDensity + changeVal), 0, cloud.MaxDensity);
+                changeVal = GameMath.Clamp(eastTargetDensity - cloud.EastFaceDensity, -1, 1);
+                cloud.EastFaceDensity += (byte)changeVal;
 
-                    cloud.UpDownDensity += (byte)GameMath.Clamp(cloud.MaxDensity - cloud.UpDownDensity, -1, 1);
-                }
+                changeVal = GameMath.Clamp(southTargetDensity - cloud.SouthFaceDensity, -1, 1);
+                cloud.SouthFaceDensity += (byte)changeVal;
+
+                changeVal = GameMath.Clamp(westTargetDensity - cloud.WestFaceDensity, -1, 1);
+                cloud.WestFaceDensity += (byte)changeVal;
+
+                changeVal = GameMath.Clamp(cloud.MaxDensity - cloud.UpDownDensity, -1, 1);
+                cloud.UpDownDensity += (byte)changeVal;
             }
-
         }
 
 
@@ -444,7 +440,7 @@ namespace Vintagestory.GameContent
             
             MeshData tile = CloudMeshUtil.GetCubeModelDataForClouds(
                 CloudTileSize / 2,
-                CloudTileSize / 8,
+                CloudTileSize / 4,
                 new Vec3f(0,0,0)
             );
 

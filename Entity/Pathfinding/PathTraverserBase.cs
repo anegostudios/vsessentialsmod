@@ -18,7 +18,7 @@ namespace Vintagestory.API.Common
 
         protected float targetDistance;
 
-        public Vec3d CurrentTarget
+        public virtual Vec3d CurrentTarget
         {
             get { return target; }
         }
@@ -28,12 +28,17 @@ namespace Vintagestory.API.Common
             this.entity = entity;
         }
 
-        public bool GoTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck)
+        public bool NavigateTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck, bool allowReachAlmost = false)
         {
-            return GoTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck);
+            return NavigateTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck, allowReachAlmost);
         }
 
-        public bool GoTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
+        public virtual bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 10000, bool allowReachAlmost = false)
+        {
+            return WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
+        }
+
+        public virtual bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
         {
             stuckCounter = 0;
 

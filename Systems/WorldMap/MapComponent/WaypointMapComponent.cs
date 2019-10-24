@@ -22,6 +22,8 @@ namespace Vintagestory.GameContent
         Waypoint waypoint;
         int waypointIndex;
 
+        Matrixf mvMat = new Matrixf();
+
         public WaypointMapComponent(int waypointIndex, Waypoint waypoint, LoadedTexture texture, ICoreClientAPI capi) : base(capi)
         {
             this.waypointIndex = waypointIndex;
@@ -51,17 +53,17 @@ namespace Vintagestory.GameContent
             prog.Uniform("noTexture", 0f);
             prog.BindTexture2D("tex2d", Texture.TextureId, 0);
 
-            api.Render.GlPushMatrix();
-            api.Render.GlTranslate(x, y, 60);
-            api.Render.GlScale(Texture.Width, Texture.Height, 0);
-            api.Render.GlScale(0.5f, 0.5f, 0);
+            mvMat
+                .Set(api.Render.CurrentModelviewMatrix)
+                .Translate(x, y, 60)
+                .Scale(Texture.Width, Texture.Height, 0)
+                .Scale(0.5f, 0.5f, 0)
+            ;
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
-            prog.UniformMatrix("modelViewMatrix", api.Render.CurrentModelviewMatrix);
+            prog.UniformMatrix("modelViewMatrix", mvMat.Values);
             
             api.Render.RenderMesh(quadModel);
-            api.Render.GlPopMatrix();
-            
         }
 
         public override void Dispose()

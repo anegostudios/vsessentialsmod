@@ -23,8 +23,7 @@ namespace Vintagestory.ServerMods
         }
 
         public override bool ShouldLoad(EnumAppSide side)
-        {
-            
+        {   
             return true;
         }
 
@@ -83,6 +82,7 @@ namespace Vintagestory.ServerMods
         {
             api.RegisterBlockEntityClass("ParticleEmitter", typeof(BlockEntityParticleEmitter));
             api.RegisterBlockEntityClass("Transient", typeof(BlockEntityTransient));
+            api.RegisterBlockEntityClass("Generic", typeof(BlockEntityGeneric));
         }
 
 

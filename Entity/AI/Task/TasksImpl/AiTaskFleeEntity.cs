@@ -13,7 +13,7 @@ namespace Vintagestory.GameContent
     public class AiTaskFleeEntity : AiTaskBase
     {
         EntityAgent targetEntity;
-        Vec3d targetPos;
+        Vec3d targetPos = new Vec3d();
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
         float executionChance = 0.07f;
@@ -27,6 +27,8 @@ namespace Vintagestory.GameContent
 
         string[] fleeEntityCodesExact = new string[] { "player" };
         string[] fleeEntityCodesBeginsWith = new string[0];
+
+        float stepHeight;
 
         EntityPartitioning partitionUtil;
 
@@ -73,7 +75,7 @@ namespace Vintagestory.GameContent
 
             if (taskConfig["fleeDurationMs"] != null)
             {
-                fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(5000);
+                fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             }
 
             if (taskConfig["entityCodes"] != null)
@@ -102,10 +104,11 @@ namespace Vintagestory.GameContent
         public override bool ShouldExecute()
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
-
+            
             if (rand.NextDouble() > executionChance || entity.World.Calendar.DayLightStrength < minDayLight) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0.01f, (30f - generation) / 30f);
@@ -135,7 +138,8 @@ namespace Vintagestory.GameContent
                 return false;
             });
 
-            
+            yawOffset = 0;
+
             if (targetEntity != null)
             {
                 updateTargetPos();
@@ -151,24 +155,32 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
+            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
+            stepHeight = bh == null ? 0.6f : bh.stepHeight;
+
             soundChance = Math.Max(0.025f, soundChance - 0.2f);
 
             float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
 
-            pathTraverser.GoTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+            //pathTraverser.NavigateTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+            pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
             fleeStartMs = entity.World.ElapsedMilliseconds;
             stuck = false;
+            
 
         }
 
         public override bool ContinueExecute(float dt)
         {
-            updateTargetPos();
+            if (world.Rand.NextDouble() < 0.2)
+            {
+                updateTargetPos();
+                pathTraverser.CurrentTarget.X = targetPos.X;
+                pathTraverser.CurrentTarget.Y = targetPos.Y;
+                pathTraverser.CurrentTarget.Z = targetPos.Z;
+            }
 
-            pathTraverser.CurrentTarget.X = targetPos.X;
-            pathTraverser.CurrentTarget.Y = targetPos.Y;
-            pathTraverser.CurrentTarget.Z = targetPos.Z;
 
             if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ) > fleeingDistance * fleeingDistance)
             {
@@ -181,13 +193,99 @@ namespace Vintagestory.GameContent
         }
 
 
+        Vec3d tmpVec = new Vec3d();
+        float yawOffset;
+
         private void updateTargetPos()
         {
-            Vec3d diff = targetEntity.Pos.XYZ.Sub(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            float yaw = (float)Math.Atan2(diff.X, diff.Z);
+            float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
 
-            targetPos = entity.Pos.XYZ.Ahead(10, 0, yaw - GameMath.PI/2);
+            /*tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(10, 0, yaw - GameMath.PI / 2);
+
+            int tries = 10;
+            double dx, dy, dz;
+            while (tries-- > 0)
+            {
+                dx = rand.NextDouble() * 8 - 4;
+                dy = rand.NextDouble() * 8 - 4;
+                dz = rand.NextDouble() * 8 - 4;
+
+                if (entity.Properties.Habitat == EnumHabitat.Land)
+                {
+                    tmpVec.Y = moveDownToFloor((int)tmpVec.X, tmpVec.Y, (int)tmpVec.Z);
+                }
+
+                tmpVec.Add(dx, dx, dz);
+
+                pathTraverser.NavigateTo(targetPos, moveSpeed, 1, OnGoalReached, OnStuck, tries > 0, 999, true);
+            }*/
+
+
+            // Some simple steering behavior, works really suxy
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI / 2);
+
+            // Running into wall?
+            if (traversable(tmpVec))
+            {
+                yawOffset = 0;
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
+                return;
+            }
+
+            // Try 90 degrees left
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI);
+                return;
+            }
+
+            // Try 90 degrees right
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw);
+                return;
+            }
+
+            // Run towards target o.O
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, -yaw);
+            //if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
+                return;
+            }
         }
+
+
+        private double moveDownToFloor(int x, double y, int z)
+        {
+            int tries = 5;
+            while (tries-- > 0)
+            {
+                Block block = world.BlockAccessor.GetBlock(x, (int)(y--), z);
+                if (block.LiquidCode == "water") return y + 1;
+                if (block.SideSolid[BlockFacing.UP.Index]) return y;
+            }
+
+            return y;
+        }
+
+
+        Vec3d collTmpVec = new Vec3d();
+        bool traversable(Vec3d pos)
+        {
+            return
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, pos, false) ||
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, collTmpVec.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
+            ;
+        }
+
 
         public override void FinishExecute(bool cancelled)
         {

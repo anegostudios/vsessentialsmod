@@ -2,6 +2,7 @@
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -250,6 +251,8 @@ namespace Vintagestory.GameContent
         private bool ReduceSaturation(float satLossMultiplier)
         {
             bool isondelay = false;
+
+            satLossMultiplier *= GlobalConstants.HungerSpeedModifier;
 
             if (SaturationLossDelayFruit > 0)
             {

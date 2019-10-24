@@ -47,6 +47,13 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public bool Harvestable
+        {
+            get
+            {
+                return !entity.Alive && !IsHarvested;
+            }
+        }
 
         public float HarvestDuration
         {
