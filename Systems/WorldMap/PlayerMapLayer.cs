@@ -73,7 +73,8 @@ namespace Vintagestory.GameContent
                 Context ctx = new Context(surface);
                 ctx.SetSourceRGBA(0, 0, 0, 0);
                 ctx.Paint();
-                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 1, 1, 1, 1 });
+                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 0, 0, 0, 1 }, new double[] { 1, 1, 1, 1 });
+                
                 ownTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), 16, 16);
                 ctx.Dispose();
                 surface.Dispose();
@@ -85,7 +86,7 @@ namespace Vintagestory.GameContent
                 Context ctx = new Context(surface);
                 ctx.SetSourceRGBA(0, 0, 0, 0);
                 ctx.Paint();
-                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 0.7, 0.7, 0.7, 1 });
+                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 0.3, 0.3, 0.3, 1 }, new double[] { 0.7, 0.7, 0.7, 1 });
                 otherTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), 16, 16);
                 ctx.Dispose();
                 surface.Dispose();

@@ -145,7 +145,6 @@
     <Compile Include="Loading\CropBehaviorType.cs" />
     <Compile Include="Loading\EntityType.cs" />
     <Compile Include="Loading\RegistryObjectTypeLoader.cs" />
-    <Compile Include="Loading\JsonObjectConverter.cs" />
     <Compile Include="Loading\JsonPatchLoader.cs" />
     <Compile Include="Loading\RecipeLoader.cs" />
     <Compile Include="Loading\RegistryObjectType.cs" />

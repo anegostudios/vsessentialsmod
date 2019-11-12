@@ -56,7 +56,7 @@ namespace Vintagestory.GameContent
 
                     if (tmp.Intersects(EntitySuffocationBox))
                     {
-                        DamageSource dmgsrc = new DamageSource() { Source = EnumDamageSource.Block, sourceBlock = block, Type = EnumDamageType.Suffocation };
+                        DamageSource dmgsrc = new DamageSource() { Source = EnumDamageSource.Block, SourceBlock = block, Type = EnumDamageType.Suffocation };
                         entity.ReceiveDamage(dmgsrc, 1f);
                         break;
                     }

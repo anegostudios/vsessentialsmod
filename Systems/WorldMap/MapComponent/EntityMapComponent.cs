@@ -40,6 +40,8 @@ namespace Vintagestory.GameContent
             if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
             if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
 
+            capi.Render.GlToggleBlend(true);
+
             IShaderProgram prog = api.Render.GetEngineShader(EnumShaderProgram.Gui);
             prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
             prog.Uniform("extraGlow", 0);

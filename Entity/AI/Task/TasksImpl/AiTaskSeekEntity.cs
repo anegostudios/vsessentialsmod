@@ -12,6 +12,7 @@ namespace Vintagestory.GameContent
     {
         EntityAgent targetEntity;
         Vec3d targetPos;
+
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
         float maxFollowTime = 60;
@@ -30,12 +31,16 @@ namespace Vintagestory.GameContent
         long finishedMs;
         bool jumpAnimOn;
 
+        EntityPartitioning partitionUtil;
+
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
+
             base.LoadConfig(taskConfig, aiConfig);
 
             if (taskConfig["movespeed"] != null)
@@ -85,7 +90,13 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            if (rand.NextDouble() > 0.04f) return false;
+            if (rand.NextDouble() > 0.1f) return false; // was 0.04 before, but that made creatures react very slowly when in emotionstate aggressiveondamage. So lets double the reaction time when in that emotion state
+
+            if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
+            if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+
+            if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
+
 
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
@@ -96,10 +107,7 @@ namespace Vintagestory.GameContent
 
 
 
-            if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
-            if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
-
-            targetEntity = (EntityAgent)entity.World.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, seekingRange, (e) => {
+            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
 
                 for (int i = 0; i < seekEntityCodesExact.Length; i++)
@@ -144,7 +152,7 @@ namespace Vintagestory.GameContent
 
                 targetPos = targetEntity.ServerPos.XYZ;
 
-                if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ) <= MinDistanceToTarget())
+                if (entity.ServerPos.SquareDistanceTo(targetPos) <= MinDistanceToTarget())
                 {
                     return false;
                 }
@@ -157,7 +165,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.1f, (targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1) / 2 + (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2);
+            return System.Math.Max(0.1f, (targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1) / 2 + (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 4);
         }
 
         public override void StartExecute()
@@ -175,7 +183,7 @@ namespace Vintagestory.GameContent
                 searchDepth = 10000;
             }
 
-            if (!pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth, true))
+            if (!pathTraverser.NavigateTo(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth, true))
             {
                 // If we cannot find a path to the target, let's circle it!
                 float angle = (float)Math.Atan2(entity.ServerPos.X - targetPos.X, entity.ServerPos.Z - targetPos.Z);
@@ -222,7 +230,7 @@ namespace Vintagestory.GameContent
 
 
 
-                ok = ok && pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth);
+                ok = ok && pathTraverser.NavigateTo(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, giveUpWhenNoPath, searchDepth, true);
 
                 stopNow = !ok;
             }
@@ -232,9 +240,18 @@ namespace Vintagestory.GameContent
 
 
         long jumpedMS = 0;
+        float lastPathUpdateSeconds;
         public override bool ContinueExecute(float dt)
         {
             currentFollowTime += dt;
+            lastPathUpdateSeconds += dt;
+
+            if (!siegeMode && lastPathUpdateSeconds >= 1 && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3*3)
+            {
+                pathTraverser.NavigateTo(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 2000, true);
+                lastPathUpdateSeconds = 0;
+                targetPos.Set(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
+            }
 
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
@@ -282,7 +299,7 @@ namespace Vintagestory.GameContent
             return
                 currentFollowTime < maxFollowTime &&
                 distance < seekingRange * seekingRange &&
-                distance > minDist &&
+                (distance > minDist || targetEntity.ServerControls.TriesToMove) &&
                 targetEntity.Alive &&
                 !inCreativeMode &&
                 !stopNow

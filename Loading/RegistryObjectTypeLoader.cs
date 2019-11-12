@@ -15,7 +15,7 @@ using Vintagestory.ServerMods.NoObf;
 
 namespace Vintagestory.ServerMods.NoObf
 {
-    public class BlockVariant
+    public class VariantEntry
     {
         public string Code;
 
@@ -44,7 +44,7 @@ namespace Vintagestory.ServerMods.NoObf
     {
         // Dict Key is filename (with .json)
         Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
-        Dictionary<AssetLocation, BlockVariant[]> worldPropertiesVariants;
+        Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
 
         Dictionary<AssetLocation, Shape> blockShapes;
         Dictionary<AssetLocation, BlockType> blockTypes;
@@ -187,7 +187,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
 
-            worldPropertiesVariants = new Dictionary<AssetLocation, BlockVariant[]>();
+            worldPropertiesVariants = new Dictionary<AssetLocation, VariantEntry[]>();
             foreach (var val in worldProperties)
             {
                 if (val.Value == null) continue;
@@ -201,11 +201,11 @@ namespace Vintagestory.ServerMods.NoObf
                     return;
                 }
 
-                worldPropertiesVariants[val.Value.Code] = new BlockVariant[variants.Length];
+                worldPropertiesVariants[val.Value.Code] = new VariantEntry[variants.Length];
 
                 for (int i = 0; i < variants.Length; i++)
                 {
-                    worldPropertiesVariants[val.Value.Code][i] = new BlockVariant() { Code = variants[i].Code.Path };
+                    worldPropertiesVariants[val.Value.Code][i] = new VariantEntry() { Code = variants[i].Code.Path };
                 }
             }
         }
@@ -388,7 +388,8 @@ namespace Vintagestory.ServerMods.NoObf
 
 
             item.Code = fullcode;
-            item.Variant = typedItemType.Variant;
+            item.VariantStrict = typedItemType.Variant;
+            item.Variant= new RelaxedReadOnlyDictionary<string, string>(typedItemType.Variant);
             item.Class = typedItemType.Class;
             item.Textures = typedItemType.Textures;
             item.MaterialDensity = typedItemType.MaterialDensity;
@@ -545,7 +546,8 @@ namespace Vintagestory.ServerMods.NoObf
 
 
             block.Code = fullcode;
-            block.Variant = typedBlockType.Variant;
+            block.VariantStrict = typedBlockType.Variant;
+            block.Variant = new RelaxedReadOnlyDictionary<string, string>(typedBlockType.Variant);
             block.Class = typedBlockType.Class;
             block.LiquidSelectable = typedBlockType.LiquidSelectable;
             block.LiquidCode = typedBlockType.LiquidCode;
@@ -559,6 +561,16 @@ namespace Vintagestory.ServerMods.NoObf
             block.Replaceable = typedBlockType.Replaceable;
             block.Fertility = typedBlockType.Fertility;
             block.LightAbsorption = typedBlockType.LightAbsorption;
+            block.LightTraversable = new bool[] { typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2 };
+            if (typedBlockType.LightTraversable != null)
+            {
+                foreach (var val in typedBlockType.LightTraversable)
+                {
+                    if (val.Key == "ns") block.LightTraversable[2] = val.Value;
+                    if (val.Key == "ud") block.LightTraversable[1] = val.Value;
+                    if (val.Key == "we") block.LightTraversable[0] = val.Value;
+                }
+            }
             block.LightHsv = typedBlockType.LightHsv;
             block.VertexFlags = typedBlockType.VertexFlags?.Clone() ?? new VertexFlags(0);
             block.Resistance = typedBlockType.Resistance;
@@ -715,7 +727,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (variantgroups == null || variantgroups.Length == 0) return variantsFinal;
 
-            OrderedDictionary<string, BlockVariant[]> blockvariantsMul = new OrderedDictionary<string, BlockVariant[]>();
+            OrderedDictionary<string, VariantEntry[]> variantsMul = new OrderedDictionary<string, VariantEntry[]>();
 
 
             // 1. Collect all types
@@ -723,22 +735,22 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 if (variantgroups[i].LoadFromProperties != null)
                 {
-                    CollectFromWorldProperties(variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
+                    CollectFromWorldProperties(variantgroups[i], variantgroups, variantsMul, variantsFinal, location);
                 }
 
                 if (variantgroups[i].LoadFromPropertiesCombine != null)
                 {
-                    CollectFromWorldPropertiesCombine(variantgroups[i].LoadFromPropertiesCombine, variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
+                    CollectFromWorldPropertiesCombine(variantgroups[i].LoadFromPropertiesCombine, variantgroups[i], variantgroups, variantsMul, variantsFinal, location);
                 }
 
                 if (variantgroups[i].States != null)
                 {
-                    CollectFromStateList(variantgroups[i], variantgroups, blockvariantsMul, variantsFinal, location);
+                    CollectFromStateList(variantgroups[i], variantgroups, variantsMul, variantsFinal, location);
                 }
             }
 
             // 2. Multiply multiplicative groups
-            BlockVariant[,] variants = MultiplyProperties(blockvariantsMul.Values.ToArray());
+            VariantEntry[,] variants = MultiplyProperties(variantsMul.Values.ToArray());
 
 
             // 3. Add up multiplicative groups
@@ -747,7 +759,7 @@ namespace Vintagestory.ServerMods.NoObf
                 ResolvedVariant resolved = new ResolvedVariant();
                 for (int j = 0; j < variants.GetLength(1); j++)
                 {
-                    BlockVariant variant = variants[i, j];
+                    VariantEntry variant = variants[i, j];
 
                     if (variant.Codes != null)
                     {
@@ -758,7 +770,7 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     else
                     {
-                        resolved.CodeParts.Add(blockvariantsMul.GetKeyAtIndex(j), variant.Code);
+                        resolved.CodeParts.Add(variantsMul.GetKeyAtIndex(j), variant.Code);
                     }
                 }
 
@@ -832,7 +844,7 @@ namespace Vintagestory.ServerMods.NoObf
             return variantsFinal;
         }
 
-        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
+        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> variantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
         {
             if (variantGroup.Code == null)
             {
@@ -860,11 +872,11 @@ namespace Vintagestory.ServerMods.NoObf
             // Multiplicative state list
             if (variantGroup.Combine == EnumCombination.Multiply)
             {
-                List<BlockVariant> stateList = new List<BlockVariant>();
+                List<VariantEntry> stateList = new List<VariantEntry>();
 
                 for (int j = 0; j < states.Length; j++)
                 {
-                    stateList.Add(new BlockVariant() { Code = states[j] });
+                    stateList.Add(new VariantEntry() { Code = states[j] });
                 }
 
 
@@ -876,8 +888,8 @@ namespace Vintagestory.ServerMods.NoObf
                         for (int k = 0; k < stateList.Count; k++)
                         {
                             if (cvg.Code != stateList[k].Code) continue;
-
-                            BlockVariant old = stateList[k];
+                            
+                            VariantEntry old = stateList[k];
 
                             stateList.RemoveAt(k);
 
@@ -889,7 +901,7 @@ namespace Vintagestory.ServerMods.NoObf
                                 codes.Add(cvg.States[j]);
                                 types.Add(cvg.Code);
 
-                                stateList.Insert(k, new BlockVariant()
+                                stateList.Insert(k, new VariantEntry()
                                 {
                                     Code = old.Code + "-" + cvg.States[j],
                                     Codes = codes,
@@ -900,26 +912,26 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                 }
 
-                if (blockvariantsMul.ContainsKey(type))
+                if (variantsMul.ContainsKey(type))
                 {
-                    stateList.AddRange(blockvariantsMul[type]);
-                    blockvariantsMul[type] = stateList.ToArray();
+                    stateList.AddRange(variantsMul[type]);
+                    variantsMul[type] = stateList.ToArray();
                 }
                 else
                 {
-                    blockvariantsMul.Add(type, stateList.ToArray());
+                    variantsMul.Add(type, stateList.ToArray());
                 }
 
             }
         }
 
 
-        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             CollectFromWorldPropertiesCombine(new AssetLocation[] { variantGroup.LoadFromProperties }, variantGroup, variantgroups, blockvariantsMul, blockvariantsFinal, location);
         }
 
-        private void CollectFromWorldPropertiesCombine(AssetLocation[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, BlockVariant[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldPropertiesCombine(AssetLocation[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             if (propList.Length > 1 && variantGroup.Code == null)
             {
@@ -958,7 +970,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 if (variantGroup.Combine == EnumCombination.Multiply)
                 {
-                    BlockVariant[] variants = null;
+                    VariantEntry[] variants = null;
                     if (blockvariantsMul.TryGetValue(typename, out variants))
                     {
                         blockvariantsMul[typename] = variants.Append(worldPropertiesVariants[property.Code]);
@@ -975,28 +987,28 @@ namespace Vintagestory.ServerMods.NoObf
         // Takes n lists of properties and returns every unique n-tuple 
         // through a 2 dimensional array blockvariants[i, ni] 
         // where i = n-tuple index and ni = index of current element in the n-tuple
-        BlockVariant[,] MultiplyProperties(BlockVariant[][] blockVariants)
+        VariantEntry[,] MultiplyProperties(VariantEntry[][] variants)
         {
             int resultingQuantiy = 1;
 
-            for (int i = 0; i < blockVariants.Length; i++)
+            for (int i = 0; i < variants.Length; i++)
             {
-                resultingQuantiy *= blockVariants[i].Length;
+                resultingQuantiy *= variants[i].Length;
             }
 
-            BlockVariant[,] multipliedProperties = new BlockVariant[resultingQuantiy, blockVariants.Length];
+            VariantEntry[,] multipliedProperties = new VariantEntry[resultingQuantiy, variants.Length];
 
             for (int i = 0; i < resultingQuantiy; i++)
             {
                 int div = 1;
 
-                for (int j = 0; j < blockVariants.Length; j++)
+                for (int j = 0; j < variants.Length; j++)
                 {
-                    BlockVariant variant = blockVariants[j][(i / div) % blockVariants[j].Length];
+                    VariantEntry variant = variants[j][(i / div) % variants[j].Length];
 
-                    multipliedProperties[i, j] = new BlockVariant() { Code = variant.Code, Codes = variant.Codes, Types = variant.Types };
+                    multipliedProperties[i, j] = new VariantEntry() { Code = variant.Code, Codes = variant.Codes, Types = variant.Types };
 
-                    div *= blockVariants[j].Length;
+                    div *= variants[j].Length;
                 }
             }
 

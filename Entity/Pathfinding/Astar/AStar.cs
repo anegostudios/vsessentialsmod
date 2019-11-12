@@ -129,6 +129,7 @@ namespace Vintagestory.Essentials
                     if (block.LiquidCode == "water")
                     {
                         extraCost = 5;
+                        //node.Y--; - we swim on top
                         break;
                     }
 

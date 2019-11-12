@@ -157,15 +157,12 @@ namespace Vintagestory.GameContent
                 {
                     if (loadedMapData.ContainsKey(cord))
                     {
-                        mapSink.RemoveMapData(loadedMapData[cord]);
-                        loadedMapData[cord].Dispose();
-
-                        //Console.WriteLine("disposed " + cord);
+                        UpdateMapData(loadedMapData[cord] as ChunkMapComponent, pixels);
+                    } else
+                    {
+                        mapSink.AddMapData(loadedMapData[cord] = LoadMapData(cord, pixels));
                     }
-
-                    mapSink.AddMapData(loadedMapData[cord] = LoadMapData(cord, pixels));
-
-                    //Console.WriteLine("generated " + cord);
+                    
                 }, "chunkmaplayerready");
             }
         }
@@ -221,7 +218,14 @@ namespace Vintagestory.GameContent
             return cmp;
         }
 
-        
+        private void UpdateMapData(ChunkMapComponent cmp, int[] pixels)
+        {
+            ICoreClientAPI capi = api as ICoreClientAPI;
+            capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref cmp.Texture);
+        }
+
+
+
 
         public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc)
         {
@@ -300,16 +304,22 @@ namespace Vintagestory.GameContent
                 if (slopeness > 0) b = 1.2f;
                 if (slopeness < 0) b = 0.8f;
 
+                b -= 0.15f; // Map seems overally a bit too bright
                 //b = 1;
-
 
                 chunksTmp[cy].Unpack();
                 int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
                 Block block = api.World.Blocks[blockId];
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
-                
-                texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(block.GetColor(capi, tmpPos), b) | 255 << 24;
+
+                int avgCol = block.GetColor(capi, tmpPos);
+                int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP);
+
+                // Add a bit of randomness to each pixel
+                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.25f);
+
+                texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(col, b) | 255 << 24;
             }
 
             for (int cy = 0; cy < chunksTmp.Length; cy++) chunksTmp[cy] = null;

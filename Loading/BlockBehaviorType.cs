@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API;
+using Vintagestory.API.Common;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -14,7 +15,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public string name;
 
-        [JsonConverter(typeof(JsonObjectConverter))]
+        [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
         public JsonObject properties;
     }
 

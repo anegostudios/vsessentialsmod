@@ -10,12 +10,12 @@ namespace Vintagestory.GameContent
     public class CloudTile
     {
         public byte MaxDensity;
-        public byte UpDownDensity;
+        public byte SelfDensity;
 
-        public byte NorthFaceDensity;
-        public byte EastFaceDensity;
-        public byte SouthFaceDensity;
-        public byte WestFaceDensity;
+        public byte NorthDensity;
+        public byte EastDensity;
+        public byte SouthDensity;
+        public byte WestDensity;
         public byte Brightness;
         
         public int XOffset; // Grid position

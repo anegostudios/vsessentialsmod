@@ -50,6 +50,8 @@ namespace Vintagestory.API.Common
         {
             this.priority = taskConfig["priority"].AsFloat();
             this.priorityForCancel = taskConfig["priorityForCancel"].AsFloat(priority);
+
+
             this.slot = (int)taskConfig["slot"]?.AsInt(0);
             this.mincooldown = (int)taskConfig["mincooldown"]?.AsInt(0);
             this.maxcooldown = (int)taskConfig["maxcooldown"]?.AsInt(100);
@@ -72,6 +74,7 @@ namespace Vintagestory.API.Common
 
             this.whenInEmotionState = taskConfig["whenInEmotionState"].AsString();
             this.whenNotInEmotionState = taskConfig["whenNotInEmotionState"].AsString();
+
 
             if (taskConfig["sound"].Exists)
             {
@@ -105,7 +108,10 @@ namespace Vintagestory.API.Common
         {
             if (animMeta != null)
             {
+                animMeta.EaseInSpeed = 1f;
+                animMeta.EaseOutSpeed = 1f;
                 entity.AnimManager.StartAnimation(animMeta);
+                //Console.WriteLine("entity id " + entity.EntityId + " ai task start anim " + animMeta.Code);
             }
 
             if (sound != null && entity.World.Rand.NextDouble() <= soundChance)
@@ -133,8 +139,10 @@ namespace Vintagestory.API.Common
             cooldownUntilMs = entity.World.ElapsedMilliseconds + mincooldown + entity.World.Rand.Next(maxcooldown - mincooldown);
             cooldownUntilTotalHours = entity.World.Calendar.TotalHours + mincooldownHours + entity.World.Rand.NextDouble() * (maxcooldownHours - mincooldownHours);
 
-            if (animMeta != null)
+            // Ugly hack to fix attack animation sometimes not playing - it seems it gets stopped even before it gets sent to the client?
+            if (animMeta != null && animMeta.Code != "attack" && animMeta.Code != "idle")
             {
+                //Console.WriteLine("entity id " + entity.EntityId +" ai task stop anim " + animMeta.Code);
                 entity.AnimManager.StopAnimation(animMeta.Code);
             }
         }

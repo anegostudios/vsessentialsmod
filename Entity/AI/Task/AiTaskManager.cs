@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
             task.StartExecute();
             ActiveTasksBySlot[slot] = task;
 
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
+            //entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
         }
 
         public T GetTask<T>() where T : IAiTask
@@ -129,6 +129,7 @@ namespace Vintagestory.GameContent
                 {
                     if (ActiveTasksBySlot[slot] != null)
                     {
+
                         ActiveTasksBySlot[slot].FinishExecute(true);
                     }
 
@@ -136,7 +137,7 @@ namespace Vintagestory.GameContent
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
 
-                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
+                    //entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
                 }
             }
 
@@ -171,7 +172,7 @@ namespace Vintagestory.GameContent
                     if (task == null) continue;
                     if (j++ > 0) tasks += ", ";
 
-                    string code = ""+task.GetType();
+                    string code;
                     AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out code);
 
                     tasks += code + "("+task.Priority+")";

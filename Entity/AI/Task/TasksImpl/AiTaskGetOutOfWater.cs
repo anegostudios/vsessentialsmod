@@ -71,12 +71,11 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
-            if (entity.Swimming)
+            /*if (entity.Swimming)
             {
                 Block aboveblock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)(entity.ServerPos.Y + entity.CollisionBox.Y2 * 0.25f), (int)entity.ServerPos.Z);
-
                 if (aboveblock.IsLiquid()) entity.ServerPos.Motion.Y = Math.Min(entity.ServerPos.Motion.Y + 0.005f, 0.03f);
-            }
+            }*/
 
             if (rand.NextDouble() < 0.1f)
             {

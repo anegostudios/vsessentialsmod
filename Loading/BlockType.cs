@@ -66,6 +66,8 @@ namespace Vintagestory.ServerMods.NoObf
         public Dictionary<string, bool> EmitSideAo;
         [JsonProperty]
         public Dictionary<string, bool> SideSolid;
+        [JsonProperty]
+        public Dictionary<string, bool> SideSolidOpaqueAo;
 
         [JsonProperty]
         public int TintIndex;
@@ -81,6 +83,8 @@ namespace Vintagestory.ServerMods.NoObf
         public byte[] LightHsv = new byte[] { 0, 0, 0 };
         [JsonProperty]
         public ushort LightAbsorption = 99;
+        [JsonProperty]
+        public Dictionary<string, bool> LightTraversable;
         [JsonProperty]
         public AdvancedParticleProperties[] ParticleProperties = null;
         [JsonProperty]
@@ -189,17 +193,26 @@ namespace Vintagestory.ServerMods.NoObf
                 SelectionBoxes = ToCuboidf(CollisionSelectionBoxesR);
             }
 
-
+            ResolveStringBoolDictFaces(SideSolidOpaqueAo);
             ResolveStringBoolDictFaces(SideSolid);
             ResolveStringBoolDictFaces(SideOpaque);
             ResolveStringBoolDictFaces(SideAo);
+            ResolveStringBoolDictFaces(EmitSideAo);
+
+            if (SideSolidOpaqueAo != null && SideSolidOpaqueAo.Count > 0)
+            {
+                ResolveDict(SideSolidOpaqueAo, ref SideSolid);
+                ResolveDict(SideSolidOpaqueAo, ref SideOpaque);
+                ResolveDict(SideSolidOpaqueAo, ref SideAo);
+                ResolveDict(SideSolidOpaqueAo, ref EmitSideAo);
+            }
 
             if (EmitSideAo == null)
             {
                 EmitSideAo = new Dictionary<string, bool>() { { "all", LightAbsorption > 0 } };
+                ResolveStringBoolDictFaces(EmitSideAo);
             }
 
-            ResolveStringBoolDictFaces(EmitSideAo);
 
             TintIndex = GameMath.Clamp(TintIndex, 0, 2);
 
@@ -211,6 +224,24 @@ namespace Vintagestory.ServerMods.NoObf
             LightHsv[2] = (byte)GameMath.Clamp(LightHsv[2], 0, ColorUtil.BrightQuantities - 1);
         }
 
+        private void ResolveDict(Dictionary<string, bool> sideSolidOpaqueAo, ref Dictionary<string, bool> targetDict)
+        {
+            bool wasNull = targetDict == null;
+            if (wasNull)
+            {
+                targetDict = new Dictionary<string, bool>() { { "all", true } };
+            }
+
+            foreach (var val in sideSolidOpaqueAo)
+            {
+                if (wasNull || !targetDict.ContainsKey(val.Key))
+                {
+                    targetDict[val.Key] = val.Value;
+                }
+            }
+
+            ResolveStringBoolDictFaces(targetDict);
+        }
 
         public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, OrderedDictionary<string, string> searchReplace)
         {
@@ -344,32 +375,32 @@ namespace Vintagestory.ServerMods.NoObf
 
         void ResolveStringBoolDictFaces(Dictionary<string, bool> stringBoolDict)
         {
-            if (stringBoolDict != null)
+            if (stringBoolDict == null) return;
+
+            if (stringBoolDict.ContainsKey("horizontals"))
             {
-                if (stringBoolDict.ContainsKey("horizontals"))
+                foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
                 {
-                    foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
-                    {
-                        if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["horizontals"];
-                    }
-                }
-
-                if (stringBoolDict.ContainsKey("verticals"))
-                {
-                    foreach (BlockFacing facing in BlockFacing.VERTICALS)
-                    {
-                        if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["verticals"];
-                    }
-                }
-
-                if (stringBoolDict.ContainsKey("all"))
-                {
-                    foreach (BlockFacing facing in BlockFacing.ALLFACES)
-                    {
-                        if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["all"];
-                    }
+                    if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["horizontals"];
                 }
             }
+
+            if (stringBoolDict.ContainsKey("verticals"))
+            {
+                foreach (BlockFacing facing in BlockFacing.VERTICALS)
+                {
+                    if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["verticals"];
+                }
+            }
+
+            if (stringBoolDict.ContainsKey("all"))
+            {
+                foreach (BlockFacing facing in BlockFacing.ALLFACES)
+                {
+                    if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["all"];
+                }
+            }
+            
         }
     }
 }

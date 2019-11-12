@@ -31,7 +31,8 @@ namespace Vintagestory.GameContent
         string[] seekEntityCodesExact = new string[] { "player" };
         string[] seekEntityCodesBeginsWith = new string[0];
 
-
+        EnumDamageType damageType = EnumDamageType.BluntAttack;
+        int damageTier = 0;
 
         public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
@@ -49,6 +50,10 @@ namespace Vintagestory.GameContent
 
             this.minDist = taskConfig["minDist"].AsFloat(2f);
             this.minVerDist = taskConfig["minVerDist"].AsFloat(1f);
+
+            this.damageType = taskConfig["damageType"].AsObject<EnumDamageType>(EnumDamageType.BluntAttack);
+            this.damageTier = taskConfig["damageType"].AsInt(0);
+
 
             if (taskConfig["entityCodes"] != null)
             {
@@ -81,8 +86,13 @@ namespace Vintagestory.GameContent
 
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
 
+            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
+            if (whenInEmotionState != null) fearReductionFactor = 1;
 
-            targetEntity = entity.World.GetNearestEntity(pos, 3f, 3f, (e) => {
+            if (fearReductionFactor <= 0) return false;
+
+            targetEntity = entity.World.GetNearestEntity(pos, 3f * fearReductionFactor, 3f * fearReductionFactor, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
 
                 for (int i = 0; i < seekEntityCodesExact.Length; i++)
@@ -125,12 +135,24 @@ namespace Vintagestory.GameContent
         }
 
 
+        float curTurnRadPerSec;
+
+        public override void StartExecute()
+        {
+            base.StartExecute();
+            curTurnRadPerSec = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser.curTurnRadPerSec;
+        }
 
         public override bool ContinueExecute(float dt)
         {
             EntityPos own = entity.ServerPos;
             EntityPos his = targetEntity.ServerPos;
-            entity.ServerPos.Yaw = (float)(float)Math.Atan2(his.X - own.X, his.Z - own.Z);
+
+            float desiredYaw = (float)Math.Atan2(his.X - own.X, his.Z - own.Z);
+            float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
+            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
+            entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
+
 
             if (lastCheckOrAttackMs + damagePlayerAtMs > entity.World.ElapsedMilliseconds) return true;
 
@@ -141,7 +163,12 @@ namespace Vintagestory.GameContent
                 bool alive = targetEntity.Alive;
                 
                 ((EntityAgent)targetEntity).ReceiveDamage(
-                    new DamageSource() { Source = EnumDamageSource.Entity, SourceEntity = entity, Type = EnumDamageType.BluntAttack },
+                    new DamageSource() { 
+                        Source = EnumDamageSource.Entity, 
+                        SourceEntity = entity, 
+                        Type = damageType,
+                        DamageTier = damageTier
+                    },
                     damage * GlobalConstants.CreatureDamageModifier
                 );
 

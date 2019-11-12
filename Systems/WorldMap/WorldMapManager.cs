@@ -364,6 +364,7 @@ namespace Vintagestory.GameContent
         public void SendMapDataToClient(MapLayer forMapLayer, IServerPlayer forPlayer, byte[] data)
         {
             if (api.Side == EnumAppSide.Client) return;
+            if (forPlayer.ConnectionState != EnumClientState.Playing) return;
 
             List<MapLayerData> maplayerdatas = new List<MapLayerData>();
 

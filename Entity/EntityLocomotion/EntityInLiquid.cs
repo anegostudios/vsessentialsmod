@@ -23,18 +23,20 @@ namespace Vintagestory.GameContent
         {
             if (entity.Swimming && entity.Alive)
             {
-                if ((controls.TriesToMove || controls.Jump) && entity.World.ElapsedMilliseconds - lastPush > 2000)
+                string playerUID = entity is EntityPlayer ? ((EntityPlayer)entity).PlayerUID : null;
+
+
+                if ((controls.TriesToMove || controls.Jump) && entity.World.ElapsedMilliseconds - lastPush > 2000 && playerUID != null)
                 {
                     push = 8f;
                     lastPush = entity.World.ElapsedMilliseconds;
-                    string playerUID = entity is EntityPlayer ? ((EntityPlayer)entity).PlayerUID : null;
                     entity.PlayEntitySound("swim", playerUID == null ? null : entity.World.PlayerByUid(playerUID));
                     EntityAgent.SplashParticleProps.BasePos.Set(pos.X, pos.Y + 0.25f, pos.Z);
                     entity.World.SpawnParticles(EntityAgent.AirBubbleParticleProps);
                 }
                 else
                 {
-                    push = Math.Max(1, push - 0.1f);
+                    push = Math.Max(1f, push - 0.1f);
                 }
 
                 double yMot = 0;
@@ -47,7 +49,7 @@ namespace Vintagestory.GameContent
                 }
 
                 pos.Motion.Add(
-                    controls.FlyVector.X * (1+push) * 0.03f, 
+                    controls.FlyVector.X * (1 + push) * 0.03f, 
                     yMot,
                     controls.FlyVector.Z * (1 + push) * 0.03f
                 );

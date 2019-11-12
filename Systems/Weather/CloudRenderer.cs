@@ -164,7 +164,6 @@ namespace Vintagestory.GameContent
                 rebuild = true;
             }
 
-            
 
             if (rebuild || cnt++ > 10)
             {
@@ -244,7 +243,6 @@ namespace Vintagestory.GameContent
 
             double partialTileOffsetX = capi.World.Player.Entity.Pos.X % CloudTileSize;
             double partialTileOffsetZ = capi.World.Player.Entity.Pos.Z % CloudTileSize;
-
 
             prog.Use();
             prog.Uniform("sunPosition", capi.World.Calendar.SunPositionNormalized);
@@ -340,8 +338,6 @@ namespace Vintagestory.GameContent
 
         public void MoveCloudTiles(int dx, int dz)
         {
-            CloudTile deftile = new CloudTile();
-
             for (int x = 0; x < CloudTileLength; x++)
             {
                 for (int z = 0; z < CloudTileLength; z++)
@@ -362,14 +358,20 @@ namespace Vintagestory.GameContent
             cloudTilesTmp = tmp;
         }
 
-        ParallelOptions _pOptions = new ParallelOptions { MaxDegreeOfParallelism = 16 };
+
+        private readonly ParallelOptions _pOptions = new ParallelOptions { MaxDegreeOfParallelism = 16 };
         public void UpdateCloudTiles()
         {
             weatherSim.EnsureNoiseCacheIsFresh();
 
             // Load density from perlin noise
             int cnt = CloudTileLength * CloudTileLength;
-            for (int i = 0; i < cnt; i++)
+            int end = CloudTileLength - 1;
+
+            //int len = width * height;
+            //Parallel.For(0, len, _pOptions, i =>
+            Parallel.For(0, cnt, _pOptions, i =>
+            //for (int i = 0; i < cnt; i++)
             {
                 int dx = i % CloudTileLength;
                 int dz = i / CloudTileLength;
@@ -380,47 +382,37 @@ namespace Vintagestory.GameContent
                 cloudTile.brightnessRand.InitPositionSeed(x, z);
                 double density = weatherSim.GetBlendedCloudDensityAt(dx, dz);
 
-
                 cloudTile.MaxDensity = (byte)GameMath.Clamp((int)((64 * 255 * density * 3)) / 64, 0, 255);
                 cloudTile.Brightness = (byte)(225 + cloudTile.brightnessRand.NextInt(31));
                 cloudTile.YOffset = (float)weatherSim.GetBlendedCloudOffsetYAt(dx, dz);
+
+                float changeVal = GameMath.Clamp(cloudTile.MaxDensity - cloudTile.SelfDensity, -1, 1);
+                cloudTile.SelfDensity += (byte)changeVal;
+
+
+                /// North: Negative Z
+                /// East: Positive X
+                /// South: Positive Z
+                /// West: Negative X
+                if (dx > 0)
+                {
+                    cloudTiles[(dx - 1) * CloudTileLength + dz].EastDensity = cloudTile.SelfDensity;
+                }
+                if (dz > 0)
+                {
+                    cloudTiles[dx * CloudTileLength + dz - 1].SouthDensity = cloudTile.SelfDensity;
+                }
+                if (dx < end)
+                {
+                    cloudTiles[(dx + 1) * CloudTileLength + dz].WestDensity = cloudTile.SelfDensity;
+                }
+                if (dz < end)
+                {
+                    cloudTiles[dx * CloudTileLength + dz + 1].NorthDensity = cloudTile.SelfDensity;
+                }
             }
-       
-            int end = CloudTileLength - 2;
 
-            // Has to be done after all densities have updated
-            for (int i = 0; i < cnt; i++)
-            {
-                int dx = i % CloudTileLength;
-                int dz = i / CloudTileLength;
-
-                CloudTile cloud = cloudTiles[dx * CloudTileLength + dz];
-
-                int northMaxDensity = dz < 1 ? 0 : cloudTiles[dx * CloudTileLength + dz - 1].MaxDensity;
-                int eastMaxDensity = dx >= end ? 0 : cloudTiles[(dx + 1) * CloudTileLength + dz].MaxDensity;
-                int southMaxDensity = dz >= end ? 0 : cloudTiles[dx * CloudTileLength + dz + 1].MaxDensity;
-                int westMaxDensity = dx < 1 ? 0 : cloudTiles[(dx - 1) * CloudTileLength + dz].MaxDensity;
-
-                int northTargetDensity = northMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
-                int eastTargetDensity = eastMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
-                int southTargetDensity = southMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
-                int westTargetDensity = westMaxDensity > cloud.MaxDensity ? 0 : cloud.MaxDensity;
-
-                int changeVal = GameMath.Clamp(northTargetDensity - cloud.NorthFaceDensity, -1, 1);
-                cloud.NorthFaceDensity += (byte)changeVal;
-
-                changeVal = GameMath.Clamp(eastTargetDensity - cloud.EastFaceDensity, -1, 1);
-                cloud.EastFaceDensity += (byte)changeVal;
-
-                changeVal = GameMath.Clamp(southTargetDensity - cloud.SouthFaceDensity, -1, 1);
-                cloud.SouthFaceDensity += (byte)changeVal;
-
-                changeVal = GameMath.Clamp(westTargetDensity - cloud.WestFaceDensity, -1, 1);
-                cloud.WestFaceDensity += (byte)changeVal;
-
-                changeVal = GameMath.Clamp(cloud.MaxDensity - cloud.UpDownDensity, -1, 1);
-                cloud.UpDownDensity += (byte)changeVal;
-            }
+            );
         }
 
 
@@ -511,12 +503,12 @@ namespace Vintagestory.GameContent
                 mesh.CustomInts.Values[intsPosition++] = (cloud.XOffset - CloudTileLength / 2);
                 mesh.CustomInts.Values[intsPosition++] = (cloud.ZOffset - CloudTileLength / 2);
 
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.NorthFaceDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.EastFaceDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.SouthFaceDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.WestFaceDensity;
+                mesh.CustomBytes.Values[bytesPosition++] = cloud.NorthDensity;
+                mesh.CustomBytes.Values[bytesPosition++] = cloud.EastDensity;
+                mesh.CustomBytes.Values[bytesPosition++] = cloud.SouthDensity;
+                mesh.CustomBytes.Values[bytesPosition++] = cloud.WestDensity;
 
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.UpDownDensity;
+                mesh.CustomBytes.Values[bytesPosition++] = cloud.SelfDensity;
                 mesh.CustomBytes.Values[bytesPosition++] = cloud.Brightness;
 
                 bytesPosition+=2;

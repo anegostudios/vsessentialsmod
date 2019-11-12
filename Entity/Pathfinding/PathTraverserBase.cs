@@ -14,7 +14,7 @@ namespace Vintagestory.API.Common
         public bool Active;
 
         protected float movingSpeed;
-        
+        public float curTurnRadPerSec;
 
         protected float targetDistance;
 

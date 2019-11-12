@@ -368,6 +368,12 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            if (MainTarget.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z) < 1.5)
+            {
+                pathTraverser.Stop();
+                return false;
+            }
+
             return !done;
         }
 

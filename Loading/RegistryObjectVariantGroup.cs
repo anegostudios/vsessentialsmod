@@ -14,5 +14,6 @@ namespace Vintagestory.ServerMods.NoObf
         public EnumCombination Combine = EnumCombination.Multiply;
 
         public string OnVariant;
+        public string IsValue;
     }
 }

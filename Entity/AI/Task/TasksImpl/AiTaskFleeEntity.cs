@@ -105,13 +105,17 @@ namespace Vintagestory.GameContent
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
             
-            if (rand.NextDouble() > executionChance || entity.World.Calendar.DayLightStrength < minDayLight) return false;
+
+            if (rand.NextDouble() > 2*executionChance || entity.World.Calendar.DayLightStrength < minDayLight) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
+            // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
+            if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
+
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0.01f, (30f - generation) / 30f);
+            float fearReductionFactor = Math.Max(0.01f, (20f - generation) / 20f);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {

@@ -138,7 +138,10 @@ namespace Vintagestory.GameContent
 
         public override void Update(float dt, ref float accuracy)
         {
-            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * 1.1, 1.5), 0, 0.93f);
+            float modacc = entity.Stats.GetBlended("rangedWeaponsAcc") - 1;
+            float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed");
+
+            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.1, 1.5), 0, 0.93f - modacc);
 
             accuracy -= GameMath.Clamp((SecondsSinceAimStart - 1.75f) / 3, 0, 0.3f);
 

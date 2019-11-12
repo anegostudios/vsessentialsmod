@@ -80,7 +80,12 @@ namespace Vintagestory.GameContent
             {
                 tmppos.Set(ownPos.X - hisPos.X, ownPos.Y - hisPos.Y, ownPos.Z - hisPos.Z);
                 tmppos.Normalize().Mul(1 - centerToCenterDistance / (ownTouchDistance + hisTouchDistance));
-                pushVector.Add(tmppos.X, tmppos.Y, tmppos.Z);
+
+                float hisSize = e.CollisionBox.Length * e.CollisionBox.Height;
+                float mySize = entity.CollisionBox.Length * entity.CollisionBox.Height;
+                float pushDiff = GameMath.Clamp(hisSize / mySize, 0, 1);
+
+                pushVector.Add(tmppos.X * pushDiff, tmppos.Y * pushDiff, tmppos.Z * pushDiff);
             }
         }
         

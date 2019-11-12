@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -22,6 +23,13 @@ namespace Vintagestory.GameContent
         public bool Transitioning;
     }
 
+    public enum WeatherDataPingPongState
+    {
+        Idle,
+        Recalculating,
+        Meshing,
+    }
+
     public class WeatherSystem : ModSystem
     {
         public ICoreAPI api;
@@ -39,6 +47,9 @@ namespace Vintagestory.GameContent
         public WeatherSimulation weatherSim;
 
         protected NormalizedSimplexNoise windNoise;
+
+        //protected Thread WeatherThread;
+        //protected WeatherDataPingPongState DataState;
 
 
         public int CloudTileLength
@@ -314,7 +325,6 @@ namespace Vintagestory.GameContent
             {
                 int dist = int.Parse(args[0]);
                 
-
                 renderer.InitCloudTiles(dist);
                 renderer.UpdateCloudTiles();
                 renderer.LoadCloudModel();

@@ -1,17 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using Vintagestory.API;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    public delegate float OnDamagedDelegate(float damage, DamageSource dmgSource);
     public class EntityBehaviorHealth : EntityBehavior
     {
         ITreeAttribute healthTree;
         int cnt;
+        public OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
 
         public float Health
         {
@@ -86,7 +91,9 @@ namespace Vintagestory.GameContent
             UpdateMaxHealth();
         }
 
-        
+
+        float secondsSinceLastUpdate;
+
         public override void OnGameTick(float deltaTime)
         {
             if (entity.Pos.Y < -30)
@@ -98,10 +105,13 @@ namespace Vintagestory.GameContent
                 }, 4);
             }
 
-            if (cnt++ > 30)
+            secondsSinceLastUpdate += deltaTime;
+
+            if (secondsSinceLastUpdate >= 1)
             {
-                cnt -= 30;
-                if (Health < MaxHealth)
+                secondsSinceLastUpdate = 0;
+
+                if (entity.Alive && Health < MaxHealth)
                 {
                     float recoverySpeed = 0.01f;
 
@@ -124,8 +134,12 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
+            damage = onDamaged(damage, damageSource);
+
             if (damageSource.Type == EnumDamageType.Heal)
             {
+                damage *= entity.Stats.GetBlended("healingeffectivness");
+
                 Health = Math.Min(Health + damage, MaxHealth);
                 entity.OnHurt(damageSource, damage);
                 UpdateMaxHealth();
@@ -133,6 +147,8 @@ namespace Vintagestory.GameContent
             }
 
             if (!entity.Alive) return;
+
+            
 
             Health -= damage;
             entity.OnHurt(damageSource, damage);
@@ -190,6 +206,11 @@ namespace Vintagestory.GameContent
                 Source = EnumDamageSource.Fall,
                 Type = EnumDamageType.Gravity
             }, (float)fallDamage);
+        }
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+           
         }
 
         public override string PropertyName()

@@ -1,6 +1,7 @@
 ﻿using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
@@ -10,7 +11,7 @@ namespace Vintagestory.GameContent
         int skinTextureSubId;
         IInventory gearInv;
         
-        public int AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
+        public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
 
         public TextureAtlasPosition this[string textureCode]
         {
@@ -74,8 +75,8 @@ namespace Vintagestory.GameContent
             if (!textureSpaceAllocated)
             {
                 TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
-                int width = (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize);
-                int height = (int)((origTexPos.y2 - origTexPos.y1) * AtlasSize);
+                int width = (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize.Width);
+                int height = (int)((origTexPos.y2 - origTexPos.y1) * AtlasSize.Height);
 
                 capi.EntityTextureAtlas.AllocateTextureSpace(width, height, out skinTextureSubId, out skinTexPos);
 
@@ -102,19 +103,19 @@ namespace Vintagestory.GameContent
             
             LoadedTexture entityAtlas = new LoadedTexture(null) {
                 TextureId = origTexPos.atlasTextureId,
-                Width = capi.EntityTextureAtlas.Size,
-                Height = capi.EntityTextureAtlas.Size
+                Width = capi.EntityTextureAtlas.Size.Width,
+                Height = capi.EntityTextureAtlas.Size.Height
             };
 
             capi.Render.GlToggleBlend(false);
             capi.EntityTextureAtlas.RenderTextureIntoAtlas(
                 entityAtlas,
-                (int)(origTexPos.x1 * AtlasSize),
-                (int)(origTexPos.y1 * AtlasSize),
-                (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize),
-                (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize),
-                skinTexPos.x1 * capi.EntityTextureAtlas.Size,
-                skinTexPos.y1 * capi.EntityTextureAtlas.Size,
+                (int)(origTexPos.x1 * AtlasSize.Width),
+                (int)(origTexPos.y1 * AtlasSize.Height),
+                (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize.Width),
+                (int)((origTexPos.y2 - origTexPos.y1) * AtlasSize.Height),
+                skinTexPos.x1 * capi.EntityTextureAtlas.Size.Width,
+                skinTexPos.y1 * capi.EntityTextureAtlas.Size.Height,
                 -1
             );
 
@@ -156,18 +157,18 @@ namespace Vintagestory.GameContent
                 
                 LoadedTexture itemAtlas = new LoadedTexture(null) {
                     TextureId = itemTexPos.atlasTextureId,
-                    Width = capi.ItemTextureAtlas.Size,
-                    Height = capi.ItemTextureAtlas.Size
+                    Width = capi.ItemTextureAtlas.Size.Width,
+                    Height = capi.ItemTextureAtlas.Size.Height
                 };
 
                 capi.EntityTextureAtlas.RenderTextureIntoAtlas(
                     itemAtlas,
-                    itemTexPos.x1 * capi.ItemTextureAtlas.Size,
-                    itemTexPos.y1 * capi.ItemTextureAtlas.Size,
-                    (itemTexPos.x2 - itemTexPos.x1) * capi.ItemTextureAtlas.Size,
-                    (itemTexPos.y2 - itemTexPos.y1) * capi.ItemTextureAtlas.Size,
-                    skinTexPos.x1 * capi.EntityTextureAtlas.Size,
-                    skinTexPos.y1 * capi.EntityTextureAtlas.Size
+                    itemTexPos.x1 * capi.ItemTextureAtlas.Size.Width,
+                    itemTexPos.y1 * capi.ItemTextureAtlas.Size.Height,
+                    (itemTexPos.x2 - itemTexPos.x1) * capi.ItemTextureAtlas.Size.Width,
+                    (itemTexPos.y2 - itemTexPos.y1) * capi.ItemTextureAtlas.Size.Height,
+                    skinTexPos.x1 * capi.EntityTextureAtlas.Size.Width,
+                    skinTexPos.y1 * capi.EntityTextureAtlas.Size.Height
                 );
             }
 

@@ -60,15 +60,18 @@ namespace Vintagestory.GameContent
 
         public override void RenderInteractiveElements(float deltaTime)
         {
-            api.Render.BeginScissor(Bounds);
+            api.Render.PushScissor(Bounds);
 
-            foreach (MapComponent cmp in mapComponents)
+            for (int i = mapComponents.Count - 1; i >= 0; i--) // Cheap hax to improve rendering quality of the player icons
+            //foreach (MapComponent cmp in mapComponents)
             {
+                MapComponent cmp = mapComponents[i];
+
                 cmp.Render(this, deltaTime);
                 api.Render.CheckGlError();
             }
 
-            api.Render.EndScissor();
+            api.Render.PopScissor();
 
             api.Render.CheckGlError();
         }

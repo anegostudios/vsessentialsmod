@@ -226,22 +226,20 @@ namespace Vintagestory.GameContent
 
 
             sprintCounter += entityAgent != null && entityAgent.Controls.Sprint ? 1 : 0;
-
-            //deltaTime *= 10;
-
             hungerCounter += deltaTime;
-
 
             // Once every 10s
             if (hungerCounter > 10)
             {
                 bool isStandingStill = (entity.World.ElapsedMilliseconds - lastMoveMs) > 3000;
                 float satLossMultiplier = isStandingStill ? 1 / 3f : 1f;
-                if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f;
+                //if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f; - Now set in InventoryPlayerHotbar
 
                 satLossMultiplier *= 1.2f * (8 + sprintCounter / 15f) / 10f;
 
-                bool isondelay = ReduceSaturation(satLossMultiplier);
+                satLossMultiplier *= entity.Stats.GetBlended("hungerrate");
+
+                ReduceSaturation(satLossMultiplier);
 
                 hungerCounter -= 10;
                 sprintCounter = 0;
@@ -333,26 +331,6 @@ namespace Vintagestory.GameContent
             float proteinRel = ProteinLevel / MaxSaturation;
 
             EntityBehaviorHealth bh = entity.GetBehavior<EntityBehaviorHealth>();
-            //float baseMax = bh.MaxHealth;
-
-            /*float MaxHealthNow =
-                fruitRel * 0.25f * baseMax +
-                grainRel * 0.25f * baseMax +
-                vegetableRel * 0.25f * baseMax +
-                proteinRel * 0.25f * baseMax
-            ;*/
-
-            // 0 nutr: 15 hp
-            // 4 nutr: 25 hp
-
-            // y = k*x + d
-            // k = (y2-y1) / (x2-x1)
-
-            // k = (25 - 15) / (4 - 0)
-            // k = 10/4 = 2.5
-
-            // 25 = 2.5 * 4 + d
-            // d = 10
 
             float healthGain = 2.5f * (fruitRel + grainRel + vegetableRel + proteinRel);
 
@@ -369,8 +347,6 @@ namespace Vintagestory.GameContent
                 EntityPlayer plr = (EntityPlayer)entity;
                 if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
             }
-
-            //dt *= 20;
 
             if (Saturation <= 0)
             {

@@ -28,6 +28,7 @@ namespace Vintagestory.Essentials
         protected override bool BeginGo()
         {
             entity.Controls.Forward = true;
+            entity.ServerControls.Forward = true;
             curTurnRadPerSec = minTurnAnglePerSec + (float)entity.World.Rand.NextDouble() * (maxTurnAnglePerSec - minTurnAnglePerSec);
             curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
 
@@ -127,10 +128,13 @@ namespace Vintagestory.Essentials
             if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
-                controls.FlyVector.Mul(0.7f);
+                controls.FlyVector.X *= 0.7f;
+                controls.FlyVector.Z *= 0.7f;
+                controls.FlyVector.Y = GameMath.Clamp(controls.FlyVector.Y, 0.002f, 0.004f);
+
                 if (entity.CollidedHorizontally)
                 {
-                    controls.FlyVector.Y = -0.05f;
+                    controls.FlyVector.Y = 0.05f;
                 }
             }
         }
@@ -140,6 +144,7 @@ namespace Vintagestory.Essentials
         {
             Active = false;
             entity.Controls.Forward = false;
+            entity.ServerControls.Forward = false;
             entity.Controls.WalkVector.Set(0, 0, 0);
             stuckCounter = 0;
         }

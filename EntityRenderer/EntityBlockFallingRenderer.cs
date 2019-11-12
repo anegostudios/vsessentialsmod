@@ -24,6 +24,8 @@ namespace Vintagestory.GameContent
         long ellapsedMsPhysics;
         internal bool DoRender;
 
+        MeshData mesh = new MeshData(4, 3, false, true, true, false, true);
+
         public EntityBlockFallingRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
             this.blockFallingEntity = (EntityBlockFalling)entity;
@@ -35,6 +37,14 @@ namespace Vintagestory.GameContent
             {
                 BlockEntity be = api.World.BlockAccessor.GetBlockEntity(blockFallingEntity.initialPos);
                 be?.OnTesselation(this, capi.Tesselator);
+
+                if (mesh.VerticesCount > 0)
+                {
+                    mesh.CustomBytes = null;
+                    mesh.CustomFloats = null;
+                    mesh.CustomInts = null;
+                    this.meshRef = capi.Render.UploadMesh(mesh);
+                }
             }
 
             if (this.meshRef == null)
@@ -63,14 +73,12 @@ namespace Vintagestory.GameContent
 
         public void AddMeshData(MeshData data)
         {
-            data.Rgba2 = null;
-            this.meshRef = capi.Render.UploadMesh(data);
+            mesh.AddMeshData(data);
         }
 
         public void AddMeshData(MeshData data, int tintColor)
         {
-            data.Rgba2 = null;
-            this.meshRef = capi.Render.UploadMesh(data);
+            mesh.AddMeshData(data);
         }
 
 

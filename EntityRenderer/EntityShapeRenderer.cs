@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -54,18 +55,21 @@ namespace Vintagestory.GameContent
         protected bool hasArmorExtras;
         protected EntityAgent eagent;
 
+        public CompositeShape OverrideCompositeShape;
+        public Shape OverrideEntityShape;
+
         protected Dictionary<string, CompositeTexture> extraTexturesByTextureName
         {
             get
             {
-                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTextures", () => new Dictionary<string, CompositeTexture>());
+                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTexturesByName", () => new Dictionary<string, CompositeTexture>());
             }
         }
-        protected HashSet<AssetLocation> extraTextureLocations
+        protected Dictionary<AssetLocation, BakedCompositeTexture> extraTextureByLocation
         {
             get
             {
-                return ObjectCacheUtil.GetOrCreate(capi, "extraTextureLocations", () => new HashSet<AssetLocation>());
+                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTexturesByLoc", () => new Dictionary<AssetLocation, BakedCompositeTexture>());
             }
         }
 
@@ -99,28 +103,22 @@ namespace Vintagestory.GameContent
             api.Event.ReloadShapes += TesselateShape;
         }
 
-
         protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
         {
-            if (data != null && data.StartsWith("From:") && entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 20*20 && message.Length > 0)
+            if (data != null && data.Contains("from:") && entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 20*20 && message.Length > 0)
             {
                 int entityid = 0;
-                int.TryParse(data.Split(new string[] { ":" }, StringSplitOptions.None)[1], out entityid);
+                string[] parts = data.Split(',');
+                if (parts.Length < 2) return;
+
+                string[] partone = parts[0].Split(':');
+                string[] parttwo = parts[1].Split(':');
+                if (partone[0] != "from") return;
+
+                int.TryParse(partone[1], out entityid);
                 if (entity.EntityId == entityid)
                 {
-                    string name = GetNameTagName();
-                    if (name != null && message.StartsWith(name + ": "))
-                    { 
-                        message = message.Substring((name + ": ").Length);
-                    }
-                    if (name != null && message.StartsWith("<strong>" + name + ":</strong>"))
-                    {
-                        message = message.Substring(("<strong>" + name + ":</strong>").Length).TrimStart();
-                    }
-
-                    message = message.Replace("&lt;", "<").Replace("&gt;", ">");
-
-
+                    message = parttwo[1];
 
                     LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
@@ -145,8 +143,8 @@ namespace Vintagestory.GameContent
 
         public virtual void TesselateShape()
         {
-            CompositeShape compositeShape = entity.Properties.Client.Shape;
-            Shape entityShape = entity.Properties.Client.LoadedShape;
+            CompositeShape compositeShape = OverrideCompositeShape != null ? OverrideCompositeShape : entity.Properties.Client.Shape;
+            Shape entityShape = OverrideEntityShape != null ? OverrideEntityShape : entity.Properties.Client.LoadedShape;
 
             if (entityShape == null)
             {
@@ -228,7 +226,10 @@ namespace Vintagestory.GameContent
 
             foreach (var slot in inv)
             {
-                if (slot.Empty || slot.Itemstack.Collectible.Attributes?["armorShape"].Exists != true) continue;
+                if (slot.Empty) continue;
+                ItemStack stack = slot.Itemstack;
+                JsonObject attrObj = stack.Collectible.Attributes;
+                if (attrObj?["wearableAttachment"].Exists != true) continue;
 
                 if (!hasArmorExtras)
                 {
@@ -252,10 +253,11 @@ namespace Vintagestory.GameContent
 
                 hasArmorExtras = true;
 
-                CompositeShape compArmorShape = slot.Itemstack.Collectible.Attributes["armorShape"].AsObject<CompositeShape>(null, slot.Itemstack.Collectible.Code.Domain);
+                CompositeShape compArmorShape = !attrObj["attachShape"].Exists ? (stack.Class == EnumItemClass.Item ? stack.Item.Shape : stack.Block.Shape) : attrObj["attachShape"].AsObject<CompositeShape>(null, stack.Collectible.Code.Domain);
+
                 AssetLocation shapePath = shapePath = compArmorShape.Base.CopyWithPath("shapes/" + compArmorShape.Base.Path + ".json");
 
-                string[] disableElements = slot.Itemstack.Collectible.Attributes["disableElements"].AsArray<string>(null);
+                string[] disableElements = attrObj["disableElements"].AsArray<string>(null);
                 if (disableElements != null)
                 {
                     foreach (var val in disableElements)
@@ -268,7 +270,7 @@ namespace Vintagestory.GameContent
 
                 if (asset == null)
                 {
-                    capi.World.Logger.Warning("Entity armor shape {0} defined in {1} {2} not found, was supposed to be at {3}. Armor piece will be invisible.", compArmorShape.Base, slot.Itemstack.Class, slot.Itemstack.Collectible.Code, shapePath);
+                    capi.World.Logger.Warning("Entity armor shape {0} defined in {1} {2} not found, was supposed to be at {3}. Armor piece will be invisible.", compArmorShape.Base, stack.Class, stack.Collectible.Code, shapePath);
                     return null;
                 }
 
@@ -311,14 +313,36 @@ namespace Vintagestory.GameContent
                     {
                         elem.Children = elem.Children.Append(val);
                     }
+
                     val.SetJointIdRecursive(elem.JointId);
-                    
+                    val.WalkRecursive((el) =>
+                    {
+                        foreach (var face in el.Faces)
+                        {
+                            face.Value.Texture = "#" + stack.Collectible.Code + "-" + face.Value.Texture.TrimStart('#');
+                        }
+                    });
 
                     added = true;
                 }
 
                 if (added && armorShape.Textures != null)
                 {
+                    Dictionary<string, AssetLocation> newdict = new Dictionary<string, AssetLocation>();
+                    foreach (var val in armorShape.Textures)
+                    {
+                        newdict[stack.Collectible.Code + "-" + val.Key] = val.Value;
+                    }
+                    
+                    // Item overrides
+                    var collDict = stack.Class == EnumItemClass.Block ? stack.Block.Textures : stack.Item.Textures;
+                    foreach (var val in collDict)
+                    {
+                        newdict[stack.Collectible.Code + "-" + val.Key] = val.Value.Base;
+                    }
+
+                    armorShape.Textures = newdict;
+
                     foreach (var val in armorShape.Textures)
                     {
                         CompositeTexture ctex = new CompositeTexture() { Base = val.Value };
@@ -333,11 +357,12 @@ namespace Vintagestory.GameContent
                         }*/
 
                         AssetLocation armorTexLoc = val.Value;
-                        var textLocs = extraTextureLocations;
+                        var texturesByLoc = extraTextureByLocation;
+                        var texturesByName = extraTexturesByTextureName;
+                        BakedCompositeTexture bakedCtex;
 
-                        if (!textLocs.Contains(armorTexLoc))
+                        if (!texturesByLoc.TryGetValue(armorTexLoc, out bakedCtex))
                         {
-                            var textDict = extraTexturesByTextureName;
                             int textureSubId = 0;
                             TextureAtlasPosition texpos;
 
@@ -353,8 +378,12 @@ namespace Vintagestory.GameContent
 
                             ctex.Baked = new BakedCompositeTexture() { BakedName = val.Value, TextureSubId = textureSubId };
 
-                            textDict.Add(val.Key, ctex);
-                            textLocs.Add(armorTexLoc);
+                            texturesByName[val.Key] = ctex;
+                            texturesByLoc[armorTexLoc] = ctex.Baked;
+                        } else
+                        {
+                            ctex.Baked = bakedCtex;
+                            texturesByName[val.Key] = ctex;
                         }
                     }
                 }
@@ -564,8 +593,8 @@ namespace Vintagestory.GameContent
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
                 {
                     prog.Tex2dOverlay2D = renderInfo.OverlayTexture.TextureId;
-                    prog.OverlayTextureSize = renderInfo.OverlayTexture.Width;
-                    prog.BaseTextureSize = renderInfo.TextureWidth;
+                    prog.OverlayTextureSize = new Vec2f(renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height);
+                    prog.BaseTextureSize = new Vec2f(renderInfo.TextureSize.Width, renderInfo.TextureSize.Height);
                     TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(stack);
                     prog.BaseUvOrigin = new Vec2f(texPos.x1, texPos.y1);
                 }
@@ -739,12 +768,14 @@ namespace Vintagestory.GameContent
                 rapi.Render2DTexture(
                     nameTagTexture.TextureId, posx, posy, cappedScale * nameTagTexture.Width, cappedScale * nameTagTexture.Height, 20
                 );
+
+                offY += nameTagTexture.Height;
             }
 
             if (debugTagTexture != null)
             {
                 float posx = (float)pos.X - cappedScale * debugTagTexture.Width / 2;
-                float posy = rapi.FrameHeight - (float)pos.Y - ((nameTagTexture.Height + debugTagTexture.Height) * Math.Max(0, cappedScale));
+                float posy = rapi.FrameHeight - (float)pos.Y - (offY + debugTagTexture.Height) * Math.Max(0, cappedScale);
 
                 rapi.Render2DTexture(
                     debugTagTexture.TextureId, posx, posy - offY, cappedScale * debugTagTexture.Width, cappedScale * debugTagTexture.Height, 20
