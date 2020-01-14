@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Essentials;
 
@@ -36,6 +38,13 @@ namespace Vintagestory.GameContent
             base.OnEntityDespawn(reason);
 
             taskManager.OnEntityDespawn(reason);
+        }
+
+        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        {
+            base.OnEntityReceiveDamage(damageSource, damage);
+
+            taskManager.OnEntityHurt(damageSource, damage);
         }
 
         public override void Initialize(EntityProperties properties, JsonObject aiconfig)
@@ -96,6 +105,11 @@ namespace Vintagestory.GameContent
         public override void Notify(string key, object data)
         {
             taskManager.Notify(key, data);
+        }
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+            base.GetInfoText(infotext);
         }
 
         public override string PropertyName()

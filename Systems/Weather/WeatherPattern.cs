@@ -11,49 +11,56 @@ namespace Vintagestory.GameContent
 {
     public class WeatherPattern
     {
-        public float Chance = 1f;
-        public float OverallDensityOffset = -0.35f;
-        public float FlatFogDensityOffset = 0f;
-        public float CloudYOffset = 0f;
+        public WeatherPatternConfig config;
+        public SimplexNoise LocationalCloudThicknessGen;
 
-        public float ChanceOfWeatherChange = 0.001f;
+        public WeatherPatternState State = new WeatherPatternState();
 
-        public string Code;
-        public string Name;
 
-        public AmbientModifier Ambient = new AmbientModifier().EnsurePopulated();
-
-        public SimplexNoise CloudDensityNoise;
-        public SimplexNoise CloudDensityOffsetNoise;
-        public SimplexNoise CloudOffsetYNoise;
-        public SimplexNoise FlatFog;
-
-        WeatherSystem ws;
+        protected SimplexNoise TimeBasePrecIntenstityGen;
+        WeatherSystemBase ws;
         ICoreAPI api;
-        double densityOffset;
-
         int lastTileX, lastTileZ;
         public double[,] CloudDensityNoiseCache;
-        public double[,] CloudOffsetYNoiseCache;
+        //public event API.Common.Action BeginUse;
+        LCGRandom rand;
+        public float hereChance;
 
-        public event API.Common.Action BeginUse;
+        public void updateHereChance(float rainfall, float temperature)
+        {
+            hereChance = config.getWeight(rainfall, temperature);
+        }
 
-
-        public WeatherPattern(WeatherSystem ws, string name, float chance)
+        public WeatherPattern(WeatherSystemBase ws, WeatherPatternConfig config, LCGRandom rand)
         {
             this.ws = ws;
-            api = ws.api;
-            this.Name = name;
-            this.Chance = chance;
+            this.rand = rand;
+            this.config = config;
+            this.api = ws.api;
+
         }
 
-        public virtual string GetWeatherName()
+        public virtual void Initialize(int index, int seed)
         {
-            return Name + string.Format(" (doff={0})", (densityOffset + OverallDensityOffset).ToString("0.##"));
+            State.Index = index;
+
+            if (config.Clouds?.LocationalThickness != null)
+            {
+                this.LocationalCloudThicknessGen = new SimplexNoise(config.Clouds.LocationalThickness.Amplitudes, config.Clouds.LocationalThickness.Frequencies, seed + index + 1512);
+            }
+            if (config.Precipitation?.IntensityNoise != null)
+            {
+                this.TimeBasePrecIntenstityGen = new SimplexNoise(config.Precipitation.IntensityNoise.Amplitudes, config.Precipitation.IntensityNoise.Frequencies, seed + index + 19987986);
+            }
+
+            EnsureNoiseCacheIsFresh();
         }
 
+        
         public virtual void EnsureNoiseCacheIsFresh()
         {
+            if (api.Side == EnumAppSide.Server) return;
+
             bool unfresh =
                 CloudDensityNoiseCache == null ||
                 lastTileX != ws.CloudTileX || lastTileZ != ws.CloudTileZ ||
@@ -63,7 +70,6 @@ namespace Vintagestory.GameContent
             if (unfresh)
             {
                 RegenNoiseCache();
-
                 return;
             }
         }
@@ -73,67 +79,96 @@ namespace Vintagestory.GameContent
             int len = ws.CloudTileLength;
 
             CloudDensityNoiseCache = new double[len, len];
-            CloudOffsetYNoiseCache = new double[len, len];
 
             lastTileX = ws.CloudTileX;
             lastTileZ = ws.CloudTileZ;
 
             double timeAxis = api.World.Calendar.TotalDays / 10.0;
 
-            for (int dx = 0; dx < len; dx++)
+            if (LocationalCloudThicknessGen == null)
             {
-                for (int dz = 0; dz < len; dz++)
+                for (int dx = 0; dx < len; dx++)
                 {
-                    double x = (lastTileX + dx - len / 2) / 20.0;
-                    double z = (lastTileZ + dz - len / 2) / 20.0;
+                    for (int dz = 0; dz < len; dz++)
+                    {
+                        CloudDensityNoiseCache[dx, dz] = 0;
+                    }
+                }
 
-                    CloudDensityNoiseCache[dx, dz] = CloudDensityNoise.Noise(x, z, timeAxis) / 2;
-                    CloudOffsetYNoiseCache[dx, dz] = CloudOffsetYNoise.Noise(x, z, timeAxis) / 2;
+            }
+            else
+            {
+
+                for (int dx = 0; dx < len; dx++)
+                {
+                    for (int dz = 0; dz < len; dz++)
+                    {
+                        double x = (lastTileX + dx - len / 2) / 20.0;
+                        double z = (lastTileZ + dz - len / 2) / 20.0;
+
+                        CloudDensityNoiseCache[dx, dz] = GameMath.Clamp(LocationalCloudThicknessGen.Noise(x, z, timeAxis), 0, 1);
+                    }
                 }
             }
         }
 
         public virtual void OnBeginUse()
         {
-            BeginUse?.Invoke();
+            //BeginUse?.Invoke();
+            State.BeginUseExecuted = true;
+            State.ActiveUntilTotalHours = api.World.Calendar.TotalHours + config.DurationHours.nextFloat(1, rand);
+
+            State.nowThinCloudModeness = config.Clouds?.ThinCloudMode?.nextFloat(1, rand) ?? 0;
+            State.nowUndulatingCloudModeness = config.Clouds?.UndulatingCloudMode?.nextFloat(1, rand) ?? 0;
+            State.nowbaseThickness = config.Clouds?.BaseThickness?.nextFloat(1, rand) ?? 0;
+            State.nowThicknessMul = config.Clouds?.ThicknessMul?.nextFloat(1, rand) ?? 1;
+            State.nowbaseOpaqueness = config.Clouds?.Opaqueness?.nextFloat(1, rand) ?? 0;
+            State.nowBrightness = config.Clouds?.Brightness.nextFloat(1, rand) ?? 0;
+            State.nowHeightMul = config.Clouds?.HeightMul?.nextFloat(1, rand) ?? 0;
+            State.nowSceneBrightness = config.SceneBrightness.nextFloat(1, rand);
+
+            State.nowFogDensity = config.Fog?.Density?.nextFloat(1, rand) ?? 0;
+            State.nowMistDensity = config.Fog?.MistDensity?.nextFloat(1, rand) ?? 0;
+            State.nowMistYPos = config.Fog?.MistYPos?.nextFloat(1, rand) ?? 0;
+            State.nowFogBrightness = config.Fog?.FogBrightness?.nextFloat(1, rand) ?? 1;
+
+            State.nowBasePrecIntensity = (config.Precipitation?.BaseIntensity?.nextFloat(1, rand) ?? 0);
+            State.nowPrecParticleSize = config.Precipitation?.ParticleSize ?? 1;
+            State.nowPrecType = config.Precipitation?.Type ?? EnumPrecipitationType.Auto;
+
+            State.nowNearLightningRate = config.Lightning?.NearRate / 100f ?? 0;
+            State.nowDistantLightningRate = config.Lightning?.DistantRate / 100f ?? 0;
+            State.nowLightningMinTempature = config.Lightning?.MinTemperature ?? 0;
+
+
+            State.nowPrecIntensity = State.nowBasePrecIntensity;
+
+            RegenNoiseCache();
         }
 
         public virtual void Update(float dt)
         {
-            densityOffset = CloudDensityOffsetNoise.Noise(api.World.Calendar.TotalHours / 10.0, 0) / 2;
+            if (!State.BeginUseExecuted)
+            {
+                int a = 1;
+            }
 
             EnsureNoiseCacheIsFresh();
+
+            double timeAxis = api.World.Calendar.TotalDays / 10.0;
+            State.nowPrecIntensity = State.nowBasePrecIntensity + (float)GameMath.Clamp(TimeBasePrecIntenstityGen?.Noise(0, timeAxis) ?? 0, 0, 1);
         }
 
         public virtual double GetCloudDensityAt(int dx, int dz)
         {
-            return GameMath.Clamp(CloudDensityNoiseCache[dx, dz] + densityOffset/*+ OverallDensityOffset*/, 0, 1);
+            return GameMath.Clamp(State.nowbaseThickness + CloudDensityNoiseCache[dx, dz], 0, 1) * State.nowThicknessMul;
         }
 
-        public virtual double GetCloudOffsetYAt(int dx, int dz)
+
+        public virtual string GetWeatherName()
         {
-            return 100 * CloudOffsetYNoiseCache[dx, dz] + CloudYOffset;
+            return config.Name;
         }
 
-        public WeatherPattern Clone()
-        {
-            return new WeatherPattern(ws, Name, Chance)
-            {
-                Ambient = Ambient.Clone().EnsurePopulated(),
-                CloudDensityNoise = CloudDensityNoise.Clone(),
-                CloudDensityOffsetNoise = CloudDensityOffsetNoise.Clone(),
-                CloudOffsetYNoise = CloudOffsetYNoise.Clone(),
-                CloudYOffset = CloudYOffset,
-                FlatFogDensityOffset = FlatFogDensityOffset
-            };
-        }
-
-        public int Index = 0;
-
-        public virtual void Initialize(int index)
-        {
-            this.Index = index;
-            EnsureNoiseCacheIsFresh();
-        }
     }
 }

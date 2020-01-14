@@ -46,7 +46,6 @@ namespace Vintagestory.ServerMods.NoObf
         Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
         Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
 
-        Dictionary<AssetLocation, Shape> blockShapes;
         Dictionary<AssetLocation, BlockType> blockTypes;
         Dictionary<AssetLocation, ItemType> itemTypes;
         Dictionary<AssetLocation, EntityType> entityTypes;
@@ -74,8 +73,6 @@ namespace Vintagestory.ServerMods.NoObf
             LoadWorldProperties();
 
 
-
-            blockShapes = api.Assets.GetMany<Shape>(api.Server.Logger, "shapes/block/");
 
             blockTypes = new Dictionary<AssetLocation, BlockType>();
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
@@ -393,10 +390,12 @@ namespace Vintagestory.ServerMods.NoObf
             item.Class = typedItemType.Class;
             item.Textures = typedItemType.Textures;
             item.MaterialDensity = typedItemType.MaterialDensity;
-            item.GuiTransform = typedItemType.GuiTransform;
-            item.FpHandTransform = typedItemType.FpHandTransform;
-            item.TpHandTransform = typedItemType.TpHandTransform;
-            item.GroundTransform = typedItemType.GroundTransform;
+            
+            item.GuiTransform = typedItemType.GuiTransform?.Clone();
+            item.FpHandTransform = typedItemType.FpHandTransform?.Clone();
+            item.TpHandTransform = typedItemType.TpHandTransform?.Clone();
+            item.GroundTransform = typedItemType.GroundTransform?.Clone();
+
             item.DamagedBy = (EnumItemDamageSource[])typedItemType.DamagedBy?.Clone();
             item.MaxStackSize = typedItemType.MaxStackSize;
             if (typedItemType.Attributes != null) item.Attributes = typedItemType.Attributes;
@@ -408,7 +407,8 @@ namespace Vintagestory.ServerMods.NoObf
             item.Tool = typedItemType.Tool;
             item.AttackPower = typedItemType.AttackPower;
             item.LiquidSelectable = typedItemType.LiquidSelectable;
-            item.MiningTier = typedItemType.MiningTier;
+            item.ToolTier = typedItemType.MiningTier;
+            item.HeldSounds = typedItemType.HeldSounds?.Clone();
             item.Durability = typedItemType.Durability;
             item.MiningSpeed = typedItemType.MiningSpeed;
             item.AttackRange = typedItemType.AttackRange;
@@ -421,7 +421,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
             item.MatterState = typedItemType.MatterState;
 
-            typedItemType.InitItem(api.World.Logger, api.ClassRegistry, item, variant);
+            typedItemType.InitItem(api.World.Logger, item, variant);
 
             typedItemType.jsonObject = null;
 
@@ -561,6 +561,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.Replaceable = typedBlockType.Replaceable;
             block.Fertility = typedBlockType.Fertility;
             block.LightAbsorption = typedBlockType.LightAbsorption;
+            
             block.LightTraversable = new bool[] { typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2 };
             if (typedBlockType.LightTraversable != null)
             {
@@ -576,6 +577,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.Resistance = typedBlockType.Resistance;
             block.BlockMaterial = typedBlockType.BlockMaterial;
             block.Shape = typedBlockType.Shape?.Clone();
+            block.Lod0Shape = typedBlockType.Lod0Shape?.Clone();
             block.ShapeInventory = typedBlockType.ShapeInventory?.Clone();
             block.TexturesInventory = typedBlockType.TexturesInventory;
             block.Textures = typedBlockType.Textures;
@@ -607,8 +609,9 @@ namespace Vintagestory.ServerMods.NoObf
             block.LiquidLevel = typedBlockType.LiquidLevel;
             block.AttackPower = typedBlockType.AttackPower;
             block.MiningSpeed = typedBlockType.MiningSpeed;
-            block.MiningTier = typedBlockType.MiningTier;
+            block.ToolTier = typedBlockType.MiningTier;
             block.RequiredMiningTier = typedBlockType.RequiredMiningTier;
+            block.HeldSounds = typedBlockType.HeldSounds?.Clone();
             block.AttackRange = typedBlockType.AttackRange;
 
 
@@ -617,6 +620,7 @@ namespace Vintagestory.ServerMods.NoObf
                 block.Sounds = typedBlockType.Sounds.Clone();
             }
             block.RandomDrawOffset = typedBlockType.RandomDrawOffset;
+            block.RandomizeRotations = typedBlockType.RandomizeRotations;
             block.RandomizeAxes = typedBlockType.RandomizeAxes;
             block.CombustibleProps = typedBlockType.CombustibleProps;
             block.StorageFlags = (EnumItemStorageFlags)typedBlockType.StorageFlags;
@@ -628,11 +632,12 @@ namespace Vintagestory.ServerMods.NoObf
             block.CreativeInventoryStacks = typedBlockType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedBlockType.CreativeInventoryStacks.Clone();
             block.AllowSpawnCreatureGroups = (string[])typedBlockType.AllowSpawnCreatureGroups.Clone();
 
+            // BlockType net only sends the collisionboxes at an accuracy of 1/10000 so we have to make sure they are the same server and client side
             if (block.CollisionBoxes != null)
             {
                 for (int i = 0; i < block.CollisionBoxes.Length; i++)
                 {
-                    block.CollisionBoxes[i].RoundToFracsOf16();
+                    block.CollisionBoxes[i].RoundToFracsOfOne10thousand();
                 }
             }
 
@@ -640,7 +645,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 for (int i = 0; i < block.SelectionBoxes.Length; i++)
                 {
-                    block.SelectionBoxes[i].RoundToFracsOf16();
+                    block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
                 }
             }
 
@@ -665,7 +670,6 @@ namespace Vintagestory.ServerMods.NoObf
                         foreach (var byTypeProperty in entry.Value.ToObject<OrderedDictionary<string, JToken>>())
                         {
                             if (WildcardUtil.Match(byTypeProperty.Key, codePath))
-                            //if (BlockType.WildCardMatch(byTypeProperty.Key, codePath))
                             {
                                 JToken typedToken = byTypeProperty.Value;
                                 solveByType(typedToken, codePath, searchReplace);
@@ -1019,7 +1023,6 @@ namespace Vintagestory.ServerMods.NoObf
 
         private void FreeRam()
         {
-            blockShapes = null;
             blockTypes = null;
             itemTypes = null;
             entityTypes = null;

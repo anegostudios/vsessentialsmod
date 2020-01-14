@@ -46,11 +46,15 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public bool RandomDrawOffset;
         [JsonProperty]
+        public bool RandomizeRotations;
+        [JsonProperty]
         public EnumChunkRenderPass RenderPass = EnumChunkRenderPass.Opaque;
         [JsonProperty]
         public EnumFaceCullMode FaceCullMode = EnumFaceCullMode.Default;
         [JsonProperty]
         public CompositeShape ShapeInventory = null;
+        [JsonProperty]
+        public CompositeShape Lod0Shape = null;
         [JsonProperty]
         public bool Ambientocclusion = true;
         [JsonProperty]
@@ -264,7 +268,14 @@ namespace Vintagestory.ServerMods.NoObf
                     BlockBehavior behavior = instancer.CreateBlockBehavior(block, behaviorType.name);
                     if (behaviorType.properties == null) behaviorType.properties = new JsonObject(new JObject());
 
-                    behavior.Initialize(behaviorType.properties);
+                    try
+                    {
+                        behavior.Initialize(behaviorType.properties);
+                    } catch (Exception e)
+                    {
+                        logger.Error("Failed calling Initialize() on block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, block.Code, behaviorType.properties.ToString(), e);
+                    }
+                    
                     behavior.properties = behaviorType.properties;
 
                     behaviors.Add(behavior);

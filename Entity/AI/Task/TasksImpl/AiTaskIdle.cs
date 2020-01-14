@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -32,12 +33,19 @@ namespace Vintagestory.GameContent
         public AssetLocation onBlockBelowCode;
         public long idleUntilMs;
 
+
+        bool entityWasInRange;
+        long lastEntityInRangeTestTotalMs;
+
         public DayTimeFrame[] duringDayTimeFrames;
 
         string[] stopOnNearbyEntityCodesExact = new string[] { "player" };
         string[] stopOnNearbyEntityCodesBeginsWith = new string[0];
         float stopRange=0;
+        bool stopOnHurt = false;
         EntityPartitioning partitionUtil;
+
+        bool stopNow;
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
@@ -56,6 +64,11 @@ namespace Vintagestory.GameContent
             if (taskConfig["stopRange"] != null)
             {
                 stopRange = taskConfig["stopRange"].AsFloat(0f);
+            }
+
+            if (taskConfig["stopOnHurt"] != null)
+            {
+                stopOnHurt = taskConfig["stopOnHurt"].AsBool(false);
             }
 
             if (taskConfig["duringDayTimeFrames"] != null)
@@ -96,15 +109,23 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            
-            if (entity.World.Rand.NextDouble() < chance && cooldownUntilMs < entity.World.ElapsedMilliseconds)
+            long ellapsedMs = entity.World.ElapsedMilliseconds;
+            if (entity.World.Rand.NextDouble() < chance && cooldownUntilMs < ellapsedMs)
             {
                 if (entity.Properties.Habitat == EnumHabitat.Land && entity.FeetInLiquid) return false;
 
                 if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
                 if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
-                if (entityInRange()) return false;
+                // The entityInRange test is expensive. So we only test for it every 4 seconds
+                // which should have zero impact on the behavior. It'll merely execute this task 4 seconds later
+                if (ellapsedMs - lastEntityInRangeTestTotalMs > 2000)
+                {
+                    entityWasInRange = entityInRange();
+                    lastEntityInRangeTestTotalMs = ellapsedMs;
+                }
+
+                if (entityWasInRange) return false;
 
                 if (duringDayTimeFrames != null)
                 {
@@ -117,9 +138,13 @@ namespace Vintagestory.GameContent
                     if (!match) return false;
                 }
 
+                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z);
+                // Only with a solid block below
+                if (!belowBlock.SideSolid[API.MathTools.BlockFacing.UP.Index]) return false;
+
                 if (onBlockBelowCode == null) return true;
                 Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
-                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z);
+
                 return block.WildCardMatch(onBlockBelowCode) || (belowBlock.WildCardMatch(onBlockBelowCode) && block.Replaceable >= 6000);
             }
 
@@ -131,13 +156,24 @@ namespace Vintagestory.GameContent
             base.StartExecute();
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
             entity.IdleSoundChanceModifier = 0f;
+            stopNow = false;
         }
 
         public override bool ContinueExecute(float dt)
         {
-            if (rand.NextDouble() < 0.1f)
+            if (rand.NextDouble() < 0.3f)
             {
-                if (entityInRange()) return false;
+                long ellapsedMs = entity.World.ElapsedMilliseconds;
+
+                // The entityInRange test is expensive. So we only test for it every 1 second
+                // which should have zero impact on the behavior. It'll merely execute this task 1 second later
+                if (ellapsedMs - lastEntityInRangeTestTotalMs > 1500)
+                {
+                    entityWasInRange = entityInRange();
+                    lastEntityInRangeTestTotalMs = ellapsedMs;
+                }
+                if (entityWasInRange) return false;
+
 
                 if (duringDayTimeFrames != null)
                 {
@@ -151,7 +187,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            return entity.World.ElapsedMilliseconds < idleUntilMs;
+            return !stopNow && entity.World.ElapsedMilliseconds < idleUntilMs;
         }
 
         public override void FinishExecute(bool cancelled)
@@ -194,7 +230,7 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < stopOnNearbyEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWith(stopOnNearbyEntityCodesBeginsWith[i]))
+                    if (e.Code.Path.StartsWithFast(stopOnNearbyEntityCodesBeginsWith[i]))
                     {
                         found = true;
                         return false;
@@ -205,6 +241,15 @@ namespace Vintagestory.GameContent
             });
 
             return found;
+        }
+
+
+        public override void OnEntityHurt(DamageSource source, float damage)
+        {
+            if (stopOnHurt)
+            {
+                stopNow = true;
+            }
         }
 
 

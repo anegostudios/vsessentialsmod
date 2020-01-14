@@ -10,7 +10,7 @@ using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
-    public class EntityBehaviorControlledPhysics : EntityBehavior
+    public class EntityBehaviorControlledPhysics : EntityBehavior, IRenderer
     {
         protected float accumulator = 0;
         protected Vec3d outposition = new Vec3d(); // Temporary field
@@ -20,9 +20,21 @@ namespace Vintagestory.GameContent
 
         public float stepHeight = 0.6f;
 
-        Cuboidf smallerCollisionBox = new Cuboidf();
+        protected Cuboidf smallerCollisionBox = new Cuboidf();
+        protected Vec3d prevPos = new Vec3d();
+
+        protected bool duringRenderFrame;
+        public double RenderOrder => 0;
+        public int RenderRange => 9999;
+
+        ICoreClientAPI capi;
 
 
+
+        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        {
+            (entity.World.Api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+        }
 
         public EntityBehaviorControlledPhysics(Entity entity) : base(entity)
         {
@@ -43,11 +55,32 @@ namespace Vintagestory.GameContent
                 Locomotors[i].Initialize(properties);
             }
 
-            smallerCollisionBox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.05f);
+            smallerCollisionBox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.1f);
+
+            if (entity.World.Side == EnumAppSide.Client)
+            {
+                capi = (entity.World.Api as ICoreClientAPI);
+                duringRenderFrame = true;
+                capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "controlledphysics");
+            }
+        }
+
+        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        {
+            if (capi.IsGamePaused) return;
+            onPhysicsTick(deltaTime);
         }
 
 
         public override void OnGameTick(float deltaTime)
+        {
+            if (!duringRenderFrame)
+            {
+                onPhysicsTick(deltaTime);
+            }
+        }
+
+        public virtual void onPhysicsTick(float deltaTime)
         {
             if (entity.State == EnumEntityState.Inactive)
             {
@@ -63,11 +96,12 @@ namespace Vintagestory.GameContent
             
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
-                entity.PhysicsUpdateWatcher?.Invoke(accumulator - GlobalConstants.PhysicsFrameTime);
+                prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
                 GameTick(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
-
+            
+            entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
             entity.World.FrameProfiler.Mark("entity-controlledphysics-end");
         }
 
@@ -245,15 +279,15 @@ namespace Vintagestory.GameContent
 
 
 
-            if (blockAccess.IsNotTraversable((int)(pos.X + pos.Motion.X), (int)pos.Y, (int)pos.Z))
+            if (blockAccess.IsNotTraversable((pos.X + pos.Motion.X), pos.Y, pos.Z))
             {
                 outposition.X = pos.X;
             }
-            if (blockAccess.IsNotTraversable((int)pos.X, (int)(pos.Y + pos.Motion.Y), (int)pos.Z))
+            if (blockAccess.IsNotTraversable(pos.X, (pos.Y + pos.Motion.Y), pos.Z))
             {
                 outposition.Y = pos.Y;
             }
-            if (blockAccess.IsNotTraversable((int)pos.X, (int)pos.Y, (int)(pos.Z + pos.Motion.Z)))
+            if (blockAccess.IsNotTraversable(pos.X, pos.Y, (pos.Z + pos.Motion.Z)))
             {
                 outposition.Z = pos.Z;
             }
@@ -261,7 +295,7 @@ namespace Vintagestory.GameContent
             pos.SetPos(outposition);
 
             
-            // Set the players motion to zero if he collided.
+            // Set the motion to zero if he collided.
 
             if ((nextPosition.X < outposition.X && pos.Motion.X < 0) || (nextPosition.X > outposition.X && pos.Motion.X > 0))
             {
@@ -286,7 +320,7 @@ namespace Vintagestory.GameContent
 
             Block block = blockAccess.GetBlock(posX, (int)(pos.Y), posZ);
             Block aboveblock = blockAccess.GetBlock(posX, (int)(pos.Y + 1), posZ);
-            Block middleBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.CollisionBox.Y1 + entity.CollisionBox.Y2 * 0.66f), posZ);
+            Block middleBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ);
 
 
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
@@ -365,7 +399,7 @@ namespace Vintagestory.GameContent
                 // Test for X
                 if (!collisionTester.IsColliding(entity.World.BlockAccessor, smallerCollisionBox, testPosition))
                 {
-                    // Weird hack you can climb down ladders more easily
+                    // Weird hack so you can climb down ladders more easily
                     if (belowBlock.Climbable)
                     {
                         outposition.X += (pos.X - outposition.X) / 10;
@@ -383,7 +417,7 @@ namespace Vintagestory.GameContent
                 // Test for X
                 if (!collisionTester.IsColliding(entity.World.BlockAccessor, smallerCollisionBox, testPosition))
                 {
-                    // Weird hack you can climb down ladders more easily
+                    // Weird hack so you can climb down ladders more easily
                     if (belowBlock.Climbable)
                     {
                         outposition.Z += (pos.Z - outposition.Z) / 10;
@@ -531,5 +565,10 @@ namespace Vintagestory.GameContent
         {
             return "controlledentityphysics";
         }
+        public void Dispose()
+        {
+
+        }
+
     }
 }

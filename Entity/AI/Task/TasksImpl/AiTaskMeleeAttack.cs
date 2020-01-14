@@ -4,8 +4,10 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -31,8 +33,8 @@ namespace Vintagestory.GameContent
         string[] seekEntityCodesExact = new string[] { "player" };
         string[] seekEntityCodesBeginsWith = new string[0];
 
-        EnumDamageType damageType = EnumDamageType.BluntAttack;
-        int damageTier = 0;
+        public EnumDamageType damageType = EnumDamageType.BluntAttack;
+        public int damageTier = 0;
 
         public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
@@ -52,8 +54,11 @@ namespace Vintagestory.GameContent
             this.minVerDist = taskConfig["minVerDist"].AsFloat(1f);
 
             this.damageType = taskConfig["damageType"].AsObject<EnumDamageType>(EnumDamageType.BluntAttack);
-            this.damageTier = taskConfig["damageType"].AsInt(0);
+            this.damageTier = taskConfig["damageTier"].AsInt(0);
 
+            ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("extraInfoText");
+            tree.SetString("dmgTier", Lang.Get("Damage tier: {0}", damageTier));
+            //tree.SetString("dmgType", Lang.Get("Damage type: {0}", damageType));
 
             if (taskConfig["entityCodes"] != null)
             {
@@ -119,7 +124,7 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < seekEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWith(seekEntityCodesBeginsWith[i]) && hasDirectContact(e))
+                    if (e.Code.Path.StartsWithFast(seekEntityCodesBeginsWith[i]) && hasDirectContact(e))
                     {
                         return true;
                     }

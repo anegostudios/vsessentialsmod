@@ -12,6 +12,8 @@ namespace Vintagestory.GameContent
     {
         double transitionAtTotalDays = -1;
 
+        public virtual int CheckIntervalMs { get; set; } = 2000;
+
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
@@ -24,21 +26,28 @@ namespace Vintagestory.GameContent
 
             if (api.Side == EnumAppSide.Server)
             {
-                RegisterGameTickListener(CheckTransition, 2000);
+                RegisterGameTickListener(CheckTransition, CheckIntervalMs);
             }
         }
 
-        public void CheckTransition(float dt)
+        public virtual void CheckTransition(float dt)
         {
             if (transitionAtTotalDays > Api.World.Calendar.TotalDays) return;
 
+            Block block = Api.World.BlockAccessor.GetBlock(Pos);
+            if (block.Attributes == null) return;
+            string toCode = block.Attributes["convertTo"].AsString();
+            tryTransition(toCode);
+        }
+
+        public void tryTransition(string toCode) 
+        { 
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
             Block tblock;
 
             if (block.Attributes == null) return;
 
             string fromCode = block.Attributes["convertFrom"].AsString();
-            string toCode = block.Attributes["convertTo"].AsString();
             if (fromCode == null || toCode == null) return;
 
             if (fromCode.IndexOf(":") == -1) fromCode = block.Code.Domain + ":" + fromCode;

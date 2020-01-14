@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -17,7 +18,6 @@ namespace Vintagestory.GameContent
     {
         private int ticksAlive;
         int lingerTicks;
-        bool hasLanded;
 
         public bool InitialBlockRemoved;
 
@@ -29,7 +29,54 @@ namespace Vintagestory.GameContent
 
         public BlockEntity removedBlockentity;
 
+        float impactDamageMul;
+
+        bool fallHandled;
+        bool dustyFall;
+
         byte[] lightHsv;
+        AssetLocation fallSound;
+        ILoadedSound sound;
+        float soundStartDelay;
+
+        ItemStack blockAsStack;
+        bool canFallSideways;
+
+        static SimpleParticleProperties dustParticles;
+        static SimpleParticleProperties bitsParticles;
+
+        Vec3d fallMotion = new Vec3d();
+
+        static EntityBlockFalling()
+        {
+            dustParticles = new SimpleParticleProperties(1, 3, ColorUtil.ToRgba(40, 220, 220, 220), new Vec3d(), new Vec3d(), new Vec3f(-0.25f, -0.25f, -0.25f), new Vec3f(0.25f, 0.25f, 0.25f), 1, 1, 0.3f, 0.3f, EnumParticleModel.Quad);
+            dustParticles.AddQuantity = 5;
+            dustParticles.MinVelocity.Set(-0.05f, -0.4f, -0.05f);
+            dustParticles.AddVelocity.Set(0.1f, 0.2f, 0.1f);
+            dustParticles.WithTerrainCollision = true;
+            dustParticles.ParticleModel = EnumParticleModel.Quad;
+            dustParticles.OpacityEvolve = EvolvingNatFloat.create(EnumTransformFunction.QUADRATIC, -16f);
+            dustParticles.SizeEvolve = EvolvingNatFloat.create(EnumTransformFunction.QUADRATIC, 3f);
+            dustParticles.GravityEffect = 0;
+            dustParticles.MaxSize = 1.3f;
+            dustParticles.LifeLength = 3f;
+            dustParticles.SelfPropelled = true;
+            dustParticles.AddPos.Set(1.4, 1.4, 1.4);
+
+
+            bitsParticles = new SimpleParticleProperties(1, 3, ColorUtil.ToRgba(40, 220, 220, 220), new Vec3d(), new Vec3d(), new Vec3f(-0.25f, -0.25f, -0.25f), new Vec3f(0.25f, 0.25f, 0.25f), 1, 1, 0.1f, 0.3f, EnumParticleModel.Quad);
+            bitsParticles.AddPos.Set(1.4, 1.4, 1.4);
+            bitsParticles.AddQuantity = 20;
+            bitsParticles.MinVelocity.Set(-0.25f, 0, -0.25f);
+            bitsParticles.AddVelocity.Set(0.5f, 1, 0.5f);
+            bitsParticles.WithTerrainCollision = true;
+            bitsParticles.ParticleModel = EnumParticleModel.Cube;
+            bitsParticles.LifeLength = 1.5f;
+            bitsParticles.SizeEvolve = EvolvingNatFloat.create(EnumTransformFunction.QUADRATIC, -0.5f);
+            bitsParticles.GravityEffect = 2.5f;
+            bitsParticles.MinSize = 0.5f;
+            bitsParticles.MaxSize = 1.5f;
+        }
 
         public EntityBlockFalling() { }
 
@@ -44,8 +91,20 @@ namespace Vintagestory.GameContent
         }
 
 
-        public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos)
+        public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, bool dustyFall)
         {
+            this.impactDamageMul = impactDamageMul;
+            this.fallSound = fallSound;
+            this.canFallSideways = canFallSideways;
+            this.dustyFall = dustyFall;
+
+            WatchedAttributes.SetBool("canFallSideways", canFallSideways);
+            WatchedAttributes.SetBool("dustyFall", dustyFall);
+            if (fallSound != null)
+            {
+                WatchedAttributes.SetString("fallSound", fallSound.ToShortString());
+            }
+
             this.Code = new AssetLocation("blockfalling");
             this.blockCode = block.Code;
             this.removedBlockentity = blockEntity;
@@ -69,36 +128,83 @@ namespace Vintagestory.GameContent
             }
 
             SimulationRange = 3 * api.World.BlockAccessor.ChunkSize;
-            
             base.Initialize(properties, api, InChunkIndex3d);
 
             // Need to capture this now before we remove the block and start to fall
             drops = Block.GetDrops(api.World, initialPos, null);
 
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
+
+			LocalPos.Motion.Y = -0.02;
+            blockAsStack = new ItemStack(Block);
+
+            
+            if (api.Side == EnumAppSide.Client && fallSound != null)
+            {
+                ICoreClientAPI capi = api as ICoreClientAPI;
+                sound = capi.World.LoadSound(new SoundParams()
+                {
+                    Location = fallSound.WithPathPrefixOnce("sounds/").WithPathAppendixOnce(".ogg"),
+                    Position = new Vec3f((float)Pos.X, (float)Pos.Y, (float)Pos.Z),
+                    Range = 32,
+                    Pitch = 0.8f + (float)capi.World.Rand.NextDouble() * 0.3f,
+                    Volume = 1,
+                    SoundType = EnumSoundType.Sound
+
+                });
+                soundStartDelay = 0.05f + (float)capi.World.Rand.NextDouble() / 3f;
+            }
         }
 
+        float pushaccum;
         /// <summary>
         /// Delays behaviors from ticking to reduce flickering
         /// </summary>
         /// <param name="dt"></param>
         public override void OnGameTick(float dt)
         {
+            if (soundStartDelay > 0)
+            {
+                soundStartDelay -= dt;
+                if (soundStartDelay <= 0)
+                {
+                    sound.Start();
+                }
+            }
+            if (sound != null)
+            {
+                sound.SetPosition((float)Pos.X, (float)Pos.Y, (float)Pos.Z);
+            }
+
+
             if (lingerTicks > 0)
             {
                 lingerTicks--;
-                if (lingerTicks == 0) Die();
+                if (lingerTicks == 0)
+                {
+                    if (Api.Side == EnumAppSide.Client && sound != null)
+                    {
+                        sound.FadeOut(3f, (s) => { s.Dispose(); });
+                    }
+                    Die();
+                }
+
                 return;
+            }
+
+            if (!Collided && !fallHandled)
+            {
+                spawnParticles(0);
             }
 
 
             ticksAlive++;
-            if (ticksAlive >= 7)
+            if (ticksAlive >= 2 || Api.World.Side == EnumAppSide.Client) // Seems like we have to do it instantly on the client, otherwise we miss the OnChunkRetesselated Event
             {
                 if (!InitialBlockRemoved)
                 {
-                    UpdateBlock(true, initialPos);
                     InitialBlockRemoved = true;
+                    UpdateBlock(true, initialPos);
                 }
 
                 foreach (EntityBehavior behavior in SidedProperties.Behaviors)
@@ -106,6 +212,37 @@ namespace Vintagestory.GameContent
                     behavior.OnGameTick(dt);
                 }
             }
+
+            pushaccum += dt;
+            fallMotion.X *= 0.99f;
+            fallMotion.Z *= 0.99f;
+            if (pushaccum > 0.2f)
+            {
+                pushaccum = 0;
+                if (!Collided)
+                {
+                    Entity[] entities = World.GetEntitiesAround(LocalPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
+                    for (int i = 0; i < entities.Length; i++)
+                    {
+                        if (Api.Side == EnumAppSide.Server || entities[i] is EntityPlayer)
+                        {
+                            entities[i].LocalPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
+                        }
+                    }
+                }
+            }
+
+
+            if (Api.Side == EnumAppSide.Server && !Collided && World.Rand.NextDouble() < 0.01)
+            {
+                World.BlockAccessor.TriggerNeighbourBlockUpdate(ServerPos.AsBlockPos);
+            }
+
+            if (CollidedVertically && Pos.Motion.Length() == 0)
+            {
+                OnFallToGround(0);
+            }
+
 
         }
 
@@ -138,6 +275,38 @@ namespace Vintagestory.GameContent
             NotifyNeighborsOfBlockChange(pos);
         }
 
+
+        void spawnParticles(float smokeAdd)
+        {
+            if (Api.Side == EnumAppSide.Server || !dustyFall) return;
+
+            dustParticles.Color = Block.GetRandomColor(Api as ICoreClientAPI, blockAsStack);
+            dustParticles.Color &= 0xffffff;
+            dustParticles.Color |= (150 << 24);
+            dustParticles.MinPos.Set(Pos.X - 0.2 - 0.5, Pos.Y, Pos.Z - 0.2 - 0.5);
+            dustParticles.MinSize = 1f;
+
+            float veloMul = smokeAdd / 20f;
+            dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)Pos.Motion.Y, -0.2f * veloMul);
+            dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)Pos.Motion.Y + -veloMul, 0.4f * veloMul);
+            dustParticles.MinQuantity = smokeAdd;
+            dustParticles.AddQuantity = 6 * Math.Abs((float)Pos.Motion.Y) + smokeAdd;
+
+            
+            
+            Api.World.SpawnParticles(dustParticles);
+
+            bitsParticles.MinPos.Set(Pos.X - 0.2 - 0.5, Pos.Y - 0.5, Pos.Z - 0.2 - 0.5);
+            
+            bitsParticles.MinVelocity.Set(-2f, 30f * (float)Pos.Motion.Y, -2f);
+            bitsParticles.AddVelocity.Set(4f, 0.2f * (float)Pos.Motion.Y, 4f);
+            bitsParticles.AddQuantity = 12 * Math.Abs((float)Pos.Motion.Y);
+            bitsParticles.Color = dustParticles.Color;
+
+            Api.World.SpawnParticles(bitsParticles);
+        }
+
+
         private void OnChunkRetesselated(bool on)
         {
             EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
@@ -156,31 +325,79 @@ namespace Vintagestory.GameContent
 
         public override void OnFallToGround(double motionY)
         {
-            Block block = World.BlockAccessor.GetBlock(blockCode);
-            ItemStack stack = (drops == null || drops.Length == 0) ? new ItemStack(block) : drops[0];
-            World.SpawnCubeParticles(LocalPos.XYZ, stack, CollisionBox.X2 - CollisionBox.X1, 10);
+            if (fallHandled) return;
 
+            BlockPos pos = LocalPos.AsBlockPos;
+
+            if (canFallSideways)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    BlockFacing facing = BlockFacing.HORIZONTALS[i];
+                    if (
+                        World.BlockAccessor.GetBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y, pos.Z + facing.Normali.Z).Replaceable >= 6000 &&
+                        World.BlockAccessor.GetBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z).Replaceable >= 6000)
+                    {
+                        if (Api.Side == EnumAppSide.Server)
+                        {
+                            LocalPos.X += facing.Normali.X;
+                            LocalPos.Y += facing.Normali.Y;
+                            LocalPos.Z += facing.Normali.Z;
+                        }
+
+                        fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
+                        spawnParticles(0);
+                        return;
+                    }
+                }
+            }
+
+            spawnParticles(20f);
+            
             BlockPos finalPos = ServerPos.AsBlockPos;
             Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
 
             if (Api.Side == EnumAppSide.Server)
             {
+                if (!IsReplaceableBlock(finalPos))
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        BlockFacing facing = BlockFacing.HORIZONTALS[i];
+                        if (World.BlockAccessor.GetBlock(finalPos.X + facing.Normali.X, finalPos.Y + facing.Normali.Y, finalPos.Z + facing.Normali.Z).Replaceable >= 6000)
+                        {
+                            finalPos.X += facing.Normali.X;
+                            finalPos.Y += facing.Normali.Y;
+                            finalPos.Z += facing.Normali.Z;
+                        }
+                    }
+                }
+
                 if (IsReplaceableBlock(finalPos))
                 {
                     UpdateBlock(false, finalPos);
 
                     (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
-
-                    hasLanded = true;
                 }
                 else
                 {
                     // Space is occupied by maybe a torch or some other block we shouldn't replace
-                    if (!hasLanded) DropItems(finalPos);
+                    DropItems(finalPos);
+                }
+
+                
+                if (impactDamageMul > 0)
+                {
+                    Entity[] entities = World.GetEntitiesInsideCuboid(finalPos, finalPos.AddCopy(1, 1, 1));
+                    foreach (var entity in entities)
+                    {
+                        entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Block, Type = EnumDamageType.Crushing, SourceBlock = Block, SourcePos = finalPos.ToVec3d() }, 6 * (float)Math.Abs(motionY) * impactDamageMul);
+                    }
                 }
             }
 
-            lingerTicks = 2;
+            lingerTicks = 50;
+            fallHandled = true;
         }
 
 
@@ -195,6 +412,10 @@ namespace Vintagestory.GameContent
                 {
                     World.BlockAccessor.MarkBlockDirty(Pos.AsBlockPos, () => OnChunkRetesselated(false));
                 }
+
+                lingerTicks = 50;
+                fallHandled = true;
+                spawnParticles(20f);
             }
         }
 
@@ -258,6 +479,16 @@ namespace Vintagestory.GameContent
                 blockEntityAttributes.FromBytes(reader);
                 blockEntityClass = reader.ReadString();
             }
+
+
+
+            if (WatchedAttributes.HasAttribute("fallSound"))
+            {
+                fallSound = new AssetLocation(WatchedAttributes.GetString("fallSound"));
+            }
+
+            canFallSideways = WatchedAttributes.GetBool("canFallSideways");
+            dustyFall = WatchedAttributes.GetBool("dustyFall");
         }
 
         public override bool ShouldReceiveDamage(DamageSource damageSource, float damage)

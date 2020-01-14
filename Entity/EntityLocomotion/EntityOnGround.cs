@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
                 pos.Motion.Add(motionDelta.X, 0, motionDelta.Z);
             }
 
-            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive)
+            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive && !entity.Swimming)
             {
                 lastJump = entity.World.ElapsedMilliseconds;
                 

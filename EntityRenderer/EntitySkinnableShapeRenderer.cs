@@ -5,26 +5,26 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public class EntitySkinnableShapeRenderer : EntityShapeRenderer, ITexPositionSource
+    public class EntitySkinnableShapeRenderer : EntityShapeRenderer
     {
-        TextureAtlasPosition skinTexPos;
-        int skinTextureSubId;
-        IInventory gearInv;
         
-        public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
+        protected int skinTextureSubId;
 
-        public TextureAtlasPosition this[string textureCode]
+
+        public override TextureAtlasPosition this[string textureCode]
         {
-            get {
+            get
+            {
                 CompositeTexture cpt = null;
                 if (extraTexturesByTextureName?.TryGetValue(textureCode, out cpt) == true)
                 {
                     return capi.EntityTextureAtlas.Positions[cpt.Baked.TextureSubId];
                 }
 
-                return skinTexPos; 
+                return skinTexPos;
             }
         }
+
 
 
         public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
@@ -32,41 +32,7 @@ namespace Vintagestory.GameContent
             api.Event.ReloadTextures += reloadSkin;
         }
 
-        void slotModified(int slotid)
-        {
-            if (slotid >= 12)
-            {
-                TesselateShape();
-            }
-            else
-            {
-                reloadSkin();
-            }
-        }
 
-        public override void BeforeRender(float dt)
-        {
-            if (gearInv == null && eagent?.GearInventory != null)
-            {
-                eagent.GearInventory.SlotModified += slotModified;
-                gearInv = eagent.GearInventory;
-                TesselateShape();
-            }
-
-            base.BeforeRender(dt);
-        }
-
-        public override void PrepareForGuiRender(float dt, double posX, double posY, double posZ, float yawDelta, float size, out MeshRef meshRef, out float[] modelviewMatrix)
-        {
-            if (gearInv == null && eagent?.GearInventory != null)
-            {
-                eagent.GearInventory.SlotModified += slotModified;
-                gearInv = eagent.GearInventory;
-                TesselateShape();
-            }
-
-            base.PrepareForGuiRender(dt, posX, posY, posZ, yawDelta, size, out meshRef, out modelviewMatrix);
-        }
 
 
         bool textureSpaceAllocated = false;
@@ -83,7 +49,7 @@ namespace Vintagestory.GameContent
                 textureSpaceAllocated = true;
             }
 
-            return this;
+            return base.GetTextureSource();
         }
 
 
@@ -97,7 +63,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public void reloadSkin()
+        public override void reloadSkin()
         {
             TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
             
@@ -140,7 +106,7 @@ namespace Vintagestory.GameContent
 
             if (gearInv == null && eagent?.GearInventory != null)
             {
-                eagent.GearInventory.SlotModified += (slotid) => reloadSkin();
+                eagent.GearInventory.SlotModified += slotModified;
                 gearInv = eagent.GearInventory;
             }
 
@@ -183,6 +149,11 @@ namespace Vintagestory.GameContent
             base.Dispose();
 
             capi.Event.ReloadTextures -= reloadSkin;
+            if (eagent?.GearInventory != null)
+            {
+                eagent.GearInventory.SlotModified -= slotModified;
+            }
+
             capi.EntityTextureAtlas.FreeTextureSpace(skinTextureSubId);
         }
     }

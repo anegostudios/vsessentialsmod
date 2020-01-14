@@ -39,13 +39,25 @@ namespace Vintagestory.GameContent
                     push = Math.Max(1f, push - 0.1f);
                 }
 
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block twoaboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 2), (int)pos.Z);
+                float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0) + (twoaboveblock.IsLiquid() ? 9 / 8f : 0);
+                float bottomSubmergedness = waterY - (float)pos.Y;
+
+                // 0 = at swim line
+                // 1 = completely submerged
+                float swimlineSubmergedness = GameMath.Clamp(bottomSubmergedness - ((float)entity.SwimmingOffsetY), 0, 1);
+                swimlineSubmergedness = Math.Min(1, swimlineSubmergedness + 0.075f);
+
+
                 double yMot = 0;
                 if (controls.Jump)
                 {
-                    yMot = push * 0.001f;
+                    yMot = 0.005f * swimlineSubmergedness;
                 } else
                 {
-                    yMot = controls.FlyVector.Y * (1 + push) * 0.03f;
+                    yMot = controls.FlyVector.Y * (1 + push) * 0.03f * swimlineSubmergedness;
                 }
 
                 pos.Motion.Add(

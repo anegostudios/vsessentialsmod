@@ -71,5 +71,6 @@ namespace Vintagestory.API.Common
         void OnEntityLoaded();
         void OnEntitySpawn();
         void OnEntityDespawn(EntityDespawnReason reason);
+        void OnEntityHurt(DamageSource source, float damage);
     }
 }

@@ -51,7 +51,8 @@ namespace Vintagestory.GameContent
 
                 } else
                 {
-                    float strength = airMovingStrength;
+                    float strength = airMovingStrength * (float)System.Math.Min(1, entity.Stats?.GetBlended("walkspeed") ?? 1.0);
+                    
                     if (!controls.Jump && entity is EntityPlayer)
                     {
                         strength = airMovingStrengthFalling;

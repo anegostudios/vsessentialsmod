@@ -63,21 +63,23 @@ namespace Vintagestory.GameContent
         }
 
 
-        public void OnPhysicsTick(float nextAccum)
+        public void OnPhysicsTick(float nextAccum, Vec3d prevPos)
         {
             this.accum = nextAccum;
-            prevPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
+            this.prevPos.Set(prevPos.X + entity.CollisionBox.X1, prevPos.Y + entity.CollisionBox.Y1, prevPos.Z + entity.CollisionBox.Z1);
 
             ellapsedMsPhysics = capi.ElapsedMilliseconds;
         }
 
         public void AddMeshData(MeshData data)
         {
+            if (data == null) return;
             mesh.AddMeshData(data);
         }
 
         public void AddMeshData(MeshData data, int tintColor)
         {
+            if (data == null) return;
             mesh.AddMeshData(data);
         }
 
@@ -87,7 +89,7 @@ namespace Vintagestory.GameContent
             // TODO: ADD
             if (isShadowPass) return;
 
-            if (!DoRender || !blockFallingEntity.InitialBlockRemoved) return;
+            if (!DoRender || (!blockFallingEntity.InitialBlockRemoved && entity.World.BlockAccessor.GetBlock(blockFallingEntity.initialPos).Id != 0)) return;
 
             curPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
 
@@ -101,23 +103,23 @@ namespace Vintagestory.GameContent
             rapi.GlDisableCullFace();
             
             rapi.GlToggleBlend(true, EnumBlendMode.Standard);
-
             
-            accum += (capi.ElapsedMilliseconds - ellapsedMsPhysics) / 1000f;
-            ellapsedMsPhysics = capi.ElapsedMilliseconds;
-
             double alpha = accum / GlobalConstants.PhysicsFrameTime;
-            
-            IStandardShaderProgram prog = rapi.PreparedStandardShader((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
+
+            float div = entity.Collided ? 4f : 1.5f;
+
+            IStandardShaderProgram prog = rapi.PreparedStandardShader((int)entity.Pos.X, (int)(entity.Pos.Y + 0.2), (int)entity.Pos.Z);
             Vec3d camPos = capi.World.Player.Entity.CameraPos;
             prog.Tex2D = atlasTextureId;
             prog.ModelMatrix = ModelMat
                 .Identity()
                 .Translate(
-                    prevPos.X + (curPos.X - prevPos.X) * alpha - camPos.X, 
-                    prevPos.Y + (curPos.Y - prevPos.Y) * alpha - camPos.Y, 
-                    prevPos.Z + (curPos.Z - prevPos.Z) * alpha - camPos.Z
+                    prevPos.X * (1 - alpha) + curPos.X * alpha - camPos.X + GameMath.Sin(capi.InWorldEllapsedMilliseconds / 120f + 30) / 20f / div,
+                    prevPos.Y * (1 - alpha) + curPos.Y * alpha - camPos.Y,
+                    prevPos.Z * (1 - alpha) + curPos.Z * alpha - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
                 )
+                .RotateX(GameMath.Sin(capi.InWorldEllapsedMilliseconds / 100f) / 15f / div)
+                .RotateZ(GameMath.Cos(10 + capi.InWorldEllapsedMilliseconds / 90f) / 15f / div)
                 .Values
             ;
             prog.ViewMatrix = rapi.CameraMatrixOriginf;

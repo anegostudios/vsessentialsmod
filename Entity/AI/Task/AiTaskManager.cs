@@ -121,6 +121,8 @@ namespace Vintagestory.GameContent
 
         public void OnGameTick(float dt)
         {
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin");
+
             foreach (IAiTask task in Tasks)
             {
                 int slot = task.Slot;
@@ -129,20 +131,21 @@ namespace Vintagestory.GameContent
                 {
                     if (ActiveTasksBySlot[slot] != null)
                     {
-
                         ActiveTasksBySlot[slot].FinishExecute(true);
                     }
 
                     ActiveTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
+                }
 
-                    //entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
+                if (entity.World.FrameProfiler.Enabled)
+                {
+                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
                 }
             }
 
-            
-
+            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin-cont");
 
             for (int i = 0; i < ActiveTasksBySlot.Length; i++)
             {
@@ -155,7 +158,10 @@ namespace Vintagestory.GameContent
                     ActiveTasksBySlot[i] = null;
                 }
 
-                //entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-" + task.GetType());
+                if (entity.World.FrameProfiler.Enabled)
+                {
+                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-" + task.GetType());
+                }
             }
 
 
@@ -239,6 +245,14 @@ namespace Vintagestory.GameContent
             }
         }
 
+
+        internal void OnEntityHurt(DamageSource source, float damage)
+        {
+            foreach (IAiTask task in Tasks)
+            {
+                task.OnEntityHurt(source, damage);
+            }
+        }
         
     }
 }

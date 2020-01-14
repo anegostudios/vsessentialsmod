@@ -36,10 +36,8 @@ namespace Vintagestory.GameContent
         {
             this.mapComponents = mapComponents;
 
-
             prevPlayerPos.X = api.World.Player.Entity.Pos.X;
             prevPlayerPos.Z = api.World.Player.Entity.Pos.Z;
-
         }
         
 
@@ -183,7 +181,8 @@ namespace Vintagestory.GameContent
             chunkviewBounds.Div(chunksize);
 
             BlockPos cur = new BlockPos().Set(chunkviewBounds.X1, 0, chunkviewBounds.Z1);
-            
+
+            bool beforeBoundsEmpty = chunkViewBoundsBefore.SizeX == 0 && chunkViewBoundsBefore.SizeZ == 0;
 
             while (cur.X <= chunkviewBounds.X2)
             {
@@ -191,7 +190,7 @@ namespace Vintagestory.GameContent
 
                 while (cur.Z <= chunkviewBounds.Z2)
                 {
-                    if (!chunkViewBoundsBefore.ContainsOrTouches(cur))
+                    if (beforeBoundsEmpty || !chunkViewBoundsBefore.ContainsOrTouches(cur))
                     {
                         nowVisible.Add(new Vec2i(cur.X, cur.Z));
                     }

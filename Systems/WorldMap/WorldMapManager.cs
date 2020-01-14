@@ -101,10 +101,6 @@ namespace Vintagestory.GameContent
             base.StartClientSide(api);
 
             capi = api;
-            capi.Input.RegisterHotKey("worldmaphud", "World Map HUD (Small overlay)", GlKeys.F6, HotkeyType.GUIOrOtherControls);
-            capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GUIOrOtherControls);
-            capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
-            capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
             capi.Event.BlockTexturesLoaded += OnLoaded;
             capi.Event.LevelFinalize += OnLvlFinalize;
 
@@ -152,6 +148,14 @@ namespace Vintagestory.GameContent
 
         private void OnLoaded()
         {
+            if (capi != null && capi.World.Config.GetBool("allowMap", true))
+            {
+                capi.Input.RegisterHotKey("worldmaphud", "World Map HUD (Small overlay)", GlKeys.F6, HotkeyType.GUIOrOtherControls);
+                capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GUIOrOtherControls);
+                capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
+                capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
+            }
+
             foreach (var val in MapLayerRegistry)
             {
                 MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));

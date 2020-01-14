@@ -161,6 +161,8 @@ namespace Vintagestory.GameContent
             float wRangeMul = WanderRangeMul;
             double dx, dy, dz;
 
+            if (rand.NextDouble() < 0.05) wRangeMul *= 3;
+
             while (tries-- > 0)
             {
                 dx = wanderRangeHorizontal.nextFloat() * (rand.Next(2) * 2 - 1) * wRangeMul;
@@ -202,7 +204,7 @@ namespace Vintagestory.GameContent
                         {
                             // Does not like water
                             block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                            if (!block.IsLiquid()) curTarget.W /= 2;
+                            if (block.IsLiquid()) curTarget.W /= 2;
 
                             // Lets make a straight line plot to see if we would fall off a cliff
                             bool stop = false;
@@ -222,18 +224,24 @@ namespace Vintagestory.GameContent
 
                                 double nowY = moveDownToFloor(x, prevY, z);
 
+                                // Not more than 4 blocks down
                                 if (nowY < 0 || prevY - nowY > 4)
                                 {
                                     willFall = true;
                                     stop = true;
                                 }
+
+                                // Not more than 2 blocks up
                                 if (nowY - prevY > 2)
                                 {
                                     stop = true;
                                 }
+
+                                prevY = (int)nowY;
                             });
 
                             if (willFall) curTarget.W = 0;
+                            
                         }
                         break;
 
@@ -254,23 +262,28 @@ namespace Vintagestory.GameContent
 
                 if (bestTarget == null || curTarget.W > bestTarget.W)
                 {
-                    bestTarget = curTarget;
+                    bestTarget = new Vec4d(curTarget.X, curTarget.Y, curTarget.Z, curTarget.W);
                 }
             }
 
 
-            /*bestTarget.Y = 15;
-            dx = bestTarget.X - entity.ServerPos.X;
-            dz = bestTarget.Z - entity.ServerPos.Z;
-            Vec3d sadf = bestTarget.XYZ.Ahead(1, 0, (float)Math.Atan2(dx, dz) + GameMath.PIHALF);
-
-            (entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 10, new List<BlockPos>() { new BlockPos((int)bestTarget.X, (int)bestTarget.Y, (int)bestTarget.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 0, 80) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
-            (entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 11, new List<BlockPos>() { new BlockPos((int)sadf.X, (int)sadf.Y, (int)sadf.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 255, 180) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);*/
-
-
             if (bestTarget.W > 0)
             {
-                FailedConsecutivePathfinds -= 3;
+                //double bla = bestTarget.Y;
+                //bestTarget.Y += 1;
+                //dx = bestTarget.X - entity.ServerPos.X;
+                //dz = bestTarget.Z - entity.ServerPos.Z;
+                //Vec3d sadf = bestTarget.XYZ.Ahead(1, 0, (float)Math.Atan2(dx, dz) + GameMath.PIHALF);
+
+                /*(entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 10, new List<BlockPos>() {
+                new BlockPos((int)bestTarget.X, (int)bestTarget.Y, (int)bestTarget.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 0, 80) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                (entity.Api as ICoreServerAPI).World.HighlightBlocks(world.AllOnlinePlayers[0], 11, new List<BlockPos>() {
+                new BlockPos((int)sadf.X, (int)sadf.Y, (int)sadf.Z) }, new List<int>() { ColorUtil.ColorFromRgba(0, 255, 255, 180) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);*/
+
+                //bestTarget.Y = bla;
+
+
+                FailedConsecutivePathfinds = Math.Max(FailedConsecutivePathfinds - 3, 0);
                 return bestTarget.XYZ;
             }
 
@@ -283,8 +296,9 @@ namespace Vintagestory.GameContent
             int tries = 5;
             while (tries-- > 0)
             {
-                Block block = world.BlockAccessor.GetBlock(x, (int)(y--), z);
-                if (block.SideSolid[BlockFacing.UP.Index]) return y;
+                Block block = world.BlockAccessor.GetBlock(x, (int)y, z);
+                if (block.SideSolid[BlockFacing.UP.Index]) return y + 1;
+                y--;
             }
 
             return -1;
@@ -368,7 +382,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (MainTarget.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z) < 1.5)
+            if (MainTarget.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z) < 0.5)
             {
                 pathTraverser.Stop();
                 return false;

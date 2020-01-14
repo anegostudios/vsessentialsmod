@@ -176,5 +176,10 @@ namespace Vintagestory.API.Common
         {
 
         }
+
+        public virtual void OnEntityHurt(DamageSource source, float damage)
+        {
+            
+        }
     }
 }

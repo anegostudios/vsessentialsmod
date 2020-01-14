@@ -23,6 +23,8 @@ namespace Vintagestory.GameContent
         public int tileOffsetX;
         public int tileOffsetZ;
 
+        public virtual void UpdateCloudTiles(int changeSpeed = 1) { }
+
     }
 
     public class CloudRenderer : CloudRendererDummy, IRenderer
@@ -33,8 +35,8 @@ namespace Vintagestory.GameContent
 
         public int CloudTileSize = 50;
 
-        internal float blendedCloudDensity = 0;//-1.3f;
-        internal float blendedGlobalCloudBrightness = 0;//0.85f;
+        internal float blendedCloudDensity = 0;
+        internal float blendedGlobalCloudBrightness = 0;
 
         
         public int QuantityCloudTiles = 25;
@@ -51,7 +53,7 @@ namespace Vintagestory.GameContent
         float windDirectionX;
         float windDirectionZ;
 
-
+        double partialTileOffsetX, partialTileOffsetZ;
 
 
 
@@ -61,9 +63,7 @@ namespace Vintagestory.GameContent
 
         MeshData updateMesh = new MeshData()
         {
-            //CustomFloats = new CustomMeshDataPartFloat(),
-            CustomBytes = new CustomMeshDataPartByte(),
-            CustomInts = new CustomMeshDataPartInt()
+            CustomShorts = new CustomMeshDataPartShort()
         };
 
         ICoreClientAPI capi;
@@ -73,17 +73,17 @@ namespace Vintagestory.GameContent
         public double RenderOrder => 0.35;
         public int RenderRange => 9999;
 
-        WeatherSimulation weatherSim;
+        WeatherSystemClient weatherSys;
         int cnt = 0;
         
 
-        public CloudRenderer(ICoreClientAPI capi, WeatherSimulation weatherSim)
+        public CloudRenderer(ICoreClientAPI capi, WeatherSystemClient weatherSys)
         {
             this.capi = capi;
             capi.Event.RegisterRenderer(this, EnumRenderStage.OIT);
-            capi.Event.RegisterGameTickListener(OnGameTick, 20);
+            
 
-            this.weatherSim = weatherSim;
+            this.weatherSys = weatherSys;
 
             capi.Event.ReloadShader += LoadShader;
             LoadShader();
@@ -136,21 +136,12 @@ namespace Vintagestory.GameContent
         }
 
         bool rebuild = false;
+        float accum;
 
         #region Render, Tick
-        public void OnGameTick(float deltaTime)
+        public void CloudTick(float deltaTime)
         {
-            if (!renderClouds) return;
-
             rebuild = false;
-
-            deltaTime = Math.Min(deltaTime, 1);
-            deltaTime *= capi.World.Calendar.SpeedOfTime / 60f;
-            if (deltaTime > 0)
-            {
-                UpdateWindAndClouds(deltaTime);
-            }
-
             int currentTilePosX = (int)(capi.World.Player.Entity.Pos.X) / CloudTileSize;
             int currentTilePosZ = (int)(capi.World.Player.Entity.Pos.Z) / CloudTileSize;
 
@@ -162,6 +153,20 @@ namespace Vintagestory.GameContent
                 tilePosZ = currentTilePosZ;
 
                 rebuild = true;
+            }
+
+            accum += deltaTime;
+            if (!rebuild && accum < 0.02f) return;
+
+            // Every 20 milliseconds
+            accum = accum % 0.02f;
+
+
+            deltaTime = Math.Min(deltaTime, 1);
+            deltaTime *= capi.World.Calendar.SpeedOfTime / 60f;
+            if (deltaTime > 0)
+            {
+                UpdateWindAndClouds(deltaTime);
             }
 
 
@@ -237,38 +242,47 @@ namespace Vintagestory.GameContent
         Matrixf mvMat = new Matrixf();
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
-            capi.Render.GlMatrixModeModelView();
+            if (!renderClouds) return;
 
-            if (!renderClouds || capi.Render.FrameWidth == 0) return;
-
-            double partialTileOffsetX = capi.World.Player.Entity.Pos.X % CloudTileSize;
-            double partialTileOffsetZ = capi.World.Player.Entity.Pos.Z % CloudTileSize;
+            if (!capi.IsGamePaused)
+            {
+                CloudTick(deltaTime);
+            }
+            
+            if (capi.Render.FrameWidth == 0) return;
 
             prog.Use();
             prog.Uniform("sunPosition", capi.World.Calendar.SunPositionNormalized);
 
-            int[] hsv = ColorUtil.RgbToHsvInts((int)(capi.World.Calendar.SunColor.R * 255), (int)(capi.World.Calendar.SunColor.G * 255), (int)(capi.World.Calendar.SunColor.B * 255));
-            hsv[1] = (int)(hsv[1] * 0.9);
-            hsv[2] = (int)(hsv[2] * 0.9);
-            int[] rgba = ColorUtil.Hsv2RgbInts(hsv[0], hsv[1], hsv[2]);
-            Vec3f sunCol = new Vec3f(rgba[0] / 255f, rgba[1] / 255f, rgba[2] / 255f);
+            
 
-            prog.Uniform("sunColor", sunCol);
-            prog.Uniform("dayLight", Math.Max(0, capi.World.Calendar.DayLightStrength + capi.World.Calendar.MoonLightStrength - 0.15f));
+            partialTileOffsetX = capi.World.Player.Entity.Pos.X % CloudTileSize;
+            partialTileOffsetZ = capi.World.Player.Entity.Pos.Z % CloudTileSize;
+
+
+            prog.Uniform("sunColor", capi.World.Calendar.SunColor);
+            prog.Uniform("dayLight", Math.Max(0, capi.World.Calendar.DayLightStrength - capi.World.Calendar.MoonLightStrength*0.95f));
             prog.Uniform("windOffset", new Vec3f(
                 (float)(windOffsetX - partialTileOffsetX),
                 0,
                 (float)(windOffsetZ - partialTileOffsetZ)
             ));
             prog.Uniform("globalCloudBrightness", blendedGlobalCloudBrightness);
+
             prog.Uniform("rgbaFogIn", capi.Ambient.BlendedFogColor);
             prog.Uniform("fogMinIn", capi.Ambient.BlendedFogMin);
             prog.Uniform("fogDensityIn", capi.Ambient.BlendedFogDensity);
-            prog.Uniform("playerPos", capi.World.Player.Entity.Pos.XYZFloat);
-            
+            prog.Uniform("playerPos", capi.Render.ShaderUniforms.PlayerPos);
+            prog.Uniform("tileOffset", new Vec2f((tilePosX - tileOffsetX) * CloudTileSize, (tilePosZ - tileOffsetZ) * CloudTileSize));
+
             prog.Uniform("cloudTileSize", CloudTileSize);
             prog.Uniform("cloudsLength", (float)CloudTileSize * CloudTileLength);
+            prog.Uniform("cloudOpaqueness", (float)weatherSys.GetBlendedCloudOpaqueness());
+            prog.Uniform("thinCloudMode", (float)weatherSys.GetBlendedThinCloudModeness());
+            prog.Uniform("undulatingCloudMode", (float)weatherSys.GetBlendedUndulatingCloudModeness());
+            prog.Uniform("cloudCounter", (float)((capi.World.Calendar.TotalHours * 20) % 578f));
             
+
             prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
 
             //int cnt = capi.Render.PointLightsCount;
@@ -285,7 +299,7 @@ namespace Vintagestory.GameContent
                 .FollowPlayer()
                 .Translate(
                     windOffsetX - partialTileOffsetX,
-                    (int)(1 * capi.World.BlockAccessor.MapSizeY) + 0.5 - capi.World.Player.Entity.Pos.Y,
+                    (weatherSys.CloudsYPosition * capi.World.BlockAccessor.MapSizeY + 0.5 - capi.World.Player.Entity.CameraPos.Y),
                     windOffsetZ - partialTileOffsetZ
                 )
             ;
@@ -326,8 +340,8 @@ namespace Vintagestory.GameContent
                 {
                     cloudTiles[i++] = new CloudTile()
                     {
-                        XOffset = x,
-                        ZOffset = z,
+                        XOffset = (short)(x - CloudTileLength/2),
+                        ZOffset = (short)(z - CloudTileLength/2),
                         brightnessRand = new LCGRandom(rand.Next())
                     };
                 }
@@ -346,8 +360,8 @@ namespace Vintagestory.GameContent
                     int newZ = GameMath.Mod(z + dz, CloudTileLength);
 
                     CloudTile tile = cloudTiles[x * CloudTileLength + z];
-                    tile.XOffset = newX;
-                    tile.ZOffset = newZ;
+                    tile.XOffset = (short)(newX - CloudTileLength / 2);
+                    tile.ZOffset = (short)(newZ - CloudTileLength / 2);
 
                     cloudTilesTmp[newX * CloudTileLength + newZ] = tile;
                 }
@@ -359,17 +373,23 @@ namespace Vintagestory.GameContent
         }
 
 
-        private readonly ParallelOptions _pOptions = new ParallelOptions { MaxDegreeOfParallelism = 16 };
-        public void UpdateCloudTiles()
+        private readonly ParallelOptions _pOptions = new ParallelOptions { MaxDegreeOfParallelism = 8 };
+        public override void UpdateCloudTiles(int changeSpeed = 64)
         {
-            weatherSim.EnsureNoiseCacheIsFresh();
+            weatherSys.EnsureNoiseCacheIsFresh();
 
             // Load density from perlin noise
             int cnt = CloudTileLength * CloudTileLength;
             int end = CloudTileLength - 1;
 
-            //int len = width * height;
-            //Parallel.For(0, len, _pOptions, i =>
+            weatherSys.LoadAdjacentSimsAndLerpValues(capi.World.Player.Entity.Pos.XYZ);
+            WeatherSimulation[] sims = weatherSys.adjacentSims;
+
+            double lerpLeftRight = weatherSys.lerpLeftRight;
+            double lerpTopBot = weatherSys.lerpTopBot;
+
+
+
             Parallel.For(0, cnt, _pOptions, i =>
             //for (int i = 0; i < cnt; i++)
             {
@@ -380,14 +400,14 @@ namespace Vintagestory.GameContent
                 int z = (tilePosZ + dz - CloudTileLength / 2 - tileOffsetZ);
                 CloudTile cloudTile = cloudTiles[dx * CloudTileLength + dz];
                 cloudTile.brightnessRand.InitPositionSeed(x, z);
-                double density = weatherSim.GetBlendedCloudDensityAt(dx, dz);
+                double density = weatherSys.GetBlendedCloudThicknessAt(dx, dz, sims, lerpLeftRight, lerpTopBot);
 
-                cloudTile.MaxDensity = (byte)GameMath.Clamp((int)((64 * 255 * density * 3)) / 64, 0, 255);
-                cloudTile.Brightness = (byte)(225 + cloudTile.brightnessRand.NextInt(31));
-                cloudTile.YOffset = (float)weatherSim.GetBlendedCloudOffsetYAt(dx, dz);
+                cloudTile.MaxThickness = (short)GameMath.Clamp(density * short.MaxValue, 0, short.MaxValue);
 
-                float changeVal = GameMath.Clamp(cloudTile.MaxDensity - cloudTile.SelfDensity, -1, 1);
-                cloudTile.SelfDensity += (byte)changeVal;
+                cloudTile.Brightness = (short)((0.88f + cloudTile.brightnessRand.NextFloat()* 0.12f) * short.MaxValue);
+
+                float changeVal = GameMath.Clamp((int)cloudTile.MaxThickness - (int)cloudTile.SelfThickness, -changeSpeed, changeSpeed);
+                cloudTile.SelfThickness = (short)GameMath.Clamp(cloudTile.SelfThickness+changeVal, 0, short.MaxValue);
 
 
                 /// North: Negative Z
@@ -396,19 +416,19 @@ namespace Vintagestory.GameContent
                 /// West: Negative X
                 if (dx > 0)
                 {
-                    cloudTiles[(dx - 1) * CloudTileLength + dz].EastDensity = cloudTile.SelfDensity;
+                    cloudTiles[(dx - 1) * CloudTileLength + dz].EastThickness = cloudTile.SelfThickness;
                 }
                 if (dz > 0)
                 {
-                    cloudTiles[dx * CloudTileLength + dz - 1].SouthDensity = cloudTile.SelfDensity;
+                    cloudTiles[dx * CloudTileLength + dz - 1].SouthThickness = cloudTile.SelfThickness;
                 }
                 if (dx < end)
                 {
-                    cloudTiles[(dx + 1) * CloudTileLength + dz].WestDensity = cloudTile.SelfDensity;
+                    cloudTiles[(dx + 1) * CloudTileLength + dz].WestThickness = cloudTile.SelfThickness;
                 }
                 if (dz < end)
                 {
-                    cloudTiles[dx * CloudTileLength + dz + 1].NorthDensity = cloudTile.SelfDensity;
+                    cloudTiles[dx * CloudTileLength + dz + 1].NorthThickness = cloudTile.SelfThickness;
                 }
             }
 
@@ -454,64 +474,38 @@ namespace Vintagestory.GameContent
 
         void InitCustomDataBuffers(MeshData modeldata)
         {
-            /*modeldata.CustomFloats = new CustomMeshDataPartFloat()
+            modeldata.CustomShorts = new CustomMeshDataPartShort()
             {
                 StaticDraw = false,
                 Instanced = true,
-                InterleaveSizes = new int[] { 1 },
-                InterleaveOffsets = new int[] { 0 },
-                InterleaveStride = 4,
-                Values = new float[QuantityCloudTiles],
-                Count = QuantityCloudTiles
-            };*/
-
-            modeldata.CustomInts = new CustomMeshDataPartInt()
-            {
-                StaticDraw = false,
-                Instanced = true, 
-                InterleaveSizes = new int[] { 2 },
-                InterleaveOffsets = new int[] { 0, 4 },
-                InterleaveStride = 8,
-                Values = new int[QuantityCloudTiles * 2],
-                Count = QuantityCloudTiles * 2
-            };
-
-            modeldata.CustomBytes = new CustomMeshDataPartByte()
-            {
-                StaticDraw = false,
-                Instanced = true,
-                InterleaveSizes = new int[] { 4, 1, 1 },
-                InterleaveOffsets = new int[] { 0, 4, 5 },
-                InterleaveStride = 8,
-                Values = new byte[QuantityCloudTiles * 8],
+                InterleaveSizes = new int[] { 2, 4, 1, 1 },
+                InterleaveOffsets = new int[] { 0, 4, 12, 14 },
+                InterleaveStride = 16,
+                Conversion = DataConversion.NormalizedFloat,
+                Values = new short[QuantityCloudTiles * 8],
                 Count = QuantityCloudTiles * 8,
-                Conversion = DataConversion.NormalizedFloat
             };
         }
 
 
         void UpdateBufferContents(MeshData mesh)
         {
-            //int floatsPosition = 0;
-            int intsPosition = 0;
-            int bytesPosition = 0;
+            int pos = 0;
 
             for (int i = 0; i < cloudTiles.Length; i++)
             {
                 CloudTile cloud = cloudTiles[i];
+                
+                mesh.CustomShorts.Values[pos++] = (short)(CloudTileSize * cloud.XOffset);
+                mesh.CustomShorts.Values[pos++] = (short)(CloudTileSize * cloud.ZOffset);
+                
+                mesh.CustomShorts.Values[pos++] = cloud.NorthThickness;
+                mesh.CustomShorts.Values[pos++] = cloud.EastThickness;
+                mesh.CustomShorts.Values[pos++] = cloud.SouthThickness;
+                mesh.CustomShorts.Values[pos++] = cloud.WestThickness;
 
-                mesh.CustomInts.Values[intsPosition++] = (cloud.XOffset - CloudTileLength / 2);
-                mesh.CustomInts.Values[intsPosition++] = (cloud.ZOffset - CloudTileLength / 2);
-
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.NorthDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.EastDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.SouthDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.WestDensity;
-
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.SelfDensity;
-                mesh.CustomBytes.Values[bytesPosition++] = cloud.Brightness;
-
-                bytesPosition+=2;
+                mesh.CustomShorts.Values[pos++] = cloud.SelfThickness;
+                mesh.CustomShorts.Values[pos++] = cloud.Brightness;
             }
         }
         

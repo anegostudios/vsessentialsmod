@@ -9,7 +9,7 @@ namespace Vintagestory.Essentials
     {
         float minTurnAnglePerSec;
         float maxTurnAnglePerSec;
-        float curTurnRadPerSec;
+        //float curTurnRadPerSec;
         Vec3f targetVec = new Vec3f();
 
         public StraightLineTraverser(EntityAgent entity) : base(entity)
@@ -128,9 +128,21 @@ namespace Vintagestory.Essentials
             if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
-                controls.FlyVector.X *= 0.7f;
-                controls.FlyVector.Z *= 0.7f;
-                controls.FlyVector.Y = GameMath.Clamp(controls.FlyVector.Y, 0.002f, 0.004f);
+                controls.FlyVector.X *= 0.85f;
+                controls.FlyVector.Z *= 0.85f;
+
+                Vec3d pos = entity.Pos.XYZ;
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
+                float bottomSubmergedness = waterY - (float)pos.Y;
+
+                // 0 = at swim line
+                // 1 = completely submerged
+                float swimlineSubmergedness = GameMath.Clamp(bottomSubmergedness - ((float)entity.SwimmingOffsetY), 0, 1);
+                swimlineSubmergedness = Math.Min(1, swimlineSubmergedness + 0.075f);
+                controls.FlyVector.Y = GameMath.Clamp(controls.FlyVector.Y, 0.002f, 0.004f) * swimlineSubmergedness;
+
 
                 if (entity.CollidedHorizontally)
                 {

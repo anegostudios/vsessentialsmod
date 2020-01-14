@@ -25,7 +25,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        public void InitItem(ILogger logger, IClassRegistryAPI instancer, Item item, OrderedDictionary<string, string> searchReplace)
+        public void InitItem(ILogger logger, Item item, OrderedDictionary<string, string> searchReplace)
         {
             if (Shape != null && !Shape.VoxelizeTexture && jsonObject["guiTransform"]?["rotate"] == null)
             {

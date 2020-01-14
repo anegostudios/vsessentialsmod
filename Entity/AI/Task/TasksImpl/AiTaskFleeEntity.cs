@@ -7,6 +7,7 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -31,6 +32,8 @@ namespace Vintagestory.GameContent
         float stepHeight;
 
         EntityPartitioning partitionUtil;
+
+        bool lowStabilityAttracted;
 
 
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
@@ -96,6 +99,7 @@ namespace Vintagestory.GameContent
                 fleeEntityCodesBeginsWith = beginswith.ToArray();
             }
 
+            lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
         }
 
 
@@ -104,9 +108,10 @@ namespace Vintagestory.GameContent
         public override bool ShouldExecute()
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
-            
 
-            if (rand.NextDouble() > 2*executionChance || entity.World.Calendar.DayLightStrength < minDayLight) return false;
+
+            if (rand.NextDouble() > 2 * executionChance) return false;
+            if (entity.World.Calendar.DayLightStrength < minDayLight) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
@@ -115,7 +120,7 @@ namespace Vintagestory.GameContent
 
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0.01f, (20f - generation) / 20f);
+            float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {
@@ -128,7 +133,11 @@ namespace Vintagestory.GameContent
                         if (e.Code.Path == "player")
                         {
                             IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            return player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator);
+                            bool ok = player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator);
+
+                            ok &= !lowStabilityAttracted || e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
+
+                            return ok;
                         }
                         return true;
                     }
@@ -136,13 +145,13 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < fleeEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWith(fleeEntityCodesBeginsWith[i])) return true;
+                    if (e.Code.Path.StartsWithFast(fleeEntityCodesBeginsWith[i])) return true;
                 }
 
                 return false;
             });
 
-            yawOffset = 0;
+            //yawOffset = 0;
 
             if (targetEntity != null)
             {
@@ -198,7 +207,7 @@ namespace Vintagestory.GameContent
 
 
         Vec3d tmpVec = new Vec3d();
-        float yawOffset;
+        //float yawOffset;
 
         private void updateTargetPos()
         {
@@ -233,7 +242,7 @@ namespace Vintagestory.GameContent
             // Running into wall?
             if (traversable(tmpVec))
             {
-                yawOffset = 0;
+                //yawOffset = 0;
                 targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
                 return;
             }
@@ -267,19 +276,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        private double moveDownToFloor(int x, double y, int z)
-        {
-            int tries = 5;
-            while (tries-- > 0)
-            {
-                Block block = world.BlockAccessor.GetBlock(x, (int)(y--), z);
-                if (block.LiquidCode == "water") return y + 1;
-                if (block.SideSolid[BlockFacing.UP.Index]) return y;
-            }
-
-            return y;
-        }
-
+        
 
         Vec3d collTmpVec = new Vec3d();
         bool traversable(Vec3d pos)

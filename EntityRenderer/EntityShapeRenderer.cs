@@ -21,7 +21,7 @@ namespace Vintagestory.GameContent
     }
 
     
-    public class EntityShapeRenderer : EntityRenderer
+    public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
         protected LoadedTexture nameTagTexture = null;
         protected int renderRange = 999;
@@ -58,6 +58,12 @@ namespace Vintagestory.GameContent
         public CompositeShape OverrideCompositeShape;
         public Shape OverrideEntityShape;
 
+        public bool glitchAffected;
+        protected IInventory gearInv;
+
+        ITexPositionSource defaultTexSource;
+
+
         protected Dictionary<string, CompositeTexture> extraTexturesByTextureName
         {
             get
@@ -70,6 +76,23 @@ namespace Vintagestory.GameContent
             get
             {
                 return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTexturesByLoc", () => new Dictionary<AssetLocation, BakedCompositeTexture>());
+            }
+        }
+
+
+        public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
+        protected TextureAtlasPosition skinTexPos;
+        public virtual TextureAtlasPosition this[string textureCode]
+        {
+            get
+            {
+                CompositeTexture cpt = null;
+                if (extraTexturesByTextureName?.TryGetValue(textureCode, out cpt) == true)
+                {
+                    return capi.EntityTextureAtlas.Positions[cpt.Baked.TextureSubId];
+                }
+
+                return defaultTexSource[textureCode];
             }
         }
 
@@ -89,6 +112,8 @@ namespace Vintagestory.GameContent
                 nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
             }
 
+            glitchAffected = true;// entity.Properties.Attributes?["glitchAffected"].AsBool(false) ?? false;
+
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
             api.Event.RegisterGameTickListener(UpdateDebugInfo, 250);
@@ -103,22 +128,26 @@ namespace Vintagestory.GameContent
             api.Event.ReloadShapes += TesselateShape;
         }
 
+
         protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
         {
             if (data != null && data.Contains("from:") && entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 20*20 && message.Length > 0)
             {
                 int entityid = 0;
-                string[] parts = data.Split(',');
+                string[] parts = data.Split(new char[] { ',' }, 2);
                 if (parts.Length < 2) return;
 
-                string[] partone = parts[0].Split(':');
-                string[] parttwo = parts[1].Split(':');
+                string[] partone = parts[0].Split(new char[] { ':' }, 2);
+                string[] parttwo = parts[1].Split(new char[] { ':' }, 2);
                 if (partone[0] != "from") return;
 
                 int.TryParse(partone[1], out entityid);
                 if (entity.EntityId == entityid)
                 {
                     message = parttwo[1];
+
+                    // Crappy fix
+                    message = message.Replace("&lt;", "<").Replace("&gt;", ">");
 
                     LoadedTexture tex = capi.Gui.TextTexture.GenTextTexture(
                         message,
@@ -156,14 +185,14 @@ namespace Vintagestory.GameContent
                 entityShape = addArmorToShape(entityShape, compositeShape.Base.ToString());
             }
 
-            ITexPositionSource texSource = GetTextureSource();
+            defaultTexSource = GetTextureSource();
             MeshData meshdata;
 
             if (entity.Properties.Client.Shape.VoxelizeTexture)
             {
                 int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
 
-                TextureAtlasPosition pos = texSource["all"];
+                TextureAtlasPosition pos = defaultTexSource["all"];
                 CompositeTexture[] Alternates = entity.Properties.Client.FirstTexture.Alternates;
 
                 CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : Alternates[altTexNumber % Alternates.Length];
@@ -178,7 +207,7 @@ namespace Vintagestory.GameContent
             {
                 try
                 {
-                    capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, texSource, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
+                    capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
                 } catch (Exception e)
                 {
                     capi.World.Logger.Fatal("Failed tesselating entity {0} with id {1}. Entity will probably be invisible!. The teselator threw {2}", entity.Code, entity.EntityId, e);
@@ -243,6 +272,7 @@ namespace Vintagestory.GameContent
                         JointsById = entityShape.JointsById,
                         TextureWidth = entityShape.TextureWidth,
                         TextureHeight = entityShape.TextureHeight,
+                        TextureSizes = entityShape.TextureSizes,
                         Textures = entityShape.Textures,
                     };
 
@@ -367,7 +397,7 @@ namespace Vintagestory.GameContent
                             TextureAtlasPosition texpos;
 
                             IAsset texAsset = capi.Assets.TryGet(val.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png"));
-                            if (asset != null)
+                            if (texAsset != null)
                             {
                                 BitmapRef bmp = texAsset.ToBitmap(capi);
                                 capi.EntityTextureAtlas.InsertTexture(bmp, out textureSubId, out texpos);
@@ -391,6 +421,7 @@ namespace Vintagestory.GameContent
 
             return entityShape;
         }
+
 
         protected virtual ITexPositionSource GetTextureSource()
         {
@@ -473,6 +504,15 @@ namespace Vintagestory.GameContent
         public override void BeforeRender(float dt)
         {
             if (meshRefOpaque == null && meshRefOit == null) return;
+
+            if (gearInv == null && eagent?.GearInventory != null)
+            {
+                eagent.GearInventory.SlotModified += slotModified;
+                gearInv = eagent.GearInventory;
+                TesselateShape();
+            }
+
+
             if (capi.IsGamePaused) return;
 
             if (player == null && entity is EntityPlayer)
@@ -529,20 +569,25 @@ namespace Vintagestory.GameContent
             {
                 DoRender3DAfterOIT(dt, true);
             }
+
+            // This was rendered in DoRender3DAfterOIT() - WHY? It makes torches render in front of water
+            if (DoRenderHeldItem && !entity.AnimManager.ActiveAnimationsByAnimCode.ContainsKey("lie") && !isSpectator)
+            {
+                RenderHeldItem(dt, isShadowPass, false);
+                RenderHeldItem(dt, isShadowPass, true);
+            }
         }
 
 
         public override void DoRender3DAfterOIT(float dt, bool isShadowPass)
         {
-            if (DoRenderHeldItem && !entity.AnimManager.ActiveAnimationsByAnimCode.ContainsKey("lie"))
-            {
-                RenderHeldItem(isShadowPass, false);
-                RenderHeldItem(isShadowPass, true);
-            }
+            
         }
 
 
-        protected void RenderHeldItem(bool isShadowPass, bool right)
+        float accum = 0;
+        
+        protected void RenderHeldItem(float dt, bool isShadowPass, bool right)
         {
             IRenderAPI rapi = capi.Render;
             ItemSlot slot = right ? eagent.RightHandItemSlot : eagent.LeftHandItemSlot;
@@ -554,8 +599,8 @@ namespace Vintagestory.GameContent
             AttachmentPoint ap = apap.AttachPoint;
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTp);
             IStandardShaderProgram prog = null;
-            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
+            if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
             
             ItemModelMat
                 .Set(ModelMat)
@@ -568,7 +613,6 @@ namespace Vintagestory.GameContent
                 .RotateZ((float)(ap.RotationZ + renderInfo.Transform.Rotation.Z) * GameMath.DEG2RAD)
                 .Translate(-(renderInfo.Transform.Origin.X), -(renderInfo.Transform.Origin.Y), -(renderInfo.Transform.Origin.Z))
             ;
-
 
 
             if (isShadowPass)
@@ -637,18 +681,66 @@ namespace Vintagestory.GameContent
             if (!isShadowPass)
             {
                 prog.Stop();
+
+                AdvancedParticleProperties[] ParticleProperties = stack.Block?.ParticleProperties;
+
+                if (stack.Block != null && !capi.IsGamePaused)
+                {
+                    
+                    Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Block.TopMiddlePos.X, stack.Block.TopMiddlePos.Y, stack.Block.TopMiddlePos.Z, 1));
+                    EntityPlayer entityPlayer = capi.World.Player.Entity;
+                    accum += dt;
+                    if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > 0.025f)
+                    {
+                        accum = accum % 0.025f;
+
+                        for (int i = 0; i < ParticleProperties.Length; i++)
+                        {
+                            AdvancedParticleProperties bps = ParticleProperties[i];
+                            bps.basePos.X = pos.X + entity.Pos.X + -(entity.Pos.X - entityPlayer.CameraPos.X);
+                            bps.basePos.Y = pos.Y + entity.Pos.Y + -(entity.Pos.Y - entityPlayer.CameraPos.Y);
+                            bps.basePos.Z = pos.Z + entity.Pos.Z + -(entity.Pos.Z - entityPlayer.CameraPos.Z);
+
+                            eagent.World.SpawnParticles(bps);
+                        }
+                    }
+                }
+
             }
 
         }
 
         public override void PrepareForGuiRender(float dt, double posX, double posY, double posZ, float yawDelta, float size, out MeshRef meshRef, out float[] modelviewMatrix)
         {
+            if (gearInv == null && eagent?.GearInventory != null)
+            {
+                eagent.GearInventory.SlotModified += slotModified;
+                gearInv = eagent.GearInventory;
+                TesselateShape();
+            }
+
             loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
             modelviewMatrix = ModelMat;
             meshRef = this.meshRefOpaque;
         }
 
 
+        protected void slotModified(int slotid)
+        {
+            if (slotid >= 12)
+            {
+                TesselateShape();
+            }
+            else
+            {
+                reloadSkin();
+            }
+        }
+
+        public virtual void reloadSkin()
+        {
+
+        }
 
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
@@ -677,7 +769,15 @@ namespace Vintagestory.GameContent
                 color[3] = ((entity.RenderColor >> 24) & 0xff) / 255f;
 
                 capi.Render.CurrentActiveShader.Uniform("renderColor", color);
+
+                double stab = entity.WatchedAttributes.GetDouble("temporalStability", 1);
+                double plrStab = capi.World.Player.Entity.WatchedAttributes.GetDouble("temporalStability", 1);
+                double stabMin = Math.Min(stab, plrStab);
+
+                float strength = (float)(glitchAffected ? Math.Max(0, 1 - 1 / 0.4f * stabMin) : 0);
+                capi.Render.CurrentActiveShader.Uniform("glitchEffectStrength", strength);
             }
+
 
             capi.Render.CurrentActiveShader.UniformMatrices(
                 "elementTransforms", 
@@ -831,6 +931,11 @@ namespace Vintagestory.GameContent
             }
 
             capi.Event.ReloadShapes -= TesselateShape;
+
+            if (DisplayChatMessages)
+            {
+                capi.Event.ChatMessage -= OnChatMessage;
+            }
         }
 
 

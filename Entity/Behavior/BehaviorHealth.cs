@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorHealth : EntityBehavior
     {
         ITreeAttribute healthTree;
-        int cnt;
+        
         public OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
 
         public float Health
@@ -127,6 +127,22 @@ namespace Vintagestory.GameContent
 
                     Health = Math.Min(Health + recoverySpeed, MaxHealth);
                 }
+
+                int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.ServerPos.X, (int)entity.ServerPos.Z);
+                if (entity.World.Side == EnumAppSide.Server && entity is EntityPlayer && rainy <= entity.ServerPos.Y)
+                {
+                    WeatherSystemBase wsys = entity.Api.ModLoader.GetModSystem<WeatherSystemBase>();
+                    var state = wsys.GetPrecipitationState(entity.ServerPos.XYZ);
+
+                    if (state != null && state.ParticleSize > 0.8 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level/2)
+                    {
+                        entity.ReceiveDamage(new DamageSource()
+                        {
+                            Source = EnumDamageSource.Weather,
+                            Type = EnumDamageType.BluntAttack
+                        }, (float)state.ParticleSize/15f);
+                    }
+                }
             }
         }
 
@@ -138,9 +154,17 @@ namespace Vintagestory.GameContent
 
             if (damageSource.Type == EnumDamageType.Heal)
             {
-                damage *= entity.Stats.GetBlended("healingeffectivness");
+                if (damageSource.Source != EnumDamageSource.Revive)
+                {
+                    damage *= Math.Max(0, entity.Stats.GetBlended("healingeffectivness"));
+                    Health = Math.Min(Health + damage, MaxHealth);
+                } else
+                {
+                    damage = Math.Min(damage, MaxHealth);
+                    damage *= Math.Max(0.33f, entity.Stats.GetBlended("healingeffectivness"));
+                    Health = damage;
+                }
 
-                Health = Math.Min(Health + damage, MaxHealth);
                 entity.OnHurt(damageSource, damage);
                 UpdateMaxHealth();
                 return;

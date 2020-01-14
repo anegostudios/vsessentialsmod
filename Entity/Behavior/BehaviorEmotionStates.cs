@@ -93,6 +93,11 @@ namespace Vintagestory.GameContent
         float healthRel;
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
+            if (damageSource.Source == EnumDamageSource.Fall && entity.World.Config.GetString("creatureHostility") == "passive" && entity.World.Config.GetString("creatureHostility") == "off")
+            {
+                return;
+            }
+
             var beh = entity.GetBehavior<EntityBehaviorHealth>();
             healthRel = beh.Health / beh.MaxHealth;
 

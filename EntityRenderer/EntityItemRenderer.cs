@@ -21,7 +21,8 @@ namespace Vintagestory.GameContent
 
         Vec3d lerpedPos = new Vec3d();
         ItemSlot inslot;
-
+        float accum = 0;
+        Vec4f particleOutTransform = new Vec4f();
 
         public EntityItemRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -40,7 +41,6 @@ namespace Vintagestory.GameContent
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
             IRenderAPI rapi = capi.Render;
-            EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             // the value 22 is just trial&error, should probably be something proportial to the
             // 13ms game ticks (which is the physics frame rate)
@@ -75,7 +75,6 @@ namespace Vintagestory.GameContent
                 {
                     prog.AddRenderFlags = (entityitem.Itemstack.Collectible.MaterialDensity > 1000 ? 0 : 1) << 12;
                     prog.WaterWaveCounter = capi.Render.ShaderUniforms.WaterWaveCounter;
-                    prog.Playerpos = new Vec3f((float)entityPlayer.CameraPos.X, (float)entityPlayer.CameraPos.Y, (float)entityPlayer.CameraPos.Z);
                 }
                 else
                 {
@@ -112,6 +111,32 @@ namespace Vintagestory.GameContent
                 prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;
                 prog.ViewMatrix = rapi.CameraMatrixOriginf;
                 prog.ModelMatrix = ModelMat;
+
+
+                ItemStack stack = entityitem.Itemstack;
+                AdvancedParticleProperties[] ParticleProperties = stack.Block?.ParticleProperties;
+
+                if (stack.Block != null && !capi.IsGamePaused)
+                {
+                    Mat4f.MulWithVec4(ModelMat, new Vec4f(stack.Block.TopMiddlePos.X, stack.Block.TopMiddlePos.Y - 0.4f, stack.Block.TopMiddlePos.Z - 0.5f, 0), particleOutTransform); // No idea why the -0.5f and -0.4f
+
+                    accum += dt;
+                    if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > 0.025f)
+                    {
+                        accum = accum % 0.025f;
+
+                        for (int i = 0; i < ParticleProperties.Length; i++)
+                        {
+                            AdvancedParticleProperties bps = ParticleProperties[i];
+                            bps.basePos.X = particleOutTransform.X + entity.Pos.X;
+                            bps.basePos.Y = particleOutTransform.Y + entity.Pos.Y;
+                            bps.basePos.Z = particleOutTransform.Z + entity.Pos.Z;
+
+                            entityitem.World.SpawnParticles(bps);
+                        }
+                    }
+                }
+
             }
 
 

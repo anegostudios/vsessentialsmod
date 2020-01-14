@@ -9,19 +9,20 @@ namespace Vintagestory.GameContent
 {
     public class CloudTile
     {
-        public byte MaxDensity;
-        public byte SelfDensity;
+        public short XOffset; // Grid position
+        public short ZOffset; // Grid position
 
-        public byte NorthDensity;
-        public byte EastDensity;
-        public byte SouthDensity;
-        public byte WestDensity;
-        public byte Brightness;
-        
-        public int XOffset; // Grid position
-        public float YOffset;
-        public int ZOffset; // Grid position
+
+        public short NorthThickness;
+        public short EastThickness;
+        public short SouthThickness;
+        public short WestThickness;
+
+        public short SelfThickness;
+        public short Brightness;
+
 
         public LCGRandom brightnessRand;
+        public short MaxThickness;
     }
 }

@@ -41,6 +41,8 @@ namespace Vintagestory.ServerMods.NoObf
         public int MiningTier;
         [JsonProperty]
         public EnumMatterState MatterState = EnumMatterState.Solid;
+        [JsonProperty]
+        public HeldSounds HeldSounds;
 
         // Determines on whether an object floats on liquids or not
         // Water has a density of 1000

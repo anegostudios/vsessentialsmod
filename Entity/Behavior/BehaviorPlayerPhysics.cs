@@ -14,6 +14,7 @@ namespace Vintagestory.GameContent
     {
         public EntityBehaviorPlayerPhysics(Entity entity) : base(entity)
         {
+            
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
@@ -21,7 +22,16 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, typeAttributes);
         }
 
+
         public override void OnGameTick(float deltaTime)
+        {
+            if (!duringRenderFrame)
+            {
+                onPhysicsTick(deltaTime);
+            }
+        }
+
+        public override void onPhysicsTick(float deltaTime)
         {
             accumulator += deltaTime;
 
@@ -29,20 +39,20 @@ namespace Vintagestory.GameContent
             {
                 accumulator = 1;
             }
-            
 
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
-                entity.PhysicsUpdateWatcher?.Invoke(accumulator - GlobalConstants.PhysicsFrameTime);
+                prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
+                
                 GameTick(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
+
+            entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
         }
 
         public override void GameTick(Entity entity, float dt)
         {
-            
-
             EntityPlayer entityplayer = entity as EntityPlayer;
             EntityControls controls = entityplayer.Controls;
 
@@ -112,5 +122,6 @@ namespace Vintagestory.GameContent
             
             TickEntityPhysics(pos, controls, dt);
         }
+
     }
 }

@@ -5,6 +5,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -25,6 +26,9 @@ namespace Vintagestory.GameContent
 
         bool alarmHerd = false;
         bool leapAtTarget = false;
+        float leapHeightMul = 1f;
+        string leapAnimationCode="jump";
+        float leapChance = 1f;
 
         bool siegeMode;
 
@@ -42,6 +46,22 @@ namespace Vintagestory.GameContent
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
             base.LoadConfig(taskConfig, aiConfig);
+
+            
+            if (taskConfig["leapAnimation"].Exists)
+            {
+                leapAnimationCode = taskConfig["leapAnimation"].AsString(null);
+            }
+
+            if (taskConfig["leapChance"].Exists)
+            {
+                leapChance = taskConfig["leapChance"].AsFloat(1);
+            }
+
+            if (taskConfig["leapHeightMul"].Exists)
+            {
+                leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
+            }
 
             if (taskConfig["movespeed"] != null)
             {
@@ -128,7 +148,7 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < seekEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWith(seekEntityCodesBeginsWith[i])) return true;
+                    if (e.Code.Path.StartsWithFast(seekEntityCodesBeginsWith[i])) return true;
                 }
 
                 return false;
@@ -255,7 +275,7 @@ namespace Vintagestory.GameContent
 
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
-                entity.AnimManager.StopAnimation("jump");
+                entity.AnimManager.StopAnimation(leapAnimationCode);
             }
 
             if (!siegeMode)
@@ -272,19 +292,33 @@ namespace Vintagestory.GameContent
 
             bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
 
-            if (!inCreativeMode && leapAtTarget)
+            if (!inCreativeMode && leapAtTarget && rand.NextDouble() < leapChance)
             {
                 bool recentlyJumped = entity.World.ElapsedMilliseconds - jumpedMS < 3000;
 
                 if (distance > 0.5 && distance < 4 && !recentlyJumped && targetEntity.ServerPos.Y + 0.1 >= entity.ServerPos.Y) 
                 {
-                    entity.ServerPos.Motion.Add((targetEntity.ServerPos.X - entity.ServerPos.X) / 20, GameMath.Max(0.15, (targetEntity.ServerPos.Y - entity.ServerPos.Y) / 20), (targetEntity.ServerPos.Z - entity.ServerPos.Z) / 20);
+                    double dx = (targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 80 - entity.ServerPos.X) / 30;
+                    double dz = (targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 80 - entity.ServerPos.Z) / 30;
+                    entity.ServerPos.Motion.Add(
+                        dx, 
+                        leapHeightMul * GameMath.Max(0.13, (targetEntity.ServerPos.Y - entity.ServerPos.Y) / 30), 
+                        dz
+                    );
+
+                    float yaw = (float)Math.Atan2(dx, dz);
+                    entity.ServerPos.Yaw = yaw;
+
+
                     jumpedMS = entity.World.ElapsedMilliseconds;
-                    entity.AnimManager.StopAnimation("walk");
-                    entity.AnimManager.StopAnimation("run");
-                    entity.AnimManager.StartAnimation(new AnimationMetaData() { Animation = "jump", Code = "jump" }.Init());
                     finishedMs = entity.World.ElapsedMilliseconds;
-                    jumpAnimOn = true;
+                    if (leapAnimationCode != null)
+                    {
+                        entity.AnimManager.StopAnimation("walk");
+                        entity.AnimManager.StopAnimation("run");
+                        entity.AnimManager.StartAnimation(new AnimationMetaData() { Animation = leapAnimationCode, Code = leapAnimationCode }.Init());
+                        jumpAnimOn = true;
+                    }
                 }
 
                 if (recentlyJumped && !entity.Collided && distance < 0.5)

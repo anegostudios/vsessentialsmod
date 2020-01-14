@@ -30,6 +30,8 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap map, float dt)
         {
+            if ((entity as EntityPlayer)?.Player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true) return;
+
             map.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
             float x = (float)(map.Bounds.renderX + viewPos.X);

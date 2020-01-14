@@ -132,13 +132,17 @@ namespace Vintagestory.GameContent
                     cord = chunksToGen.Dequeue();
                 }
 
+                if (!api.World.BlockAccessor.IsValidPos(cord.X * chunksize, 1, cord.Y * chunksize)) continue;
+
                 IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord);
                 if (mc == null)
                 {
+
                     lock (chunksToGenLock)
                     {
                         chunksToGen.Enqueue(cord);
                     }
+
                     continue;
                 }
 
@@ -190,7 +194,7 @@ namespace Vintagestory.GameContent
 
             foreach (Vec2i cord in nowHidden)
             {
-                MapComponent mc = null;
+                MapComponent mc;
                 if (loadedMapData.TryGetValue(cord, out mc))
                 {
                     mapSink.RemoveMapData(mc);
@@ -301,11 +305,8 @@ namespace Vintagestory.GameContent
 
                 float slopeness = (leftTop + rightTop + leftBot);
 
-                if (slopeness > 0) b = 1.2f;
-                if (slopeness < 0) b = 0.8f;
-
-                b -= 0.15f; // Map seems overally a bit too bright
-                //b = 1;
+                if (slopeness > 0) b = 1.18f;
+                if (slopeness < 0) b = 0.82f;
 
                 chunksTmp[cy].Unpack();
                 int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
@@ -317,7 +318,7 @@ namespace Vintagestory.GameContent
                 int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP);
 
                 // Add a bit of randomness to each pixel
-                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.25f);
+                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.2f);
 
                 texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(col, b) | 255 << 24;
             }
