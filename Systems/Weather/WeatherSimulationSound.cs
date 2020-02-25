@@ -41,6 +41,8 @@ namespace Vintagestory.GameContent
         float quarterSecAccum;
         float secAccum = 0;
 
+        bool searchComplete = true;
+        float roomVolumePitchLoss;
 
         //public float windSoundIntensity;
 
@@ -155,23 +157,26 @@ namespace Vintagestory.GameContent
 
             WeatherDataSnapshot weatherData = weatherSys.blendedWeatherData;
 
+            if (searchComplete)
+            {
+                EntityPlayer eplr = capi.World.Player.Entity;
+                plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
+                searchComplete = false;
 
-
-            
-            EntityPlayer eplr = capi.World.Player.Entity;
-            plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
-
-            float val = (capi.World.BlockAccessor.GetHorDistanceToRainFall(plrPos, 10)-2) / 10f;
-            float roomVolumePitchLoss = GameMath.Clamp(val, 0, 1);
-
-
+                TyronThreadPool.QueueTask(() =>
+                {
+                    float val = (float)Math.Pow(Math.Max(0, (capi.World.BlockAccessor.GetDistanceToRainFall(plrPos, 12, 4) - 2) / 10f), 2);
+                    roomVolumePitchLoss = GameMath.Clamp(val, 0, 1);
+                    searchComplete = true;
+                });
+            }
 
 
             if (weatherData.PrecIntensity > 0)
             {
                 if (weatherData.nowPrecType == EnumPrecipitationType.Rain || weatherSys.clientClimateCond.Temperature < weatherData.snowThresholdTemp)
                 {
-                    targetRainVolume = GameMath.Clamp(weatherData.PrecIntensity * 2f - Math.Max(0, 3 * (weatherData.snowThresholdTemp - weatherSys.clientClimateCond.Temperature)), 0, 1);
+                    targetRainVolume = GameMath.Clamp(weatherData.PrecIntensity * 2f - Math.Max(0, 2f * (weatherData.snowThresholdTemp - weatherSys.clientClimateCond.Temperature)), 0, 1);
                     targetRainVolume = GameMath.Max(0, targetRainVolume - roomVolumePitchLoss);
 
                     targetRainPitch = Math.Max(0.7f, 1.25f - weatherData.PrecIntensity * 0.7f);
@@ -186,6 +191,11 @@ namespace Vintagestory.GameContent
                         rainSoundsOn = true;
 
                         curRainPitch = targetRainPitch;
+                    }
+
+                    if (capi.World.Player.Entity.IsEyesSubmerged()) { 
+                        curRainPitch = targetRainPitch / 2;
+                        targetRainVolume *= 0.75f;
                     }
 
                 }
@@ -208,6 +218,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            
             curRainVolume += (targetRainVolume - curRainVolume) * dt;
             curTrembleVolume += (targetTrembleVolume - curTrembleVolume) * dt;
             curHailVolume += (targetHailVolume - curHailVolume) * dt;

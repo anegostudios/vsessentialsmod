@@ -33,6 +33,7 @@ namespace Vintagestory.GameContent
             Register("getoutofwater", typeof(AiTaskGetOutOfWater));
             Register("idle", typeof(AiTaskIdle));
             Register("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
+            Register("useinventory", typeof(AiTaskUseInventory));
         }
     }
 

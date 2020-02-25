@@ -46,7 +46,7 @@ namespace Vintagestory.GameContent
     /// <summary>
     /// Location based weather simulation for one map region
     /// </summary>
-    public class WeatherSimulation
+    public class WeatherSimulationRegion
     {
         // Persistent data
         public bool Transitioning;
@@ -62,7 +62,8 @@ namespace Vintagestory.GameContent
         public int regionX;
         public int regionZ;
 
-        
+        public int cloudTilebasePosX;
+        public int cloudTilebasePosZ;
 
 
 
@@ -85,7 +86,7 @@ namespace Vintagestory.GameContent
         
 
 
-        public WeatherSimulation(WeatherSystemBase ws, int regionX, int regionZ)
+        public WeatherSimulationRegion(WeatherSystemBase ws, int regionX, int regionZ)
         {
             this.ws = ws;
             this.regionX = regionX;
@@ -93,11 +94,15 @@ namespace Vintagestory.GameContent
 
             int regsize = ws.api.World.BlockAccessor.RegionSize;
 
+            cloudTilebasePosX = (regionX * regsize) / ws.CloudTileSize;
+            cloudTilebasePosZ = (regionZ * regsize) / ws.CloudTileSize;
+
+
             regionCenterPos = new BlockPos(regionX * regsize + regsize/2, 0, regionZ * regsize + regsize/2);
 
 
             Rand = new LCGRandom(ws.api.World.Seed);
-            Rand.InitPositionSeed(regionX, regionZ);
+            Rand.InitPositionSeed(regionX/3, regionZ/3);
             weatherData.Ambient = new AmbientModifier().EnsurePopulated();
 
             if (ws.api.Side == EnumAppSide.Client)
@@ -119,7 +124,7 @@ namespace Vintagestory.GameContent
             WeatherPatterns = new WeatherPattern[ws.weatherConfigs.Length];
             for (int i = 0; i < ws.weatherConfigs.Length; i++)
             {
-                WeatherPatterns[i] = new WeatherPattern(ws, ws.weatherConfigs[i], Rand);
+                WeatherPatterns[i] = new WeatherPattern(ws, ws.weatherConfigs[i], Rand, cloudTilebasePosX, cloudTilebasePosZ);
                 WeatherPatterns[i].State.Index = i;
             }
 
@@ -283,6 +288,7 @@ namespace Vintagestory.GameContent
             if (quarterSecAccum > 0.25f)
             {
                 regionCenterPos.Y = ws.api.World.BlockAccessor.GetRainMapHeightAt(regionCenterPos);
+                if (regionCenterPos.Y == 0) regionCenterPos.Y = ws.api.World.SeaLevel; // Map chunk might not be loaded. In that case y will be 0.
                 ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos);
                 if (nowcond != null)
                 {
@@ -441,16 +447,28 @@ namespace Vintagestory.GameContent
 
 
 
-        public double GetBlendedCloudThicknessAt(int dx, int dz)
+        public double GetBlendedCloudThicknessAt(int cloudTilePosX, int cloudTilePosZ)
         {
             if (IsDummy) return 0;
 
-            return (NewWePattern.GetCloudDensityAt(dx, dz) * Weight + OldWePattern.GetCloudDensityAt(dx, dz) * (1 - Weight));
+            int x = cloudTilePosX - cloudTilebasePosX;
+            int z = cloudTilePosZ - cloudTilebasePosZ;
+
+            return (NewWePattern.GetCloudDensityAt(x, z) * Weight + OldWePattern.GetCloudDensityAt(x, z) * (1 - Weight));
         }
 
         public double GetBlendedCloudOpaqueness()
         {
             return NewWePattern.State.nowbaseOpaqueness * Weight + OldWePattern.State.nowbaseOpaqueness * (1 - Weight);
+        }
+
+        public double GetBlendedCloudBrightness(float b)
+        {
+            float w = weatherData.Ambient.CloudBrightness.Weight;
+
+            float bc = weatherData.Ambient.CloudBrightness.Value * weatherData.Ambient.SceneBrightness.Value;
+
+            return b * (1-w) + bc * w;
         }
 
         public double GetBlendedThinCloudModeness()
@@ -463,12 +481,12 @@ namespace Vintagestory.GameContent
             return NewWePattern.State.nowUndulatingCloudModeness * Weight + OldWePattern.State.nowUndulatingCloudModeness * (1 - Weight);
         }
 
-        internal void EnsureNoiseCacheIsFresh()
+        internal void EnsureCloudTileCacheIsFresh(Vec3i tilePos)
         {
             if (IsDummy) return;
 
-            NewWePattern.EnsureNoiseCacheIsFresh();
-            OldWePattern.EnsureNoiseCacheIsFresh();
+            NewWePattern.EnsureCloudTileCacheIsFresh(tilePos);
+            OldWePattern.EnsureCloudTileCacheIsFresh(tilePos);
         }
 
         

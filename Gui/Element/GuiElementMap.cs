@@ -60,13 +60,24 @@ namespace Vintagestory.GameContent
         {
             api.Render.PushScissor(Bounds);
 
-            for (int i = mapComponents.Count - 1; i >= 0; i--) // Cheap hax to improve rendering quality of the player icons
-            //foreach (MapComponent cmp in mapComponents)
+            for (int i = 0; i < mapComponents.Count; i++)
             {
                 MapComponent cmp = mapComponents[i];
 
-                cmp.Render(this, deltaTime);
-                api.Render.CheckGlError();
+                if (cmp is ChunkMapComponent)
+                {
+                    cmp.Render(this, deltaTime);
+                }
+            }
+
+            for (int i = mapComponents.Count - 1; i >= 0; i--) // Cheap hax to improve rendering quality of the player icons
+            {
+                MapComponent cmp = mapComponents[i];
+
+                if (!(cmp is ChunkMapComponent))
+                {
+                    cmp.Render(this, deltaTime);
+                }
             }
 
             api.Render.PopScissor();
@@ -89,7 +100,10 @@ namespace Vintagestory.GameContent
         {
             base.OnMouseDownOnElement(api, args);
 
-            IsDragingMap = true;
+            if (args.Button == EnumMouseButton.Left)
+            {
+                IsDragingMap = true;
+            }
         }
 
         public override void OnMouseUp(ICoreClientAPI api, MouseEvent args)

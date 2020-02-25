@@ -31,8 +31,6 @@ namespace Vintagestory.GameContent
                     push = 8f;
                     lastPush = entity.World.ElapsedMilliseconds;
                     entity.PlayEntitySound("swim", playerUID == null ? null : entity.World.PlayerByUid(playerUID));
-                    EntityAgent.SplashParticleProps.BasePos.Set(pos.X, pos.Y + 0.25f, pos.Z);
-                    entity.World.SpawnParticles(EntityAgent.AirBubbleParticleProps);
                 }
                 else
                 {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -9,7 +10,8 @@ namespace Vintagestory.API.Common
 {
     public abstract class AiTaskBase : IAiTask
     {
-        public Random rand;
+        public ThreadLocal<Random> randTL;
+        public Random rand => randTL.Value;
         public EntityAgent entity;
         public IWorldAccessor world;
         public AnimationMetaData animMeta;
@@ -41,7 +43,7 @@ namespace Vintagestory.API.Common
         {
             this.entity = entity;
             this.world = entity.World;
-            rand = new Random((int)entity.EntityId);
+            randTL = new ThreadLocal<Random>(() => new Random((int)entity.EntityId));
 
             this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser; 
         }

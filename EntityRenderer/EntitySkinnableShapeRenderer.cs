@@ -106,7 +106,7 @@ namespace Vintagestory.GameContent
 
             if (gearInv == null && eagent?.GearInventory != null)
             {
-                eagent.GearInventory.SlotModified += slotModified;
+                eagent.GearInventory.SlotModified += gearSlotModified;
                 gearInv = eagent.GearInventory;
             }
 
@@ -151,7 +151,7 @@ namespace Vintagestory.GameContent
             capi.Event.ReloadTextures -= reloadSkin;
             if (eagent?.GearInventory != null)
             {
-                eagent.GearInventory.SlotModified -= slotModified;
+                eagent.GearInventory.SlotModified -= gearSlotModified;
             }
 
             capi.EntityTextureAtlas.FreeTextureSpace(skinTextureSubId);

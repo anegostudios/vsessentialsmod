@@ -109,8 +109,9 @@ namespace Vintagestory.GameContent
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
 
-
             if (rand.NextDouble() > 2 * executionChance) return false;
+
+
             if (entity.World.Calendar.DayLightStrength < minDayLight) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
@@ -124,7 +125,7 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {
-                if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
+                if (!e.Alive || e.EntityId == this.entity.EntityId || e is EntityItem) return false;
 
                 for (int i = 0; i < fleeEntityCodesExact.Length; i++)
                 {
@@ -200,7 +201,7 @@ namespace Vintagestory.GameContent
                 return false;
             }
 
-            if (entity.IsActivityRunning("invulnerable")) return false;
+            //if (entity.IsActivityRunning("invulnerable")) return false;
 
             return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs);
         }

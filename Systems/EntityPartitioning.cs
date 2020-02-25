@@ -167,7 +167,7 @@ namespace Vintagestory.GameContent
             else didChange = true;
 
 
-            if (didChange && gridIndex > 0) // Grindindex can be negative when a entity is outside world bounds 
+            if (didChange && gridIndex >= 0) // Grindindex can be negative when a entity is outside world bounds 
             {
                 partition.Entities[gridIndex].Add(entity);
                 GridIndexByEntityId[entity.EntityId] = new GridAndChunkIndex(lgz * partitionsLength + lgx, nowInChunkIndex3d);
@@ -238,8 +238,8 @@ namespace Vintagestory.GameContent
             EntityPartitionChunk partitionChunk = null;
 
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridZMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            int gridYMax = api.World.BlockAccessor.MapSizeY / gridSizeInBlocks;
+            int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {

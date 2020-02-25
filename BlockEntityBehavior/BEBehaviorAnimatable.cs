@@ -114,11 +114,11 @@ namespace Vintagestory.GameContent
         }
 
 
-        public void InitializeAnimator(string cacheDictKey, Vec3f rotation, Shape blockShape, MeshRef meshref, params string[] requireJointsForElements)
+        public void InitializeAnimator(string cacheDictKey, Vec3f rotation, Shape blockShape, MeshRef meshref)
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
-            animator = GetAnimator(api, cacheDictKey, blockShape, requireJointsForElements);
+            animator = GetAnimator(api, cacheDictKey, blockShape);
 
             render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, meshref);
         }
@@ -138,7 +138,6 @@ namespace Vintagestory.GameContent
         {
             if (activeAnimationsByAnimCode.Remove(code))
             {
-
                 if (activeAnimationsByAnimCode.Count == 0)
                 {
                     api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = false);
@@ -147,7 +146,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public static AnimatorBase GetAnimator(ICoreAPI api, string cacheDictKey, Shape blockShape, params string[] requireJointsForElements)
+        public static AnimatorBase GetAnimator(ICoreAPI api, string cacheDictKey, Shape blockShape)
         {
             if (blockShape == null)
             {
@@ -212,7 +211,7 @@ namespace Vintagestory.GameContent
 
         internal void Dispose()
         {
-            render?.Unregister();
+            render?.Dispose();
         }
     }
 }

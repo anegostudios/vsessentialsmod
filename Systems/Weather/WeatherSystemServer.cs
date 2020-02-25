@@ -64,7 +64,7 @@ namespace Vintagestory.GameContent
         {
             foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
             {
-                WeatherSimulation weatherSim = getOrCreateWeatherSimForRegion(val.Key, val.Value);
+                WeatherSimulationRegion weatherSim = getOrCreateWeatherSimForRegion(val.Key, val.Value);
                 weatherSim.TickEvery25ms(dt);
                 weatherSim.UpdateWeatherData();
             }

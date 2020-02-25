@@ -53,6 +53,9 @@ namespace Vintagestory.GameContent
         {
             WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
 
+            int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
+            int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
+
             string arg = args.PopWord();
 
             if (arg == "acp")
@@ -140,6 +143,57 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            if (arg == "setirandom")
+            {
+                wsysServer.ReloadConfigs();
+                
+                bool ok = true;
+                foreach (var val in wsysServer.weatherSimByMapRegion)
+                {
+                    ok &= val.Value.SetWeatherPattern(val.Value.RandomWeatherPattern().config.Code, true);
+                    if (ok)
+                    {
+                        val.Value.TickEvery25ms(0.025f);
+                    }
+                }
+
+                if (!ok)
+                {
+                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
+                }
+                else
+                {
+                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                }
+                return;
+            }
+
+            if (arg == "setir")
+            {
+                wsysServer.ReloadConfigs();
+                string code = args.PopWord();
+
+                WeatherSimulationRegion weatherSim;
+                long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+                if (weatherSim == null)
+                {
+                    player.SendMessage(groupId, "Weather sim not loaded (yet) for this region", EnumChatType.CommandError);
+                    return;
+                }
+
+                if (weatherSim.SetWeatherPattern(code, true))
+                {
+                    weatherSim.TickEvery25ms(0.025f);
+                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                } else
+                {
+                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
+                }
+                return;
+            }
+
+
             string text = getWeatherInfo<WeatherSystemServer>(player);
             player.SendMessage(groupId, text, EnumChatType.CommandSuccess);
         }
@@ -157,7 +211,7 @@ namespace Vintagestory.GameContent
             int regionX = (int)pos.X / api.World.BlockAccessor.RegionSize;
             int regionZ = (int)pos.Z / api.World.BlockAccessor.RegionSize;
 
-            WeatherSimulation weatherSim;
+            WeatherSimulationRegion weatherSim;
             long index2d = wsys.MapRegionIndex2D(regionX, regionZ);
             wsys.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
             if (weatherSim == null)
@@ -182,7 +236,7 @@ namespace Vintagestory.GameContent
 
             for (int i = 0; i < 4; i++)
             {
-                WeatherSimulation sim = wsys.adjacentSims[i];
+                WeatherSimulationRegion sim = wsys.adjacentSims[i];
 
                 if (sim == wsys.dummySim)
                 {

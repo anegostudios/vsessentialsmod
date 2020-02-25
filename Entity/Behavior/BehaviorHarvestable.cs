@@ -121,7 +121,9 @@ namespace Vintagestory.GameContent
 
         public override void OnInteract(EntityAgent byEntity, ItemSlot itemslot, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled)
         {
-            if (!IsHarvested || byEntity.Pos.SquareDistanceTo(entity.Pos) > 5)
+            bool inRange = (byEntity.World.Side == EnumAppSide.Client && byEntity.Pos.SquareDistanceTo(entity.Pos) <= 5) || (byEntity.World.Side == EnumAppSide.Server && byEntity.Pos.SquareDistanceTo(entity.Pos) <= 14);
+
+            if (!IsHarvested || !inRange)
             {
                 return;
             }
@@ -130,6 +132,8 @@ namespace Vintagestory.GameContent
             IPlayer player = entity.World.PlayerByUid(entityplr.PlayerUID);
             player.InventoryManager.OpenInventory(inv);
             
+            
+
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
                 dlg = new GuiDialogCarcassContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI);
@@ -151,6 +155,7 @@ namespace Vintagestory.GameContent
                 handled = EnumHandling.PreventSubsequent;
                 return;
             }
+
             if (packetid == 1012)
             {
                 if (!IsHarvested)
@@ -208,6 +213,11 @@ namespace Vintagestory.GameContent
             entity.WatchedAttributes["harvestableInv"] = tree;
             entity.WatchedAttributes.MarkPathDirty("harvestableInv");
             entity.WatchedAttributes.MarkPathDirty("harvested");
+
+            if (entity.World.Side == EnumAppSide.Server)
+            {
+                entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.AsBlockPos).MarkModified();
+            }
 
             //entity.World.Logger.Debug("setharvested done");
         }

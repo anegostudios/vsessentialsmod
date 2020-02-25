@@ -26,14 +26,14 @@ namespace Vintagestory.GameContent
             this.entity = entity;
         }
 
+        public ItemStack ItemStack => entity.Itemstack;
+
         public Vec3d Position => entity.ServerPos.XYZ;
 
         public string Type => "food";
 
         public float ConsumeOnePortion()
         {
-            entity.World.SpawnCubeParticles(entity.ServerPos.XYZ, entity.Itemstack, 0.25f, 20);
-
             entity.Itemstack.StackSize--;
             if (entity.Itemstack.StackSize <= 0) entity.Die();
             return 1f;
@@ -61,15 +61,22 @@ namespace Vintagestory.GameContent
         float eatTimeNow = 0;
         bool soundPlayed = false;
         bool doConsumePortion = true;
+        bool eatAnimStarted = false;
+        bool playEatAnimForLooseItems = true;
 
         bool eatLooseItems;
         HashSet<EnumFoodCategory> eatItemCategories = new HashSet<EnumFoodCategory>();
+        HashSet<AssetLocation> eatItemCodes = new HashSet<AssetLocation>();
 
         float quantityEaten;
 
         AnimationMetaData eatAnimMeta;
+        AnimationMetaData eatAnimMetaLooseItems;
 
         Dictionary<IAnimalFoodSource, FailedAttempt> failedSeekTargets = new Dictionary<IAnimalFoodSource, FailedAttempt>();
+
+        float extraTargetDist;
+        long lastPOISearchTotalMs;
 
         public AiTaskSeekFoodAndEat(EntityAgent entity) : base(entity)
         {
@@ -106,11 +113,24 @@ namespace Vintagestory.GameContent
                 eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
             }
 
+            if (taskConfig["playEatAnimForLooseItems"] != null)
+            {
+                playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
+            }
+
             if (taskConfig["eatItemCategories"] != null)
             {
                 foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
                 {
                     eatItemCategories.Add(val);
+                }
+            }
+
+            if (taskConfig["eatItemCodes"] != null)
+            {
+                foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
+                {
+                    eatItemCodes.Add(val);
                 }
             }
 
@@ -123,11 +143,23 @@ namespace Vintagestory.GameContent
                     AnimationSpeed = taskConfig["eatAnimationSpeed"].AsFloat(1f)
                 }.Init();
             }
+
+            if (taskConfig["eatAnimationLooseItems"].Exists)
+            {
+                eatAnimMetaLooseItems = new AnimationMetaData()
+                {
+                    Code = taskConfig["eatAnimationLooseItems"].AsString()?.ToLowerInvariant(),
+                    Animation = taskConfig["eatAnimationLooseItems"].AsString()?.ToLowerInvariant(),
+                    AnimationSpeed = taskConfig["eatAnimationSpeedLooseItems"].AsFloat(1f)
+                }.Init();
+            }
         }
 
         public override bool ShouldExecute()
         {
             if (entity.World.Rand.NextDouble() < 0.005) return false;
+            // Don't search more often than every 15 seconds
+            if (lastPOISearchTotalMs + 15000 > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilTotalHours > entity.World.Calendar.TotalHours) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
@@ -137,7 +169,9 @@ namespace Vintagestory.GameContent
             if (bh != null && !bh.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
 
             targetPoi = null;
-            
+            extraTargetDist = 0;
+            lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
+
             entity.World.Api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 3, (e) =>
             {
                 if (e is EntityItem)
@@ -149,6 +183,13 @@ namespace Vintagestory.GameContent
                         targetPoi = new LooseItemFoodSource(ei);
                         return false;
                     }
+
+                    AssetLocation code = ei.Itemstack?.Collectible?.Code;
+                    if (code != null && eatItemCodes.Contains(code))
+                    {
+                        targetPoi = new LooseItemFoodSource(ei);
+                        return false;
+                    }
                 }
 
                 return true;
@@ -156,6 +197,7 @@ namespace Vintagestory.GameContent
 
             if (targetPoi == null)
             {
+                
                 targetPoi = porregistry.GetNearestPoi(entity.ServerPos.XYZ, 48, (poi) =>
                 {
                     if (poi.Type != "food") return false;
@@ -165,13 +207,28 @@ namespace Vintagestory.GameContent
                     {
                         FailedAttempt attempt;
                         failedSeekTargets.TryGetValue(foodPoi, out attempt);
-                        if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000)) return true;
+                        if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000))
+                        {
+                            return true;
+                        }
                     }
 
                     return false;
                 }) as IAnimalFoodSource;
             }
             
+            /*if (targetPoi != null)
+            {
+                if (targetPoi is BlockEntity || targetPoi is Block)
+                {
+                    Block block = entity.World.BlockAccessor.GetBlock(targetPoi.Position.AsBlockPos);
+                    Cuboidf[] collboxes = block.GetCollisionBoxes(entity.World.BlockAccessor, targetPoi.Position.AsBlockPos);
+                    if (collboxes != null && collboxes.Length != 0 && collboxes[0].Y2 > 0.3f)
+                    {
+                        extraTargetDist = 0.15f;
+                    }
+                }
+            }*/
 
             return targetPoi != null;
         }
@@ -180,7 +237,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.5f, (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2 + 0.05f);
+            return Math.Max(extraTargetDist + 0.5f, (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2 + 0.05f);
         }
 
         public override void StartExecute()
@@ -191,6 +248,7 @@ namespace Vintagestory.GameContent
             soundPlayed = false;
             eatTimeNow = 0;
             pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 1000);
+            eatAnimStarted = false;
         }
 
         public override bool ContinueExecute(float dt)
@@ -208,22 +266,32 @@ namespace Vintagestory.GameContent
 
             if (distance < minDist)
             {
+                pathTraverser.Stop();
+
                 EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
                 if (bh != null && !bh.ShouldEat) return false;
 
                 if (targetPoi.IsSuitableFor(entity) != true) return false;
                 
-                if (eatAnimMeta != null)
+                if (eatAnimMeta != null && !eatAnimStarted)
                 {
                     if (animMeta != null)
                     {
                         entity.AnimManager.StopAnimation(animMeta.Code);
                     }
 
-                    entity.AnimManager.StartAnimation(eatAnimMeta.Code);
+                    entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);                        
+
+                    eatAnimStarted = true;
                 }
 
                 eatTimeNow += dt;
+
+                if (targetPoi is LooseItemFoodSource foodSource)
+                {
+                    entity.World.SpawnCubeParticles(entity.ServerPos.XYZ, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
+                }
+                
 
                 if (eatTimeNow > eatTime * 0.75f && !soundPlayed)
                 {

@@ -241,7 +241,7 @@ namespace Vintagestory.GameContent
 
                 ReduceSaturation(satLossMultiplier);
 
-                hungerCounter -= 10;
+                hungerCounter = 0;
                 sprintCounter = 0;
             }
         }

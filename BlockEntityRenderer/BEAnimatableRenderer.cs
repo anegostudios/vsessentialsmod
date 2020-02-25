@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
 
             textureId = capi.BlockTextureAtlas.GetPosition(capi.World.BlockAccessor.GetBlock(pos), "rusty").atlasTextureId;
 
-            capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque);
+            capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimatable");
         }
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
@@ -111,13 +111,10 @@ namespace Vintagestory.GameContent
             prevProg?.Use();
         }
 
-        public void Unregister()
-        {
-            capi.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);
-        }
 
         public void Dispose()
         {
+            capi.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);
             meshref?.Dispose();
         }
 

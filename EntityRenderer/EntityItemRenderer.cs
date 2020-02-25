@@ -23,6 +23,7 @@ namespace Vintagestory.GameContent
         ItemSlot inslot;
         float accum = 0;
         Vec4f particleOutTransform = new Vec4f();
+        Vec4f glowRgb = new Vec4f();
 
         public EntityItemRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -54,7 +55,7 @@ namespace Vintagestory.GameContent
 
             IStandardShaderProgram prog = null;
             LoadModelMatrix(renderInfo, isShadowPass, dt);
-            
+                
             if (isShadowPass)
             {
                 rapi.CurrentActiveShader.BindTexture2D("tex2d", renderInfo.TextureId, 0);
@@ -70,6 +71,7 @@ namespace Vintagestory.GameContent
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
                 prog.DontWarpVertices = 0;
+                prog.NormalShaded = 1;
 
                 if (entity.Swimming)
                 {
@@ -96,17 +98,22 @@ namespace Vintagestory.GameContent
                 Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
                 int temp = (int)entityitem.Itemstack.Collectible.GetTemperature(capi.World, entityitem.Itemstack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
-                lightrgbs[0] += glowColor[0];
-                lightrgbs[1] += glowColor[1];
-                lightrgbs[2] += glowColor[2];
+                int extraGlow = GameMath.Clamp((temp - 550) / 2, 0, 255);
+                glowRgb.R = glowColor[0];
+                glowRgb.G = glowColor[1];
+                glowRgb.B = glowColor[2];
+                glowRgb.A = extraGlow / 255f;
 
-                prog.ExtraGlow = GameMath.Clamp((temp - 500) / 3, 0, 255);
+                prog.ExtraGlow = extraGlow;
                 prog.RgbaAmbientIn = rapi.AmbientColor;
                 prog.RgbaLightIn = lightrgbs;
+                prog.RgbaGlowIn = glowRgb;
                 prog.RgbaBlockIn = ColorUtil.WhiteArgbVec;
                 prog.RgbaFogIn = rapi.FogColor;
                 prog.FogMinIn = rapi.FogMin;
                 prog.FogDensityIn = rapi.FogDensity;
+                prog.ExtraGodray = 0;
+                prog.NormalShaded = renderInfo.NormalShaded ? 1 : 0;
 
                 prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;
                 prog.ViewMatrix = rapi.CameraMatrixOriginf;

@@ -35,6 +35,8 @@ namespace Vintagestory.GameContent
         long finishedMs;
         bool jumpAnimOn;
 
+        long lastSearchTotalMs;
+
         EntityPartitioning partitionUtil;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
@@ -114,7 +116,7 @@ namespace Vintagestory.GameContent
 
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
-
+            if (lastSearchTotalMs + 4000 > entity.World.ElapsedMilliseconds) return false;
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
 
@@ -126,6 +128,7 @@ namespace Vintagestory.GameContent
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
 
 
+            lastSearchTotalMs = entity.World.ElapsedMilliseconds;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
@@ -153,6 +156,8 @@ namespace Vintagestory.GameContent
 
                 return false;
             });
+
+            
 
             if (targetEntity != null)
             {

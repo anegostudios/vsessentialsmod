@@ -34,6 +34,7 @@ namespace Vintagestory.GameContent
         public override void OnEntityDespawn(EntityDespawnReason despawn)
         {
             (entity.World.Api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+            Dispose();
         }
 
         public EntityBehaviorControlledPhysics(Entity entity) : base(entity)
@@ -120,10 +121,17 @@ namespace Vintagestory.GameContent
 
         public void TickEntityPhysics(EntityPos pos, EntityControls controls, float dt)
         {
-            IBlockAccessor blockAccessor = entity.World.BlockAccessor;
+            // This seems to make creatures clip into the terrain. Le sigh. 
+            // Since we currently only really need it for when the creature is dead, let's just use it only there
 
-            bool isAlive = entity.Alive;
+            // Also running animations for all nearby living entities is pretty CPU intensive so
+            // the AnimationManager also just ticks if the entity is in view or dead
+            if (!entity.Alive)
+            {
+                AdjustCollisionBoxToAnimation();
+            }
 
+            
             foreach (EntityLocomotion locomotor in Locomotors)
             {
                 if (locomotor.Applicable(entity, pos, controls))
@@ -160,16 +168,6 @@ namespace Vintagestory.GameContent
                 entity.OnGround = false;
             }
             
-
-            // This seems to make creatures clip into the terrain. Le sigh. 
-            // Since we currently only really need it for when the creature is dead, let's just use it only there
-            
-            // Also running animations for all nearby living entities is pretty CPU intensive so
-            // the AnimationManager also just ticks if the entity is in view or dead
-            if (!isAlive)
-            {
-                AdjustCollisionBoxToAnimation();
-            }
             
 
             // Shake the player violently when falling at high speeds
@@ -273,7 +271,10 @@ namespace Vintagestory.GameContent
 
             collisionTester.ApplyTerrainCollision(entity, pos, ref outposition, !(entity is EntityPlayer));
 
-            controls.IsStepping = HandleSteppingOnBlocks(pos, controls);
+            if (!entity.Properties.CanClimbAnywhere)
+            {
+                controls.IsStepping = HandleSteppingOnBlocks(pos, controls);
+            }
             
             HandleSneaking(pos, controls, dt);
 
@@ -325,6 +326,7 @@ namespace Vintagestory.GameContent
 
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
             entity.FeetInLiquid = block.IsLiquid() && ((block.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
+            entity.InLava = block.LiquidCode == "lava";
             entity.Swimming = middleBlock.IsLiquid();
 
             if (!onGroundBefore && entity.OnGround)
@@ -483,6 +485,8 @@ namespace Vintagestory.GameContent
             {
                 Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
 
+                if (!collisionTester.CollisionBoxList.blocks[i].CanStep) continue;
+
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 if (intersect == EnumIntersect.NoIntersect) continue;
 
@@ -553,10 +557,32 @@ namespace Vintagestory.GameContent
                 .Translate(ap.PosX / 16f, ap.PosY / 16f, ap.PosZ / 16f)
             ;
 
+            EntityPos epos = entity.LocalPos;
+
             float[] endVec = Mat4f.MulWithVec4(tmpModelMat.Values, hitboxOff);
 
-            entity.CollisionBox.Set(entity.OriginCollisionBox);
-            entity.CollisionBox.Translate(endVec[0], 0, endVec[2]);
+            float motionX = endVec[0] - (entity.CollisionBox.X1 - entity.OriginCollisionBox.X1);
+            float motionZ = endVec[2] - (entity.CollisionBox.Z1 - entity.OriginCollisionBox.Z1);
+
+            if (Math.Abs(motionX) > 0.00001 || Math.Abs(motionZ) > 0.00001)
+            {
+
+                EntityPos posMoved = epos.Copy();
+                posMoved.Motion.X = motionX;
+                posMoved.Motion.Z = motionZ;
+
+                collisionTester.ApplyTerrainCollision(entity, posMoved, ref outposition, !(entity is EntityPlayer));
+
+                double reflectX = outposition.X - epos.X - motionX;
+                double reflectZ = outposition.Z - epos.Z - motionZ;
+
+                epos.Motion.X = reflectX;
+                epos.Motion.Z = reflectZ;
+
+                entity.CollisionBox.Set(entity.OriginCollisionBox);
+                entity.CollisionBox.Translate(endVec[0], 0, endVec[2]);
+            }
+            //Console.WriteLine("{0}/{1}", reflectX, reflectZ);
         }
 
 

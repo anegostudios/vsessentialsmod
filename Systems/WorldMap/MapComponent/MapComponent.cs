@@ -33,5 +33,10 @@ namespace Vintagestory.GameContent
         {
 
         }
+
+        public virtual void OnMouseUpOnElement(MouseEvent args, GuiElementMap mapElem)
+        {
+
+        }
     }
 }

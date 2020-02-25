@@ -101,7 +101,7 @@ namespace Vintagestory.GameContent
                 float desiredYaw = (float)Math.Atan2(controls.WalkVector.X, controls.WalkVector.Z) - GameMath.PIHALF;
                 
                 float yawDist = GameMath.AngleRadDistance(entityplayer.WalkYaw, desiredYaw);
-                entityplayer.WalkYaw += GameMath.Clamp(yawDist, -10 * dt * GlobalConstants.OverallSpeedMultiplier, 10 * dt * GlobalConstants.OverallSpeedMultiplier);
+                entityplayer.WalkYaw += GameMath.Clamp(yawDist, -8 * dt * GlobalConstants.OverallSpeedMultiplier, 8 * dt * GlobalConstants.OverallSpeedMultiplier);
                 entityplayer.WalkYaw = GameMath.Mod(entityplayer.WalkYaw, GameMath.TWOPI);
 
                 if (entity.Swimming)

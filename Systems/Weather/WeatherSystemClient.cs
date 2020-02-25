@@ -11,7 +11,7 @@ namespace Vintagestory.GameContent
     {
         public ICoreClientAPI capi;
         public IClientNetworkChannel clientChannel;
-        public CloudRendererDummy cloudRenderer;
+        public CloudRenderer cloudRenderer;
 
 
         public ClimateCondition clientClimateCond;
@@ -36,19 +36,6 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override int CloudTileLength
-        {
-            get { return cloudRenderer.CloudTileLength; }
-        }
-
-        public override int CloudTileX
-        {
-            get { return cloudRenderer.tilePosX - cloudRenderer.tileOffsetX; }
-        }
-        public override int CloudTileZ
-        {
-            get { return cloudRenderer.tilePosZ - cloudRenderer.tileOffsetZ; }
-        }
 
         public override void StartClientSide(ICoreClientAPI capi)
         {
@@ -63,7 +50,7 @@ namespace Vintagestory.GameContent
             capi.Event.LevelFinalize += LevelFinalizeInit;
             capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "weatherSystem");
             capi.Event.RegisterRenderer(this, EnumRenderStage.Done, "weatherSystem");
-            capi.Event.LeaveWorld += () => (cloudRenderer as CloudRenderer)?.Dispose();
+            capi.Event.LeaveWorld += () => cloudRenderer?.Dispose();
 
             blendedWeatherData.Ambient = new AmbientModifier().EnsurePopulated();
 
@@ -126,7 +113,7 @@ namespace Vintagestory.GameContent
 
             for (int i = 0; i < 4; i++)
             {
-                WeatherSimulation sim = adjacentSims[i];
+                WeatherSimulationRegion sim = adjacentSims[i];
                 if (sim == dummySim) continue;
                 sim.TickEvery25ms(dt);
             }
@@ -136,20 +123,24 @@ namespace Vintagestory.GameContent
 
 
 
-        Queue<WeatherState> earlyWeatherUpdates = new Queue<WeatherState>();
+        Queue<WeatherState> weatherUpdateQueue = new Queue<WeatherState>();
         private void OnWeatherUpdate(WeatherState msg)
         {
-            // Ok thing. The server will send weather updates before our weather simulation is initialized.
-            // We initialize our weather simulators only during LevelFinalize
-            // So, let's just queue those up in that case, and process once we done initializing
+            weatherUpdateQueue.Enqueue(msg);
+        }
 
-            if (!haveLevelFinalize)
+        public void ProcessWeatherUpdates()
+        {
+            foreach (var packet in weatherUpdateQueue)
             {
-                earlyWeatherUpdates.Enqueue(msg);
-                return;
+                ProcessWeatherUpdate(packet);
             }
+            weatherUpdateQueue.Clear();
+        }
 
-            WeatherSimulation weatherSim = getOrCreateWeatherSimForRegion(msg.RegionX, msg.RegionZ);
+        void ProcessWeatherUpdate(WeatherState msg)
+        { 
+            WeatherSimulationRegion weatherSim = getOrCreateWeatherSimForRegion(msg.RegionX, msg.RegionZ);
 
             if (weatherSim == null)
             {
@@ -178,17 +169,18 @@ namespace Vintagestory.GameContent
             weatherSim.Transitioning = msg.Transitioning;
             weatherSim.Weight = msg.Weight;
 
-            bool windChanged = weatherSim.CurWindPattern.State.Index != msg.WindPattern.Index;
+            //bool windChanged = weatherSim.CurWindPattern.State.Index != msg.WindPattern.Index;
             weatherSim.CurWindPattern = weatherSim.WindPatterns[msg.WindPattern.Index];
             weatherSim.CurWindPattern.State = msg.WindPattern;
 
             if (msg.updateInstant)
             {
                 weatherSim.NewWePattern.OnBeginUse();
+                cloudRenderer.instantTileBlend = true;
             }
 
 
-            api.World.Logger.Notification("Weather pattern update @{0}/{1}", weatherSim.regionX, weatherSim.regionZ);
+            //api.World.Logger.Notification("Weather pattern update @{0}/{1}", weatherSim.regionX, weatherSim.regionZ);
 
             if (msg.Transitioning)
             {
@@ -214,20 +206,17 @@ namespace Vintagestory.GameContent
             cloudRenderer = new CloudRenderer(capi, this);
 
             smoothedLightLevel = capi.World.BlockAccessor.GetLightLevel(capi.World.Player.Entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
-            dummySim = new WeatherSimulation(this, 0, 0);
+            dummySim = new WeatherSimulationRegion(this, 0, 0);
+            dummySim.Initialize();
+
             adjacentSims[0] = dummySim;
             adjacentSims[1] = dummySim;
             adjacentSims[2] = dummySim;
             adjacentSims[3] = dummySim;
-            dummySim.Initialize();
+            
 
             capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", blendedWeatherData.Ambient);
             haveLevelFinalize = true;
-
-            foreach (var packet in earlyWeatherUpdates)
-            {
-                OnWeatherUpdate(packet);
-            }
 
             // Pre init the clouds.             
             capi.Ambient.UpdateAmbient(0.1f);
@@ -235,35 +224,21 @@ namespace Vintagestory.GameContent
 
             renderer.blendedCloudDensity = capi.Ambient.BlendedCloudDensity;
             renderer.blendedGlobalCloudBrightness = capi.Ambient.BlendedCloudBrightness;
-            renderer.UpdateWindAndClouds(0.1f);
+            renderer.CloudTick(0.1f);
+
         }
 
-
-
-        public double GetBlendedCloudThicknessAt(int dx, int dz)
+       
+        public double GetBlendedCloudThicknessAt(int cloudTileX, int cloudTileZ)
         {
             return GameMath.BiLerp(
-                adjacentSims[0].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[1].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[2].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[3].GetBlendedCloudThicknessAt(dx, dz),
+                adjacentSims[0].GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ),
+                adjacentSims[1].GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ),
+                adjacentSims[2].GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ),
+                adjacentSims[3].GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ),
                 lerpLeftRight, lerpTopBot
             );
         }
-
-
-
-        public double GetBlendedCloudThicknessAt(int dx, int dz, WeatherSimulation[] adjacentSims, double lerpLeftRight, double lerpTopBot)
-        {
-            return GameMath.BiLerp(
-                adjacentSims[0].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[1].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[2].GetBlendedCloudThicknessAt(dx, dz),
-                adjacentSims[3].GetBlendedCloudThicknessAt(dx, dz),
-                lerpLeftRight, lerpTopBot
-            );
-        }
-
 
         public double GetBlendedCloudOpaqueness()
         {
@@ -272,6 +247,17 @@ namespace Vintagestory.GameContent
                 adjacentSims[1].GetBlendedCloudOpaqueness(),
                 adjacentSims[2].GetBlendedCloudOpaqueness(),
                 adjacentSims[3].GetBlendedCloudOpaqueness(),
+                lerpLeftRight, lerpTopBot
+            );
+        }
+
+        public double GetBlendedCloudBrightness(float b)
+        {
+            return GameMath.BiLerp(
+                adjacentSims[0].GetBlendedCloudBrightness(b),
+                adjacentSims[1].GetBlendedCloudBrightness(b),
+                adjacentSims[2].GetBlendedCloudBrightness(b),
+                adjacentSims[3].GetBlendedCloudBrightness(b),
                 lerpLeftRight, lerpTopBot
             );
         }
@@ -298,12 +284,12 @@ namespace Vintagestory.GameContent
             );
         }
 
-        public void EnsureNoiseCacheIsFresh()
+        public void EnsureCloudTileCacheIsFresh(Vec3i tilePos)
         {
-            adjacentSims[0].EnsureNoiseCacheIsFresh();
-            adjacentSims[1].EnsureNoiseCacheIsFresh();
-            adjacentSims[2].EnsureNoiseCacheIsFresh();
-            adjacentSims[3].EnsureNoiseCacheIsFresh();
+            adjacentSims[0].EnsureCloudTileCacheIsFresh(tilePos);
+            adjacentSims[1].EnsureCloudTileCacheIsFresh(tilePos);
+            adjacentSims[2].EnsureCloudTileCacheIsFresh(tilePos);
+            adjacentSims[3].EnsureCloudTileCacheIsFresh(tilePos);
         }
 
 

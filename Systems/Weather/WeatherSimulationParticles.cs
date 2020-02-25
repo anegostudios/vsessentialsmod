@@ -211,9 +211,9 @@ namespace Vintagestory.GameContent
             // Don't spawn if wind speed below 70% or if the player is 10 blocks above ground
             if (weatherData.curWindSpeed.X > 0.7f && particlePos.Y - rainYPos < 10)
             {
-                float dx = (float)(plrPos.X * 40) - 50 * weatherData.curWindSpeed.X;
-                float dy = (float)(plrPos.Y * 40);
-                float dz = (float)(plrPos.Z * 40);
+                float dx = (float)(plrPos.Motion.X * 40) - 50 * weatherData.curWindSpeed.X;
+                float dy = (float)(plrPos.Motion.Y * 40);
+                float dz = (float)(plrPos.Motion.Z * 40);
 
                 dustParticles.MinPos.Set(particlePos.X - 40 + dx, particlePos.Y + 15 + dy, particlePos.Z - 40 + dz);
                 dustParticles.AddPos.Set(80, -20, 80);
@@ -228,7 +228,7 @@ namespace Vintagestory.GameContent
                 dustParticles.MinSize = 0.1f;
                 dustParticles.MaxSize = 0.4f;
 
-                dustParticles.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -0.5f, -0.025f);
+                dustParticles.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -0.2f, -0.025f);
                 dustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
 
 

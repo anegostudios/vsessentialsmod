@@ -26,18 +26,22 @@ namespace Vintagestory.GameContent
         LCGRandom rand;
         public float hereChance;
 
+        int cloudTilebasePosX;
+        int cloudTilebasePosZ;
+
         public void updateHereChance(float rainfall, float temperature)
         {
             hereChance = config.getWeight(rainfall, temperature);
         }
 
-        public WeatherPattern(WeatherSystemBase ws, WeatherPatternConfig config, LCGRandom rand)
+        public WeatherPattern(WeatherSystemBase ws, WeatherPatternConfig config, LCGRandom rand, int cloudTilebasePosX, int cloudTilebasePosZ)
         {
             this.ws = ws;
             this.rand = rand;
             this.config = config;
             this.api = ws.api;
-
+            this.cloudTilebasePosX = cloudTilebasePosX;
+            this.cloudTilebasePosZ = cloudTilebasePosZ;
         }
 
         public virtual void Initialize(int index, int seed)
@@ -52,44 +56,44 @@ namespace Vintagestory.GameContent
             {
                 this.TimeBasePrecIntenstityGen = new SimplexNoise(config.Precipitation.IntensityNoise.Amplitudes, config.Precipitation.IntensityNoise.Frequencies, seed + index + 19987986);
             }
-
-            EnsureNoiseCacheIsFresh();
         }
 
         
-        public virtual void EnsureNoiseCacheIsFresh()
+        public virtual void EnsureCloudTileCacheIsFresh(Vec3i tileOffset)
         {
             if (api.Side == EnumAppSide.Server) return;
 
             bool unfresh =
                 CloudDensityNoiseCache == null ||
-                lastTileX != ws.CloudTileX || lastTileZ != ws.CloudTileZ ||
-                ws.CloudTileLength != CloudDensityNoiseCache.GetLength(1)
+                lastTileX != cloudTilebasePosX + tileOffset.X || lastTileZ != cloudTilebasePosZ + tileOffset.Z
             ;
 
             if (unfresh)
             {
-                RegenNoiseCache();
+                RegenCloudTileCache(tileOffset);
                 return;
             }
         }
 
-        public virtual void RegenNoiseCache()
+        public static int NoisePadding = 4;
+        int tilesPerRegion;
+
+        public virtual void RegenCloudTileCache(Vec3i tileOffset)
         {
-            int len = ws.CloudTileLength;
+            tilesPerRegion = (int)Math.Ceiling((float)api.World.BlockAccessor.RegionSize / ws.CloudTileSize) + 2 * NoisePadding;
 
-            CloudDensityNoiseCache = new double[len, len];
+            CloudDensityNoiseCache = new double[tilesPerRegion, tilesPerRegion];
 
-            lastTileX = ws.CloudTileX;
-            lastTileZ = ws.CloudTileZ;
+            lastTileX = cloudTilebasePosX + tileOffset.X;
+            lastTileZ = cloudTilebasePosZ + tileOffset.Z;
 
             double timeAxis = api.World.Calendar.TotalDays / 10.0;
 
             if (LocationalCloudThicknessGen == null)
             {
-                for (int dx = 0; dx < len; dx++)
+                for (int dx = 0; dx < tilesPerRegion; dx++)
                 {
-                    for (int dz = 0; dz < len; dz++)
+                    for (int dz = 0; dz < tilesPerRegion; dz++)
                     {
                         CloudDensityNoiseCache[dx, dz] = 0;
                     }
@@ -99,12 +103,12 @@ namespace Vintagestory.GameContent
             else
             {
 
-                for (int dx = 0; dx < len; dx++)
+                for (int dx = 0; dx < tilesPerRegion; dx++)
                 {
-                    for (int dz = 0; dz < len; dz++)
+                    for (int dz = 0; dz < tilesPerRegion; dz++)
                     {
-                        double x = (lastTileX + dx - len / 2) / 20.0;
-                        double z = (lastTileZ + dz - len / 2) / 20.0;
+                        double x = (lastTileX + dx - tilesPerRegion / 2 - NoisePadding) / 20.0;
+                        double z = (lastTileZ + dz - tilesPerRegion / 2 - NoisePadding) / 20.0;
 
                         CloudDensityNoiseCache[dx, dz] = GameMath.Clamp(LocationalCloudThicknessGen.Noise(x, z, timeAxis), 0, 1);
                     }
@@ -140,10 +144,7 @@ namespace Vintagestory.GameContent
             State.nowDistantLightningRate = config.Lightning?.DistantRate / 100f ?? 0;
             State.nowLightningMinTempature = config.Lightning?.MinTemperature ?? 0;
 
-
             State.nowPrecIntensity = State.nowBasePrecIntensity;
-
-            RegenNoiseCache();
         }
 
         public virtual void Update(float dt)
@@ -153,7 +154,7 @@ namespace Vintagestory.GameContent
                 int a = 1;
             }
 
-            EnsureNoiseCacheIsFresh();
+            //EnsureNoiseCacheIsFresh();
 
             double timeAxis = api.World.Calendar.TotalDays / 10.0;
             State.nowPrecIntensity = State.nowBasePrecIntensity + (float)GameMath.Clamp(TimeBasePrecIntenstityGen?.Noise(0, timeAxis) ?? 0, 0, 1);
@@ -161,7 +162,14 @@ namespace Vintagestory.GameContent
 
         public virtual double GetCloudDensityAt(int dx, int dz)
         {
-            return GameMath.Clamp(State.nowbaseThickness + CloudDensityNoiseCache[dx, dz], 0, 1) * State.nowThicknessMul;
+            try
+            {
+                return GameMath.Clamp(State.nowbaseThickness + CloudDensityNoiseCache[GameMath.Clamp(dx + NoisePadding, 0, tilesPerRegion-1), GameMath.Clamp(dz + NoisePadding, 0, tilesPerRegion-1)], 0, 1) * State.nowThicknessMul;
+            } catch (Exception e)
+            {
+                throw new Exception(string.Format("{0}/{1} is out of range. Width/Height: {2}/{3}", dx, dz, CloudDensityNoiseCache.GetLength(0), CloudDensityNoiseCache.GetLength(1)));
+            }
+            
         }
 
 

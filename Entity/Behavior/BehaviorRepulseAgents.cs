@@ -38,6 +38,7 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
+            if (entity.World.ElapsedMilliseconds < 2000) return;
             if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
 
             ownPos.Set(

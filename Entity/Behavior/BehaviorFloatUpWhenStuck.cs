@@ -35,7 +35,9 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (counter++ > 10 || stuckInBlock)
+            if (entity.World.ElapsedMilliseconds < 2000) return;
+
+            if (counter++ > 10 || (stuckInBlock && counter > 1))
             {
                 if ((onlyWhenDead && entity.Alive) || entity.Properties.CanClimbAnywhere) return;
 
@@ -84,18 +86,25 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < distByFacing.Length; i++)
             {
                 BlockFacing face = BlockFacing.ALLFACES[i];
-                if (distByFacing[i] < shortestDist && !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X, posY, posZ + face.Normali.Z)))
+                if (distByFacing[i] < shortestDist && (
+                    !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X, posY, posZ + face.Normali.Z), false)
+                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X/2f, posY, posZ + face.Normali.Z/2f), false)
+                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X/4f, posY, posZ + face.Normali.Z/4f), false)
+                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X / 8f, posY, posZ + face.Normali.Z / 8f), false)
+                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X / 16f, posY, posZ + face.Normali.Z / 16f), false)
+                ))
                 {
                     shortestDist = distByFacing[i];
                     pushDir = face;
                 }
             }
 
+
             dt = Math.Min(dt, 0.1f);
 
-            entity.LocalPos.X += pushDir.Normali.X * dt;
-            entity.LocalPos.Y += pushDir.Normali.Y * dt;
-            entity.LocalPos.Z += pushDir.Normali.Z * dt;
+            entity.LocalPos.X += pushDir.Normali.X * dt * 0.4f;
+            entity.LocalPos.Y += pushDir.Normali.Y * dt * 0.4f;
+            entity.LocalPos.Z += pushDir.Normali.Z * dt * 0.4f;
 
             entity.LocalPos.Motion.X = pushDir.Normali.X * dt;
             entity.LocalPos.Motion.Y = pushDir.Normali.Y * dt * 2;

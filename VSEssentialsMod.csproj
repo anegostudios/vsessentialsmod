@@ -76,9 +76,11 @@
     <Compile Include="Entity\AI\Goap\AIGoapAction.cs" />
     <Compile Include="Entity\AI\Goap\AIGoal.cs" />
     <Compile Include="Entity\AI\Goap\GoapCondition.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskUseInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
     <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
     <Compile Include="Entity\Behavior\BehaviorHarvestable.cs" />
+    <Compile Include="Entity\Behavior\BehaviorMouthInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
     <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
     <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
@@ -91,6 +93,7 @@
     <Compile Include="Entity\AI\Task\IAiTask.cs" />
     <Compile Include="Gui\GuiDialogCarcassContents.cs" />
     <Compile Include="Gui\GuiDialogHandbook.cs" />
+    <Compile Include="Inventory\ItemSlotMouth.cs" />
     <Compile Include="JsonExport.cs" />
     <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />
     <Compile Include="EntityRenderer\EntityItemRenderer.cs" />
@@ -134,7 +137,9 @@
     <Compile Include="Entity\EntityLocomotion\EntityOnGround.cs" />
     <Compile Include="Gui\Element\GuiElementMap.cs" />
     <Compile Include="Gui\GuiDialogLogViewer.cs" />
-    <Compile Include="Gui\GuiDialogWorldMap.cs" />
+    <Compile Include="Systems\WorldMap\GuiDialogEditWayPoint.cs" />
+    <Compile Include="Systems\WorldMap\GuiDialogAddWayPoint.cs" />
+    <Compile Include="Systems\WorldMap\GuiDialogWorldMap.cs" />
     <Compile Include="InerhitableRotatableCube.cs" />
     <Compile Include="Loading\BasicBlocksLoader.cs" />
     <Compile Include="Loading\BlockBehaviorType.cs" />
@@ -170,7 +175,7 @@
     <Compile Include="Systems\Weather\WeatherSystemClient.cs" />
     <Compile Include="Systems\Weather\WeatherSystemServer.cs" />
     <Compile Include="Systems\Weather\WeatherPattern.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulation.cs" />
+    <Compile Include="Systems\Weather\WeatherSimulationRegion.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationParticles.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationSound.cs" />
     <Compile Include="Systems\Weather\WindPattern.cs" />

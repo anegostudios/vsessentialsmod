@@ -149,10 +149,19 @@ namespace Vintagestory.GameContent
                     Range = 32,
                     Pitch = 0.8f + (float)capi.World.Rand.NextDouble() * 0.3f,
                     Volume = 1,
-                    SoundType = EnumSoundType.Sound
+                    SoundType = EnumSoundType.Ambient
 
                 });
                 soundStartDelay = 0.05f + (float)capi.World.Rand.NextDouble() / 3f;
+            }
+
+            canFallSideways = WatchedAttributes.GetBool("canFallSideways");
+            dustyFall = WatchedAttributes.GetBool("dustyFall");
+
+
+            if (WatchedAttributes.HasAttribute("fallSound"))
+            {
+                fallSound = new AssetLocation(WatchedAttributes.GetString("fallSound"));
             }
         }
 

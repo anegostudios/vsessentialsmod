@@ -23,6 +23,8 @@ namespace Vintagestory.GameContent
         GuiElementHoverText hoverTextElem;
         bool requireRecompose = false;
 
+        public override double DrawOrder => 0.11;
+
         public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
         {
             this.viewChanged = viewChanged;
@@ -135,7 +137,7 @@ namespace Vintagestory.GameContent
 
         public override bool TryClose()
         {
-            if (DialogType == EnumDialogType.Dialog && capi.Settings.Bool["hudOpened"])
+            if (DialogType == EnumDialogType.Dialog && capi.Settings.Bool["showMinimapHud"])
             {
                 Open(EnumDialogType.HUD);
                 return false;
@@ -192,18 +194,13 @@ namespace Vintagestory.GameContent
 
             if (SingleComposer != null && SingleComposer.Bounds.PointInside(args.X, args.Y))
             {
-                double x = args.X - SingleComposer.Bounds.absX;
-                double y = args.Y - SingleComposer.Bounds.absY - GuiElement.scaled(30); // no idea why the 30 :/
+                loadWorldPos(args.X, args.Y, ref hoveredWorldPos);
 
-                StringBuilder hoverText = new StringBuilder();
-                mapElem.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref hoveredWorldPos);
-                hoveredWorldPos.Y++;
-
-                //BlockPos pos = capi.World.Player.Entity.Pos.AsBlockPos;
                 double yAbs = hoveredWorldPos.Y;
                 hoveredWorldPos.Sub(capi.World.DefaultSpawnPosition.AsBlockPos);
                 hoveredWorldPos.Y = yAbs;
 
+                StringBuilder hoverText = new StringBuilder();
                 hoverText.AppendLine(string.Format("{0}, {1}, {2}", (int)hoveredWorldPos.X, (int)hoveredWorldPos.Y, (int)hoveredWorldPos.Z));
 
                 foreach (MapComponent cmp in mapComponents)
@@ -215,7 +212,15 @@ namespace Vintagestory.GameContent
 
                 hoverTextElem.SetNewText(text);
             }
+        }
 
+        void loadWorldPos(double mouseX, double mouseY, ref Vec3d worldPos)
+        {
+            double x = mouseX - SingleComposer.Bounds.absX;
+            double y = mouseY - SingleComposer.Bounds.absY - (dialogType == EnumDialogType.Dialog ? GuiElement.scaled(30) : 0); // no idea why the 30 :/
+
+            mapElem.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref worldPos);
+            worldPos.Y++;
         }
 
         public override void OnMouseDown(MouseEvent args)
@@ -234,6 +239,46 @@ namespace Vintagestory.GameContent
         {
             base.OnFinalizeFrame(dt);
             capi.Render.CheckGlError("map-fina");
+
+            bool showHover = SingleComposer.Bounds.PointInside(capi.Input.MouseX, capi.Input.MouseY) && Focused;
+
+            hoverTextElem.SetVisible(showHover);
+            hoverTextElem.SetAutoDisplay(showHover);
+        }
+
+
+        GuiDialogAddWayPoint addWpDlg;
+        public override void OnMouseUp(MouseEvent args)
+        {
+            if (!SingleComposer.Bounds.PointInside(args.X, args.Y))
+            {
+                base.OnMouseUp(args);
+                return;
+            }
+
+            foreach (MapComponent cmp in mapComponents)
+            {
+                cmp.OnMouseUpOnElement(args, mapElem);
+                if (args.Handled) return;
+            }
+
+
+            if (args.Button == API.Common.EnumMouseButton.Right)
+            {
+                Vec3d wpPos = new Vec3d();
+                loadWorldPos(args.X, args.Y, ref wpPos);
+
+                if (addWpDlg != null)
+                {
+                    addWpDlg.TryClose();
+                    addWpDlg.Dispose();
+                }
+                addWpDlg = new GuiDialogAddWayPoint(capi);
+                addWpDlg.WorldPos = wpPos;
+                addWpDlg.TryOpen();
+            }
+
+            base.OnMouseUp(args);
         }
     }
 }

@@ -407,7 +407,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.Tool = typedItemType.Tool;
             item.AttackPower = typedItemType.AttackPower;
             item.LiquidSelectable = typedItemType.LiquidSelectable;
-            item.ToolTier = typedItemType.MiningTier;
+            item.ToolTier = typedItemType.ToolTier;
             item.HeldSounds = typedItemType.HeldSounds?.Clone();
             item.Durability = typedItemType.Durability;
             item.MiningSpeed = typedItemType.MiningSpeed;
@@ -609,7 +609,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.LiquidLevel = typedBlockType.LiquidLevel;
             block.AttackPower = typedBlockType.AttackPower;
             block.MiningSpeed = typedBlockType.MiningSpeed;
-            block.ToolTier = typedBlockType.MiningTier;
+            block.ToolTier = typedBlockType.ToolTier;
             block.RequiredMiningTier = typedBlockType.RequiredMiningTier;
             block.HeldSounds = typedBlockType.HeldSounds?.Clone();
             block.AttackRange = typedBlockType.AttackRange;

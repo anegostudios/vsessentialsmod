@@ -12,7 +12,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorBreathe : EntityBehavior
     {
         Cuboidd tmp = new Cuboidd();
-        float breatheInterval = 0;
+        float breathAccum = 0;
         //the padding that the collisionbox is adjusted by for suffocation damage.  Can be adjusted as necessary - don't set to exactly 0.
         float padding = 0.1f; 
 
@@ -73,11 +73,11 @@ namespace Vintagestory.GameContent
         {
             base.OnGameTick(deltaTime);
 
-            breatheInterval += deltaTime;
+            breathAccum += deltaTime;
 
-            if (breatheInterval > 1)
+            if (breathAccum > 1)
             {
-                breatheInterval--;
+                breathAccum = 0;
                 Check();
             }
 

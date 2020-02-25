@@ -105,7 +105,7 @@ namespace Vintagestory.GameContent
             rollDiff = entity.ServerPos.Roll - entity.Pos.Roll;
             yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
             pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
-
+            
             accum = 0;
         }
 
@@ -114,6 +114,7 @@ namespace Vintagestory.GameContent
         {
             base.OnEntityDespawn(despawn);
             (entity.Api as ICoreClientAPI).Event.UnregisterRenderer(this, EnumRenderStage.Before);
+            Dispose();
         }
 
         public override string PropertyName()

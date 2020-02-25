@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
     {
         ITreeAttribute healthTree;
         
-        public OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
+        public event OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
 
         public float Health
         {

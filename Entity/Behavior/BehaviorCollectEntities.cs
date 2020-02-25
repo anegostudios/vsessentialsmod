@@ -23,6 +23,8 @@ namespace Vintagestory.GameContent
             // Only running for active entities
             if (entity.State != EnumEntityState.Active || !entity.Alive) return;
 
+            //if ((entity as EntityAgent)?.Controls.Sneak == false) return;
+
             if (entity.IsActivityRunning("invulnerable"))
             {
                 waitTicks = 3;

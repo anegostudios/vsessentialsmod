@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
     public class WaypointMapComponent : MapComponent
     {
         public MeshRef quadModel;
-        public LoadedTexture Texture;
+        
 
         Vec2f viewPos = new Vec2f();
         Vec4f color = new Vec4f();
@@ -24,11 +24,16 @@ namespace Vintagestory.GameContent
 
         Matrixf mvMat = new Matrixf();
 
-        public WaypointMapComponent(int waypointIndex, Waypoint waypoint, LoadedTexture texture, ICoreClientAPI capi) : base(capi)
+        WaypointMapLayer wpLayer;
+
+        bool mouseOver;
+
+        public WaypointMapComponent(int waypointIndex, Waypoint waypoint, WaypointMapLayer wpLayer, ICoreClientAPI capi) : base(capi)
         {
             this.waypointIndex = waypointIndex;
             this.waypoint = waypoint;
-            this.Texture = texture;
+            this.wpLayer = wpLayer;
+            
             ColorUtil.ToRGBAVec4f(waypoint.Color, ref color);
 
             quadModel = capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
@@ -36,7 +41,7 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap map, float dt)
         {
-            if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+            //if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
             if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
 
             map.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
@@ -51,19 +56,29 @@ namespace Vintagestory.GameContent
             prog.Uniform("extraGlow", 0);
             prog.Uniform("applyColor", 0);
             prog.Uniform("noTexture", 0f);
-            prog.BindTexture2D("tex2d", Texture.TextureId, 0);
 
-            mvMat
-                .Set(api.Render.CurrentModelviewMatrix)
-                .Translate(x, y, 60)
-                .Scale(Texture.Width, Texture.Height, 0)
-                .Scale(0.5f, 0.5f, 0)
-            ;
+            LoadedTexture tex;
 
-            prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
-            prog.UniformMatrix("modelViewMatrix", mvMat.Values);
+            float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ZoomLevel);
             
-            api.Render.RenderMesh(quadModel);
+
+            if (wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out tex))
+            {
+                prog.BindTexture2D("tex2d", wpLayer.texturesByIcon[waypoint.Icon].TextureId, 0);
+                mvMat
+                    .Set(api.Render.CurrentModelviewMatrix)
+                    .Translate(x, y, 60)
+                    .Scale(tex.Width + hover, tex.Height + hover, 0)
+                    .Scale(0.5f, 0.5f, 0)
+                ;
+                prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
+                prog.UniformMatrix("modelViewMatrix", mvMat.Values);
+
+                api.Render.RenderMesh(quadModel);
+            } else
+            {
+                int a = 1;
+            }
         }
 
         public override void Dispose()
@@ -76,6 +91,7 @@ namespace Vintagestory.GameContent
         }
 
 
+
         public override void OnMouseMove(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
         {
             Vec2f viewPos = new Vec2f();
@@ -84,10 +100,35 @@ namespace Vintagestory.GameContent
             double mouseX = args.X - mapElem.Bounds.renderX;
             double mouseY = args.Y - mapElem.Bounds.renderY;
             
-            if (Math.Abs(viewPos.X - mouseX) < 5 && Math.Abs(viewPos.Y - mouseY) < 5)
+            if (mouseOver = Math.Abs(viewPos.X - mouseX) < 8 && Math.Abs(viewPos.Y - mouseY) < 8)
             {
                 string text = Lang.Get("Waypoint {0}", waypointIndex) + "\n" + waypoint.Title;
-                hoverText.Append(text);
+                hoverText.AppendLine(text);
+            }
+        }
+
+        GuiDialogEditWayPoint editWpDlg;
+        public override void OnMouseUpOnElement(MouseEvent args, GuiElementMap mapElem)
+        {
+            if (args.Button == EnumMouseButton.Right)
+            {
+                Vec2f viewPos = new Vec2f();
+                mapElem.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
+
+                double mouseX = args.X - mapElem.Bounds.renderX;
+                double mouseY = args.Y - mapElem.Bounds.renderY;
+
+                if (Math.Abs(viewPos.X - mouseX) < 5 && Math.Abs(viewPos.Y - mouseY) < 5)
+                {
+                    if (editWpDlg != null)
+                    {
+                        editWpDlg.TryClose();
+                        editWpDlg.Dispose();
+                    }
+                    editWpDlg = new GuiDialogEditWayPoint(capi, waypoint, waypointIndex);
+                    editWpDlg.TryOpen();
+                    args.Handled = true;
+                }
             }
         }
     }

@@ -56,10 +56,10 @@ namespace Vintagestory.GameContent
             int y = mapchunk.RainHeightMap[lz * chunksize + lx];
             int ly = y % chunksize;
 
-            
-            int cy = y / chunksize;
 
             IWorldChunk chunk = api.World.BlockAccessor.GetChunkAtBlockPos(blockSel.Position.X, y, blockSel.Position.Z);
+            if (chunk == null) return;
+
             chunk.Unpack();
             int blockId = chunk.Blocks[(ly * chunksize + lz) * chunksize + lx];
 

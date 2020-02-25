@@ -65,7 +65,7 @@ namespace Vintagestory.GameContent
                     float tmprel = (TempRange + 20) / 60f;
                     float mul = rainfall * (1 - tmprel);
 
-                    Math.Max(rainfall, (1 - tmprel)/2f);
+                    //Math.Max(rainfall, (1 - tmprel)/2f);
 
                     hereweight *= mul;
 
@@ -110,7 +110,7 @@ namespace Vintagestory.GameContent
 
     public class WeatherCloudConfig
     {
-        public NatFloat Brightness;
+        public NatFloat Brightness = NatFloat.createUniform(1, 0);
         public NatFloat HeightMul = NatFloat.createUniform(1,0);
         public NatFloat BaseThickness;
         public NatFloat ThinCloudMode = NatFloat.createUniform(0, 0);

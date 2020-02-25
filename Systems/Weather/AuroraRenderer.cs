@@ -29,7 +29,7 @@ namespace Vintagestory.GameContent
         {
             this.capi = capi;
             this.wsys = wsys;
-            capi.Event.RegisterRenderer(this, EnumRenderStage.OIT);
+            capi.Event.RegisterRenderer(this, EnumRenderStage.OIT, "aurora");
 
             capi.Event.ReloadShader += LoadShader;
             LoadShader();

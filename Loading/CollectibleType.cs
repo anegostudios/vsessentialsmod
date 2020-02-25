@@ -38,7 +38,11 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public Dictionary<EnumBlockMaterial, float> MiningSpeed;
         [JsonProperty]
-        public int MiningTier;
+        public int ToolTier;
+
+        [Obsolete("Use tool tier")]
+        public int MiningTier { get { return ToolTier; } set { ToolTier = value; } }
+
         [JsonProperty]
         public EnumMatterState MatterState = EnumMatterState.Solid;
         [JsonProperty]

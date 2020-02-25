@@ -9,8 +9,8 @@ namespace Vintagestory.GameContent
 {
     public class CloudTile
     {
-        public short XOffset; // Grid position
-        public short ZOffset; // Grid position
+        public short GridXOffset; // Grid position
+        public short GridZOffset; // Grid position
 
 
         public short NorthThickness;
@@ -18,11 +18,19 @@ namespace Vintagestory.GameContent
         public short SouthThickness;
         public short WestThickness;
 
+        public short TargetThickness;
+        public short TargetBrightnes;
+        public short TargetThinCloudMode;
+        public short TargetUndulatingCloudMode;
+        public short TargetCloudOpaquenes;
+
         public short SelfThickness;
         public short Brightness;
-
+        public short ThinCloudMode;
+        public short UndulatingCloudMode;
+        public short CloudOpaqueness;
 
         public LCGRandom brightnessRand;
-        public short MaxThickness;
+        
     }
 }
