@@ -52,10 +52,10 @@ namespace Vintagestory.GameContent
             {
                 this.LocationalCloudThicknessGen = new SimplexNoise(config.Clouds.LocationalThickness.Amplitudes, config.Clouds.LocationalThickness.Frequencies, seed + index + 1512);
             }
-            if (config.Precipitation?.IntensityNoise != null)
+            /*if (config.Precipitation?.IntensityNoise != null)
             {
                 this.TimeBasePrecIntenstityGen = new SimplexNoise(config.Precipitation.IntensityNoise.Amplitudes, config.Precipitation.IntensityNoise.Frequencies, seed + index + 19987986);
-            }
+            }*/
         }
 
         
@@ -88,6 +88,11 @@ namespace Vintagestory.GameContent
             lastTileZ = cloudTilebasePosZ + tileOffset.Z;
 
             double timeAxis = api.World.Calendar.TotalDays / 10.0;
+
+            if (double.IsNaN(timeAxis))
+            {
+                throw new ArgumentException("timeAxis value in WeatherPattern.cs:RegenCloudTileCahce is NaN. Somethings broken.");
+            }
 
             if (LocationalCloudThicknessGen == null)
             {
@@ -127,7 +132,7 @@ namespace Vintagestory.GameContent
             State.nowbaseThickness = config.Clouds?.BaseThickness?.nextFloat(1, rand) ?? 0;
             State.nowThicknessMul = config.Clouds?.ThicknessMul?.nextFloat(1, rand) ?? 1;
             State.nowbaseOpaqueness = config.Clouds?.Opaqueness?.nextFloat(1, rand) ?? 0;
-            State.nowBrightness = config.Clouds?.Brightness.nextFloat(1, rand) ?? 0;
+            State.nowCloudBrightness = config.Clouds?.Brightness.nextFloat(1, rand) ?? 0;
             State.nowHeightMul = config.Clouds?.HeightMul?.nextFloat(1, rand) ?? 0;
             State.nowSceneBrightness = config.SceneBrightness.nextFloat(1, rand);
 
@@ -138,26 +143,26 @@ namespace Vintagestory.GameContent
 
             State.nowBasePrecIntensity = (config.Precipitation?.BaseIntensity?.nextFloat(1, rand) ?? 0);
             State.nowPrecParticleSize = config.Precipitation?.ParticleSize ?? 1;
-            State.nowPrecType = config.Precipitation?.Type ?? EnumPrecipitationType.Auto;
+            //State.nowPrecType = config.Precipitation?.Type ?? EnumPrecipitationType.Auto;*/
 
-            State.nowNearLightningRate = config.Lightning?.NearRate / 100f ?? 0;
+            /*State.nowNearLightningRate = config.Lightning?.NearRate / 100f ?? 0;
             State.nowDistantLightningRate = config.Lightning?.DistantRate / 100f ?? 0;
-            State.nowLightningMinTempature = config.Lightning?.MinTemperature ?? 0;
+            State.nowLightningMinTempature = config.Lightning?.MinTemperature ?? 0;*/
 
-            State.nowPrecIntensity = State.nowBasePrecIntensity;
+            //State.nowPrecIntensity = State.nowBasePrecIntensity;
         }
 
         public virtual void Update(float dt)
         {
-            if (!State.BeginUseExecuted)
+            /*if (!State.BeginUseExecuted)
             {
                 int a = 1;
-            }
+            }*/
 
             //EnsureNoiseCacheIsFresh();
 
-            double timeAxis = api.World.Calendar.TotalDays / 10.0;
-            State.nowPrecIntensity = State.nowBasePrecIntensity + (float)GameMath.Clamp(TimeBasePrecIntenstityGen?.Noise(0, timeAxis) ?? 0, 0, 1);
+            //double timeAxis = api.World.Calendar.TotalDays / 10.0;
+            //State.nowPrecIntensity = State.nowBasePrecIntensity + (float)GameMath.Clamp(TimeBasePrecIntenstityGen?.Noise(0, timeAxis) ?? 0, 0, 1);
         }
 
         public virtual double GetCloudDensityAt(int dx, int dz)
@@ -165,7 +170,7 @@ namespace Vintagestory.GameContent
             try
             {
                 return GameMath.Clamp(State.nowbaseThickness + CloudDensityNoiseCache[GameMath.Clamp(dx + NoisePadding, 0, tilesPerRegion-1), GameMath.Clamp(dz + NoisePadding, 0, tilesPerRegion-1)], 0, 1) * State.nowThicknessMul;
-            } catch (Exception e)
+            } catch (Exception)
             {
                 throw new Exception(string.Format("{0}/{1} is out of range. Width/Height: {2}/{3}", dx, dz, CloudDensityNoiseCache.GetLength(0), CloudDensityNoiseCache.GetLength(1)));
             }

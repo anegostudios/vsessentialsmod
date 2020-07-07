@@ -31,9 +31,9 @@ namespace Vintagestory.GameContent
             }
             
             BlockPos pos = new BlockPos(
-                (int)(entity.ServerPos.X),
-                (int)(entity.ServerPos.Y + ((EntityAgent)entity).EyeHeight),
-                (int)(entity.ServerPos.Z)
+                (int)(entity.ServerPos.X + entity.LocalEyePos.X),
+                (int)(entity.ServerPos.Y + entity.LocalEyePos.Y),
+                (int)(entity.ServerPos.Z + entity.LocalEyePos.Z)
             );
 
             Block block = entity.World.BlockAccessor.GetBlock(pos);
@@ -50,7 +50,7 @@ namespace Vintagestory.GameContent
                 tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
                 box.OmniGrowBy(padding);
 
-                if (tmp.Contains(entity.ServerPos.X, entity.ServerPos.Y + ((EntityAgent)entity).EyeHeight, entity.ServerPos.Z))
+                if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
                 {
                     Cuboidd EntitySuffocationBox = entity.CollisionBox.ToDouble();
 
@@ -71,6 +71,12 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
+            if (entity.State == EnumEntityState.Inactive)
+            {
+                return;
+            }
+
+
             base.OnGameTick(deltaTime);
 
             breathAccum += deltaTime;
@@ -80,8 +86,6 @@ namespace Vintagestory.GameContent
                 breathAccum = 0;
                 Check();
             }
-
-            entity.World.FrameProfiler.Mark("entity-breathe");
         }
 
         public override string PropertyName()

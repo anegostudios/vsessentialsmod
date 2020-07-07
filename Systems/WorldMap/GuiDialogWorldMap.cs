@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -23,6 +25,8 @@ namespace Vintagestory.GameContent
         GuiElementHoverText hoverTextElem;
         bool requireRecompose = false;
 
+        int mapWidth=1200, mapHeight=800;
+
         public override double DrawOrder => 0.11;
 
         public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
@@ -30,7 +34,16 @@ namespace Vintagestory.GameContent
             this.viewChanged = viewChanged;
             ComposeDialog();
 
-            
+            capi.RegisterCommand("worldmapsize", "Set the size of the world map dialog", "width height", onCmdMapSize);
+        }
+
+        private void onCmdMapSize(int groupId, CmdArgs args)
+        {
+            mapWidth = (int)args.PopInt(1200);
+            mapHeight = (int)args.PopInt(800);
+            ComposeDialog();
+
+            capi.ShowChatMessage(string.Format("Map size {0}x{1} set", mapWidth, mapHeight));
         }
 
         public override bool TryOpen()
@@ -41,7 +54,7 @@ namespace Vintagestory.GameContent
 
         private void ComposeDialog()
         {
-            ElementBounds mapBounds = ElementBounds.Fixed(0, 28, 1200, 800);
+            ElementBounds mapBounds = ElementBounds.Fixed(0, 28, mapWidth, mapHeight);
             ElementBounds layerList = mapBounds.RightCopy().WithFixedSize(1, 350);
 
             ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(3);
@@ -69,7 +82,11 @@ namespace Vintagestory.GameContent
 
             Vec3d centerPos = capi.World.Player.Entity.Pos.XYZ;
 
-            if (SingleComposer != null) SingleComposer.Dispose();
+            if (SingleComposer != null)
+            {
+                mapElem.mapComponents = null; // Let's not dispose that
+                SingleComposer.Dispose();
+            }
 
             SingleComposer = capi.Gui
                 .CreateCompo("worldmap", dialogBounds)
@@ -123,8 +140,8 @@ namespace Vintagestory.GameContent
             base.OnGuiOpened();
 
             if (mapElem != null) mapElem.chunkViewBoundsBefore = new Cuboidi();
-            mapComponents.Clear();
-            mapElem.EnsureMapFullyLoaded();
+            //mapComponents.Clear();
+            //mmapElem.EnsureMapFullyLoaded();
 
             OnMouseMove(new MouseEvent(capi.Input.MouseX, capi.Input.MouseY));
         }

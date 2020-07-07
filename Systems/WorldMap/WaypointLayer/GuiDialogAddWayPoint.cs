@@ -2,6 +2,7 @@
 using System;
 using System.Globalization;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -61,7 +62,7 @@ namespace Vintagestory.GameContent
                     .AddStaticText("Name", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
                     .AddTextInput(rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), onNameChanged, CairoFont.TextInput(), "nameInput")
 
-                    .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
+                    .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
                     .AddDropDown(
                         new string[] { "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel" }, 
                         new string[] { "<icon name=\"wpCircle\">", "<icon name=\"wpBee\">", "<icon name=\"wpCave\">", "<icon name=\"wpHome\">", "<icon name=\"wpLadder\">", "<icon name=\"wpPick\">", "<icon name=\"wpRocks\">", "<icon name=\"wpRuins\">", "<icon name=\"wpSpiral\">", "<icon name=\"wpStar1\">", "<icon name=\"wpStar2\">", "<icon name=\"wpTrader\">", "<icon name=\"wpVessel\">" },
@@ -71,6 +72,10 @@ namespace Vintagestory.GameContent
                         CairoFont.WhiteSmallishText(),
                         "iconInput"
                     )
+
+                    .AddStaticText("Pinned", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
+                    .AddSwitch(onPinnedToggled, rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), "pinnedSwitch")
+
                     .AddSmallButton("Cancel", onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)
                     .AddSmallButton("Save", onSave, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.RightFixed), EnumButtonStyle.Normal, key: "saveButton")
                 .EndChildElements()
@@ -81,6 +86,13 @@ namespace Vintagestory.GameContent
 
         }
 
+
+        private void onPinnedToggled(bool on)
+        {
+            
+        }
+
+
         private void onIconSelectionChanged(string code, bool selected)
         {
             
@@ -89,8 +101,10 @@ namespace Vintagestory.GameContent
         private bool onSave()
         {
             string name = SingleComposer.GetTextInput("nameInput").GetText();
+            bool pinned = SingleComposer.GetSwitch("pinnedSwitch").On;
             string icon = SingleComposer.GetDropDown("iconInput").SelectedValue;
-            capi.SendChatMessage(string.Format("/waypoint addati {5} ={0} ={1} ={2} {3} {4}", WorldPos.X, WorldPos.Y, WorldPos.Z, colorText, name, icon));
+
+            capi.SendChatMessage(string.Format("/waypoint addati {0} ={1} ={2} ={3} {4} {5} {6}", icon, WorldPos.X.ToString(GlobalConstants.DefaultCultureInfo), WorldPos.Y.ToString(GlobalConstants.DefaultCultureInfo), WorldPos.Z.ToString(GlobalConstants.DefaultCultureInfo), pinned, colorText, name));
             TryClose();
             return true;
         }
@@ -115,13 +129,13 @@ namespace Vintagestory.GameContent
         private void onNameChanged(string t1)
         {
             bool hasValidColor = (SingleComposer.GetTextInput("colorInput").Font.Color != GuiStyle.ErrorTextColor);
-            SingleComposer.GetButton("saveButton").Enabled = (t1 != "") && hasValidColor;
+            SingleComposer.GetButton("saveButton").Enabled = (t1.Trim() != "") && hasValidColor;
         }
 
         private void onColorChanged(string colorstring)
         {
             int transparent = System.Drawing.Color.Transparent.ToArgb();
-            int fullAlpha   = System.Drawing.Color.Black.ToArgb();
+            int fullAlpha = System.Drawing.Color.Black.ToArgb();
 
             int? newColor = null;
             if (colorstring.StartsWith("#"))
@@ -132,7 +146,7 @@ namespace Vintagestory.GameContent
                     try { newColor = Int32.Parse(s, NumberStyles.HexNumber) | fullAlpha; }
                     // We can ignore the exception because if one occurred,
                     // the newColor variable will still be set to null.
-                    catch (Exception) {  }
+                    catch (Exception) { }
                 }
             }
             else
@@ -143,13 +157,13 @@ namespace Vintagestory.GameContent
                     newColor = knownColor.ToArgb();
             }
 
-            color     = newColor ?? transparent;
+            color = newColor ?? transparent;
             colorText = colorstring;
 
             SingleComposer.GetTextInput("colorInput").Font.Color = newColor.HasValue
                 ? GuiStyle.DialogDefaultTextColor : GuiStyle.ErrorTextColor;
             
-            bool hasName = (SingleComposer.GetTextInput("nameInput").GetText() != "");
+            bool hasName = (SingleComposer.GetTextInput("nameInput").GetText().Trim() != "");
             SingleComposer.GetButton("saveButton").Enabled = newColor.HasValue && hasName;
 
             SingleComposer.GetCustomDraw("colorRect").Redraw();

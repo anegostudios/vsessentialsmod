@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -46,6 +47,9 @@ namespace Vintagestory.GameContent
         static SimpleParticleProperties bitsParticles;
 
         Vec3d fallMotion = new Vec3d();
+        float pushaccum;
+
+        static HashSet<long> fallingNow = new HashSet<long>();
 
         static EntityBlockFalling()
         {
@@ -127,7 +131,7 @@ namespace Vintagestory.GameContent
                 blockEntityClass = api.World.ClassRegistry.GetBlockEntityClass(removedBlockentity.GetType());
             }
 
-            SimulationRange = 3 * api.World.BlockAccessor.ChunkSize;
+            SimulationRange = (int)(0.75f * GlobalConstants.DefaultTrackingRange);
             base.Initialize(properties, api, InChunkIndex3d);
 
             // Need to capture this now before we remove the block and start to fall
@@ -135,12 +139,13 @@ namespace Vintagestory.GameContent
 
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
 
-			LocalPos.Motion.Y = -0.02;
+			SidedPos.Motion.Y = -0.02;
             blockAsStack = new ItemStack(Block);
 
             
-            if (api.Side == EnumAppSide.Client && fallSound != null)
+            if (api.Side == EnumAppSide.Client && fallSound != null && fallingNow.Count < 100)
             {
+                fallingNow.Add(EntityId);
                 ICoreClientAPI capi = api as ICoreClientAPI;
                 sound = capi.World.LoadSound(new SoundParams()
                 {
@@ -165,7 +170,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        float pushaccum;
+        
         /// <summary>
         /// Delays behaviors from ticking to reduce flickering
         /// </summary>
@@ -230,12 +235,12 @@ namespace Vintagestory.GameContent
                 pushaccum = 0;
                 if (!Collided)
                 {
-                    Entity[] entities = World.GetEntitiesAround(LocalPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
+                    Entity[] entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
                     for (int i = 0; i < entities.Length; i++)
                     {
                         if (Api.Side == EnumAppSide.Server || entities[i] is EntityPlayer)
                         {
-                            entities[i].LocalPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
+                            entities[i].SidedPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
                         }
                     }
                 }
@@ -251,8 +256,16 @@ namespace Vintagestory.GameContent
             {
                 OnFallToGround(0);
             }
+        }
 
-
+        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        {
+            base.OnEntityDespawn(despawn);
+            
+            if (Api.World.Side == EnumAppSide.Client)
+            {
+                fallingNow.Remove(EntityId);
+            }
         }
 
         private void UpdateBlock(bool remove, BlockPos pos)
@@ -328,7 +341,7 @@ namespace Vintagestory.GameContent
             {
                 BlockPos npos = pos.AddCopy(facing);
                 Block neib = World.BlockAccessor.GetBlock(npos);
-                neib.OnNeighourBlockChange(World, npos, pos);
+                neib.OnNeighbourBlockChange(World, npos, pos);
             }
         }
 
@@ -336,7 +349,7 @@ namespace Vintagestory.GameContent
         {
             if (fallHandled) return;
 
-            BlockPos pos = LocalPos.AsBlockPos;
+            BlockPos pos = SidedPos.AsBlockPos;
 
             if (canFallSideways)
             {
@@ -349,9 +362,9 @@ namespace Vintagestory.GameContent
                     {
                         if (Api.Side == EnumAppSide.Server)
                         {
-                            LocalPos.X += facing.Normali.X;
-                            LocalPos.Y += facing.Normali.Y;
-                            LocalPos.Z += facing.Normali.Z;
+                            SidedPos.X += facing.Normali.X;
+                            SidedPos.Y += facing.Normali.Y;
+                            SidedPos.Z += facing.Normali.Z;
                         }
 
                         fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);

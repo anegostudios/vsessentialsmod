@@ -93,11 +93,13 @@ namespace Vintagestory.GameContent
         public double RenderOrder => 0.35;
         public int RenderRange => 9999;
 
+        WeatherDataReaderPreLoad wreaderpreload;
 
         public CloudRenderer(ICoreClientAPI capi, WeatherSystemClient weatherSys)
         {
             this.capi = capi;
             this.weatherSys = weatherSys;
+            this.wreaderpreload = weatherSys.getWeatherDataReaderPreLoad();
             rand = new Random(capi.World.Seed);
 
             capi.Event.RegisterRenderer(this, EnumRenderStage.OIT, "clouds");
@@ -219,7 +221,8 @@ namespace Vintagestory.GameContent
                     targetCloudSpeedZ = (float)rand.NextDouble() * 0.5f;
                 }
 
-                float windspeedx = 3 * (float)weatherSys.GetWindSpeed(capi.World.Player.Entity.Pos.XYZ);
+                //float windspeedx = 3 * (float)wreaderpreload.GetWindSpeed(capi.World.Player.Entity.Pos.Y); - likely wrong
+                float windspeedx = 3 * (float)weatherSys.WeatherDataAtPlayer.GetWindSpeed(capi.World.Player.Entity.Pos.Y);
 
                 // Wind speed direction change smoothing 
                 cloudSpeedX = cloudSpeedX + (targetCloudSpeedX + windspeedx - cloudSpeedX) * deltaTime;
@@ -420,11 +423,11 @@ namespace Vintagestory.GameContent
                 {
                     prevTopLeftRegX = topLeftRegX;
                     prevTopLeftRegZ = topLeftRegZ;
-                    weatherSys.LoadAdjacentSimsAndLerpValues(cloudTilePos);
-                    weatherSys.EnsureCloudTileCacheIsFresh(tileOffset);
+                    wreaderpreload.LoadAdjacentSimsAndLerpValues(cloudTilePos);
+                    wreaderpreload.EnsureCloudTileCacheIsFresh(tileOffset);
                 } else 
                 {
-                    weatherSys.loadLerp(cloudTilePos);
+                    wreaderpreload.LoadLerp(cloudTilePos);
                 }
 
                 // This is the tile position relative to the current regions origin point
@@ -432,15 +435,15 @@ namespace Vintagestory.GameContent
                 int cloudTileZ = (int)cloudTilePos.Z / CloudTileSize;
 
                 // Here we need the cloud tile position relative to cloud tile pos 0/0 of the current region
-                double density = GameMath.Clamp(weatherSys.GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ), 0, 1);
-                double bright = weatherSys.GetBlendedCloudBrightness(1) * (0.85f + cloudTile.brightnessRand.NextFloat() * 0.15f);
+                double density = GameMath.Clamp(wreaderpreload.GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ), 0, 1);
+                double bright = wreaderpreload.GetBlendedCloudBrightness(1) * (0.85f + cloudTile.brightnessRand.NextFloat() * 0.15f);
 
 
                 cloudTile.TargetBrightnes = (short)(GameMath.Clamp(bright, 0, 1) * short.MaxValue);
                 cloudTile.TargetThickness = (short)GameMath.Clamp(density * short.MaxValue, 0, short.MaxValue);
-                cloudTile.TargetThinCloudMode = (short)GameMath.Clamp(weatherSys.GetBlendedThinCloudModeness() * short.MaxValue, 0, short.MaxValue);
-                cloudTile.TargetCloudOpaquenes = (short)GameMath.Clamp(weatherSys.GetBlendedCloudOpaqueness() * short.MaxValue, 0, short.MaxValue);
-                cloudTile.TargetUndulatingCloudMode = (short)GameMath.Clamp(weatherSys.GetBlendedUndulatingCloudModeness() * short.MaxValue, 0, short.MaxValue);
+                cloudTile.TargetThinCloudMode = (short)GameMath.Clamp(wreaderpreload.GetBlendedThinCloudModeness() * short.MaxValue, 0, short.MaxValue);
+                cloudTile.TargetCloudOpaquenes = (short)GameMath.Clamp(wreaderpreload.GetBlendedCloudOpaqueness() * short.MaxValue, 0, short.MaxValue);
+                cloudTile.TargetUndulatingCloudMode = (short)GameMath.Clamp(wreaderpreload.GetBlendedUndulatingCloudModeness() * short.MaxValue, 0, short.MaxValue);
 
                 cloudTile.Brightness = LerpTileValue(cloudTile.TargetBrightnes, cloudTile.Brightness, changeSpeed);
                 cloudTile.SelfThickness = LerpTileValue(cloudTile.TargetThickness, cloudTile.SelfThickness, changeSpeed);
@@ -507,7 +510,7 @@ namespace Vintagestory.GameContent
         public void LoadCloudModel()
         {
             MeshData modeldata = new MeshData(4 * 6, 6 * 6, false, false, true);
-            modeldata.Rgba2 = null;
+            //modeldata.Rgba2 = null;
             modeldata.Flags = new int[4 * 6];
 
             float[] CloudSideShadings = new float[] {

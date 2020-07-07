@@ -128,7 +128,7 @@ namespace Vintagestory.GameContent
             quadTilesRef?.Dispose();
             float height = 200;
 
-            MeshData mesh = new MeshData(4, 6, false, true, true, false, false);
+            MeshData mesh = new MeshData(4, 6, false, true, true, false);
             float x=0, y=0, z=0;
             Random rnd = new Random();
 

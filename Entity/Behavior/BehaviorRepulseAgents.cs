@@ -38,13 +38,13 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.World.ElapsedMilliseconds < 2000) return;
             if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
+            if (entity.World.ElapsedMilliseconds < 2000) return;
 
             ownPos.Set(
-                entity.LocalPos.X + (entity.CollisionBox.X2 - entity.OriginCollisionBox.X2), 
-                entity.LocalPos.Y + (entity.CollisionBox.Y2 - entity.OriginCollisionBox.Y2), 
-                entity.LocalPos.Z + (entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2)
+                entity.SidedPos.X + (entity.CollisionBox.X2 - entity.OriginCollisionBox.X2), 
+                entity.SidedPos.Y + (entity.CollisionBox.Y2 - entity.OriginCollisionBox.Y2), 
+                entity.SidedPos.Z + (entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2)
             );
 
             ownTouchDistance = (entity.CollisionBox.X2 - entity.CollisionBox.X1)/2;
@@ -56,7 +56,7 @@ namespace Vintagestory.GameContent
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
             pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 3);
             pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
-            entity.LocalPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
+            entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
 
             entity.World.FrameProfiler.Mark("entity-repulse");
         }
@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
         private void WalkEntity(Entity e)
         {
             double hisTouchDistance = (e.CollisionBox.X2 - e.CollisionBox.X1) / 2;
-            EntityPos epos = e.LocalPos;
+            EntityPos epos = e.SidedPos;
 
             hisPos.Set(
                 epos.X + (e.CollisionBox.X2 - e.OriginCollisionBox.X2),

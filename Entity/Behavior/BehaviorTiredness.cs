@@ -31,14 +31,18 @@ namespace Vintagestory.GameContent
 
         public bool IsSleeping
         {
-            get { return entity.WatchedAttributes.GetTreeAttribute("tiredness").GetInt("isSleeping") > 0; }
+            get {
+                ITreeAttribute attr = entity.WatchedAttributes.GetTreeAttribute("tiredness");
+
+                return attr != null && attr.GetInt("isSleeping") > 0; 
+            }
             set { entity.WatchedAttributes.GetTreeAttribute("tiredness").SetInt("isSleeping", value ? 1 : 0); entity.WatchedAttributes.MarkPathDirty("tiredness"); }
         }
 
 
         public EntityBehaviorTiredness(Entity entity) : base(entity)
         {
-            EntityAgent agent = entity as EntityAgent;
+            
         }
 
 

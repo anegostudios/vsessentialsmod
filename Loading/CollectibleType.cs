@@ -40,6 +40,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public int ToolTier;
 
+        [JsonProperty]
         [Obsolete("Use tool tier")]
         public int MiningTier { get { return ToolTier; } set { ToolTier = value; } }
 

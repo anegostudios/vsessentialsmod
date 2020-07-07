@@ -36,10 +36,12 @@ namespace Vintagestory.GameContent
         public void ClientTick(float dt) {
 
             Random rnd = capi.World.Rand;
-            WeatherDataSnapshot weatherData = weatherSys.blendedWeatherData;
+            WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
 
-            if (weatherSys.clientClimateCond.Temperature >= weatherData.lightningMinTemp && weatherData.nowPrecType == EnumPrecipitationType.Rain)
+            if (weatherSys.clientClimateCond.Temperature >= weatherData.lightningMinTemp)
             {
+                float deepnessSub = GameMath.Clamp(1 - (float)capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel, 0, 1);
+
                 double rndval = capi.World.Rand.NextDouble();
                 rndval -= weatherData.distantLightningRate;
                 if (rndval <= 0)
@@ -47,10 +49,12 @@ namespace Vintagestory.GameContent
                     lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
                     lightningIntensity = 0.25f + (float)rnd.NextDouble();
 
-                    float pitch = GameMath.Clamp((float)rnd.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2, 0.6f, 1.15f);
-                    float volume = Math.Min(1, 0.25f + lightningTime + lightningIntensity / 2);
+
+
+                    float pitch = GameMath.Clamp((float)rnd.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2 - deepnessSub / 2, 0.6f, 1.15f);
+                    float volume = GameMath.Clamp(Math.Min(1, 0.25f + lightningTime + lightningIntensity / 2) - 2f * deepnessSub, 0, 1);
                     
-                    capi.World.PlaySoundAt(new AssetLocation("sounds/weather/lightning-distant.ogg"), 0, 0, 0, null, pitch, 32, volume);
+                    capi.World.PlaySoundAt(new AssetLocation("sounds/weather/lightning-distant.ogg"), 0, 0, 0, null, EnumSoundType.Ambient, pitch, 32, volume);
                 }
                 else if (nearLightningCoolDown <= 0)
                 {
@@ -59,9 +63,9 @@ namespace Vintagestory.GameContent
                     {
                         lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
                         lightningIntensity = 1 + (float)rnd.NextDouble() * 0.9f;
-
-                        float pitch = 0.75f + (float)rnd.NextDouble() * 0.3f;
-                        float volume = 0.5f + (float)rnd.NextDouble() * 0.5f;
+                        
+                        float pitch = GameMath.Clamp(0.75f + (float)rnd.NextDouble() * 0.3f - deepnessSub/2, 0.5f, 1.2f);
+                        float volume = GameMath.Clamp(0.5f + (float)rnd.NextDouble() * 0.5f - 2f * deepnessSub, 0, 1);
                         AssetLocation loc;
 
                         if (rnd.NextDouble() > 0.25)
@@ -76,7 +80,7 @@ namespace Vintagestory.GameContent
                         }
 
                         
-                        capi.World.PlaySoundAt(loc, 0, 0, 0, null, pitch, 32, volume);
+                        capi.World.PlaySoundAt(loc, 0, 0, 0, null, EnumSoundType.Ambient, pitch, 32, volume);
                     }
                 }
             }
@@ -104,7 +108,7 @@ namespace Vintagestory.GameContent
             {
                 float mul = Math.Min(10 * lightningIntensity * lightningTime, 1.5f);
 
-                WeatherDataSnapshot weatherData = weatherSys.blendedWeatherData;
+                WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
 
                 LightningAmbient.CloudBrightness.Value = Math.Max(weatherData.Ambient.SceneBrightness.Value, mul);
                 LightningAmbient.FogBrightness.Value = Math.Max(weatherData.Ambient.FogBrightness.Value, mul);

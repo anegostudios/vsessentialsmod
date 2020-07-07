@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -11,29 +13,39 @@ namespace Vintagestory.GameContent
     {
         public ICoreServerAPI sapi;
         public IServerNetworkChannel serverChannel;
+        
+        internal WeatherSimulationSnowAccum snowSimSnowAccu;
+
 
         public override bool ShouldLoad(EnumAppSide side)
         {
             return side == EnumAppSide.Server;
         }
 
+
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.sapi = api;
 
-            serverChannel =
-               api.Network.RegisterChannel("weather")
-               .RegisterMessageType(typeof(WeatherState))
-            ;
+            serverChannel = api.Network.GetChannel("weather");
 
             sapi.Event.RegisterGameTickListener(OnServerGameTick, 200);
             sapi.Event.GameWorldSave += OnSaveGameSaving;
             sapi.Event.SaveGameLoaded += Event_SaveGameLoaded;
+            sapi.Event.OnGetClimate += Event_OnGetClimate;
+            
+           
+            snowSimSnowAccu = new WeatherSimulationSnowAccum(sapi, this);
         }
+
 
         private void Event_SaveGameLoaded()
         {
             base.Initialize();
+            base.InitDummySim();
+            WeatherDataSlowAccess = getWeatherDataReader();
+
+            GeneralConfig.Init(api.World);
         }
 
         public void SendWeatherStateUpdate(WeatherState state)
@@ -60,6 +72,10 @@ namespace Vintagestory.GameContent
         }
 
 
+        object updateSnowlayerQueueLock = new object();
+        Dictionary<BlockPos, Block> updateSnowLayerQueue = new Dictionary<BlockPos, Block>();
+
+
         private void OnServerGameTick(float dt)
         {
             foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
@@ -68,7 +84,10 @@ namespace Vintagestory.GameContent
                 weatherSim.TickEvery25ms(dt);
                 weatherSim.UpdateWeatherData();
             }
+
+            rainOverlaySnap.SetAmbient(rainOverlayPattern, 0);
         }
+
 
         private void OnSaveGameSaving()
         {
@@ -93,7 +112,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        
+
 
     }
 

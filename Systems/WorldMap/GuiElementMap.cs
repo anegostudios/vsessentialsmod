@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent
 {
     public class GuiElementMap : GuiElement
     {
-        List<MapComponent> mapComponents;
+        public List<MapComponent> mapComponents;
         public bool IsDragingMap;
         public float ZoomLevel = 1;
 
@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
         {
             Bounds.CalcWorldBounds();
 
-            mapComponents.Clear();
+            //mapComponents.Clear();
             chunkViewBoundsBefore = new Cuboidi();
 
             BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
@@ -64,7 +64,7 @@ namespace Vintagestory.GameContent
             {
                 MapComponent cmp = mapComponents[i];
 
-                if (cmp is ChunkMapComponent)
+                if (cmp is MultiChunkMapComponent)
                 {
                     cmp.Render(this, deltaTime);
                 }
@@ -74,7 +74,7 @@ namespace Vintagestory.GameContent
             {
                 MapComponent cmp = mapComponents[i];
 
-                if (!(cmp is ChunkMapComponent))
+                if (!(cmp is MultiChunkMapComponent))
                 {
                     cmp.Render(this, deltaTime);
                 }
@@ -103,6 +103,8 @@ namespace Vintagestory.GameContent
             if (args.Button == EnumMouseButton.Left)
             {
                 IsDragingMap = true;
+                prevMouseX = args.X;
+                prevMouseY = args.Y;
             }
         }
 
@@ -113,11 +115,15 @@ namespace Vintagestory.GameContent
             IsDragingMap = false;
         }
 
+        int prevMouseX, prevMouseY;
+
         public override void OnMouseMove(ICoreClientAPI api, MouseEvent args)
         {
             if (IsDragingMap)
             {
-                CurrentBlockViewBounds.Translate(-args.DeltaX / ZoomLevel, 0, -args.DeltaY / ZoomLevel);
+                CurrentBlockViewBounds.Translate(-(args.X - prevMouseX) / ZoomLevel, 0, -(args.Y - prevMouseY) / ZoomLevel);
+                prevMouseX = args.X;
+                prevMouseY = args.Y;
             }
         }
 
@@ -138,14 +144,10 @@ namespace Vintagestory.GameContent
 
         public void ZoomAdd(float zoomDiff, float px, float pz)
         {
-            float zoomBefore = ZoomLevel;
-
             if (zoomDiff < 0 && ZoomLevel + zoomDiff < 0.25f) return;
             if (zoomDiff > 0 && ZoomLevel + zoomDiff > 6f) return;
 
             ZoomLevel += zoomDiff;
-
-
 
             double nowRelSize = 1 / ZoomLevel;
             double diffX = Bounds.InnerWidth * nowRelSize - CurrentBlockViewBounds.Width;
@@ -162,6 +164,8 @@ namespace Vintagestory.GameContent
 
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
+            if (worldPos == null) throw new ArgumentNullException("worldPos is null");
+
             double blocksWidth = CurrentBlockViewBounds.X2 - CurrentBlockViewBounds.X1;
             double blocksLength = CurrentBlockViewBounds.Z2 - CurrentBlockViewBounds.Z1;
             
@@ -171,6 +175,8 @@ namespace Vintagestory.GameContent
 
         public void TranslateViewPosToWorldPos(Vec2f viewPos, ref Vec3d worldPos)
         {
+            if (worldPos == null) throw new ArgumentNullException("viewPos is null");
+
             double blocksWidth = CurrentBlockViewBounds.X2 - CurrentBlockViewBounds.X1;
             double blocksLength = CurrentBlockViewBounds.Z2 - CurrentBlockViewBounds.Z1;
 

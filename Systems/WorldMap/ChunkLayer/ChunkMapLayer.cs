@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -16,6 +18,8 @@ namespace Vintagestory.GameContent
     // make a property block.BlockColor for the blocks color
     // and have the chunk intmap cached client side
 
+
+
     public class ChunkMapLayer : RGBMapLayer
     {
         int[] texDataTmp;
@@ -24,8 +28,8 @@ namespace Vintagestory.GameContent
 
         object chunksToGenLock = new object();
         UniqueQueue<Vec2i> chunksToGen = new UniqueQueue<Vec2i>();
-        Dictionary<Vec2i, MapComponent> loadedMapData = new Dictionary<Vec2i, MapComponent>();
-
+        Dictionary<Vec2i, MultiChunkMapComponent> loadedMapData = new Dictionary<Vec2i, MultiChunkMapComponent>();
+        HashSet<Vec2i> curVisibleChunks = new HashSet<Vec2i>();
 
         public override MapLegendItem[] LegendItems => throw new NotImplementedException();
         public override EnumMinMagFilter MinFilter => EnumMinMagFilter.Linear;
@@ -34,15 +38,38 @@ namespace Vintagestory.GameContent
         public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
 
 
+        MapDB mapdb;
+        
+
+        public string getMapDbFilePath()
+        {
+            string path = Path.Combine(GamePaths.DataPath, "Maps");
+            GamePaths.EnsurePathExists(path);
+
+            return Path.Combine(path, api.World.SavegameIdentifier + ".db");
+        }
+
 
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
+            
             if (api.Side == EnumAppSide.Server)
             {
                 (api as ICoreServerAPI).Event.DidPlaceBlock += Event_DidPlaceBlock;
             }
 
+            if (api.Side == EnumAppSide.Client)
+            {
+                mapdb = new MapDB(api.World.Logger);
+                string errorMessage = null;
+                string mapdbfilepath = getMapDbFilePath();
+                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, true);
+                if (errorMessage != null)
+                {
+                    throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
+                }
+            }
         }
 
         private void Event_DidPlaceBlock(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel, ItemStack withItemStack)
@@ -72,11 +99,16 @@ namespace Vintagestory.GameContent
             }
         }
 
+        Vec2i tmpMccoord = new Vec2i();
+        Vec2i tmpCoord = new Vec2i();
+
         private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
             if (reason == EnumChunkDirtyReason.NewlyCreated || !mapSink.IsOpened) return;
 
-            if (!loadedMapData.ContainsKey(new Vec2i(chunkCoord.X, chunkCoord.Z))) return;
+            tmpMccoord.Set(chunkCoord.X / MultiChunkMapComponent.ChunkLen, chunkCoord.Z / MultiChunkMapComponent.ChunkLen);
+            tmpCoord.Set(chunkCoord.X, chunkCoord.Z);
+            if (!loadedMapData.ContainsKey(tmpCoord) && !curVisibleChunks.Contains(tmpMccoord)) return;
 
             lock (chunksToGenLock)
             {
@@ -103,6 +135,8 @@ namespace Vintagestory.GameContent
             {
                 chunksToGen.Clear();
             }
+
+            curVisibleChunks.Clear();
         }
 
         public override void Dispose()
@@ -118,7 +152,16 @@ namespace Vintagestory.GameContent
             base.Dispose();
         }
 
-        public override void OnOffThreadTick()
+        public override void OnShutDown()
+        {
+            MultiChunkMapComponent.tmpTexture?.Dispose();
+            mapdb?.Dispose();
+        }
+
+        float accum = 0f;
+
+
+        public override void OnOffThreadTick(float dt)
         {
             int quantityToGen = chunksToGen.Count;
             while (quantityToGen > 0)
@@ -137,10 +180,10 @@ namespace Vintagestory.GameContent
                 IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord);
                 if (mc == null)
                 {
-
-                    lock (chunksToGenLock)
+                    MapPieceDB piece = mapdb.GetMapPiece(cord);
+                    if (piece?.Pixels != null)
                     {
-                        chunksToGen.Enqueue(cord);
+                        loadFromChunkPixels(cord, piece.Pixels);
                     }
 
                     continue;
@@ -157,78 +200,114 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                api.Event.EnqueueMainThreadTask(() =>
+                mapdb.SetMapPiece(cord, new MapPieceDB() { Pixels = pixels });
+
+                loadFromChunkPixels(cord, pixels);
+            }
+
+
+            accum += dt;
+            if (accum > 1)
+            {
+                foreach (var val in loadedMapData)
                 {
-                    if (loadedMapData.ContainsKey(cord))
+                    MultiChunkMapComponent mcmp = val.Value;
+
+                    if (!mcmp.AnyChunkSet)
                     {
-                        UpdateMapData(loadedMapData[cord] as ChunkMapComponent, pixels);
+                        mcmp.TTL -= 1;
+
+                        if (mcmp.TTL <= 0)
+                        {
+                            Vec2i mccord = val.Key;
+
+                            api.Event.EnqueueMainThreadTask(() =>
+                            {
+                                if (!mcmp.AnyChunkSet)
+                                {
+                                    mapSink.RemoveMapData(mcmp);
+                                    loadedMapData.Remove(mccord);
+                                    mcmp.Dispose();
+                                }
+                            }, "disposemcmcp");
+                        }
                     } else
                     {
-                        mapSink.AddMapData(loadedMapData[cord] = LoadMapData(cord, pixels));
+                        mcmp.TTL = MultiChunkMapComponent.MaxTTL;
                     }
-                    
-                }, "chunkmaplayerready");
+                }
+
+                accum = 0;
             }
         }
 
+
+        void loadFromChunkPixels(Vec2i cord, int[] pixels)
+        {
+            api.Event.EnqueueMainThreadTask(() =>
+            {
+                Vec2i mcord = new Vec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+                Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
+
+                MultiChunkMapComponent mccomp;
+                if (!loadedMapData.TryGetValue(mcord, out mccomp))
+                {
+                    loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
+                    mapSink.AddMapData(mccomp);
+                }
+
+                mccomp.setChunk(cord.X - baseCord.X, cord.Y - baseCord.Y, pixels);
+
+            }, "chunkmaplayerready");
+        }
+
+
+
         public override void OnViewChangedClient(List<Vec2i> nowVisible, List<Vec2i> nowHidden)
         {
+            foreach (var val in nowVisible)
+            {
+                curVisibleChunks.Add(val);
+            }
+
+            foreach (var val in nowHidden)
+            {
+                curVisibleChunks.Remove(val);
+            }
+
             lock (chunksToGenLock)
             {
                 foreach (Vec2i cord in nowVisible)
                 {
-                    if (loadedMapData.ContainsKey(cord))
-                    {
-                        if (mapSink.RemoveMapData(loadedMapData[cord]))
-                        {
-                            // In case it got added twice due to race condition (which tends to happen)
-                        }
+                    tmpMccoord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+                    MultiChunkMapComponent mcomp;
 
-                        mapSink.AddMapData(loadedMapData[cord]);
-                        continue;
+                    if (loadedMapData.TryGetValue(tmpMccoord, out mcomp))
+                    {
+                        int dx = cord.X % MultiChunkMapComponent.ChunkLen;
+                        int dz = cord.Y % MultiChunkMapComponent.ChunkLen;
+                        if (mcomp.IsChunkSet(dx, dz)) continue;
                     }
 
                     chunksToGen.Enqueue(cord.Copy());
                 }
             }
 
+            Vec2i mcord = new Vec2i();
             foreach (Vec2i cord in nowHidden)
             {
-                MapComponent mc;
-                if (loadedMapData.TryGetValue(cord, out mc))
-                {
-                    mapSink.RemoveMapData(mc);
-                    loadedMapData.Remove(cord);
-                    mc.Dispose();
-                }
+                MultiChunkMapComponent mc;
+                
+                mcord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
 
-                //Console.WriteLine("removed " + cord);
+                if (loadedMapData.TryGetValue(mcord, out mc))
+                {
+                    mc.unsetChunk(cord.X % MultiChunkMapComponent.ChunkLen, cord.Y % MultiChunkMapComponent.ChunkLen);
+                }
             }
         }
 
         
-
-        public MapComponent LoadMapData(Vec2i chunkCoord, int[] pixels)
-        {
-            ICoreClientAPI capi = api as ICoreClientAPI;
-            int chunksize = api.World.BlockAccessor.ChunkSize;
-            LoadedTexture tex = new LoadedTexture(capi, 0, chunksize, chunksize);
-
-            capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref tex);
-            
-            ChunkMapComponent cmp = new ChunkMapComponent(capi, chunkCoord.Copy());
-            cmp.Texture = tex;
-
-            return cmp;
-        }
-
-        private void UpdateMapData(ChunkMapComponent cmp, int[] pixels)
-        {
-            ICoreClientAPI capi = api as ICoreClientAPI;
-            capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref cmp.Texture);
-        }
-
-
 
 
         public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc)
@@ -378,6 +457,8 @@ namespace Vintagestory.GameContent
             sapi.WorldManager.ResendMapChunk(cx, cz, true);
             mapchunk.MarkDirty();
         }
+
+
 
     }
 }

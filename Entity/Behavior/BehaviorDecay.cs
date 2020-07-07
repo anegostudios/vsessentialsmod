@@ -99,7 +99,7 @@ namespace Vintagestory.GameContent
                 
             }
 
-            Vec3d pos = entity.LocalPos.XYZ;
+            Vec3d pos = entity.SidedPos.XYZ;
             pos.Y += entity.Properties.DeadHitBoxSize.Y / 2;
 
             entity.World.SpawnParticles(new EntityCubeParticles(

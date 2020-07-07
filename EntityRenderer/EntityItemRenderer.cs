@@ -108,7 +108,6 @@ namespace Vintagestory.GameContent
                 prog.RgbaAmbientIn = rapi.AmbientColor;
                 prog.RgbaLightIn = lightrgbs;
                 prog.RgbaGlowIn = glowRgb;
-                prog.RgbaBlockIn = ColorUtil.WhiteArgbVec;
                 prog.RgbaFogIn = rapi.FogColor;
                 prog.FogMinIn = rapi.FogMin;
                 prog.FogDensityIn = rapi.FogDensity;

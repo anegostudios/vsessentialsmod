@@ -345,11 +345,33 @@ namespace Vintagestory.GameContent
             if (IsPregnant) infotext.AppendLine(Lang.Get("Is pregnant"));
             else
             {
-                ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-                if (tree != null)
+                if (entity.Alive)
                 {
-                    float saturation = tree.GetFloat("saturation", 0);
-                    infotext.AppendLine(Lang.Get("Saturation: {0}", saturation));
+                    ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
+                    if (tree != null)
+                    {
+                        float saturation = tree.GetFloat("saturation", 0);
+                        infotext.AppendLine(Lang.Get("Saturation: {0}", saturation));
+                    }
+
+                    double daysLeft = TotalDaysCooldownUntil - entity.World.Calendar.TotalDays;
+
+                    if (daysLeft > 0)
+                    {
+                        if (daysLeft > 3)
+                        {
+                            infotext.AppendLine(Lang.Get("Several days left before ready to mate"));
+                        }
+                        else
+                        {
+                            infotext.AppendLine(Lang.Get("Less than 3 days before ready to mate"));
+                        }
+
+                    }
+                    else
+                    {
+                        infotext.AppendLine(Lang.Get("Ready to mate"));
+                    }
                 }
             }
 

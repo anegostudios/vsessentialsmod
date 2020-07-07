@@ -40,12 +40,19 @@ namespace Vintagestory.GameContent
                 accumulator = 1;
             }
 
-            while (accumulator >= GlobalConstants.PhysicsFrameTime)
+            float frameTime = GlobalConstants.PhysicsFrameTime;
+            bool isSelf = entity.World.Side == EnumAppSide.Client && (entity.World as IClientWorldAccessor).Player.Entity == entity;
+            if (isSelf)
+            {
+                frameTime = 1 / 60f;
+            }
+
+            while (accumulator >= frameTime)
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
                 
-                GameTick(entity, GlobalConstants.PhysicsFrameTime);
-                accumulator -= GlobalConstants.PhysicsFrameTime;
+                GameTick(entity, frameTime);
+                accumulator -= frameTime;
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);

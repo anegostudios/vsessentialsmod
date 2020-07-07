@@ -68,7 +68,10 @@ namespace Vintagestory.GameContent
             task.StartExecute();
             ActiveTasksBySlot[slot] = task;
 
-            //entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
+            if (entity.World.FrameProfiler.Enabled)
+            {
+                entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
+            }
         }
 
         public T GetTask<T>() where T : IAiTask

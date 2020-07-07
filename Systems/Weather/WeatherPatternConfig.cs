@@ -10,6 +10,7 @@ namespace Vintagestory.GameContent
         AvoidHotAndDry
     }
 
+
     public class WeatherPatternConfig
     {
         public string Code;
@@ -30,7 +31,7 @@ namespace Vintagestory.GameContent
         public WeatherPrecipitationConfig Precipitation;
         public WeatherCloudConfig Clouds;
         public WeatherFogConfig Fog;
-        public LightningConfig Lightning;
+        
 
         public float getWeight(float rainfall, float temperature)
         {
@@ -94,7 +95,6 @@ namespace Vintagestory.GameContent
 
     public enum EnumPrecipitationType
     {
-        Auto,
         Rain,
         Snow,
         Hail
@@ -104,7 +104,7 @@ namespace Vintagestory.GameContent
     {
         public NatFloat BaseIntensity;
         public NoiseConfig IntensityNoise;
-		public EnumPrecipitationType Type = EnumPrecipitationType.Auto;
+	//	public EnumPrecipitationType Type = EnumPrecipitationType.Auto;
         public float ParticleSize = 1f;
     }
 

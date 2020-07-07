@@ -45,13 +45,13 @@ namespace Vintagestory.GameContent
                 if (controls.IsClimbing)
                 {
                     pos.Motion.Add(controls.WalkVector);
-                    pos.Motion.X *= (1 - wallDragFactor);
-                    pos.Motion.Y *= (1 - wallDragFactor);
-                    pos.Motion.Z *= (1 - wallDragFactor);
+                    pos.Motion.X *= System.Math.Pow(1 - wallDragFactor, dt * 60);
+                    pos.Motion.Y *= System.Math.Pow(1 - wallDragFactor, dt * 60);
+                    pos.Motion.Z *= System.Math.Pow(1 - wallDragFactor, dt * 60);
 
                 } else
                 {
-                    float strength = airMovingStrength * (float)System.Math.Min(1, entity.Stats?.GetBlended("walkspeed") ?? 1.0);
+                    float strength = airMovingStrength * (float)System.Math.Min(1, entity.Stats?.GetBlended("walkspeed") ?? 1.0) * dt * 60f;
                     
                     if (!controls.Jump && entity is EntityPlayer)
                     {

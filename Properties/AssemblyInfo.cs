@@ -42,5 +42,4 @@ using Vintagestory.API.Config;
     Version = GameVersion.ShortGameVersion,
     NetworkVersion = GameVersion.NetworkVersion,
     Description = "Game Essentials (Json assets loader, World map, weather, player entity, entity ai, entity behaviors, physics simulation, etc.)",
-    Authors = new[] { "Tyron" },
-    RequiredOnClient = true)]
+    Authors = new[] { "Tyron" })]

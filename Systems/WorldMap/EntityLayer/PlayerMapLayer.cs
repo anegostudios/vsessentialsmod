@@ -44,6 +44,11 @@ namespace Vintagestory.GameContent
 
         private void Event_PlayerSpawn(IClientPlayer byPlayer)
         {
+            if (capi.World.Config.GetBool("mapHideOtherPlayers", true) && byPlayer.PlayerUID != capi.World.Player.PlayerUID)
+            {
+                return;
+            }
+
             if (mapSink.IsOpened && !MapComps.ContainsKey(byPlayer))
             {
                 EntityMapComponent cmp = new EntityMapComponent(capi, otherTexture, byPlayer.Entity);

@@ -215,6 +215,8 @@ namespace Vintagestory.GameContent
             if (entity is EntityPlayer)
             {
                 EntityPlayer plr = (EntityPlayer)entity;
+                if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
+
                 EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
                 if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
 

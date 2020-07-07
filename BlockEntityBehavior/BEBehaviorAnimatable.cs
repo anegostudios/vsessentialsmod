@@ -108,7 +108,7 @@ namespace Vintagestory.GameContent
 
             capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
 
-            meshdata.Rgba2 = null;
+            //meshdata.Rgba2 = null;
 
             InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
         }

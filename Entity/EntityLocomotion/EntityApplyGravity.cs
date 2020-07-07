@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
 
             if (pos.Y > -100)
             {
-                pos.Motion.Y -= (gravityPerSecond * dt + Math.Max(0, -0.015f * pos.Motion.Y)) * (entity.FeetInLiquid ? 0.33f : 1f);
+                pos.Motion.Y -= (gravityPerSecond + Math.Max(0, -0.015f * pos.Motion.Y)) * (entity.FeetInLiquid ? 0.33f : 1f) * dt;
             }
             
         }

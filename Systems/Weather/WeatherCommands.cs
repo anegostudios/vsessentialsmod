@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Client;
@@ -7,6 +9,10 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using VintagestoryAPI.Util;
+using AnimatedGif;
+using System.Diagnostics;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -31,7 +37,161 @@ namespace Vintagestory.GameContent
         public override void StartServerSide(ICoreServerAPI sapi)
         {
             this.sapi = sapi;
+
             sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
+#if DEBUG
+            sapi.RegisterCommand("prectest", "Precipitation test export", "", cmdPrecTestServer, Privilege.controlserver);
+            sapi.RegisterCommand("snowaccum", "Snow accum test", "", cmdSnowAccum, Privilege.controlserver);
+#endif
+        }
+
+        private void cmdSnowAccum(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+
+            string cmd = args.PopWord();
+
+            if (cmd == "on")
+            {
+                wsys.snowSimSnowAccu.ProcessChunks = true;
+                player.SendMessage(groupId, "Snow accum process chunks on", EnumChatType.CommandSuccess);
+                return;
+            }
+
+            if (cmd == "off")
+            {
+                wsys.snowSimSnowAccu.ProcessChunks = false;
+                player.SendMessage(groupId, "Snow accum process chunks off", EnumChatType.CommandSuccess);
+                return;
+            }
+
+            if (cmd == "here")
+            {
+                float amount = (float)args.PopFloat(0);
+
+                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+                int chunksize = api.World.BlockAccessor.ChunkSize;
+                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
+                IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
+                int reso = WeatherSimulationRegion.snowAccumResolution;
+
+                SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
+                {
+                    SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
+                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(reso, reso, reso)
+                };
+
+                sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
+
+                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, false);
+                wsys.snowSimSnowAccu.accum = 1f;
+
+                var ba = sapi.World.BulkBlockAccessor;
+                wsys.snowSimSnowAccu.processBlockUpdates(chunkPos, updatepacket, ba);
+                ba.Commit();
+
+                player.SendMessage(groupId, "Ok, test snow accum gen complete", EnumChatType.CommandSuccess);
+                return;
+            }
+        }
+
+
+
+        private void cmdPrecTestServer(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            EntityPos pos = player.Entity.Pos;
+
+            int wdt = 400;
+            float hourStep = 4f;
+            float days = 1f;
+            float posStep = 3f;
+
+            double totaldays = api.World.Calendar.TotalDays;
+            
+
+            string subarg = args.PopWord();
+            bool climateTest = subarg == "climate";
+
+            ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
+
+            int offset = wdt / 200;
+            Bitmap bmp;
+            int[] pixels;
+
+            if (subarg == "here")
+            {
+                wdt = 800;
+                offset = 400;
+                bmp = new Bitmap(wdt, wdt, PixelFormat.Format32bppArgb);
+                pixels = new int[wdt * wdt];
+
+
+                for (int dx = 0; dx < wdt; dx++)
+                {
+                    for (int dz = 0; dz < wdt; dz++)
+                    {
+                        float precip = wsys.GetPrecipitation(pos.X + dx * posStep - offset, pos.Y, pos.Z + dz * posStep - offset, totaldays);
+                        int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                        pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                    }
+                }
+
+                bmp.SetPixels(pixels);
+                bmp.Save("preciphere.png");
+                player.SendMessage(groupId, "Ok exported", EnumChatType.CommandSuccess);
+
+                return;
+
+            }
+
+
+            bmp = new Bitmap(wdt, wdt, PixelFormat.Format32bppArgb);
+            pixels = new int[wdt * wdt];
+
+
+            using (var gif = AnimatedGif.AnimatedGif.Create("precip.gif", 100, -1))
+            {
+                for (int i = 0; i < days * 24f; i++) {
+
+                    if (climateTest)
+                    {
+                        for (int dx = 0; dx < wdt; dx++)
+                        {
+                            for (int dz = 0; dz < wdt; dz++)
+                            {
+                                conds.Rainfall = (float)i / (days * 24f);
+                                float precip = wsys.GetRainCloudness(conds, pos.X + dx * posStep - offset, pos.Z + dz * posStep - offset, api.World.Calendar.TotalDays);
+                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (int dx = 0; dx < wdt; dx++)
+                        {
+                            for (int dz = 0; dz < wdt; dz++)
+                            {
+                                float precip = wsys.GetPrecipitation(pos.X + dx * posStep - offset, pos.Y, pos.Z + dz * posStep - offset, totaldays);
+                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                            }
+                        }
+                    }
+
+
+                    totaldays += hourStep / 24f;
+
+                    bmp.SetPixels(pixels);
+                    
+                    gif.AddFrame(bmp, 100, GifQuality.Grayscale);
+                }
+
+                
+            }
+
+            player.SendMessage(groupId, "Ok exported", EnumChatType.CommandSuccess);
         }
 
 
@@ -58,6 +218,26 @@ namespace Vintagestory.GameContent
 
             string arg = args.PopWord();
 
+            if (arg == "setprecip")
+            {
+                string val = args.PopWord();
+
+                if (val == "auto")
+                {
+                    wsysServer.OverridePrecipitation = null;
+                    player.SendMessage(groupId, "Ok auto precipitation on", EnumChatType.CommandSuccess);
+
+                } else
+                {
+                    float level = val.ToFloat(0);
+                    wsysServer.OverridePrecipitation = level;
+                    player.SendMessage(groupId, string.Format("Ok precipitation set to {0}", level), EnumChatType.CommandSuccess);
+                }
+
+                wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { OverridePrecipitation = wsysServer.OverridePrecipitation });
+                return;
+            }
+
             if (arg == "acp")
             {
                 wsysServer.autoChangePatterns = !wsysServer.autoChangePatterns;
@@ -67,7 +247,7 @@ namespace Vintagestory.GameContent
 
             if (arg == "lp")
             {
-                string patterns = string.Join(", ", wsysServer.weatherConfigs.Select(c => c.Code));
+                string patterns = string.Join(", ", wsysServer.WeatherConfigs.Select(c => c.Code));
                 player.SendMessage(groupId, "Patterns: " + patterns, EnumChatType.CommandSuccess);
                 return;
             }
@@ -203,10 +383,12 @@ namespace Vintagestory.GameContent
         {
             T wsys = api.ModLoader.GetModSystem<T>();
 
-            Vec3d plrPos = player.Entity.LocalPos.XYZ;
+            Vec3d plrPos = player.Entity.SidedPos.XYZ;
             BlockPos pos = plrPos.AsBlockPos;
 
-            wsys.LoadAdjacentSimsAndLerpValues(plrPos);
+            var wreader = wsys.getWeatherDataReaderPreLoad();
+
+            wreader.LoadAdjacentSimsAndLerpValues(plrPos);
 
             int regionX = (int)pos.X / api.World.BlockAccessor.RegionSize;
             int regionZ = (int)pos.Z / api.World.BlockAccessor.RegionSize;
@@ -227,16 +409,16 @@ namespace Vintagestory.GameContent
             //botBlendedWeatherData.SetLerped(adjacentSims[2].weatherData, adjacentSims[3].weatherData, (float)lerpLeftRight);
             //blendedWeatherData.SetLerped(topBlendedWeatherData, botBlendedWeatherData, (float)lerpTopBot);
 
-            double tlLerp = GameMath.BiLerp(1, 0, 0, 0, wsys.lerpLeftRight, wsys.lerpTopBot);
-            double trLerp = GameMath.BiLerp(0, 1, 0, 0, wsys.lerpLeftRight, wsys.lerpTopBot);
-            double blLerp = GameMath.BiLerp(0, 0, 1, 0, wsys.lerpLeftRight, wsys.lerpTopBot);
-            double brLerp = GameMath.BiLerp(0, 0, 0, 1, wsys.lerpLeftRight, wsys.lerpTopBot);
+            double tlLerp = GameMath.BiLerp(1, 0, 0, 0, wreader.LerpLeftRight, wreader.LerpTopBot);
+            double trLerp = GameMath.BiLerp(0, 1, 0, 0, wreader.LerpLeftRight, wreader.LerpTopBot);
+            double blLerp = GameMath.BiLerp(0, 0, 1, 0, wreader.LerpLeftRight, wreader.LerpTopBot);
+            double brLerp = GameMath.BiLerp(0, 0, 0, 1, wreader.LerpLeftRight, wreader.LerpTopBot);
 
             int[] lerps = new int[] { (int)(100*tlLerp), (int)(100 * trLerp), (int)(100 * blLerp), (int)(100 * brLerp) };
 
             for (int i = 0; i < 4; i++)
             {
-                WeatherSimulationRegion sim = wsys.adjacentSims[i];
+                WeatherSimulationRegion sim = wreader.AdjacentSims[i];
 
                 if (sim == wsys.dummySim)
                 {
@@ -244,20 +426,29 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    sb.AppendLine(string.Format("{10}% of {0}@{8}/{9}: {1}% {2}, {3}% {4}. Prec: {5}, Wind: {6} (v={7})",
+                    /*sb.AppendLine(string.Format("{10}% of {0}@{8}/{9}: {1}% {2}, {3}% {4}. Prec: {5}, Wind: {6} (v={7})",
                         cornerNames[i], (int)(100 * sim.Weight), sim.NewWePattern.GetWeatherName(), (int)(100 - 100 * sim.Weight),
                         sim.OldWePattern.GetWeatherName(), sim.weatherData.PrecIntensity.ToString("0.###"),
                         sim.CurWindPattern.GetWindName(), sim.GetWindSpeed(pos.Y).ToString("0.###"),
                         sim.regionX, sim.regionZ,
                         lerps[i]
-                    )) ;
+                    )) ;*/
+
+                    sb.AppendLine(string.Format("{9}% of {0}@{7}/{8}: {1}% {2}, {3}% {4}. Wind: {5} (v={6})",
+                        cornerNames[i], (int)(100 * sim.Weight), sim.NewWePattern.GetWeatherName(), (int)(100 - 100 * sim.Weight),
+                        sim.OldWePattern.GetWeatherName(), 
+                        sim.CurWindPattern.GetWindName(), sim.GetWindSpeed(pos.Y).ToString("0.###"),
+                        sim.regionX, sim.regionZ,
+                        lerps[i]
+                    ));
                 }
             }
 
-            wsys.updateAdjacentAndBlendWeatherData();
+            //wsys.updateAdjacentAndBlendWeatherData();
+            //WeatherDataSnapshot wData = wsys.blendedWeatherData;
+            //sb.AppendLine(string.Format(string.Format("Blended:\nPrecipitation: {0}, Particle size: {1}, Type: {2}, Wind speed: {3}", wData.PrecIntensity, wData.PrecParticleSize, wData.BlendedPrecType, wsys.GetWindSpeed(plrPos))));
 
-            WeatherDataSnapshot wData = wsys.blendedWeatherData;
-            sb.AppendLine(string.Format(string.Format("Blended:\nPrecipitation: {0}, Particle size: {1}, Type: {2}, Wind speed: {3}", wData.PrecIntensity, wData.PrecParticleSize, wData.BlendedPrecType, wsys.GetWindSpeed(plrPos))));
+            
             return sb.ToString();
         }
     }

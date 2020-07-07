@@ -24,7 +24,7 @@ namespace Vintagestory.GameContent
         long ellapsedMsPhysics;
         internal bool DoRender;
 
-        MeshData mesh = new MeshData(4, 3, false, true, true, false, true);
+        MeshData mesh = new MeshData(4, 3, false, true, true, true);
 
         public EntityBlockFallingRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -50,10 +50,7 @@ namespace Vintagestory.GameContent
             if (this.meshRef == null)
             {
                 MeshData mesh = api.TesselatorManager.GetDefaultBlockMesh(block);
-                byte[] rgba2 = mesh.Rgba2;
-                mesh.Rgba2 = null; // Don't need rba2 but also need to restore that stuff afterwards
                 this.meshRef = api.Render.UploadMesh(mesh);
-                mesh.Rgba2 = rgba2;
             }
             
             int textureSubId = block.FirstTextureInventory.Baked.TextureSubId;
@@ -77,7 +74,7 @@ namespace Vintagestory.GameContent
             mesh.AddMeshData(data);
         }
 
-        public void AddMeshData(MeshData data, int tintColor)
+        public void AddMeshData(MeshData data, ColorMapData colormapdata)
         {
             if (data == null) return;
             mesh.AddMeshData(data);

@@ -58,7 +58,7 @@ namespace Vintagestory.GameContent
             this.mapSink = mapSink;
         }
         
-        public virtual void OnOffThreadTick()
+        public virtual void OnOffThreadTick(float dt)
         {
 
         }
@@ -125,7 +125,10 @@ namespace Vintagestory.GameContent
 
         }
 
-        
+        public virtual void OnShutDown()
+        {
+            
+        }
     }
 
 

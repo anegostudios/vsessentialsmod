@@ -4,75 +4,34 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class PrecipitationState
-    {
-        public double Level;
-        public double ParticleSize;
-        public EnumPrecipitationType Type;
-    }
 
     public abstract class WeatherSystemBase : ModSystem
     {
         public ICoreAPI api;
-        public WeatherPatternConfig[] weatherConfigs;
-        public WindPatternConfig[] windConfigs;
+        public WeatherSystemConfig GeneralConfig;
+        public WeatherPatternConfig[] WeatherConfigs;
+        public WindPatternConfig[] WindConfigs;
 
         public bool autoChangePatterns = true;
         public Dictionary<long, WeatherSimulationRegion> weatherSimByMapRegion = new Dictionary<long, WeatherSimulationRegion>();
-        protected NormalizedSimplexNoise windNoise;
+        protected SimplexNoise precipitationNoise;
+        protected SimplexNoise precipitationNoiseSub;
 
-        public NormalizedSimplexNoise weatherPatternNoise;
+        public float? OverridePrecipitation;
 
-        public WeatherDataSnapshot blendedWeatherData = new WeatherDataSnapshot();
-        protected WeatherDataSnapshot topBlendedWeatherData = new WeatherDataSnapshot();
-        protected WeatherDataSnapshot botBlendedWeatherData = new WeatherDataSnapshot();
-        
-        public WeatherSimulationRegion[] adjacentSims
-        {
-            get
-            {
-                return adjacentSimsTL.Value;
-            }
-            set
-            {
-                adjacentSimsTL.Value = value;
-            }
-        }
-
-        public double lerpLeftRight
-        {
-            get
-            {
-                return lerpLeftRightTL.Value;
-            }
-            set
-            {
-                lerpLeftRightTL.Value = value;
-            }
-        }
-
-        public double lerpTopBot
-        {
-            get
-            {
-                return lerpTopBotTL.Value;
-            }
-            set
-            {
-                lerpTopBotTL.Value = value;
-            }
-        }
-
-        public ThreadLocal<WeatherSimulationRegion[]> adjacentSimsTL = new ThreadLocal<WeatherSimulationRegion[]>(() => new WeatherSimulationRegion[4]);
-        public ThreadLocal<double> lerpLeftRightTL = new ThreadLocal<double>(() => 0);
-        public ThreadLocal<double> lerpTopBotTL = new ThreadLocal<double>(() => 0);
 
         public WeatherSimulationRegion dummySim;
+
+        public WeatherDataReader WeatherDataSlowAccess;
+
+        public WeatherPattern rainOverlayPattern;
+        public WeatherDataSnapshot rainOverlaySnap;
 
         public virtual int CloudTileSize { get; set; } = 50;
 
@@ -82,16 +41,35 @@ namespace Vintagestory.GameContent
         {
             this.api = api;
             LoadConfigs();
+
+            api.Network
+               .RegisterChannel("weather")
+               .RegisterMessageType(typeof(WeatherState))
+               .RegisterMessageType(typeof(WeatherConfigPacket))
+            ;
         }
 
         public void Initialize()
         {
-            windNoise = NormalizedSimplexNoise.FromDefaultOctaves(6, 0.1, 0.8, api.World.Seed + 2323182);
+            precipitationNoise = SimplexNoise.FromDefaultOctaves(4, 0.02 / 3, 0.95, api.World.Seed - 18971121);
+            precipitationNoiseSub = SimplexNoise.FromDefaultOctaves(3, 0.004 / 3, 0.95, api.World.Seed - 1717121);
+        }
 
-            weatherPatternNoise = NormalizedSimplexNoise.FromDefaultOctaves(6, 0.1, 0.8, api.World.Seed + 9867910);
-
+        public void InitDummySim()
+        {
             dummySim = new WeatherSimulationRegion(this, 0, 0);
             dummySim.IsDummy = true;
+            dummySim.Initialize();
+
+            var rand = new LCGRandom(api.World.Seed);
+            rand.InitPositionSeed(3, 3);
+
+            rainOverlayPattern = new WeatherPattern(this, GeneralConfig.RainOverlayPattern, rand, 0, 0);
+            rainOverlayPattern.Initialize(0, api.World.Seed);
+            rainOverlayPattern.OnBeginUse();
+
+            rainOverlaySnap = new WeatherDataSnapshot();
+            
         }
 
 
@@ -99,182 +77,123 @@ namespace Vintagestory.GameContent
         public void ReloadConfigs()
         {
             api.Assets.Reload(new AssetLocation("config/"));
-            LoadConfigs();
+            LoadConfigs(true);
         }
 
-        public void LoadConfigs() { 
+        public void LoadConfigs(bool isReload = false) {
+
+            // Thread safe assignment
+            var nowconfig = api.Assets.Get<WeatherSystemConfig>(new AssetLocation("config/weather.json"));
+            if (isReload) nowconfig.Init(api.World);
+
+            GeneralConfig = nowconfig;
+
             var dictWeatherPatterns = api.Assets.GetMany<WeatherPatternConfig[]>(api.World.Logger, "config/weatherpatterns/");
             var orderedWeatherPatterns = dictWeatherPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
 
-            weatherConfigs = new WeatherPatternConfig[0];
+            WeatherConfigs = new WeatherPatternConfig[0];
             foreach (var val in orderedWeatherPatterns)
             {
-                weatherConfigs = weatherConfigs.Append(val);
+                WeatherConfigs = WeatherConfigs.Append(val);
             }
 
             var dictWindPatterns = api.Assets.GetMany<WindPatternConfig[]>(api.World.Logger, "config/windpatterns/");
             var orderedWindPatterns = dictWindPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
 
-            windConfigs = new WindPatternConfig[0];
+            WindConfigs = new WindPatternConfig[0];
             foreach (var val in orderedWindPatterns)
             {
-                windConfigs = windConfigs.Append(val);
+                WindConfigs = WindConfigs.Append(val);
             }
 
-            api.World.Logger.Notification("Reloaded {0} weather patterns and {1} wind patterns", weatherConfigs.Length, windConfigs.Length);
+            api.World.Logger.Notification("Reloaded {0} weather patterns and {1} wind patterns", WeatherConfigs.Length, WindConfigs.Length);
         }
 
 
         public PrecipitationState GetPrecipitationState(Vec3d pos)
         {
-            LoadAdjacentSimsAndLerpValues(pos);
-
-            double level = GameMath.BiLerp(
-                adjacentSims[0].weatherData.PrecIntensity,
-                adjacentSims[1].weatherData.PrecIntensity,
-                adjacentSims[2].weatherData.PrecIntensity,
-                adjacentSims[3].weatherData.PrecIntensity,
-                lerpLeftRight,
-                lerpTopBot
-            );
-
-            double size = GameMath.BiLerp(
-                adjacentSims[0].weatherData.PrecParticleSize,
-                adjacentSims[1].weatherData.PrecParticleSize,
-                adjacentSims[2].weatherData.PrecParticleSize,
-                adjacentSims[3].weatherData.PrecParticleSize,
-                lerpLeftRight,
-                lerpTopBot
-            );
-
-            EnumPrecipitationType top = lerpLeftRight < 0.5 ? adjacentSims[0].weatherData.nowPrecType : adjacentSims[1].weatherData.nowPrecType;
-            EnumPrecipitationType bot = lerpLeftRight < 0.5 ? adjacentSims[2].weatherData.nowPrecType : adjacentSims[3].weatherData.nowPrecType;
-
-            EnumPrecipitationType type = lerpTopBot < 0.5 ? top : bot;
+            float level = GetPrecipitation(pos.X, pos.Y, pos.Z);
 
             return new PrecipitationState()
             {
                 Level = level,
-                ParticleSize = size,
-                Type = type
+                ParticleSize = level,
+                Type = EnumPrecipitationType.Rain
             };
         }
 
-        public double GetRainFall(Vec3d pos)
-        {
-            LoadAdjacentSimsAndLerpValues(pos);
 
-            return GameMath.BiLerp(
-                adjacentSims[0].weatherData.PrecIntensity,
-                adjacentSims[1].weatherData.PrecIntensity,
-                adjacentSims[2].weatherData.PrecIntensity,
-                adjacentSims[3].weatherData.PrecIntensity,
-                lerpLeftRight,
-                lerpTopBot
-            );
+
+
+
+        public float GetPrecipitation(Vec3d pos)
+        {
+            return GetPrecipitation(pos.X, pos.Y, pos.Z, api.World.Calendar.TotalDays);
         }
 
-        public double GetWindSpeed(Vec3d pos)
+        public float GetPrecipitation(double posX, double posY, double posZ)
         {
-            LoadAdjacentSimsAndLerpValues(pos);
+            return GetPrecipitation(posX, posY, posZ, api.World.Calendar.TotalDays);
+        }
 
-            return GameMath.BiLerp(
-                adjacentSims[0].GetWindSpeed(pos.Y),
-                adjacentSims[1].GetWindSpeed(pos.Y),
-                adjacentSims[2].GetWindSpeed(pos.Y),
-                adjacentSims[3].GetWindSpeed(pos.Y),
-                lerpLeftRight,
-                lerpTopBot
-            );
+        public float GetPrecipitation(double posX, double posY, double posZ, double totalDays)
+        {
+            ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)posX, (int)posY, (int)posZ), EnumGetClimateMode.WorldGenValues, totalDays);
+            return GetRainCloudness(conds, posX, posZ, totalDays) - 0.5f;
         }
 
 
-        public void LoadAdjacentSimsAndLerpValues(Vec3d pos)
+
+        protected void Event_OnGetClimate(ref ClimateCondition climate, BlockPos pos, EnumGetClimateMode mode = EnumGetClimateMode.WorldGenValues, double totalDays = 0)
         {
-            int regSize = api.World.BlockAccessor.RegionSize;
+            if (mode == EnumGetClimateMode.WorldGenValues) return;
+            float rainCloudness = GetRainCloudness(climate, pos.X + 0.5, pos.Z + 0.5, totalDays);
 
-            int topLeftRegX = (int)Math.Round(pos.X / regSize) - 1;
-            int topLeftRegZ = (int)Math.Round(pos.Z / regSize) - 1;
+            climate.Rainfall = GameMath.Clamp(rainCloudness - 0.5f, 0, 1);
+            climate.RainCloudOverlay = GameMath.Clamp(rainCloudness, 0, 1);
+        }
 
-            int i = 0;
-            for (int dx = 0; dx <= 1; dx++)
+        public float GetRainCloudness(ClimateCondition conds, double posX, double posZ, double totalDays)
+        {
+            if (OverridePrecipitation != null)
             {
-                for (int dz = 0; dz <= 1; dz++)
-                {
-                    int regX = topLeftRegX + dx;
-                    int regZ = topLeftRegZ + dz;
-
-                    WeatherSimulationRegion weatherSim = getOrCreateWeatherSimForRegion(regX, regZ);
-                    if (weatherSim == null)
-                    {
-                        weatherSim = dummySim;
-                    }
-
-                    adjacentSims[i++] = weatherSim;
-                }
+                return (float)OverridePrecipitation + 0.5f;
             }
 
+            float value = getPrecipNoise(posX, posZ, totalDays) * 1.6f;
 
-            loadLerp(pos);
-        }
-
-
-        public void loadLerp(Vec3d pos)
-        {
-            int regSize = api.World.BlockAccessor.RegionSize;
-
-            double plrRegionRelX = (pos.X / regSize) - (int)Math.Round(pos.X / regSize);
-            double plrRegionRelZ = (pos.Z / regSize) - (int)Math.Round(pos.Z / regSize);
-
-            lerpTopBot = GameMath.Smootherstep(plrRegionRelX + 0.5);
-            lerpLeftRight = GameMath.Smootherstep(plrRegionRelZ + 0.5);
-
-            // Lerps only at the edges where we have noise padding available
-
-            /*int tilesPerRegion = (int)Math.Ceiling((float)regSize / CloudTileSize);
-
-            WeatherSimulationRegion sim = adjacentSims[0];
-            int lerpBaseX = sim.cloudTilebasePosX + tilesPerRegion - WeatherPattern.NoisePadding;
-            int lerpBaseZ = sim.cloudTilebasePosZ + tilesPerRegion - WeatherPattern.NoisePadding;
-
-            double plrTileX = pos.X / CloudTileSize;
-            double plrTileZ = pos.Z / CloudTileSize;
-
-            lerpLeftRight = GameMath.Clamp((plrTileX - lerpBaseX) / (2 * WeatherPattern.NoisePadding), 0, 1);
-            lerpTopBot = GameMath.Clamp((plrTileZ - lerpBaseZ) / (2 * WeatherPattern.NoisePadding), 0, 1);*/
-
-
-            // No lerp for testing
-            /*lerpLeftRight = 0;
-            lerpTopBot = 0;
-            int a = (int)pos.X / regSize;
-            int b = (int)pos.Z / regSize;
-            adjacentSims[0] = adjacentSims[1] = adjacentSims[2] = adjacentSims[3] = getOrCreateWeatherSimForRegion(a, b);
-            if (adjacentSims[0] == null)
+            if (conds != null)
             {
-                adjacentSims[0] = dummySim;
-                adjacentSims[1] = dummySim;
-                adjacentSims[2] = dummySim;
-                adjacentSims[3] = dummySim;
-            }*/
+                value = GameMath.Clamp(value - (1 - conds.Rainfall * conds.Rainfall), 0, 1.5f);
+            }
+
+            return value;
         }
 
-        public void updateAdjacentAndBlendWeatherData()
+        public ClimateCondition GetClimateFast(BlockPos pos, int climate)
         {
-            // No lerp for testing
-            /*adjacentSims[0].UpdateWeatherData();
-            blendedWeatherData.SetLerped(adjacentSims[0].weatherData, adjacentSims[0].weatherData, (float)0);
-            return;*/
+            return api.World.BlockAccessor.GetClimateAt(pos, climate);
+        }
 
-            adjacentSims[0].UpdateWeatherData();
-            adjacentSims[1].UpdateWeatherData();
-            adjacentSims[2].UpdateWeatherData();
-            adjacentSims[3].UpdateWeatherData();
-            topBlendedWeatherData.SetLerped(adjacentSims[0].weatherData, adjacentSims[1].weatherData, (float)lerpLeftRight);
-            botBlendedWeatherData.SetLerped(adjacentSims[2].weatherData, adjacentSims[3].weatherData, (float)lerpLeftRight);
 
-            blendedWeatherData.SetLerped(topBlendedWeatherData, botBlendedWeatherData, (float)lerpTopBot);
-            blendedWeatherData.Ambient.CloudBrightness.Weight = 0;
+        float getPrecipNoise(double posX, double posZ, double totalDays)
+        {
+            return (float)GameMath.Max(
+                precipitationNoise.Noise(posX / 9 / 2, posZ / 9 / 2 + totalDays * 4, totalDays * 2) -
+                GameMath.Clamp(precipitationNoiseSub.Noise(posX / 4 / 2, posZ / 4 / 2 + totalDays * 6, totalDays * 6) * 5 - 1, 0, 1),
+                0
+            );
+        }
+
+
+        public WeatherDataReader getWeatherDataReader()
+        {
+            return new WeatherDataReader(api, this);
+        }
+
+        public WeatherDataReaderPreLoad getWeatherDataReaderPreLoad()
+        {
+            return new WeatherDataReaderPreLoad(api, this);
         }
 
 
@@ -282,10 +201,12 @@ namespace Vintagestory.GameContent
         {
             long index2d = MapRegionIndex2D(regionX, regionZ);
             IMapRegion mapregion = api.World.BlockAccessor.GetMapRegion(regionX, regionZ);
+
             if (mapregion == null)
             {
                 return null;
             }
+
             return getOrCreateWeatherSimForRegion(index2d, mapregion);
         }
 
@@ -320,7 +241,7 @@ namespace Vintagestory.GameContent
                 }
                 catch (Exception)
                 {
-                    api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one", regioncoord.X, regioncoord.Z);
+                    api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one. Likely due to game version change.", regioncoord.X, regioncoord.Z);
                     weatherSim.LoadRandomPattern();
                     weatherSim.NewWePattern.OnBeginUse();
                 }
@@ -332,6 +253,7 @@ namespace Vintagestory.GameContent
                 mapregion.ModData["weather"] = weatherSim.ToBytes();
             }
 
+            weatherSim.MapRegion = mapregion;
             weatherSimByMapRegion[index2d] = weatherSim;
 
             return weatherSim;
@@ -341,35 +263,20 @@ namespace Vintagestory.GameContent
 
         public long MapRegionIndex2D(int regionX, int regionZ)
         {
-            return ((long)regionZ) * RegionMapSizeX + regionX;
+            return ((long)regionZ) * api.World.BlockAccessor.RegionMapSizeX + regionX;
         }
 
-        internal int RegionMapSizeX
-        {
-            get { return api.World.BlockAccessor.MapSizeX / api.World.BlockAccessor.RegionSize; }
-        }
 
         public Vec3i MapRegionPosFromIndex2D(long index)
         {
-            if (RegionMapSizeX == 0) // For maps smaller than RegionSize
-            {
-                return new Vec3i(0, 0, 0);
-            }
-
             return new Vec3i(
-                (int)(index % RegionMapSizeX),
+                (int)(index % api.World.BlockAccessor.RegionMapSizeX),
                 0,
-                (int)(index / RegionMapSizeX)
+                (int)(index / api.World.BlockAccessor.RegionMapSizeX)
             );
         }
 
-        public override void Dispose()
-        {
-            adjacentSimsTL.Dispose();
-            lerpLeftRightTL.Dispose();
-            lerpTopBotTL.Dispose();
-            base.Dispose();
-        }
+
 
     }
 }

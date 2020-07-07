@@ -119,6 +119,9 @@ namespace Vintagestory.GameContent
 
                     if (ebh != null)
                     {
+                        EntityPlayer plr = (EntityPlayer)entity;
+                        if (plr != null && entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
+
                         // When below 75% satiety, autoheal starts dropping
                         recoverySpeed = GameMath.Clamp(0.01f * ebh.Saturation / ebh.MaxSaturation * 1/0.75f, 0, 0.01f);
 
@@ -150,7 +153,13 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
-            damage = onDamaged(damage, damageSource);
+            if (onDamaged != null)
+            {
+                foreach (OnDamagedDelegate dele in onDamaged.GetInvocationList())
+                {
+                    damage = dele.Invoke(damage, damageSource);
+                }
+            }
 
             if (damageSource.Type == EnumDamageType.Heal)
             {

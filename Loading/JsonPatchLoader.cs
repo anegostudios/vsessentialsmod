@@ -196,13 +196,21 @@ namespace Vintagestory.ServerMods.NoObf
             var asset = api.Assets.TryGet(loc);
             if (asset == null)
             {
-                EnumAppSide catSide = jsonPatch.File.Category.SideType;
-                if (catSide != EnumAppSide.Universal && api.Side != catSide)
+                if (jsonPatch.File.Category == null)
                 {
-                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
-                } else
+                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Wrong asset category", patchIndex, patchSourcefile, loc);
+                }
+                else
                 {
-                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                    EnumAppSide catSide = jsonPatch.File.Category.SideType;
+                    if (catSide != EnumAppSide.Universal && api.Side != catSide)
+                    {
+                        api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
+                    }
+                    else
+                    {
+                        api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                    }
                 }
 
 

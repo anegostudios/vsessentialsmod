@@ -49,6 +49,13 @@ namespace Vintagestory.GameContent
             float x = (float)(map.Bounds.renderX + viewPos.X);
             float y = (float)(map.Bounds.renderY + viewPos.Y);
 
+            if (waypoint.Pinned)
+            {
+                map.Api.Render.PushScissor(null);
+                x = (float)GameMath.Clamp(x, map.Bounds.renderX + 2, map.Bounds.renderX + map.Bounds.InnerWidth - 2);
+                y = (float)GameMath.Clamp(y, map.Bounds.renderY + 2, map.Bounds.renderY + map.Bounds.InnerHeight - 2);
+            }
+
             ICoreClientAPI api = map.Api;
 
             IShaderProgram prog = api.Render.GetEngineShader(EnumShaderProgram.Gui);
@@ -75,9 +82,11 @@ namespace Vintagestory.GameContent
                 prog.UniformMatrix("modelViewMatrix", mvMat.Values);
 
                 api.Render.RenderMesh(quadModel);
-            } else
+            }
+
+            if (waypoint.Pinned)
             {
-                int a = 1;
+                map.Api.Render.PopScissor();
             }
         }
 
@@ -97,10 +106,19 @@ namespace Vintagestory.GameContent
             Vec2f viewPos = new Vec2f();
             mapElem.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
 
-            double mouseX = args.X - mapElem.Bounds.renderX;
-            double mouseY = args.Y - mapElem.Bounds.renderY;
             
-            if (mouseOver = Math.Abs(viewPos.X - mouseX) < 8 && Math.Abs(viewPos.Y - mouseY) < 8)
+            double x = viewPos.X + mapElem.Bounds.renderX;
+            double y = viewPos.Y + mapElem.Bounds.renderY;
+            if (waypoint.Pinned)
+            {
+                x = (float)GameMath.Clamp(x, mapElem.Bounds.renderX + 2, mapElem.Bounds.renderX + mapElem.Bounds.InnerWidth - 2);
+                y = (float)GameMath.Clamp(y, mapElem.Bounds.renderY + 2, mapElem.Bounds.renderY + mapElem.Bounds.InnerHeight - 2);
+            }
+            double dX = args.X - x;
+            double dY = args.Y - y;
+
+
+            if (mouseOver = Math.Abs(dX) < 8 && Math.Abs(dY) < 8)
             {
                 string text = Lang.Get("Waypoint {0}", waypointIndex) + "\n" + waypoint.Title;
                 hoverText.AppendLine(text);
@@ -115,10 +133,18 @@ namespace Vintagestory.GameContent
                 Vec2f viewPos = new Vec2f();
                 mapElem.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
 
-                double mouseX = args.X - mapElem.Bounds.renderX;
-                double mouseY = args.Y - mapElem.Bounds.renderY;
+                double x = viewPos.X + mapElem.Bounds.renderX;
+                double y = viewPos.Y + mapElem.Bounds.renderY;
+                if (waypoint.Pinned)
+                {
+                    x = (float)GameMath.Clamp(x, mapElem.Bounds.renderX + 2, mapElem.Bounds.renderX + mapElem.Bounds.InnerWidth - 2);
+                    y = (float)GameMath.Clamp(y, mapElem.Bounds.renderY + 2, mapElem.Bounds.renderY + mapElem.Bounds.InnerHeight - 2);
+                }
+                double dX = args.X - x;
+                double dY = args.Y - y;
 
-                if (Math.Abs(viewPos.X - mouseX) < 5 && Math.Abs(viewPos.Y - mouseY) < 5)
+
+                if (Math.Abs(dX) < 7 && Math.Abs(dY) < 7)
                 {
                     if (editWpDlg != null)
                     {

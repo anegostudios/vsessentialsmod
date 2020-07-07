@@ -1,6 +1,9 @@
 ﻿using Cairo;
 using System;
+using System.Drawing;
 using System.Globalization;
+using System.Linq;
+using System.Reflection;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
@@ -19,10 +22,19 @@ namespace Vintagestory.GameContent
 
         Waypoint waypoint;
         int wpIndex;
-        
+
         internal Vec3d WorldPos;
 
         public override double DrawOrder => 0.2;
+
+
+        static ILookup<int, System.Drawing.Color> colorLookup = typeof(System.Drawing.Color)
+            .GetProperties(BindingFlags.Public | BindingFlags.Static)
+            .Select(f => (System.Drawing.Color)f.GetValue(null, null))
+            .Where(c => c.IsNamedColor)
+            .ToLookup(c => c.ToArgb());
+
+
 
         public GuiDialogEditWayPoint(ICoreClientAPI capi, Waypoint waypoint, int index) : base("", capi)
         {
@@ -72,7 +84,7 @@ namespace Vintagestory.GameContent
                     .AddStaticText("Name", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
                     .AddTextInput(rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), onNameChanged, CairoFont.TextInput(), "nameInput")
 
-                    .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
+                    .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
                     .AddDropDown(
                         names,
                         new string[] { "<icon name=\"wpCircle\">", "<icon name=\"wpBee\">", "<icon name=\"wpCave\">", "<icon name=\"wpHome\">", "<icon name=\"wpLadder\">", "<icon name=\"wpPick\">", "<icon name=\"wpRocks\">", "<icon name=\"wpRuins\">", "<icon name=\"wpSpiral\">", "<icon name=\"wpStar1\">", "<icon name=\"wpStar2\">", "<icon name=\"wpTrader\">", "<icon name=\"wpVessel\">" },
@@ -83,6 +95,9 @@ namespace Vintagestory.GameContent
                         "iconInput"
                     )
 
+                    .AddStaticText("Pinned", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
+                    .AddSwitch(onPinnedToggled, rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), "pinnedSwitch")
+
                     .AddSmallButton("Cancel", onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)
                     .AddSmallButton("Delete", onDelete, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.CenterFixed), EnumButtonStyle.Normal)
                     .AddSmallButton("Save", onSave, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.RightFixed), EnumButtonStyle.Normal, key: "saveButton")
@@ -90,20 +105,27 @@ namespace Vintagestory.GameContent
                 .Compose()
             ;
 
-            
-            var col = System.Drawing.Color.FromArgb(0, ColorUtil.ColorR(waypoint.Color), ColorUtil.ColorG(waypoint.Color), ColorUtil.ColorB(waypoint.Color));
-            if (col.IsKnownColor)
+            var col = System.Drawing.Color.FromArgb(255, ColorUtil.ColorR(waypoint.Color), ColorUtil.ColorG(waypoint.Color), ColorUtil.ColorB(waypoint.Color));
+
+
+            if (colorLookup[waypoint.Color].Count() > 0)
             {
-                SingleComposer.GetTextInput("colorInput").SetValue(col.ToKnownColor().ToString().ToLowerInvariant());
-            } else
+                SingleComposer.GetTextInput("colorInput").SetValue(colorLookup[waypoint.Color].First().ToKnownColor().ToString().ToLowerInvariant());
+            }
+            else
             {
                 SingleComposer.GetTextInput("colorInput").SetValue(ColorUtil.Int2Hex(waypoint.Color));
             }
 
             SingleComposer.GetTextInput("nameInput").SetValue(waypoint.Title);
-            
+            SingleComposer.GetSwitch("pinnedSwitch").SetValue(waypoint.Pinned);
+
         }
 
+        private void onPinnedToggled(bool t1)
+        {
+
+        }
 
         private void onIconSelectionChanged(string code, bool selected)
         {
@@ -120,8 +142,9 @@ namespace Vintagestory.GameContent
         private bool onSave()
         {
             string name = SingleComposer.GetTextInput("nameInput").GetText();
+            bool pinned = SingleComposer.GetSwitch("pinnedSwitch").On;
             string icon = SingleComposer.GetDropDown("iconInput").SelectedValue;
-            capi.SendChatMessage(string.Format("/waypoint modify {0} {1} {2} {3}", wpIndex, colorText, icon, name));
+            capi.SendChatMessage(string.Format("/waypoint modify {0} {1} {2} {3} {4}", wpIndex, colorText, icon, pinned, name));
             TryClose();
             return true;
         }
@@ -152,7 +175,7 @@ namespace Vintagestory.GameContent
         private void onColorChanged(string colorstring)
         {
             int transparent = System.Drawing.Color.Transparent.ToArgb();
-            int fullAlpha   = System.Drawing.Color.Black.ToArgb();
+            int fullAlpha = System.Drawing.Color.Black.ToArgb();
 
             int? newColor = null;
             if (colorstring.StartsWith("#"))
@@ -163,7 +186,7 @@ namespace Vintagestory.GameContent
                     try { newColor = Int32.Parse(s, NumberStyles.HexNumber) | fullAlpha; }
                     // We can ignore the exception because if one occurred,
                     // the newColor variable will still be set to null.
-                    catch (Exception) {  }
+                    catch (Exception) { }
                 }
             }
             else
@@ -174,12 +197,12 @@ namespace Vintagestory.GameContent
                     newColor = knownColor.ToArgb();
             }
 
-            color     = newColor ?? transparent;
+            color = newColor ?? transparent;
             colorText = colorstring;
 
             SingleComposer.GetTextInput("colorInput").Font.Color = newColor.HasValue
                 ? GuiStyle.DialogDefaultTextColor : GuiStyle.ErrorTextColor;
-            
+
             bool hasName = (SingleComposer.GetTextInput("nameInput").GetText().Trim() != "");
             SingleComposer.GetButton("saveButton").Enabled = newColor.HasValue && hasName;
 
