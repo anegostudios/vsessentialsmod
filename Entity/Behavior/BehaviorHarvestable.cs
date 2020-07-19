@@ -79,11 +79,20 @@ namespace Vintagestory.GameContent
             TreeAttribute tree = entity.WatchedAttributes["harvestableInv"] as TreeAttribute;
             if (tree != null) inv.FromTreeAttributes(tree);
             inv.PutLocked = true;
-
+            
             if (entity.World.Side == EnumAppSide.Server)
             {
+                inv.SlotModified += Inv_SlotModified;
                 inv.OnInventoryClosed += Inv_OnInventoryClosed;
             }
+        }
+
+        private void Inv_SlotModified(int slotid)
+        {
+            TreeAttribute tree = new TreeAttribute();
+            inv.ToTreeAttributes(tree);
+            entity.WatchedAttributes["harvestableInv"] = tree;
+            entity.WatchedAttributes.MarkPathDirty("harvestableInv");
         }
 
         private void Inv_OnInventoryClosed(IPlayer player)

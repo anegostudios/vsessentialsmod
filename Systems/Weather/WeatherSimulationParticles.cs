@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
         public int[,] lowResRainHeightMap;
         public BlockPos centerPos;
 
-        public override Vec3d Pos { 
+        public override Vec3d Pos {
             get
             {
                 tmpPos.Set(
@@ -179,13 +179,30 @@ namespace Vintagestory.GameContent
 
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
         {
-            WeatherDataSnapshot weatherData = ws.blendedWeatherData;
+            WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
 
-            float plevel = weatherData.PrecIntensity * capi.Settings.Int["particleLevel"] / 100f;
-
-            EnumPrecipitationType precType = weatherData.nowPrecType;
-            particlePos.Set(capi.World.Player.Entity.Pos.X, capi.World.Player.Entity.Pos.Y, capi.World.Player.Entity.Pos.Z);
+            ClimateCondition conds = ws.clientClimateCond;
+            if (conds == null) return true; 
+            
             EntityPos plrPos = capi.World.Player.Entity.Pos;
+            float precIntensity = conds.Rainfall;
+
+            float plevel = precIntensity * capi.Settings.Int["particleLevel"] / 100f;
+
+            tmpPos.Set((int)plrPos.X, (int)plrPos.Y, (int)plrPos.Z);
+
+
+            /*float plevel = weatherData.PrecIntensity * capi.Settings.Int["particleLevel"] / 100f;
+
+            EnumPrecipitationType precType = weatherData.BlendedPrecType;
+            if (precType == EnumPrecipitationType.Auto)
+            {*/
+            //EnumPrecipitationType precType = ws.clientClimateCond?.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+            //}
+
+            
+            particlePos.Set(capi.World.Player.Entity.Pos.X, capi.World.Player.Entity.Pos.Y, capi.World.Player.Entity.Pos.Z);
+            
 
 
             centerPos.Set((int)particlePos.X, 0, (int)particlePos.Z);
@@ -250,9 +267,9 @@ namespace Vintagestory.GameContent
             }
 
 
-            if (weatherData.PrecIntensity <= 0.02) return true;
+            if (precIntensity <= 0.02) return true;
 
-            if (precType == EnumPrecipitationType.Hail)
+            /*if (precType == EnumPrecipitationType.Hail)
             {
                 float dx = (float)(plrPos.Motion.X * 40) - 4 * weatherData.curWindSpeed.X;
                 float dy = (float)(plrPos.Motion.Y * 40);
@@ -278,10 +295,11 @@ namespace Vintagestory.GameContent
 
                 manager.Spawn(hailParticle);
                 return true;
-            }
+            }*/
 
 
-            if (precType == EnumPrecipitationType.Rain)
+            //if (precType == EnumPrecipitationType.Rain)
+            if (conds.Temperature >= 4)
             {
                 float dx = (float)(plrPos.Motion.X * 80);
                 float dy = (float)(plrPos.Motion.Y * 80);
@@ -292,8 +310,8 @@ namespace Vintagestory.GameContent
                 rainParticle.MinQuantity = 1000 * plevel;
                 rainParticle.LifeLength = 1f;
                 rainParticle.AddQuantity = 25 * plevel;
-                rainParticle.MinSize = 0.15f * weatherData.PrecParticleSize;
-                rainParticle.MaxSize = 0.22f * weatherData.PrecParticleSize;
+                rainParticle.MinSize = 0.15f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
+                rainParticle.MaxSize = 0.22f * (0.5f + conds.Rainfall); // weatherData.PrecParticleSize;
 
                 rainParticle.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -10f, -0.025f);
                 rainParticle.AddVelocity.Set(0.05f + 8 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
@@ -304,10 +322,10 @@ namespace Vintagestory.GameContent
                 splashParticles.MinVelocity = new Vec3f(-1f, 3, -1f);
                 splashParticles.AddVelocity = new Vec3f(2, 0, 2);
                 splashParticles.LifeLength = 0.1f;
-                splashParticles.MinSize = 0.07f * weatherData.PrecParticleSize;
-                splashParticles.MaxSize = 0.2f * weatherData.PrecParticleSize;
+                splashParticles.MinSize = 0.07f * conds.Rainfall;// weatherData.PrecParticleSize;
+                splashParticles.MaxSize = 0.2f * conds.Rainfall; // weatherData.PrecParticleSize;
                 splashParticles.ShouldSwimOnLiquid = true;
-
+                    
                 float cnt = 75 * plevel;
                 
                 for (int i = 0; i < cnt; i++)
@@ -336,7 +354,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (precType == EnumPrecipitationType.Snow)
+            else //if (precType == EnumPrecipitationType.Snow)
             {
                 float wetness = 2.5f * GameMath.Clamp(ws.clientClimateCond.Temperature + 1, 0, 4) / 4f;
 
@@ -356,8 +374,8 @@ namespace Vintagestory.GameContent
                 snowParticle.LifeLength = Math.Max(1f, 4f - wetness);
                 snowParticle.Color = ColorUtil.ColorOverlay(ColorUtil.ToRgba(255, 255, 255, 255), rainParticle.Color, wetness / 4f);
                 snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
-                snowParticle.MinSize = 0.1f * weatherData.PrecParticleSize;
-                snowParticle.MaxSize = 0.3f * weatherData.PrecParticleSize / (1 + wetness);
+                snowParticle.MinSize = 0.1f * conds.Rainfall;// weatherData.PrecParticleSize;
+                snowParticle.MaxSize = 0.3f * conds.Rainfall / (1 + wetness);// weatherData.PrecParticleSize / (1 + wetness);
 
                 float hrange = 40;
                 float vrange = 20;

@@ -34,7 +34,7 @@ namespace Vintagestory.GameContent
         EntityPartitioning partitionUtil;
 
         bool lowStabilityAttracted;
-
+        bool ignoreDeepDayLight;
 
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
         {
@@ -69,6 +69,11 @@ namespace Vintagestory.GameContent
             if (taskConfig["cancelOnHurt"] != null)
             {
                 cancelOnHurt = taskConfig["cancelOnHurt"].AsBool(false);
+            }
+
+            if (taskConfig["ignoreDeepDayLight"] != null)
+            {
+                ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
             }
 
             if (taskConfig["fleeingDistance"] != null)
@@ -112,25 +117,40 @@ namespace Vintagestory.GameContent
             if (rand.NextDouble() > 2 * executionChance) return false;
 
 
-            if (entity.World.Calendar.DayLightStrength < minDayLight) return false;
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
             // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
+            if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) < minDayLight)
+            {
+                return false;
+            }
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
-            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, fearReductionFactor * seekingRange, (e) => {
+            Vec3d ownPos = entity.ServerPos.XYZ;
+            double hereRange = fearReductionFactor * seekingRange;
+
+            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
                 if (!e.Alive || e.EntityId == this.entity.EntityId || e is EntityItem) return false;
 
                 for (int i = 0; i < fleeEntityCodesExact.Length; i++)
                 {
                     if (e.Code.Path == fleeEntityCodesExact[i])
                     {
+                        if (e is EntityAgent eagent)
+                        {
+                            // Sneaking halves the detection range
+                            if (eagent.Controls.Sneak && eagent.OnGround)
+                            {
+                                if (e.ServerPos.DistanceTo(ownPos) > hereRange * 0.6f) return false;
+                            }
+                        }
+
                         if (e.Code.Path == "player")
                         {
                             IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);

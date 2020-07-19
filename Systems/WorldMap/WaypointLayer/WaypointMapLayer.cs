@@ -22,13 +22,14 @@ namespace Vintagestory.GameContent
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class Waypoint
     {
-        public Vec3d Position;
+        public Vec3d Position = new Vec3d();
         public string Title;
         public string Text;
         public int Color;
 
         public string Icon = "circle";
         public bool ShowInWorld;
+        public bool Pinned;
 
         public string OwningPlayerUid = null;
         public int OwningPlayerGroupId = -1;
@@ -60,7 +61,7 @@ namespace Vintagestory.GameContent
                 this.sapi = sapi;
 
                 sapi.Event.GameWorldSave += OnSaveGameGettingSaved;
-                sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|remove|list]", OnCmdWayPoint, Privilege.chat);
+                sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list]", OnCmdWayPoint, Privilege.chat);
             }
         }
 
@@ -71,33 +72,57 @@ namespace Vintagestory.GameContent
             switch (cmd)
             {
                 case "add":
-                    AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle"); 
+                    AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle", false); 
                     break;
+
+                case "addp":
+                    AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle", true);
+                    break;
+
                 case "addat":
                     {
                         Vec3d spawnpos = sapi.World.DefaultSpawnPosition.XYZ;
                         spawnpos.Y = 0;
                         Vec3d targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
 
-                        AddWp(targetpos, args, player, groupId, "circle");
+                        if (targetpos == null)
+                        {
+                            player.SendMessage(groupId, Lang.Get("Syntax: /waypoint addat x y z pinned color title"), EnumChatType.CommandError);
+                            return;
+                        }
+
+                        AddWp(targetpos, args, player, groupId, "circle", (bool)args.PopBool(false));
                         break;
                     }
 
                 case "addati":
                     {
+                        if (args.Length == 0)
+                        {
+                            player.SendMessage(groupId, Lang.Get("Syntax: /waypoint addati icon x y z pinned color title"), EnumChatType.CommandError);
+                            return;
+                        }
+
                         string icon = args.PopWord();
 
                         Vec3d spawnpos = sapi.World.DefaultSpawnPosition.XYZ;
                         spawnpos.Y = 0;
                         Vec3d targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
 
-                        AddWp(targetpos, args, player, groupId, icon);
+                        if (targetpos == null)
+                        {
+                            player.SendMessage(groupId, Lang.Get("Invalid position. Syntax: /waypoint addati icon x y z pinned color title"), EnumChatType.CommandError);
+                            return;
+                        }
+
+                        AddWp(targetpos, args, player, groupId, icon, (bool)args.PopBool(false));
                     }
                     break;
 
                 case "modify":
                     ModWp(args, player, groupId);
                     break;
+
 
                 case "remove":
                     {
@@ -163,7 +188,6 @@ namespace Vintagestory.GameContent
             }
 
             Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
-
             int? wpIndex = args.PopInt();
 
             if (wpIndex == null || wpIndex < 0 || ownwpaypoints.Length < (int)wpIndex - 1)
@@ -174,6 +198,7 @@ namespace Vintagestory.GameContent
 
             string colorstring = args.PopWord();
             string icon = args.PopWord();
+            bool pinned = (bool)args.PopBool(false);
             string title = args.PopAll();
 
             System.Drawing.Color parsedColor;
@@ -204,6 +229,8 @@ namespace Vintagestory.GameContent
 
             ownwpaypoints[(int)wpIndex].Color = parsedColor.ToArgb() | (255 << 24);
             ownwpaypoints[(int)wpIndex].Title = title;
+            ownwpaypoints[(int)wpIndex].Pinned = pinned;
+
             if (icon != null)
             {
                 ownwpaypoints[(int)wpIndex].Icon = icon;
@@ -213,7 +240,7 @@ namespace Vintagestory.GameContent
             ResendWaypoints(player);
         }
 
-        private void AddWp(Vec3d pos, CmdArgs args, IServerPlayer player, int groupId, string icon)
+        private void AddWp(Vec3d pos, CmdArgs args, IServerPlayer player, int groupId, string icon, bool pinned)
         {
             if (args.Length == 0)
             {
@@ -251,6 +278,7 @@ namespace Vintagestory.GameContent
             }
 
             
+            
 
             Waypoint waypoint = new Waypoint()
             {
@@ -258,7 +286,8 @@ namespace Vintagestory.GameContent
                 OwningPlayerUid = player.PlayerUID,
                 Position = pos,
                 Title = title,
-                Icon = icon
+                Icon = icon,
+                Pinned = pinned
             };
 
 
@@ -291,9 +320,20 @@ namespace Vintagestory.GameContent
 
             if (texturesByIcon == null || rebuildAnyway)
             {
+                if (texturesByIcon != null)
+                {
+                    foreach (var val in texturesByIcon)
+                    {
+                        val.Value.Dispose();
+                    }
+                }
+
                 texturesByIcon = new Dictionary<string, LoadedTexture>();
 
-                ImageSurface surface = new ImageSurface(Format.Argb32, 25, 25);
+                double scale = RuntimeEnv.GUIScale;
+                int size = (int)(27 * scale);
+
+                ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
                 Context ctx = new Context(surface);
 
                 string[] icons = new string[] { "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel" };
@@ -306,11 +346,13 @@ namespace Vintagestory.GameContent
                     ctx.Paint();
                     ctx.Operator = Operator.Over;
 
-                    capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 1, 1, 23, 23, ColorUtil.WhiteArgbDouble);
+                    capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 1, 1, size - 2, size - 2, new double[] { 0,0,0,1});
+
+                    capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 2, 2, size - 4, size - 4, ColorUtil.WhiteArgbDouble);
 
                     //surface.WriteToPng("icon-" + val+".png");
 
-                    texturesByIcon[val] = new LoadedTexture(api as ICoreClientAPI, (api as ICoreClientAPI).Gui.LoadCairoTexture(surface, false), 20, 20);
+                    texturesByIcon[val] = new LoadedTexture(api as ICoreClientAPI, (api as ICoreClientAPI).Gui.LoadCairoTexture(surface, false), (int)(20 * scale), (int)(20 * scale));
                 }
 
                 ctx.Dispose();
@@ -356,6 +398,17 @@ namespace Vintagestory.GameContent
                 {
                     byte[] data = sapi.WorldManager.SaveGame.GetData("playerMapMarkers");
                     if (data != null) Waypoints = JsonUtil.FromBytes<List<Waypoint>>(data);
+
+                    for (int i = 0; i < Waypoints.Count; i++)
+                    {
+                        if (Waypoints[i].Position == null)
+                        {
+                            sapi.World.Logger.Error("Waypoint with no position loaded, will remove");
+                            Waypoints.RemoveAt(i);
+                            i--;
+                        }
+                    }
+
                 } catch (Exception e)
                 {
                     sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: ", e);

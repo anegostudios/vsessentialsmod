@@ -74,7 +74,9 @@ namespace Vintagestory.ServerMods.NoObf
         public Dictionary<string, bool> SideSolidOpaqueAo;
 
         [JsonProperty]
-        public int TintIndex;
+        public string ClimateColorMap = null;
+        [JsonProperty]
+        public string SeasonColorMap = null;
         [JsonProperty]
         public int Replaceable;
         [JsonProperty]
@@ -217,8 +219,6 @@ namespace Vintagestory.ServerMods.NoObf
                 ResolveStringBoolDictFaces(EmitSideAo);
             }
 
-
-            TintIndex = GameMath.Clamp(TintIndex, 0, 2);
 
             if (LightHsv == null) LightHsv = new byte[3];
 

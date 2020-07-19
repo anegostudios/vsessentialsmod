@@ -1,4 +1,5 @@
-﻿using Vintagestory.API;
+﻿using System;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -13,6 +14,8 @@ namespace Vintagestory.GameContent
         double groundDragFactor = 0.3f;
 
         Vec3d motionDelta = new Vec3d();
+
+        float accum;
 
         internal override void Initialize(EntityProperties properties)
         {
@@ -30,36 +33,50 @@ namespace Vintagestory.GameContent
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
-            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y - 0.05f), (int)pos.Z);           
+            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y - 0.05f), (int)pos.Z);
 
-            if (!entity.Swimming && entity.Alive)
+            accum = Math.Min(1, accum + dt);
+            float frametime = 1 / 60f;
+
+            while (accum > frametime)
             {
-                double multiplier = (entity as EntityAgent).GetWalkSpeedMultiplier(groundDragFactor);
+                accum -= frametime;
 
-                motionDelta.Set(
-                    motionDelta.X + (controls.WalkVector.X * multiplier - motionDelta.X) * belowBlock.DragMultiplier, 
-                    0,
-                    motionDelta.Z + (controls.WalkVector.Z * multiplier - motionDelta.Z) * belowBlock.DragMultiplier
-                );
+                if (!entity.Swimming && entity.Alive)
+                {
+                    // Apply walk motion
+                    double multiplier = (entity as EntityAgent).GetWalkSpeedMultiplier(groundDragFactor);
 
-                pos.Motion.Add(motionDelta.X, 0, motionDelta.Z);
+                    motionDelta.Set(
+                        motionDelta.X + (controls.WalkVector.X * multiplier - motionDelta.X) * belowBlock.DragMultiplier,
+                        0,
+                        motionDelta.Z + (controls.WalkVector.Z * multiplier - motionDelta.Z) * belowBlock.DragMultiplier
+                    );
+
+                    pos.Motion.Add(motionDelta.X, 0, motionDelta.Z);
+                }
+
+                if (!entity.Swimming)
+                {
+                    // Apply ground drag
+                    double dragstrength = 1 - groundDragFactor;
+
+                    pos.Motion.X *= dragstrength;
+                    pos.Motion.Z *= dragstrength;
+                }
             }
 
             if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive && !entity.Swimming)
             {
+                // Apply jump motion
                 lastJump = entity.World.ElapsedMilliseconds;
-                
-                pos.Motion.Y = GlobalConstants.BaseJumpForce * dt;
+                pos.Motion.Y = GlobalConstants.BaseJumpForce * 1 / 60f;
+
                 EntityPlayer entityPlayer = entity as EntityPlayer;
                 IPlayer player = entityPlayer != null ? entityPlayer.World.PlayerByUid(entityPlayer.PlayerUID) : null;
                 entity.PlayEntitySound("jump", player, false);
             }
 
-            if (!entity.Swimming)
-            {
-                pos.Motion.X *= (1 - groundDragFactor);
-                pos.Motion.Z *= (1 - groundDragFactor);
-            }
         }
     }
 }

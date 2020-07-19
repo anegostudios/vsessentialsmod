@@ -8,10 +8,6 @@ using Vintagestory.GameContent;
 
 namespace Vintagestory.ServerMods
 {
-
-    /// <summary>
-    /// This class contains core settings for the Vintagestory server
-    /// </summary>
     public class Core : ModSystem
 	{
         ICoreServerAPI sapi;
@@ -46,15 +42,13 @@ namespace Vintagestory.ServerMods
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.sapi = api;
-            
         }
 
-        
+
 
         public override void Start(ICoreAPI api)
         {
             this.api = api;
-            
 
             RegisterDefaultBlocks();
             RegisterDefaultBlockBehaviors();
@@ -64,7 +58,7 @@ namespace Vintagestory.ServerMods
             RegisterDefaultEntityBehaviors();
             RegisterDefaultBlockEntities();
         }
-        
+
 
         private void RegisterDefaultBlocks()
         {
@@ -73,7 +67,7 @@ namespace Vintagestory.ServerMods
         
         private void RegisterDefaultBlockBehaviors()
         {
-            
+            api.RegisterBlockBehaviorClass("ClearSnowAccumOnRemove", typeof(BehaviorClearSnowAccumOnRemove));
         }
 
 
@@ -97,6 +91,9 @@ namespace Vintagestory.ServerMods
             
            
         }
+
+
+
 
 
 

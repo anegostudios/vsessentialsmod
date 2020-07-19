@@ -115,6 +115,7 @@ namespace Vintagestory.GameContent
 
                 foreach (var layer in MapLayers)
                 {
+                    layer?.OnShutDown();
                     layer?.Dispose();
                 }
             };
@@ -173,7 +174,7 @@ namespace Vintagestory.GameContent
                 {
                     foreach (MapLayer layer in MapLayers)
                     {
-                        layer.OnOffThreadTick();
+                        layer.OnOffThreadTick(20/1000f);
                     }
 
                     Thread.Sleep(20);

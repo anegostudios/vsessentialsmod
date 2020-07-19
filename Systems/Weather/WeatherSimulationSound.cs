@@ -16,7 +16,8 @@ namespace Vintagestory.GameContent
     {
         WeatherSystemClient weatherSys;
 
-        ILoadedSound[] rainSounds;
+        ILoadedSound[] rainSoundsLeafless;
+        ILoadedSound[] rainSoundsLeafy;
         ILoadedSound lowTrembleSound;
         ILoadedSound hailSound;
         ILoadedSound windSoundLeafy;
@@ -32,7 +33,9 @@ namespace Vintagestory.GameContent
         
         float curWindVolumeLeafy = 0f;
         float curWindVolumeLeafless = 0f;
-        float curRainVolume = 0f;
+        float curRainVolumeLeafy = 0f;
+        float curRainVolumeLeafless = 0f;
+
         float curRainPitch = 1f;
         float curHailVolume = 0f;
         float curHailPitch = 1f;
@@ -83,10 +86,10 @@ namespace Vintagestory.GameContent
             });
 
 
-            rainSounds = new ILoadedSound[1];
-            rainSounds[0] = capi.World.LoadSound(new SoundParams()
+            rainSoundsLeafless = new ILoadedSound[1];
+            rainSoundsLeafless[0] = capi.World.LoadSound(new SoundParams()
             {
-                Location = new AssetLocation("sounds/weather/tracks/rain.ogg"),
+                Location = new AssetLocation("sounds/weather/tracks/rain-leafless.ogg"),
                 ShouldLoop = true,
                 DisposeOnFinish = false,
                 Position = new Vec3f(0, 0, 0),
@@ -95,6 +98,20 @@ namespace Vintagestory.GameContent
                 SoundType = EnumSoundType.Ambient,
                 Volume = 1
             });
+
+            rainSoundsLeafy = new ILoadedSound[1];
+            rainSoundsLeafy[0] = capi.World.LoadSound(new SoundParams()
+            {
+                Location = new AssetLocation("sounds/weather/tracks/rain-leafy.ogg"),
+                ShouldLoop = true,
+                DisposeOnFinish = false,
+                Position = new Vec3f(0, 0, 0),
+                RelativePosition = true,
+                Range = 16,
+                SoundType = EnumSoundType.Ambient,
+                Volume = 1
+            });
+
 
             windSoundLeafy = capi.World.LoadSound(new SoundParams()
             {
@@ -147,15 +164,17 @@ namespace Vintagestory.GameContent
 
         private void updateSounds(float dt)
         {
-            float targetRainVolume=0;
+            float targetRainVolumeLeafy=0;
+            float targetRainVolumeLeafless = 0;
             float targetHailVolume=0;
             float targetTrembleVolume=0;
 
             float targetRainPitch=1;
             float targetHailPitch=1;
 
+            
 
-            WeatherDataSnapshot weatherData = weatherSys.blendedWeatherData;
+            WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
 
             if (searchComplete)
             {
@@ -171,23 +190,37 @@ namespace Vintagestory.GameContent
                 });
             }
 
+            //EnumPrecipitationType precType = weatherData.BlendedPrecType;
+            //if (precType == EnumPrecipitationType.Auto)
+            //{
+            EnumPrecipitationType precType = weatherSys.clientClimateCond?.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+            //}
 
-            if (weatherData.PrecIntensity > 0)
+            float nearbyLeaviness = GameMath.Clamp(GlobalConstants.CurrentNearbyRelLeavesCountClient * 60, 0, 1);
+
+            ClimateCondition conds = weatherSys.clientClimateCond;
+
+            if (conds.Rainfall > 0)
             {
-                if (weatherData.nowPrecType == EnumPrecipitationType.Rain || weatherSys.clientClimateCond.Temperature < weatherData.snowThresholdTemp)
+                if (precType == EnumPrecipitationType.Rain || weatherSys.clientClimateCond.Temperature < weatherData.snowThresholdTemp)
                 {
-                    targetRainVolume = GameMath.Clamp(weatherData.PrecIntensity * 2f - Math.Max(0, 2f * (weatherData.snowThresholdTemp - weatherSys.clientClimateCond.Temperature)), 0, 1);
-                    targetRainVolume = GameMath.Max(0, targetRainVolume - roomVolumePitchLoss);
+                    targetRainVolumeLeafy = nearbyLeaviness * GameMath.Clamp(conds.Rainfall * 2f - Math.Max(0, 2f * (weatherData.snowThresholdTemp - weatherSys.clientClimateCond.Temperature)), 0, 1);
+                    targetRainVolumeLeafy = GameMath.Max(0, targetRainVolumeLeafy - roomVolumePitchLoss);
 
-                    targetRainPitch = Math.Max(0.7f, 1.25f - weatherData.PrecIntensity * 0.7f);
+                    targetRainVolumeLeafless = Math.Max(0.3f, 1 - nearbyLeaviness) * GameMath.Clamp(conds.Rainfall * 2f - Math.Max(0, 2f * (weatherData.snowThresholdTemp - weatherSys.clientClimateCond.Temperature)), 0, 1);
+                    targetRainVolumeLeafless = GameMath.Max(0, targetRainVolumeLeafless - roomVolumePitchLoss);
+
+                    targetRainPitch = Math.Max(0.7f, 1.25f - conds.Rainfall * 0.7f);
                     targetRainPitch = Math.Max(0, targetRainPitch - roomVolumePitchLoss/4f);
 
-                    targetTrembleVolume = GameMath.Clamp(weatherData.PrecIntensity * 1.6f - 0.8f - roomVolumePitchLoss, 0, 1);
+                    targetTrembleVolume = GameMath.Clamp(conds.Rainfall * 1.6f - 0.8f - roomVolumePitchLoss*0.25f, 0, 1);
 
-                    if (!rainSoundsOn && targetRainVolume > 0.01)
+                    if (!rainSoundsOn && (targetRainVolumeLeafy > 0.01 || targetRainVolumeLeafless > 0.01))
                     {
-                        for (int i = 0; i < rainSounds.Length; i++) { rainSounds[i].Start(); }
-                        lowTrembleSound.Start();
+                        for (int i = 0; i < rainSoundsLeafless.Length; i++) { rainSoundsLeafless[i].Start(); }
+                        for (int i = 0; i < rainSoundsLeafy.Length; i++) { rainSoundsLeafy[i].Start(); }
+
+                        lowTrembleSound?.Start();
                         rainSoundsOn = true;
 
                         curRainPitch = targetRainPitch;
@@ -195,22 +228,23 @@ namespace Vintagestory.GameContent
 
                     if (capi.World.Player.Entity.IsEyesSubmerged()) { 
                         curRainPitch = targetRainPitch / 2;
-                        targetRainVolume *= 0.75f;
+                        targetRainVolumeLeafy *= 0.75f;
+                        targetRainVolumeLeafless *= 0.75f;
                     }
 
                 }
 
-                if (weatherData.nowPrecType == EnumPrecipitationType.Hail)
+                if (precType == EnumPrecipitationType.Hail)
                 {
-                    targetHailVolume = GameMath.Clamp(weatherData.PrecIntensity * 2f - roomVolumePitchLoss, 0, 1);
+                    targetHailVolume = GameMath.Clamp(conds.Rainfall * 2f - roomVolumePitchLoss, 0, 1);
                     targetHailVolume = GameMath.Max(0, targetHailVolume - roomVolumePitchLoss);
 
-                    targetHailPitch = Math.Max(0.7f, 1.25f - weatherData.PrecIntensity * 0.7f);
+                    targetHailPitch = Math.Max(0.7f, 1.25f - conds.Rainfall * 0.7f);
                     targetHailPitch = Math.Max(0, targetHailPitch - roomVolumePitchLoss / 4f);
 
                     if (!hailSoundsOn && targetHailVolume > 0.01)
                     {
-                        hailSound.Start();
+                        hailSound?.Start();
                         hailSoundsOn = true;
                         curHailPitch = targetHailPitch;
                     }
@@ -219,7 +253,9 @@ namespace Vintagestory.GameContent
             }
 
             
-            curRainVolume += (targetRainVolume - curRainVolume) * dt;
+            curRainVolumeLeafy += (targetRainVolumeLeafy - curRainVolumeLeafy) * dt / 2;
+            curRainVolumeLeafless += (targetRainVolumeLeafless - curRainVolumeLeafless) * dt / 2;
+
             curTrembleVolume += (targetTrembleVolume - curTrembleVolume) * dt;
             curHailVolume += (targetHailVolume - curHailVolume) * dt;
 
@@ -227,32 +263,41 @@ namespace Vintagestory.GameContent
             curRainPitch += (targetRainPitch - curRainPitch) * dt;
 
 
+            
+
+
             if (rainSoundsOn)
             {
-                for (int i = 0; i < rainSounds.Length; i++)
+                for (int i = 0; i < rainSoundsLeafless.Length; i++)
                 {
-                    rainSounds[i].SetVolume(curRainVolume);
-                    rainSounds[i].SetPitch(curRainPitch);
+                    rainSoundsLeafless[i]?.SetVolume(curRainVolumeLeafless);
+                    rainSoundsLeafless[i]?.SetPitch(curRainPitch);
+                }
+                for (int i = 0; i < rainSoundsLeafy.Length; i++)
+                {
+                    rainSoundsLeafy[i]?.SetVolume(curRainVolumeLeafy);
+                    rainSoundsLeafy[i]?.SetPitch(curRainPitch);
                 }
 
-                lowTrembleSound.SetVolume(curTrembleVolume);
+                lowTrembleSound?.SetVolume(curTrembleVolume);
             }
             if (hailSoundsOn)
             {
-                hailSound.SetVolume(curHailVolume);
-                hailSound.SetPitch(curHailPitch);
+                hailSound?.SetVolume(curHailVolume);
+                hailSound?.SetPitch(curHailPitch);
             }
 
 
-            if (curRainVolume < 0.01)
+            if (curRainVolumeLeafless < 0.01 && curRainVolumeLeafy < 0.01)
             {
-                for (int i = 0; i < rainSounds.Length; i++) rainSounds[i].Stop();
+                for (int i = 0; i < rainSoundsLeafless.Length; i++) rainSoundsLeafless[i]?.Stop();
+                for (int i = 0; i < rainSoundsLeafy.Length; i++) rainSoundsLeafy[i]?.Stop();
                 rainSoundsOn = false;
             }
 
             if (curHailVolume < 0.01)
             {
-                hailSound.Stop();
+                hailSound?.Stop();
                 hailSoundsOn = false;
             }
 
@@ -260,34 +305,31 @@ namespace Vintagestory.GameContent
 
 
             float wstr = (1 - roomVolumePitchLoss) * weatherData.curWindSpeed.X - 0.3f;
-            if (wstr> 0.03f || curWindVolumeLeafy > 0.01f || curWindVolumeLeafless > 0.01f)
+            if (wstr > 0.03f || curWindVolumeLeafy > 0.01f || curWindVolumeLeafless > 0.01f)
             {
                 if (!windSoundsOn)
                 {
-                    windSoundLeafy.Start();
-                    windSoundLeafless.Start();
+                    windSoundLeafy?.Start();
+                    windSoundLeafless?.Start();
                     windSoundsOn = true;
                 }
 
-                float w = GameMath.Clamp(GlobalConstants.CurrentNearbyRelLeavesCountClient * 60, 0, 1);
-
-                float targetVolumeLeafy = w * 1.2f * wstr;
-                float targetVolumeLeafless = (1 - w) * 1.2f * wstr;
+                float targetVolumeLeafy = nearbyLeaviness * 1.2f * wstr;
+                float targetVolumeLeafless = (1 - nearbyLeaviness) * 1.2f * wstr;
 
                 curWindVolumeLeafy += (targetVolumeLeafy - curWindVolumeLeafy) * dt;
                 curWindVolumeLeafless += (targetVolumeLeafless - curWindVolumeLeafless) * dt;
 
-
-                windSoundLeafy.SetVolume(curWindVolumeLeafy);
-                windSoundLeafless.SetVolume(curWindVolumeLeafless);
+                windSoundLeafy?.SetVolume(curWindVolumeLeafy);
+                windSoundLeafless?.SetVolume(curWindVolumeLeafless);
 
             }
             else
             {
                 if (windSoundsOn)
                 {
-                    windSoundLeafy.Stop();
-                    windSoundLeafless.Stop();
+                    windSoundLeafy?.Stop();
+                    windSoundLeafless?.Stop();
                     windSoundsOn = false;
                 }
             }
@@ -296,9 +338,16 @@ namespace Vintagestory.GameContent
 
         public void Dispose()
         {
-            if (rainSounds != null)
+            if (rainSoundsLeafless != null)
             {
-                foreach (var val in rainSounds)
+                foreach (var val in rainSoundsLeafless)
+                {
+                    val?.Dispose();
+                }
+            }
+            if (rainSoundsLeafy != null)
+            {
+                foreach (var val in rainSoundsLeafy)
                 {
                     val?.Dispose();
                 }

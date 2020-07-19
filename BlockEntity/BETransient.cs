@@ -5,39 +5,82 @@ using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
     public class BlockEntityTransient : BlockEntity
     {
-        double transitionAtTotalDays = -1;
+        double lastCheckAtTotalDays = 0;
+        double transitionHoursLeft = -1;
 
         public virtual int CheckIntervalMs { get; set; } = 2000;
+
+        long listenerId;
+
+        double? transitionAtTotalDaysOld = null; // old v1.13 data format, here for backwards compatibility
 
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
 
-            if (transitionAtTotalDays <= 0)
+            if (transitionHoursLeft <= 0)
             {
-                float hours = Block.Attributes["inGameHours"].AsFloat(24);
-                transitionAtTotalDays = api.World.Calendar.TotalDays + hours / 24;
+                transitionHoursLeft = Block.Attributes["inGameHours"].AsFloat(24);
             }
 
             if (api.Side == EnumAppSide.Server)
             {
-                RegisterGameTickListener(CheckTransition, CheckIntervalMs);
+                listenerId = RegisterGameTickListener(CheckTransition, CheckIntervalMs);
+
+                if (transitionAtTotalDaysOld != null)
+                {
+                    transitionHoursLeft = ((double)transitionAtTotalDaysOld - Api.World.Calendar.TotalDays) * Api.World.Calendar.HoursPerDay;
+                }
             }
         }
 
         public virtual void CheckTransition(float dt)
         {
-            if (transitionAtTotalDays > Api.World.Calendar.TotalDays) return;
-
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
-            if (block.Attributes == null) return;
-            string toCode = block.Attributes["convertTo"].AsString();
-            tryTransition(toCode);
+            if (block.Attributes == null)
+            {
+                Api.World.Logger.Error("BETransient exiting at {0} cannot find block attributes. Will stop transient timer", Pos);
+                UnregisterGameTickListener(listenerId);
+                return;
+            }
+
+            // In case this block was imported from another older world. In that case lastCheckAtTotalDays would be a future date.
+            lastCheckAtTotalDays = Math.Min(lastCheckAtTotalDays, Api.World.Calendar.TotalDays);
+
+
+            while (Api.World.Calendar.TotalDays - lastCheckAtTotalDays > 1f / Api.World.Calendar.HoursPerDay)
+            {
+                lastCheckAtTotalDays += 1f / Api.World.Calendar.HoursPerDay;
+                transitionHoursLeft -= 1f;
+
+                ClimateCondition conds = Api.World.BlockAccessor.GetClimateAt(Pos, EnumGetClimateMode.ForSuppliedDateValues, lastCheckAtTotalDays);
+                bool reset = conds.Temperature < Block.Attributes["resetBelowTemperature"].AsFloat(-999);
+                bool stop = conds.Temperature < Block.Attributes["stopBelowTemperature"].AsFloat(-999);
+
+                if (stop || reset)
+                {
+                    transitionHoursLeft += 1f;
+
+                    if (reset)
+                    {
+                        transitionHoursLeft = Block.Attributes["inGameHours"].AsFloat(24);
+                    }
+
+                    continue;
+                }
+
+                if (transitionHoursLeft <= 0) { 
+                    string toCode = block.Attributes["convertTo"].AsString();
+                    tryTransition(toCode);
+                    break;
+                }
+            }
         }
 
         public void tryTransition(string toCode) 
@@ -78,23 +121,36 @@ namespace Vintagestory.GameContent
         {
             base.FromTreeAtributes(tree, worldForResolving);
 
-            transitionAtTotalDays = tree.GetDouble("transitionAtTotalDays");
+            transitionHoursLeft = tree.GetDouble("transitionHoursLeft");
+
+            if (tree.HasAttribute("transitionAtTotalDays")) // Pre 1.13 format
+            {
+                transitionAtTotalDaysOld = tree.GetDouble("transitionAtTotalDays");
+            }
+
+            lastCheckAtTotalDays = tree.GetDouble("lastCheckAtTotalDays");
         }
 
         public override void ToTreeAttributes(ITreeAttribute tree)
         {
             base.ToTreeAttributes(tree);
 
-            tree.SetDouble("transitionAtTotalDays", transitionAtTotalDays);
+            tree.SetDouble("transitionHoursLeft", transitionHoursLeft);
+            tree.SetDouble("lastCheckAtTotalDays", lastCheckAtTotalDays);
         }
 
-        public bool WasPlacedAtTotalHours(double totalHoursUntilPlace)
+
+        public void SetPlaceTime(double totalHours)
         {
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
             float hours = block.Attributes["inGameHours"].AsFloat(24);
-            transitionAtTotalDays = totalHoursUntilPlace / Api.World.Calendar.HoursPerDay + hours / 24;
 
-            return transitionAtTotalDays > Api.World.Calendar.TotalDays;
+            transitionHoursLeft = hours + totalHours - Api.World.Calendar.TotalHours;
+        }
+
+        public bool IsDueTransition()
+        {
+            return transitionHoursLeft <= 0;
         }
     }
 }

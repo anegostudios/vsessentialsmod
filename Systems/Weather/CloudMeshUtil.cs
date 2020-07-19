@@ -27,7 +27,7 @@ namespace Vintagestory.GameContent
             modeldata.SetIndices(CubeVertexIndices);
             modeldata.SetIndicesCount(3 * 2 * 6);
 
-            modeldata.Rgba2 = null;
+            //modeldata.Rgba2 = null;
 
             return modeldata;
         }

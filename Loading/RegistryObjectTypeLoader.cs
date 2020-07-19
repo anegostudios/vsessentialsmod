@@ -43,8 +43,8 @@ namespace Vintagestory.ServerMods.NoObf
     public class ModRegistryObjectTypeLoader : ModSystem
     {
         // Dict Key is filename (with .json)
-        Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
-        Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
+        public Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
+        public Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
 
         Dictionary<AssetLocation, BlockType> blockTypes;
         Dictionary<AssetLocation, ItemType> itemTypes;
@@ -456,7 +456,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         void GatherBlocks(AssetLocation location, BlockType blockType, List<Block> blocks)
         {
-            List<ResolvedVariant> variants = null;
+            List<ResolvedVariant> variants;
             try
             {
                 variants = GatherVariants(blockType.Code, blockType.VariantGroups, location, blockType.AllowedVariants, blockType.SkipVariants);
@@ -544,7 +544,6 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
 
-
             block.Code = fullcode;
             block.VariantStrict = typedBlockType.Variant;
             block.Variant = new RelaxedReadOnlyDictionary<string, string>(typedBlockType.Variant);
@@ -581,7 +580,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.ShapeInventory = typedBlockType.ShapeInventory?.Clone();
             block.TexturesInventory = typedBlockType.TexturesInventory;
             block.Textures = typedBlockType.Textures;
-            block.TintIndex = typedBlockType.TintIndex;
+            block.ClimateColorMap = typedBlockType.ClimateColorMap;
+            block.SeasonColorMap = typedBlockType.SeasonColorMap;
             block.Ambientocclusion = typedBlockType.Ambientocclusion;
             block.CollisionBoxes = typedBlockType.CollisionBoxes == null ? null : (Cuboidf[])typedBlockType.CollisionBoxes.Clone();
             block.SelectionBoxes = typedBlockType.SelectionBoxes == null ? null : (Cuboidf[])typedBlockType.SelectionBoxes.Clone();

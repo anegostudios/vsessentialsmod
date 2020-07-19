@@ -23,6 +23,8 @@ namespace Vintagestory.GameContent
         protected double FloatyDialogPosition => 0.6;
         protected double FloatyDialogAlign => 0.8;
 
+        public override bool UnregisterOnClose => true;
+
         public GuiDialogCarcassContents(InventoryGeneric inv, EntityAgent owningEntity, ICoreClientAPI capi) : base(capi)
         {
             this.inv = inv;
@@ -88,8 +90,6 @@ namespace Vintagestory.GameContent
         {
             if (capi.Settings.Bool["immersiveMouseMode"])
             {
-                EntityPlayer entityPlayer = capi.World.Player.Entity;
-
                 double offX = owningEntity.CollisionBox.X2 - owningEntity.OriginCollisionBox.X2;
                 double offZ = owningEntity.CollisionBox.Z2 - owningEntity.OriginCollisionBox.Z2;
 
@@ -123,8 +123,13 @@ namespace Vintagestory.GameContent
             if (!IsInRangeOfBlock())
             {
                 // Because we cant do it in here
-                capi.Event.RegisterCallback((deltatime) => TryClose(), 0);
+                capi.Event.EnqueueMainThreadTask(() => TryClose(), "closedlg");
             }
+        }
+
+        public override bool TryClose()
+        {
+            return base.TryClose();
         }
 
         /// <summary>
@@ -134,7 +139,7 @@ namespace Vintagestory.GameContent
         /// <returns>In range or no?</returns>
         public virtual bool IsInRangeOfBlock()
         {
-            Vec3d playerEye = capi.World.Player.Entity.Pos.XYZ.Add(0, capi.World.Player.Entity.EyeHeight, 0);
+            Vec3d playerEye = capi.World.Player.Entity.Pos.XYZ.Add(capi.World.Player.Entity.LocalEyePos);
             double dist = GameMath.Sqrt(playerEye.SquareDistanceTo(entityPos));
 
             return dist <= capi.World.Player.WorldData.PickingRange;

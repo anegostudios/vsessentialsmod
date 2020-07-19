@@ -110,7 +110,8 @@ namespace Vintagestory.GameContent
         public virtual void GameTick(Entity entity, float dt) {
             EntityControls controls = ((EntityAgent)entity).Controls;
             TickEntityPhysics(entity.ServerPos, controls, dt);  // this was entity.ServerPos - wtf? - apparently needed so they don't glitch through terrain o.O
-            if (entity.World is IServerWorldAccessor)
+
+            if (entity.World.Side == EnumAppSide.Server)
             {
                 entity.Pos.SetFrom(entity.ServerPos);
             }
@@ -121,6 +122,8 @@ namespace Vintagestory.GameContent
 
         public void TickEntityPhysics(EntityPos pos, EntityControls controls, float dt)
         {
+            float dtFac = 60 * dt;
+
             // This seems to make creatures clip into the terrain. Le sigh. 
             // Since we currently only really need it for when the creature is dead, let's just use it only there
 
@@ -128,7 +131,7 @@ namespace Vintagestory.GameContent
             // the AnimationManager also just ticks if the entity is in view or dead
             if (!entity.Alive)
             {
-                AdjustCollisionBoxToAnimation();
+                AdjustCollisionBoxToAnimation(dtFac);
             }
 
             
@@ -159,9 +162,9 @@ namespace Vintagestory.GameContent
                 DisplaceWithBlockCollision(pos, controls, dt);
             } else
             {
-                pos.X += pos.Motion.X;
-                pos.Y += pos.Motion.Y;
-                pos.Z += pos.Motion.Z;
+                pos.X += pos.Motion.X * dt * 60f;
+                pos.Y += pos.Motion.Y * dt * 60f;
+                pos.Z += pos.Motion.Z * dt * 60f;
 
                 entity.Swimming = false;
                 entity.FeetInLiquid = false;
@@ -184,14 +187,18 @@ namespace Vintagestory.GameContent
 
 
         Vec3d nextPosition = new Vec3d();
+        Vec3d moveDelta = new Vec3d();
         BlockPos tmpPos = new BlockPos();
         Cuboidd entityBox = new Cuboidd();
 
         public void DisplaceWithBlockCollision(EntityPos pos, EntityControls controls, float dt)
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
+            float dtFac = 60 * dt;
 
-            nextPosition.Set(pos.X + pos.Motion.X, pos.Y + pos.Motion.Y, pos.Z + pos.Motion.Z);
+            moveDelta.Set(pos.Motion.X * dtFac, pos.Motion.Y * dtFac, pos.Motion.Z * dtFac);
+
+            nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             bool falling = pos.Motion.Y < 0;
             bool feetInLiquidBefore = entity.FeetInLiquid;
             bool onGroundBefore = entity.OnGround;
@@ -266,29 +273,31 @@ namespace Vintagestory.GameContent
                     if (controls.Jump) pos.Motion.Y = 0.04;
                 }
 
-                nextPosition.Set(pos.X + pos.Motion.X, pos.Y + pos.Motion.Y, pos.Z + pos.Motion.Z);
+                moveDelta.Y = pos.Motion.Y * dt * 60f;
+
+                nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
-            collisionTester.ApplyTerrainCollision(entity, pos, ref outposition, !(entity is EntityPlayer));
+            collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition);
 
             if (!entity.Properties.CanClimbAnywhere)
             {
-                controls.IsStepping = HandleSteppingOnBlocks(pos, controls);
+                controls.IsStepping = HandleSteppingOnBlocks(pos, moveDelta, dtFac, controls);
             }
             
             HandleSneaking(pos, controls, dt);
 
 
 
-            if (blockAccess.IsNotTraversable((pos.X + pos.Motion.X), pos.Y, pos.Z))
+            if (blockAccess.IsNotTraversable((pos.X + pos.Motion.X * dt * 60f), pos.Y, pos.Z))
             {
                 outposition.X = pos.X;
             }
-            if (blockAccess.IsNotTraversable(pos.X, (pos.Y + pos.Motion.Y), pos.Z))
+            if (blockAccess.IsNotTraversable(pos.X, (pos.Y + pos.Motion.Y * dt * 60f), pos.Z))
             {
                 outposition.Y = pos.Y;
             }
-            if (blockAccess.IsNotTraversable(pos.X, pos.Y, (pos.Z + pos.Motion.Z)))
+            if (blockAccess.IsNotTraversable(pos.X, pos.Y, (pos.Z + pos.Motion.Z * dt * 60f)))
             {
                 outposition.Z = pos.Z;
             }
@@ -432,7 +441,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private bool HandleSteppingOnBlocks(EntityPos pos, EntityControls controls)
+        private bool HandleSteppingOnBlocks(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
             if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
 
@@ -443,34 +452,34 @@ namespace Vintagestory.GameContent
             Vec3d testVec = new Vec3d();
             Vec3d testMotion = new Vec3d();
 
-            Cuboidd stepableBox = findSteppableCollisionbox(entityCollisionBox, pos.Motion.Y, walkVec);
+
+            Cuboidd stepableBox = findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, walkVec);
             
             // Must have walked into a slab
             if (stepableBox != null)
             {
                 return
-                    tryStep(pos, testMotion.Set(pos.Motion.X, pos.Motion.Y, pos.Motion.Z), stepableBox, entityCollisionBox) ||
-                    tryStep(pos, testMotion.Set(pos.Motion.X, pos.Motion.Y, 0), findSteppableCollisionbox(entityCollisionBox, pos.Motion.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox) ||
-                    tryStep(pos, testMotion.Set(0, pos.Motion.Y, pos.Motion.Z), findSteppableCollisionbox(entityCollisionBox, pos.Motion.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)
+                    tryStep(pos, testMotion.Set(moveDelta.X, moveDelta.Y, moveDelta.Z), dtFac, stepableBox, entityCollisionBox) ||
+                    tryStep(pos, testMotion.Set(moveDelta.X, moveDelta.Y, 0), dtFac, findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox) ||
+                    tryStep(pos, testMotion.Set(0, moveDelta.Y, moveDelta.Z), dtFac, findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)
                 ;
             }
 
             return false;
         }
 
-        private bool tryStep(EntityPos pos, Vec3d motion, Cuboidd stepableBox, Cuboidd entityCollisionBox)
+        private bool tryStep(EntityPos pos, Vec3d moveDelta, float dtFac, Cuboidd stepableBox, Cuboidd entityCollisionBox)
         {
             if (stepableBox == null) return false;
 
-            double heightDiff = stepableBox.Y2 - entityCollisionBox.Y1 + 0.01;
-            Vec3d steppos = outposition.OffsetCopy(motion.X, heightDiff, motion.Z);
+            double heightDiff = stepableBox.Y2 - entityCollisionBox.Y1 + 0.01 * 3f; // This added constant value is a fugly hack because outposition has gravity added, but has not adjusted its position to the ground floor yet
+            Vec3d steppos = outposition.OffsetCopy(moveDelta.X, heightDiff, moveDelta.Z);
             bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, steppos, false);
 
             if (canStep)
             {
-                pos.Y += 0.07;
-                //pos.Motion.Y = 0.001;
-                collisionTester.ApplyTerrainCollision(entity, pos, ref outposition, !(entity is EntityPlayer));
+                pos.Y += 0.07 * dtFac;
+                collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition);
                 return true;
             }
 
@@ -517,7 +526,7 @@ namespace Vintagestory.GameContent
         /// If an attachment point called "Center" exists, then this method
         /// offsets the creatures collision box so that the Center attachment point is the center of the collision box.
         /// </summary>
-        public void AdjustCollisionBoxToAnimation()
+        public void AdjustCollisionBoxToAnimation(float dtFac)
         {
             float[] hitboxOff = new float[4] { 0, 0, 0, 1 };
 
@@ -557,7 +566,7 @@ namespace Vintagestory.GameContent
                 .Translate(ap.PosX / 16f, ap.PosY / 16f, ap.PosZ / 16f)
             ;
 
-            EntityPos epos = entity.LocalPos;
+            EntityPos epos = entity.SidedPos;
 
             float[] endVec = Mat4f.MulWithVec4(tmpModelMat.Values, hitboxOff);
 
@@ -566,12 +575,13 @@ namespace Vintagestory.GameContent
 
             if (Math.Abs(motionX) > 0.00001 || Math.Abs(motionZ) > 0.00001)
             {
-
                 EntityPos posMoved = epos.Copy();
                 posMoved.Motion.X = motionX;
                 posMoved.Motion.Z = motionZ;
 
-                collisionTester.ApplyTerrainCollision(entity, posMoved, ref outposition, !(entity is EntityPlayer));
+                moveDelta.Set(posMoved.Motion.X, posMoved.Motion.Y, posMoved.Motion.Z);
+
+                collisionTester.ApplyTerrainCollision(entity, posMoved, dtFac, ref outposition);
 
                 double reflectX = outposition.X - epos.X - motionX;
                 double reflectZ = outposition.Z - epos.Z - motionZ;

@@ -122,14 +122,13 @@ namespace Vintagestory.GameContent
             {
                 blockAccess.SetBlock(block.BlockId, pos);
 
-                // Not the most elegant solution, but should work either way
+                // Instantly despawn the block again if it expired already
                 BlockEntityTransient betran = blockAccess.GetBlockEntity(pos) as BlockEntityTransient;
-                if (betran != null)
-                {
-                    if (!betran.WasPlacedAtTotalHours(TotalHoursUntilPlace))
-                    {
-                        blockAccess.SetBlock(0, pos);
-                    }
+                betran?.SetPlaceTime(TotalHoursUntilPlace);
+
+                if (betran?.IsDueTransition() == true)
+                { 
+                    blockAccess.SetBlock(0, pos);
                 }
 
                 return true;

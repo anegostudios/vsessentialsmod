@@ -46,7 +46,7 @@ namespace Vintagestory.GameContent
                 entity.Properties.Habitat = EnumHabitat.Land;
                 if (!entity.Swimming)
                 {
-                    tmpPos.Set(entity.LocalPos.X, entity.LocalPos.Y, entity.LocalPos.Z);
+                    tmpPos.Set(entity.SidedPos.X, entity.SidedPos.Y, entity.SidedPos.Z);
                     Cuboidd collbox = entity.World.CollisionTester.GetCollidingCollisionBox(entity.World.BlockAccessor, entity.CollisionBox, tmpPos, false);
 
                     if (collbox != null)
@@ -63,9 +63,9 @@ namespace Vintagestory.GameContent
 
         private void PushoutOfCollisionbox(float dt, Cuboidd collBox)
         {
-            double posX = entity.LocalPos.X;
-            double posY = entity.LocalPos.Y;
-            double posZ = entity.LocalPos.Z;
+            double posX = entity.SidedPos.X;
+            double posY = entity.SidedPos.Y;
+            double posZ = entity.SidedPos.Z;
             /// North: Negative Z
             /// East: Positive X
             /// South: Positive Z
@@ -102,13 +102,13 @@ namespace Vintagestory.GameContent
 
             dt = Math.Min(dt, 0.1f);
 
-            entity.LocalPos.X += pushDir.Normali.X * dt * 0.4f;
-            entity.LocalPos.Y += pushDir.Normali.Y * dt * 0.4f;
-            entity.LocalPos.Z += pushDir.Normali.Z * dt * 0.4f;
+            entity.SidedPos.X += pushDir.Normali.X * dt * 0.4f;
+            entity.SidedPos.Y += pushDir.Normali.Y * dt * 0.4f;
+            entity.SidedPos.Z += pushDir.Normali.Z * dt * 0.4f;
 
-            entity.LocalPos.Motion.X = pushDir.Normali.X * dt;
-            entity.LocalPos.Motion.Y = pushDir.Normali.Y * dt * 2;
-            entity.LocalPos.Motion.Z = pushDir.Normali.Z * dt;
+            entity.SidedPos.Motion.X = pushDir.Normali.X * dt;
+            entity.SidedPos.Motion.Y = pushDir.Normali.Y * dt * 2;
+            entity.SidedPos.Motion.Z = pushDir.Normali.Z * dt;
 
             entity.Properties.Habitat = EnumHabitat.Air;
         }

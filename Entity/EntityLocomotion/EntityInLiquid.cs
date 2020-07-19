@@ -34,7 +34,7 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    push = Math.Max(1f, push - 0.1f);
+                    push = Math.Max(1f, push - 0.1f * dt * 60f);
                 }
 
                 Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
@@ -52,7 +52,7 @@ namespace Vintagestory.GameContent
                 double yMot = 0;
                 if (controls.Jump)
                 {
-                    yMot = 0.005f * swimlineSubmergedness;
+                    yMot = 0.005f * swimlineSubmergedness * dt * 60;
                 } else
                 {
                     yMot = controls.FlyVector.Y * (1 + push) * 0.03f * swimlineSubmergedness;

@@ -1,4 +1,4 @@
-﻿using System;
+﻿    using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,13 +7,13 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-
-
     // Epiphany!
     // Stratus clouds can be made with using fog that is only added with a vertical up gradient. No fog near sealevel!!!
     // "Stratus clouds are low-level clouds characterized by horizontal layering with a uniform base, as opposed to convective or cumuliform clouds that are formed by rising thermals. More specifically, the term stratus is used to describe flat, hazy, featureless clouds of low altitude varying in color from dark gray to nearly white."
@@ -54,6 +54,11 @@ namespace Vintagestory.GameContent
         public WeatherPattern NewWePattern;
         public WeatherPattern OldWePattern;
 
+        /// <summary>
+        /// Holds a list of daily snow accum snapshot of previous 144 days (= 1 year)
+        /// </summary>
+        public LimitedList<SnowAccumSnapshot> SnowAccumSnapshots;
+
         public WindPattern CurWindPattern;
 
         public float Weight;
@@ -83,7 +88,13 @@ namespace Vintagestory.GameContent
         protected BlockPos regionCenterPos;
         protected Vec3d tmpVecPos = new Vec3d();
 
-        
+
+
+        public IMapRegion MapRegion;
+
+        public static int snowAccumResolution = 2;
+
+
 
 
         public WeatherSimulationRegion(WeatherSystemBase ws, int regionX, int regionZ)
@@ -91,12 +102,15 @@ namespace Vintagestory.GameContent
             this.ws = ws;
             this.regionX = regionX;
             this.regionZ = regionZ;
+            this.SnowAccumSnapshots = new LimitedList<SnowAccumSnapshot>(ws.api.World.Calendar.DaysPerYear + 1);
+
 
             int regsize = ws.api.World.BlockAccessor.RegionSize;
 
+            LastUpdateTotalHours = ws.api.World.Calendar.TotalHours;
+
             cloudTilebasePosX = (regionX * regsize) / ws.CloudTileSize;
             cloudTilebasePosZ = (regionZ * regsize) / ws.CloudTileSize;
-
 
             regionCenterPos = new BlockPos(regionX * regsize + regsize/2, 0, regionZ * regsize + regsize/2);
 
@@ -121,16 +135,16 @@ namespace Vintagestory.GameContent
 
         internal void ReloadPatterns(int seed)
         {
-            WeatherPatterns = new WeatherPattern[ws.weatherConfigs.Length];
-            for (int i = 0; i < ws.weatherConfigs.Length; i++)
+            WeatherPatterns = new WeatherPattern[ws.WeatherConfigs.Length];
+            for (int i = 0; i < ws.WeatherConfigs.Length; i++)
             {
-                WeatherPatterns[i] = new WeatherPattern(ws, ws.weatherConfigs[i], Rand, cloudTilebasePosX, cloudTilebasePosZ);
+                WeatherPatterns[i] = new WeatherPattern(ws, ws.WeatherConfigs[i], Rand, cloudTilebasePosX, cloudTilebasePosZ);
                 WeatherPatterns[i].State.Index = i;
             }
 
-            WindPatterns = new WindPattern[ws.windConfigs.Length];
-            for (int i = 0; i < ws.windConfigs.Length; i++) {
-                WindPatterns[i] = new WindPattern(ws.api, ws.windConfigs[i], i, Rand, seed);
+            WindPatterns = new WindPattern[ws.WindConfigs.Length];
+            for (int i = 0; i < ws.WindConfigs.Length; i++) {
+                WindPatterns[i] = new WindPattern(ws.api, ws.WindConfigs[i], i, Rand, seed);
             }
         }
 
@@ -181,54 +195,76 @@ namespace Vintagestory.GameContent
         
         public void UpdateWeatherData()
         {
-            // 1-(1.1-x)^4
-            // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIxLSgxLjEteCleNCIsImNvbG9yIjoiIzAwMDAwMCJ9LHsidHlwZSI6MTAwMCwid2luZG93IjpbIjAiLCIxIiwiMCIsIjEiXX1d
-            float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - weatherData.climateCond.Rainfall, 4), 0, 1);
-            float fogMultiplier = drynessMultiplier;
+            weatherData.SetAmbientLerped(OldWePattern, NewWePattern, Weight, capi == null ? 0 : capi.Ambient.Base.FogDensity.Value);
+        }
 
+        public void TickEveryInGameHourServer(double nowTotalHours)
+        {
+            SnowAccumSnapshot latestSnap = SnowAccumSnapshots.LastElement();
 
-            weatherData.Ambient.FlatFogDensity.Value = (NewWePattern.State.nowMistDensity * Weight + OldWePattern.State.nowMistDensity * (1 - Weight)) / 250f;
-            weatherData.Ambient.FlatFogDensity.Weight = 1;
-            weatherData.Ambient.FlatFogDensity.Weight *= fogMultiplier;
-
-
-            weatherData.Ambient.FlatFogYPos.Value = NewWePattern.State.nowMistYPos * Weight + OldWePattern.State.nowMistYPos * (1 - Weight);
-            weatherData.Ambient.FlatFogYPos.Weight = 1;
-
-            weatherData.Ambient.FogDensity.Value = ((capi == null ? 0 : capi.Ambient.Base.FogDensity.Value) + NewWePattern.State.nowFogDensity * Weight + OldWePattern.State.nowFogDensity * (1 - Weight)) / 1000f;
-            weatherData.Ambient.FogDensity.Weight = fogMultiplier;
-
-            weatherData.Ambient.CloudBrightness.Value = NewWePattern.State.nowBrightness * Weight + OldWePattern.State.nowBrightness * (1 - Weight);
-            weatherData.Ambient.CloudBrightness.Weight = 1;
-
-            if (Weight > 0.5) weatherData.BlendedPrecType = NewWePattern.State.nowPrecType;
-            else weatherData.BlendedPrecType = OldWePattern.State.nowPrecType;
-
-            weatherData.nowPrecType = weatherData.BlendedPrecType;
-            if (weatherData.nowPrecType == EnumPrecipitationType.Auto)
+            if (latestSnap == null || nowTotalHours - latestSnap.TotalHours >= 1)
             {
-                weatherData.nowPrecType = weatherData.climateCond.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+                 SnowAccumSnapshots.Add(latestSnap = new SnowAccumSnapshot() { 
+                    TotalHours = nowTotalHours, 
+                    SumTemperatureByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution),
+                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
+                });
             }
 
-            weatherData.PrecParticleSize = NewWePattern.State.nowPrecParticleSize * Weight + OldWePattern.State.nowPrecParticleSize * (1 - Weight);
-            weatherData.PrecIntensity = drynessMultiplier * NewWePattern.State.nowPrecIntensity * Weight + OldWePattern.State.nowPrecIntensity * (1 - Weight);
+            // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations
+            // lets try with just the 8 corner points of the region cuboid and lerp
+            BlockPos tmpPos = new BlockPos();
+            int regsize = ws.api.World.BlockAccessor.RegionSize;
 
-            weatherData.Ambient.CloudDensity.Value = NewWePattern.State.nowbaseThickness * Weight + OldWePattern.State.nowbaseThickness * (1 - Weight);
-            weatherData.Ambient.CloudDensity.Weight = 1;
+            for (int ix = 0; ix < snowAccumResolution; ix++)
+            {
+                for (int iy = 0; iy < snowAccumResolution; iy++)
+                {
+                    for (int iz = 0; iz < snowAccumResolution; iz++)
+                    {
+                        int y = iy == 0 ? ws.api.World.SeaLevel : ws.api.World.BlockAccessor.MapSizeY - 1;
 
+                        tmpPos.Set(
+                            regionX * regsize + ix * (regsize - 1), 
+                            y,
+                            regionZ * regsize + iz * (regsize - 1)
+                        );
 
-            weatherData.Ambient.SceneBrightness.Value = NewWePattern.State.nowSceneBrightness * Weight + OldWePattern.State.nowSceneBrightness * (1 - Weight);
-            weatherData.Ambient.SceneBrightness.Weight = 1f;
+                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.NowValues);
 
-            weatherData.Ambient.FogBrightness.Value = NewWePattern.State.nowFogBrightness * Weight + OldWePattern.State.nowFogBrightness * (1 - Weight);
-            weatherData.Ambient.FogBrightness.Weight = 1f;
+                        latestSnap.SumTemperatureByRegionCorner.AddValue(ix, iy, iz, nowcond.Temperature);
+
+                        if (nowcond.Temperature > 0)
+                        {
+                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, -nowcond.Temperature / 5f);
+                        }
+                        else
+                        {
+                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 2f);
+                        }
+                    }
+                }
+            }
+
+            latestSnap.Checks++;
+
         }
+
+        
 
         public void TickEvery25ms(float dt)
         {
             if (ws.api.Side == EnumAppSide.Client)
             {
                 clientUpdate(dt);
+            } else
+            {
+                double nowTotalHours = ws.api.World.Calendar.TotalHours;
+                while (nowTotalHours - LastUpdateTotalHours > 1)
+                {
+                    TickEveryInGameHourServer(LastUpdateTotalHours);
+                    LastUpdateTotalHours++;
+                }
             }
 
             if (Transitioning)
@@ -292,13 +328,14 @@ namespace Vintagestory.GameContent
                 ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos);
                 if (nowcond != null)
                 {
-
                     weatherData.climateCond = nowcond;
                 }
+
                 quarterSecAccum = 0;
             }
         }
 
+        
 
         private void clientUpdate(float dt)
         {
@@ -313,6 +350,8 @@ namespace Vintagestory.GameContent
 
         public double GetWindSpeed(double posY)
         {
+            if (CurWindPattern == null) return 0;
+
             double strength = CurWindPattern.Strength;
 
             if (posY > ws.api.World.SeaLevel)
@@ -504,7 +543,8 @@ namespace Vintagestory.GameContent
                 LastUpdateTotalHours = LastUpdateTotalHours,
                 LcgCurrentSeed = Rand.currentSeed,
                 LcgMapGenSeed = Rand.mapGenSeed,
-                LcgWorldSeed = Rand.worldSeed
+                LcgWorldSeed = Rand.worldSeed,
+                SnowAccumSnapshots = SnowAccumSnapshots?.ToArray()
             };
 
             return SerializerUtil.Serialize(state);
@@ -552,6 +592,12 @@ namespace Vintagestory.GameContent
                 Rand.worldSeed = state.LcgWorldSeed;
                 Rand.currentSeed = state.LcgCurrentSeed;
                 Rand.mapGenSeed = state.LcgMapGenSeed;
+
+                double nowTotalHours = ws.api.World.Calendar.TotalHours;
+                // Cap that at max 1 year or we simulate forever on startup
+                LastUpdateTotalHours = Math.Max(LastUpdateTotalHours, nowTotalHours - 144 * 24);
+
+                SnowAccumSnapshots = new LimitedList<SnowAccumSnapshot>(ws.api.World.Calendar.DaysPerYear, state.SnowAccumSnapshots);
             }
 
         }
