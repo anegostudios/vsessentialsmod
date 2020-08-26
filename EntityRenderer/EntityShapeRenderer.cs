@@ -185,66 +185,74 @@ namespace Vintagestory.GameContent
             entity.OnTesselation(ref entityShape, compositeShape.Base.ToString());
 
             defaultTexSource = GetTextureSource();
-            MeshData meshdata;
 
-            if (entity.Properties.Client.Shape.VoxelizeTexture)
+            TyronThreadPool.QueueTask(() =>
             {
-                int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
+                MeshData meshdata;
 
-                TextureAtlasPosition pos = defaultTexSource["all"];
-                CompositeTexture[] Alternates = entity.Properties.Client.FirstTexture.Alternates;
-
-                CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : Alternates[altTexNumber % Alternates.Length];
-                meshdata = capi.Tesselator.VoxelizeTexture(tex, capi.EntityTextureAtlas.Size, pos);
-                for (int i = 0; i < meshdata.xyz.Length; i+=3)
+                if (entity.Properties.Client.Shape.VoxelizeTexture)
                 {
-                    meshdata.xyz[i] -= 0.125f;
-                    meshdata.xyz[i + 1] -= 0.5f;
-                    meshdata.xyz[i + 2] += 0.125f / 2;
+                    int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
+
+                    TextureAtlasPosition pos = defaultTexSource["all"];
+                    CompositeTexture[] Alternates = entity.Properties.Client.FirstTexture.Alternates;
+
+                    CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : Alternates[altTexNumber % Alternates.Length];
+                    meshdata = capi.Tesselator.VoxelizeTexture(tex, capi.EntityTextureAtlas.Size, pos);
+                    for (int i = 0; i < meshdata.xyz.Length; i += 3)
+                    {
+                        meshdata.xyz[i] -= 0.125f;
+                        meshdata.xyz[i + 1] -= 0.5f;
+                        meshdata.xyz[i + 2] += 0.125f / 2;
+                    }
                 }
-            } else
-            {
-                try
+                else
                 {
-                    capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
+                    try
+                    {
+                        capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
 
-                    meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
+                        meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
 
-                } catch (Exception e)
-                {
-                    capi.World.Logger.Fatal("Failed tesselating entity {0} with id {1}. Entity will probably be invisible!. The teselator threw {2}", entity.Code, entity.EntityId, e);
-                    return;
+                    }
+                    catch (Exception e)
+                    {
+                        capi.World.Logger.Fatal("Failed tesselating entity {0} with id {1}. Entity will probably be invisible!. The teselator threw {2}", entity.Code, entity.EntityId, e);
+                        return;
+                    }
                 }
-            }
 
-            //meshdata.Rgba2 = null;
+                MeshData opaqueMesh = meshdata.Clone().Clear();
+                MeshData oitMesh = meshdata.Clone().Clear();
+                opaqueMesh.AddMeshData(meshdata, EnumChunkRenderPass.Opaque);
+                oitMesh.AddMeshData(meshdata, EnumChunkRenderPass.Transparent);
 
-            if (meshRefOpaque != null)
-            {
-                capi.Render.DeleteMesh(meshRefOpaque);
-                meshRefOpaque = null;
-            }
-            if (meshRefOit != null)
-            {
-                capi.Render.DeleteMesh(meshRefOit);
-                meshRefOit = null;
-            }
+                capi.Event.EnqueueMainThreadTask(() =>
+                {
+                    if (meshRefOpaque != null)
+                    {
+                        capi.Render.DeleteMesh(meshRefOpaque);
+                        meshRefOpaque = null;
+                    }
+                    if (meshRefOit != null)
+                    {
+                        capi.Render.DeleteMesh(meshRefOit);
+                        meshRefOit = null;
+                    }
 
-            MeshData opaqueMesh = meshdata.Clone().Clear();
-            MeshData oitMesh = meshdata.Clone().Clear();
+                    if (opaqueMesh.VerticesCount > 0)
+                    {
+                        meshRefOpaque = capi.Render.UploadMesh(opaqueMesh);
+                    }
 
-            opaqueMesh.AddMeshData(meshdata, EnumChunkRenderPass.Opaque);
-            oitMesh.AddMeshData(meshdata, EnumChunkRenderPass.Transparent);
+                    if (oitMesh.VerticesCount > 0)
+                    {
+                        meshRefOit = capi.Render.UploadMesh(oitMesh);
+                    }
 
-            if (opaqueMesh.VerticesCount > 0)
-            {
-                meshRefOpaque = capi.Render.UploadMesh(opaqueMesh);
-            }
+                }, "uploadentitymesh");
+            });
 
-            if (oitMesh.VerticesCount > 0)
-            {
-                meshRefOit = capi.Render.UploadMesh(oitMesh);
-            }
             
         }
 
@@ -307,16 +315,16 @@ namespace Vintagestory.GameContent
 
         protected void OnNameChanged()
         {
-            if (nameTagRenderHandler == null) return;
+            var bh = entity.GetBehavior<EntityBehaviorNameTag>();
+            if (nameTagRenderHandler == null || bh == null) return;
             if (nameTagTexture != null)
             {
                 nameTagTexture.Dispose();
                 nameTagTexture = null;
             }
 
-            int? range = entity.GetBehavior<EntityBehaviorNameTag>()?.RenderRange;
-            renderRange = range == null ? 999 : (int)range;
-            showNameTagOnlyWhenTargeted = entity.GetBehavior<EntityBehaviorNameTag>()?.ShowOnlyWhenTargeted == true;
+            renderRange = bh.RenderRange;
+            showNameTagOnlyWhenTargeted = bh.ShowOnlyWhenTargeted;
             nameTagTexture = nameTagRenderHandler.Invoke(capi, entity);
         }
 
@@ -771,9 +779,6 @@ namespace Vintagestory.GameContent
                     rapi.Render2DTexture(
                         mt.tex.TextureId, posx, rapi.FrameHeight - posy, cappedScale * mt.tex.Width, cappedScale * mt.tex.Height, 20
                     );
-                    // - cappedScale * mt.tex.height
-
-                    
                 }
             }
         }
@@ -901,8 +906,9 @@ namespace Vintagestory.GameContent
 
 
             float scale = entity.Properties.Client.Size;
+            Mat4f.Translate(ModelMat, ModelMat, 0, -entity.CollisionBox.Y2 / 2, 0f);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
-            Mat4f.Translate(ModelMat, ModelMat, -0.5f, -entity.CollisionBox.Y2 / 2, -0.5f);
+            Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
         }
 
         
@@ -984,14 +990,11 @@ namespace Vintagestory.GameContent
             if (walkspeedsq > 0.001 && entity.OnGround)
             {
                 float angledist = GameMath.AngleRadDistance((float)prevAngleSwing, (float)nowAngle);
-                sidewaysSwivelAngle -= GameMath.Clamp(angledist, -0.05f, 0.05f) * dt * 10 * (float)walkspeedsq * 80 * (eagent?.Controls.Backward == true ? -1 : 1);
-
-                sidewaysSwivelAngle *= 1 - 0.04f * dt * 60f;
-            } else
-            {
-                sidewaysSwivelAngle *= 1 - 0.1f * dt * 60f;
+                sidewaysSwivelAngle -= GameMath.Clamp(angledist, -0.05f, 0.05f) * dt * 40 * (float)Math.Min(0.025f, walkspeedsq) *  80 * (eagent?.Controls.Backward == true ? -1 : 1);
+                sidewaysSwivelAngle = GameMath.Clamp(sidewaysSwivelAngle, -0.3f, 0.3f);
             }
 
+            sidewaysSwivelAngle *= Math.Min(0.99f, 1 - 0.1f * dt * 60f);
             prevAngleSwing = nowAngle;
         }
 
@@ -1004,13 +1007,11 @@ namespace Vintagestory.GameContent
             if (dx * dx + dz * dz > 0.001 && entity.OnGround)
             {
                 float angledist = GameMath.AngleRadDistance((float)prevAngleSwing, (float)nowAngle);
-                sidewaysSwivelAngle -= GameMath.Clamp(angledist, -0.05f, 0.05f) * dt * 50; // * (eagent?.Controls.Backward == true ? 1 : -1);
-
-                sidewaysSwivelAngle *= 0.96f;
-            } else
-            {
-                sidewaysSwivelAngle *= 0.92f;
+                sidewaysSwivelAngle -= GameMath.Clamp(angledist, -0.05f, 0.05f) * dt * 40; // * (eagent?.Controls.Backward == true ? 1 : -1);
+                sidewaysSwivelAngle = GameMath.Clamp(sidewaysSwivelAngle, -0.3f, 0.3f);
             }
+
+            sidewaysSwivelAngle *= Math.Min(0.99f, 1 - 0.1f * dt * 60f);
 
             prevAngleSwing = nowAngle;
 

@@ -39,10 +39,10 @@ namespace Vintagestory.GameContent
             this.sapi = sapi;
 
             sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
-#if DEBUG
+//#if DEBUG
             sapi.RegisterCommand("prectest", "Precipitation test export", "", cmdPrecTestServer, Privilege.controlserver);
             sapi.RegisterCommand("snowaccum", "Snow accum test", "", cmdSnowAccum, Privilege.controlserver);
-#endif
+//#endif
         }
 
         private void cmdSnowAccum(IServerPlayer player, int groupId, CmdArgs args)
@@ -65,6 +65,79 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            if (cmd == "processhere")
+            {
+                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+                int chunksize = api.World.BlockAccessor.ChunkSize;
+                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize); 
+
+                wsys.snowSimSnowAccu.AddToCheckQueue(chunkPos);
+                player.SendMessage(groupId, "Ok, added to check queue", EnumChatType.CommandSuccess);
+                return;
+            }
+
+            if (cmd == "info")
+            {
+                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+                int chunksize = api.World.BlockAccessor.ChunkSize;
+                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
+                IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
+
+                byte[] data = mc.GetData("lastSnowAccumUpdateTotalHours");
+                double lastSnowAccumUpdateTotalHours = data == null ? 0 : SerializerUtil.Deserialize<double>(data);
+
+                player.SendMessage(groupId, "lastSnowAccumUpdateTotalHours: " + lastSnowAccumUpdateTotalHours, EnumChatType.CommandSuccess);
+
+                int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
+                int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
+                IMapRegion mapreg = api.World.BlockAccessor.GetMapRegion(regionX, regionZ);
+
+                WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+                long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+                WeatherSimulationRegion simregion;
+                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out simregion);
+
+                int reso = WeatherSimulationRegion.snowAccumResolution;
+
+                SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
+                {
+                    //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
+                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(reso, reso, reso)
+                };
+                float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
+
+                // Can't grow bigger than one full snow block
+                float max = 3 + 0.5f;
+
+                int len = simregion.SnowAccumSnapshots.Length;
+                int i = simregion.SnowAccumSnapshots.Start;
+                
+                // This code here causes wacky snow patterns
+                // The lerp itself is fine!!!
+                while (len-- > 0)
+                {
+                    SnowAccumSnapshot hoursnapshot = simregion.SnowAccumSnapshots[i];
+                    i = (i + 1) % simregion.SnowAccumSnapshots.Length;
+
+                    float[] snowaccumdata = hoursnapshot.SnowAccumulationByRegionCorner.Data;
+                    for (int j = 0; j < snowaccumdata.Length; j++)
+                    {
+                        sumdata[j] = GameMath.Clamp(sumdata[j] + snowaccumdata[j], -max, max);
+                    }
+
+                    lastSnowAccumUpdateTotalHours = Math.Max(lastSnowAccumUpdateTotalHours, hoursnapshot.TotalHours);
+                }
+
+                
+
+                for (int j = 0; j < sumdata.Length; j++)
+                {
+                    player.SendMessage(groupId, j + ": " + sumdata[j], EnumChatType.CommandSuccess);
+                }
+
+                return;
+            }
+
             if (cmd == "here")
             {
                 float amount = (float)args.PopFloat(0);
@@ -83,7 +156,7 @@ namespace Vintagestory.GameContent
 
                 sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
 
-                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, false);
+                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos);
                 wsys.snowSimSnowAccu.accum = 1f;
 
                 var ba = sapi.World.BulkBlockAccessor;
@@ -105,7 +178,7 @@ namespace Vintagestory.GameContent
             int wdt = 400;
             float hourStep = 4f;
             float days = 1f;
-            float posStep = 3f;
+            float posStep = 2f;
 
             double totaldays = api.World.Calendar.TotalDays;
             
@@ -113,25 +186,41 @@ namespace Vintagestory.GameContent
             string subarg = args.PopWord();
             bool climateTest = subarg == "climate";
 
+            if (subarg == "pos")
+            {
+                float precip = wsys.GetPrecipitation(pos.X, pos.Y, pos.Z, totaldays);
+                player.SendMessage(groupId, "Prec here: " + precip, EnumChatType.CommandSuccess);
+                return;
+            }
+
             ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
 
-            int offset = wdt / 200;
+            int offset = wdt / 2;
             Bitmap bmp;
             int[] pixels;
 
             if (subarg == "here")
             {
-                wdt = 800;
-                offset = 400;
+                wdt = 400;
                 bmp = new Bitmap(wdt, wdt, PixelFormat.Format32bppArgb);
                 pixels = new int[wdt * wdt];
-
+                posStep = 3f;
+                offset = wdt / 2;
 
                 for (int dx = 0; dx < wdt; dx++)
                 {
                     for (int dz = 0; dz < wdt; dz++)
                     {
-                        float precip = wsys.GetPrecipitation(pos.X + dx * posStep - offset, pos.Y, pos.Z + dz * posStep - offset, totaldays);
+                        float x = dx * posStep - offset;
+                        float z = dz * posStep - offset;
+
+                        if ((int)x == 0 && (int)z == 0)
+                        {
+                            pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(255, 0, 0, 255);
+                            continue;
+                        }
+
+                        float precip = wsys.GetPrecipitation(pos.X + x, pos.Y, pos.Z + z, totaldays);
                         int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
                         pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
                     }
@@ -166,6 +255,7 @@ namespace Vintagestory.GameContent
                                 pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
                             }
                         }
+
                     }
                     else
                     {
@@ -186,6 +276,7 @@ namespace Vintagestory.GameContent
                     bmp.SetPixels(pixels);
                     
                     gif.AddFrame(bmp, 100, GifQuality.Grayscale);
+                    
                 }
 
                 
@@ -280,6 +371,8 @@ namespace Vintagestory.GameContent
                 bool ok = true;
                 foreach (var val in wsysServer.weatherSimByMapRegion)
                 {
+                    val.Value.ReloadPatterns(api.World.Seed);
+
                     ok &= val.Value.SetWindPattern(code, true);
                     if (ok)
                     {
@@ -294,6 +387,57 @@ namespace Vintagestory.GameContent
                 else
                 {
                     player.SendMessage(groupId, "Ok wind pattern set", EnumChatType.CommandSuccess);
+                }
+                return;
+            }
+
+            if (arg == "setev" || arg == "setevr")
+            {
+                wsysServer.ReloadConfigs();
+                string code = args.PopWord();
+
+                WeatherSimulationRegion weatherSim;
+
+                if (arg == "setevr")
+                {
+
+                    long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+                    wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+                    if (weatherSim == null)
+                    {
+                        player.SendMessage(groupId, "Weather sim not loaded (yet) for this region", EnumChatType.CommandError);
+                        return;
+                    }
+
+                    if (weatherSim.SetWeatherEvent(code, true))
+                    {
+                        weatherSim.TickEvery25ms(0.025f);
+                        player.SendMessage(groupId, "Ok weather event for this region set", EnumChatType.CommandSuccess);
+                    }
+                    else
+                    {
+                        player.SendMessage(groupId, "No such weather event found", EnumChatType.CommandError);
+                    }
+                } else
+                {
+                    bool ok = true;
+                    foreach (var val in wsysServer.weatherSimByMapRegion)
+                    {
+                        ok &= val.Value.SetWeatherEvent(code, true);
+                        if (ok)
+                        {
+                            val.Value.TickEvery25ms(0.025f);
+                        }
+                    }
+
+                    if (!ok)
+                    {
+                        player.SendMessage(groupId, "No such weather event found", EnumChatType.CommandError);
+                    }
+                    else
+                    {
+                        player.SendMessage(groupId, "Ok weather event set for all loaded regions", EnumChatType.CommandSuccess);
+                    }
                 }
                 return;
             }
@@ -318,7 +462,7 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                    player.SendMessage(groupId, "Ok weather pattern set for all loaded regions", EnumChatType.CommandSuccess);
                 }
                 return;
             }
@@ -343,7 +487,7 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                    player.SendMessage(groupId, "Ok random weather pattern set", EnumChatType.CommandSuccess);
                 }
                 return;
             }
@@ -365,7 +509,7 @@ namespace Vintagestory.GameContent
                 if (weatherSim.SetWeatherPattern(code, true))
                 {
                     weatherSim.TickEvery25ms(0.025f);
-                    player.SendMessage(groupId, "Ok weather pattern set", EnumChatType.CommandSuccess);
+                    player.SendMessage(groupId, "Ok weather pattern set for current region", EnumChatType.CommandSuccess);
                 } else
                 {
                     player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
@@ -434,12 +578,13 @@ namespace Vintagestory.GameContent
                         lerps[i]
                     )) ;*/
 
-                    sb.AppendLine(string.Format("{9}% of {0}@{7}/{8}: {1}% {2}, {3}% {4}. Wind: {5} (v={6})",
+                    sb.AppendLine(string.Format("{9}% of {0}@{7}/{8}: {1}% {2}, {3}% {4}. Wind: {5}, Event: {10} (v={6})",
                         cornerNames[i], (int)(100 * sim.Weight), sim.NewWePattern.GetWeatherName(), (int)(100 - 100 * sim.Weight),
                         sim.OldWePattern.GetWeatherName(), 
                         sim.CurWindPattern.GetWindName(), sim.GetWindSpeed(pos.Y).ToString("0.###"),
                         sim.regionX, sim.regionZ,
-                        lerps[i]
+                        lerps[i],
+                        sim.CurWeatherEvent.config.Code
                     ));
                 }
             }
@@ -447,8 +592,9 @@ namespace Vintagestory.GameContent
             //wsys.updateAdjacentAndBlendWeatherData();
             //WeatherDataSnapshot wData = wsys.blendedWeatherData;
             //sb.AppendLine(string.Format(string.Format("Blended:\nPrecipitation: {0}, Particle size: {1}, Type: {2}, Wind speed: {3}", wData.PrecIntensity, wData.PrecParticleSize, wData.BlendedPrecType, wsys.GetWindSpeed(plrPos))));
+            ClimateCondition climate = api.World.BlockAccessor.GetClimateAt(player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
+            sb.AppendLine(string.Format("Current precipitation: {0}%", (int)(climate.Rainfall * 100f)));
 
-            
             return sb.ToString();
         }
     }

@@ -94,7 +94,6 @@ namespace Vintagestory.Essentials
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
 
-
                 List<PathNode> nodes = pfs.FindPath(start, end, maxFallHeight, stepHeight, collbox);
                 sw.Stop();
                 int timeMs = (int)sw.ElapsedMilliseconds;

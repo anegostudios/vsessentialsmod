@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,11 +16,17 @@ namespace Vintagestory.GameContent
         public EnumPrecipitationType Type;
     }
 
+    [JsonObject(MemberSerialization.OptIn)]
     public class WeatherSystemConfig
     {
+        [JsonProperty]
         public AssetLocation[] SnowLayerBlockCodes;
-        public OrderedDictionary<Block, int> SnowLayerBlocks;
+        [JsonProperty]
         public WeatherPatternConfig RainOverlayPattern;
+
+        public OrderedDictionary<Block, int> SnowLayerBlocks;
+
+
 
         internal void Init(IWorldAccessor world)
         {

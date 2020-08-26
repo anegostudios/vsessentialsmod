@@ -84,6 +84,8 @@ namespace Vintagestory.ServerMods.NoObf
 
         [JsonProperty]
         public VertexFlags VertexFlags;
+        [JsonProperty]
+        public bool Frostable;
 
         [JsonProperty]
         public byte[] LightHsv = new byte[] { 0, 0, 0 };
@@ -293,6 +295,12 @@ namespace Vintagestory.ServerMods.NoObf
                 block.CropProps.NutrientConsumption = CropProps.NutrientConsumption;
                 block.CropProps.RequiredNutrient = CropProps.RequiredNutrient;
                 block.CropProps.TotalGrowthDays = CropProps.TotalGrowthDays;
+
+                block.CropProps.ColdDamageBelow = CropProps.ColdDamageBelow;
+                block.CropProps.HeatDamageAbove = CropProps.HeatDamageAbove;
+                block.CropProps.DamageGrowthStuntMul = CropProps.DamageGrowthStuntMul;
+                block.CropProps.ColdDamageRipeMul = CropProps.ColdDamageRipeMul;
+
 
                 if (CropProps.Behaviors != null)
                 {

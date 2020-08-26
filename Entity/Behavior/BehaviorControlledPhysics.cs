@@ -64,6 +64,8 @@ namespace Vintagestory.GameContent
                 duringRenderFrame = true;
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "controlledphysics");
             }
+
+            accumulator = (float)entity.World.Rand.NextDouble() * GlobalConstants.PhysicsFrameTime;
         }
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
@@ -270,15 +272,15 @@ namespace Vintagestory.GameContent
                 if (controls.WalkVector.Y == 0)
                 {
                     pos.Motion.Y = controls.Sneak ? Math.Max(-0.07, pos.Motion.Y - 0.07) : pos.Motion.Y;
-                    if (controls.Jump) pos.Motion.Y = 0.04;
+                    if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
                 }
 
-                moveDelta.Y = pos.Motion.Y * dt * 60f;
-
-                nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
+                // what was this for? it causes jitter
+                //moveDelta.Y = pos.Motion.Y * dt * 60f;
+                //nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
-            collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition);
+            collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition, stepHeight);
 
             if (!entity.Properties.CanClimbAnywhere)
             {
@@ -287,6 +289,14 @@ namespace Vintagestory.GameContent
             
             HandleSneaking(pos, controls, dt);
 
+            if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping)
+            {
+                if (blockAccess.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z).LiquidLevel >= 7 || (blockAccess.GetBlock((int)pos.X, (int)(pos.Y - 0.05), (int)pos.Z).LiquidLevel >= 7))
+                {
+                    pos.Motion.Y += 0.2 * dt;
+                    controls.IsStepping = true;
+                }
+            }
 
 
             if (blockAccess.IsNotTraversable((pos.X + pos.Motion.X * dt * 60f), pos.Y, pos.Z))
@@ -445,8 +455,10 @@ namespace Vintagestory.GameContent
         {
             if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
 
+
             Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
             entityCollisionBox.Translate(pos.X, pos.Y, pos.Z);
+            entityCollisionBox.Y2 = Math.Max(entityCollisionBox.Y1 + stepHeight, entityCollisionBox.Y2);
 
             Vec3d walkVec = controls.WalkVector;
             Vec3d testVec = new Vec3d();
@@ -454,7 +466,9 @@ namespace Vintagestory.GameContent
 
 
             Cuboidd stepableBox = findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, walkVec);
+
             
+
             // Must have walked into a slab
             if (stepableBox != null)
             {
@@ -493,15 +507,16 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < collisionTester.CollisionBoxList.Count; i++)
             {
                 Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
+                Block block = collisionTester.CollisionBoxList.blocks[i];
 
-                if (!collisionTester.CollisionBoxList.blocks[i].CanStep) continue;
+                if (!block.CanStep) continue;
 
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 if (intersect == EnumIntersect.NoIntersect) continue;
 
                 // Already stuck somewhere? Can't step stairs
                 // Would get stuck vertically if I go up? Can't step up either
-                if (intersect == EnumIntersect.Stuck || (intersect == EnumIntersect.IntersectY && motionY > 0))
+                if ((intersect == EnumIntersect.Stuck && !block.AllowStepWhenStuck) || (intersect == EnumIntersect.IntersectY && motionY > 0))
                 {
                     return null;
                 }
@@ -557,8 +572,10 @@ namespace Vintagestory.GameContent
             Mat4f.Mul(ModelMat, ModelMat, Mat4f.FromQuat(Mat4f.Create(), qf));
 
             float scale = entity.Properties.Client.Size;
+            
+            Mat4f.Translate(ModelMat, ModelMat, 0, -entity.CollisionBox.Y2 / 2, 0f);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
-            Mat4f.Translate(ModelMat, ModelMat, -0.5f, -entity.CollisionBox.Y2 / 2, -0.5f);
+            Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
 
             tmpModelMat
                 .Set(ModelMat)

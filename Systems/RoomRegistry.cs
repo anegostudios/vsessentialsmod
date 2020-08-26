@@ -46,6 +46,7 @@ namespace Vintagestory.GameContent
         int chunkMapSizeZ;
 
         ICoreAPI api;
+        IBlockAccessor blockAccess;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -58,6 +59,8 @@ namespace Vintagestory.GameContent
             this.api = api;
 
             api.Event.ChunkDirty += Event_ChunkDirty;
+
+            blockAccess = api.World.GetCachingBlockAccessor(false, false);
         }
 
         public override void StartClientSide(ICoreClientAPI api)
@@ -81,7 +84,6 @@ namespace Vintagestory.GameContent
             long index3d = MapUtil.Index3dL(chunkCoord.X, chunkCoord.Y, chunkCoord.Z, chunkMapSizeX, chunkMapSizeZ);
             lock (roomsByChunkIndexLock)
             {
-
                 roomsByChunkIndex.Remove(index3d);
             }
         }
@@ -97,7 +99,7 @@ namespace Vintagestory.GameContent
             {
                 roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
-
+            
             if (chunkrooms != null)
             {
                 Room firstEnclosedRoom=null;
@@ -155,7 +157,7 @@ namespace Vintagestory.GameContent
             bfsQueue.Enqueue(pos);
             visitedPositions.Add(pos);
 
-            int maxHalfSize = 6;
+            int maxHalfSize = 7;
 
             int coolingWallCount = 0;
             int nonCoolingWallCount = 0;
@@ -164,9 +166,11 @@ namespace Vintagestory.GameContent
             int nonSkyLightCount = 0;
             int exitCount = 0;
 
+            (blockAccess as ICachingBlockAccessor).Begin();
+
             HashSet<Vec2i> skyLightXZChecked = new HashSet<Vec2i>();
 
-            int minx=pos.X, miny = pos.Y, minz = pos.Z, maxx = pos.X, maxy = pos.Y, maxz = pos.Z;
+            int minx=pos.X, miny = pos.Y, minz = pos.Z, maxx = pos.X + 1, maxy = pos.Y + 1, maxz = pos.Z + 1;
 
             while (bfsQueue.Count > 0)
             {
@@ -175,7 +179,14 @@ namespace Vintagestory.GameContent
                 foreach (BlockFacing facing in BlockFacing.ALLFACES)
                 {
                     BlockPos npos = bpos.AddCopy(facing);
-                    Block nBlock = api.World.BlockAccessor.GetBlock(npos);
+
+                    if (!api.World.BlockAccessor.IsValidPos(npos))
+                    {
+                        nonCoolingWallCount++;
+                        continue;
+                    }
+
+                    Block nBlock = blockAccess.GetBlock(npos);
 
                     // We hit a wall, no need to scan further
                     if (nBlock.SideSolid[facing.GetOpposite().Index] || nBlock.SideSolid[facing.Index])
@@ -187,7 +198,7 @@ namespace Vintagestory.GameContent
                     }
 
                     // We hit a door or trapdoor - stop, but penalty!
-                    if (nBlock.Code.Path.Contains("door"))
+                    if (nBlock.Code?.Path.Contains("door") == true || nBlock.Code?.Path.Contains("farmland") == true)
                     {
                         nonCoolingWallCount+=3;
                         continue;
@@ -216,8 +227,9 @@ namespace Vintagestory.GameContent
                     {
                         skyLightXZChecked.Add(vec);
 
-                        int rainY = api.World.BlockAccessor.GetRainMapHeightAt(npos);
-                        if (rainY <= npos.Y)
+                        int light = api.World.BlockAccessor.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
+
+                        if (light >= api.World.SunBrightness - 1)
                         {
                             skyLightCount++;
                         } else

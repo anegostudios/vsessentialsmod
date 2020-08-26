@@ -18,11 +18,12 @@ namespace Vintagestory.GameContent
 
         long listenerId;
 
-        double? transitionAtTotalDaysOld = null; // old v1.13 data format, here for backwards compatibility
+        double? transitionAtTotalDaysOld = null; // old v1.12 data format, here for backwards compatibility
 
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
+            if (Block.Attributes?["inGameHours"].Exists != true) return;
 
             if (transitionHoursLeft <= 0)
             {
@@ -31,13 +32,23 @@ namespace Vintagestory.GameContent
 
             if (api.Side == EnumAppSide.Server)
             {
+                if (listenerId != 0)
+                {
+                    throw new InvalidOperationException("Initializing BETransient twice would create a memory and performance leak");
+                }
                 listenerId = RegisterGameTickListener(CheckTransition, CheckIntervalMs);
 
                 if (transitionAtTotalDaysOld != null)
                 {
                     transitionHoursLeft = ((double)transitionAtTotalDaysOld - Api.World.Calendar.TotalDays) * Api.World.Calendar.HoursPerDay;
+                    lastCheckAtTotalDays = Api.World.Calendar.TotalDays;
                 }
             }
+        }
+
+        public override void OnBlockPlaced(ItemStack byItemStack = null)
+        {
+            lastCheckAtTotalDays = Api.World.Calendar.TotalDays;
         }
 
         public virtual void CheckTransition(float dt)

@@ -67,7 +67,7 @@ namespace Vintagestory.ServerMods
         
         private void RegisterDefaultBlockBehaviors()
         {
-            api.RegisterBlockBehaviorClass("ClearSnowAccumOnRemove", typeof(BehaviorClearSnowAccumOnRemove));
+            
         }
 
 

@@ -68,13 +68,13 @@ namespace Vintagestory.GameContent
             ellapsedMsPhysics = capi.ElapsedMilliseconds;
         }
 
-        public void AddMeshData(MeshData data)
+        public void AddMeshData(MeshData data, int lodlevel = 1)
         {
             if (data == null) return;
             mesh.AddMeshData(data);
         }
 
-        public void AddMeshData(MeshData data, ColorMapData colormapdata)
+        public void AddMeshData(MeshData data, ColorMapData colormapdata, int lodlevel = 1)
         {
             if (data == null) return;
             mesh.AddMeshData(data);

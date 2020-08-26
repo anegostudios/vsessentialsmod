@@ -386,13 +386,21 @@ namespace Vintagestory.GameContent
             }
         }
 
-        
 
 
+        int accum = 20;
 
         
         public void UpdateCloudTilesOffThread(int changeSpeed)
         {
+            bool reloadRainNoiseValues = false;
+            accum++;
+            if (accum > 10)
+            {
+                accum = 0;
+                reloadRainNoiseValues = true;
+            }
+
             // Load density from perlin noise
             int cnt = CloudTileLength * CloudTileLength;
 
@@ -410,10 +418,15 @@ namespace Vintagestory.GameContent
                 int tileXPos = tileCenterPos.X + cloudTile.GridXOffset;
                 int tileZPos = tileCenterPos.Z + cloudTile.GridZOffset;
 
+                /*if (cloudTile.GridXOffset == 0 && cloudTile.GridZOffset == 0 && reloadRainNoiseValues)
+                {
+                    int a = 1;
+                }*/
+
                 cloudTile.brightnessRand.InitPositionSeed(tileXPos - offThreadState.WindTileOffsetX, tileZPos - offThreadState.WindTileOffsetZ);
 
                 // This is a block position
-                Vec3d cloudTilePos = new Vec3d(tileXPos * CloudTileSize, 0, tileZPos * CloudTileSize);
+                Vec3d cloudTilePos = new Vec3d(tileXPos * CloudTileSize, capi.World.SeaLevel, tileZPos * CloudTileSize);
 
                 int regSize = capi.World.BlockAccessor.RegionSize;
                 int topLeftRegX = (int)Math.Round(cloudTilePos.X / regSize) - 1;
@@ -423,11 +436,21 @@ namespace Vintagestory.GameContent
                 {
                     prevTopLeftRegX = topLeftRegX;
                     prevTopLeftRegZ = topLeftRegZ;
-                    wreaderpreload.LoadAdjacentSimsAndLerpValues(cloudTilePos);
+                    wreaderpreload.LoadAdjacentSims(cloudTilePos);
                     wreaderpreload.EnsureCloudTileCacheIsFresh(tileOffset);
-                } else 
+                }
+
+                // Noise generation (from the precipitation and temperature subsystems) is expensive, lets do it less often.
+                // Since the clouds have smooth transition anyways, it should not be noticable at all
+                if (reloadRainNoiseValues || !cloudTile.rainValuesSet)
                 {
                     wreaderpreload.LoadLerp(cloudTilePos);
+                    cloudTile.lerpRainCloudOverlay = wreaderpreload.lerpRainCloudOverlay;
+                    cloudTile.lerpRainOverlay = wreaderpreload.lerpRainOverlay;
+                    cloudTile.rainValuesSet = true;
+                } else
+                {
+                    wreaderpreload.LoadLerp(cloudTilePos, true, cloudTile.lerpRainCloudOverlay, cloudTile.lerpRainOverlay);
                 }
 
                 // This is the tile position relative to the current regions origin point
@@ -438,6 +461,7 @@ namespace Vintagestory.GameContent
                 double density = GameMath.Clamp(wreaderpreload.GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ), 0, 1);
                 double bright = wreaderpreload.GetBlendedCloudBrightness(1) * (0.85f + cloudTile.brightnessRand.NextFloat() * 0.15f);
 
+                
 
                 cloudTile.TargetBrightnes = (short)(GameMath.Clamp(bright, 0, 1) * short.MaxValue);
                 cloudTile.TargetThickness = (short)GameMath.Clamp(density * short.MaxValue, 0, short.MaxValue);
@@ -450,6 +474,10 @@ namespace Vintagestory.GameContent
                 cloudTile.ThinCloudMode = LerpTileValue(cloudTile.TargetThinCloudMode, cloudTile.ThinCloudMode, changeSpeed);
                 cloudTile.CloudOpaqueness = LerpTileValue(cloudTile.TargetCloudOpaquenes, cloudTile.CloudOpaqueness, changeSpeed);
                 cloudTile.UndulatingCloudMode = LerpTileValue(cloudTile.TargetUndulatingCloudMode, cloudTile.UndulatingCloudMode, changeSpeed);
+
+                /*cloudTile.Brightness = 0;
+                cloudTile.SelfThickness = short.MaxValue;
+                cloudTile.CloudOpaqueness = short.MaxValue;*/
 
 
                 // North: Negative Z

@@ -1,6 +1,8 @@
-﻿using Vintagestory.API;
+﻿using System.Text;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 
 namespace Vintagestory.GameContent
 {
@@ -37,7 +39,7 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (!entity.Alive) return;
+            if (!entity.Alive || entity.World.Side == EnumAppSide.Client) return;
 
             accumSeconds += deltaTime;
 
@@ -45,7 +47,6 @@ namespace Vintagestory.GameContent
             {
                 DeathTime = 0;
                 accumSeconds = 0;
-                deltaTime = 0;
                 return;
             }
 
@@ -75,13 +76,22 @@ namespace Vintagestory.GameContent
             int level = entity.World.BlockAccessor.GetLightLevel(entity.ServerPos.AsBlockPos, EnumLightLevelType.MaxLight);
 
             return level >= belowLightLevel;
-
-            
         }
 
         public override string PropertyName()
         {
             return "timeddespawn";
+        }
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+            if (belowLightLevel != null && !LightLevelOk())
+            {
+                infotext.AppendLine(Lang.Get("Deprived of light, might die soon"));
+            }
+
+
+            base.GetInfoText(infotext);
         }
     }
 }

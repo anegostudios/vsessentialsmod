@@ -17,34 +17,6 @@ namespace Vintagestory.GameContent
         public int Count;
     }
 
-    public class LooseItemFoodSource : IAnimalFoodSource
-    {
-        EntityItem entity;
-
-        public LooseItemFoodSource(EntityItem entity)
-        {
-            this.entity = entity;
-        }
-
-        public ItemStack ItemStack => entity.Itemstack;
-
-        public Vec3d Position => entity.ServerPos.XYZ;
-
-        public string Type => "food";
-
-        public float ConsumeOnePortion()
-        {
-            entity.Itemstack.StackSize--;
-            if (entity.Itemstack.StackSize <= 0) entity.Die();
-            return 1f;
-        }
-
-        public bool IsSuitableFor(Entity entity)
-        {
-            return true;
-        }
-    }
-
     public class AiTaskSeekFoodAndEat : AiTaskBase
     {
         AssetLocation eatSound;
@@ -65,6 +37,8 @@ namespace Vintagestory.GameContent
         bool playEatAnimForLooseItems = true;
 
         bool eatLooseItems;
+        bool searchPlayerInv;
+
         HashSet<EnumFoodCategory> eatItemCategories = new HashSet<EnumFoodCategory>();
         HashSet<AssetLocation> eatItemCodes = new HashSet<AssetLocation>();
 
@@ -81,6 +55,8 @@ namespace Vintagestory.GameContent
         public AiTaskSeekFoodAndEat(EntityAgent entity) : base(entity)
         {
             porregistry = entity.Api.ModLoader.GetModSystem<POIRegistry>();
+
+            entity.WatchedAttributes.SetBool("doesEat", true);
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
@@ -97,7 +73,12 @@ namespace Vintagestory.GameContent
             {
                 moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
             }
-            
+
+            if (taskConfig["searchPlayerInv"] != null)
+            {
+                searchPlayerInv = taskConfig["searchPlayerInv"].AsBool(false);
+            }
+
             if (taskConfig["eatTime"] != null)
             {
                 eatTime = taskConfig["eatTime"].AsFloat(1.5f);
@@ -172,7 +153,7 @@ namespace Vintagestory.GameContent
             extraTargetDist = 0;
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            entity.World.Api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 3, (e) =>
+            entity.World.Api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 10, (e) =>
             {
                 if (e is EntityItem)
                 {
@@ -192,12 +173,19 @@ namespace Vintagestory.GameContent
                     }
                 }
 
+                if (searchPlayerInv && e is EntityPlayer eplr)
+                {
+                    if (eplr.Player.InventoryManager.Find(slot => slot.Inventory is InventoryBasePlayer && !slot.Empty && eatItemCodes.Contains(slot.Itemstack.Collectible.Code)))
+                    {
+                        targetPoi = new PlayerPoi(eplr);
+                    }
+                }
+
                 return true;
             });
 
             if (targetPoi == null)
-            {
-                
+            {   
                 targetPoi = porregistry.GetNearestPoi(entity.ServerPos.XYZ, 48, (poi) =>
                 {
                     if (poi.Type != "food") return false;
@@ -237,7 +225,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return Math.Max(extraTargetDist + 0.5f, (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2 + 0.05f);
+            return Math.Max(extraTargetDist + 0.6f, (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2 + 0.05f);
         }
 
         public override void StartExecute()
@@ -247,7 +235,7 @@ namespace Vintagestory.GameContent
             nowStuck = false;
             soundPlayed = false;
             eatTimeNow = 0;
-            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 1000);
+            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000);
             eatAnimStarted = false;
         }
 
@@ -264,7 +252,7 @@ namespace Vintagestory.GameContent
 
             float minDist = MinDistanceToTarget();
 
-            if (distance < minDist)
+            if (distance <= minDist)
             {
                 pathTraverser.Stop();
 
@@ -310,6 +298,7 @@ namespace Vintagestory.GameContent
                         float sat = targetPoi.ConsumeOnePortion();
                         quantityEaten += sat;
                         tree.SetFloat("saturation", sat + tree.GetFloat("saturation", 0));
+                        entity.WatchedAttributes.SetDouble("lastMealEatenTotalHours", entity.World.Calendar.TotalHours);
                         entity.WatchedAttributes.MarkPathDirty("hunger");
                     }
                     else quantityEaten = 1;
@@ -317,6 +306,17 @@ namespace Vintagestory.GameContent
                     failedSeekTargets.Remove(targetPoi);
 
                     return false;
+                }
+            } else
+            {
+                if (!pathTraverser.Active)
+                {
+                    float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
+                    float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
+                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500))
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -386,10 +386,71 @@ namespace Vintagestory.GameContent
         private void OnGoalReached()
         {
             pathTraverser.Active = true;
-
             failedSeekTargets.Remove(targetPoi);
         }
 
 
     }
+
+    public class PlayerPoi : IAnimalFoodSource
+    {
+        EntityPlayer plr;
+        Vec3d pos = new Vec3d();
+
+        public PlayerPoi(EntityPlayer plr)
+        {
+            this.plr = plr;
+        }
+
+        public Vec3d Position
+        {
+            get
+            {
+                pos.Set(plr.Pos.X, plr.Pos.Y, plr.Pos.Z);
+                return pos;
+            }
+        }
+
+        public string Type => "food";
+
+        public float ConsumeOnePortion()
+        {
+            return 0;
+        }
+
+        public bool IsSuitableFor(Entity entity)
+        {
+            return false;
+        }
+    }
+
+
+    public class LooseItemFoodSource : IAnimalFoodSource
+    {
+        EntityItem entity;
+
+        public LooseItemFoodSource(EntityItem entity)
+        {
+            this.entity = entity;
+        }
+
+        public ItemStack ItemStack => entity.Itemstack;
+
+        public Vec3d Position => entity.ServerPos.XYZ;
+
+        public string Type => "food";
+
+        public float ConsumeOnePortion()
+        {
+            entity.Itemstack.StackSize--;
+            if (entity.Itemstack.StackSize <= 0) entity.Die();
+            return 1f;
+        }
+
+        public bool IsSuitableFor(Entity entity)
+        {
+            return true;
+        }
+    }
+
 }

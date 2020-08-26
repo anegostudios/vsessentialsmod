@@ -31,6 +31,26 @@ namespace Vintagestory.GameContent
         {
         }
 
+        SQLiteCommand setMapPieceCmd;
+        SQLiteCommand getMapPieceCmd;
+
+
+        public override void OnOpened()
+        {
+            base.OnOpened();
+
+            setMapPieceCmd = sqliteConn.CreateCommand();
+            setMapPieceCmd.CommandText = "INSERT OR REPLACE INTO mappiece (position, data) VALUES (@pos, @data)";
+            setMapPieceCmd.Parameters.Add("@pos", DbType.UInt64, 1);
+            setMapPieceCmd.Parameters.Add("@data", DbType.Binary);
+            setMapPieceCmd.Prepare();
+
+            getMapPieceCmd = sqliteConn.CreateCommand();
+            getMapPieceCmd.CommandText = "SELECT data FROM mappiece WHERE position=@pos";
+            getMapPieceCmd.Parameters.Add("@pos", DbType.UInt64, 1);
+            getMapPieceCmd.Prepare();
+        }
+
         protected override void CreateTablesIfNotExists(SQLiteConnection sqliteConn)
         {
             using (SQLiteCommand sqlite_cmd = sqliteConn.CreateCommand())
@@ -46,40 +66,63 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public MapPieceDB GetMapPiece(Vec2i chunkCoord)
+        public void Purge()
         {
             using (SQLiteCommand cmd = sqliteConn.CreateCommand())
             {
-                cmd.CommandText = "SELECT data FROM mappiece WHERE position=?";
-                cmd.Parameters.Add(CreateParameter("position", DbType.UInt64, chunkCoord.ToChunkIndex(), cmd));
+                cmd.CommandText = "delete FROM mappiece";
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-                using (SQLiteDataReader sqlite_datareader = cmd.ExecuteReader())
+        public MapPieceDB[] GetMapPieces(List<Vec2i> chunkCoords)
+        {
+            MapPieceDB[] pieces = new MapPieceDB[chunkCoords.Count];
+            for (int i = 0; i < chunkCoords.Count; i++)
+            {
+                getMapPieceCmd.Parameters["@pos"].Value = chunkCoords[i].ToChunkIndex();
+                using (SQLiteDataReader sqlite_datareader = getMapPieceCmd.ExecuteReader())
                 {
                     while (sqlite_datareader.Read())
                     {
                         object data = sqlite_datareader["data"];
                         if (data == null) return null;
 
-                        return SerializerUtil.Deserialize<MapPieceDB>(data as byte[]);
+                        pieces[i] = SerializerUtil.Deserialize<MapPieceDB>(data as byte[]);
                     }
+                }
+            }
+
+            return pieces;
+        }
+
+        public MapPieceDB GetMapPiece(Vec2i chunkCoord)
+        {
+            getMapPieceCmd.Parameters["@pos"].Value = chunkCoord.ToChunkIndex();
+
+            using (SQLiteDataReader sqlite_datareader = getMapPieceCmd.ExecuteReader())
+            {
+                while (sqlite_datareader.Read())
+                {
+                    object data = sqlite_datareader["data"];
+                    if (data == null) return null;
+
+                    return SerializerUtil.Deserialize<MapPieceDB>(data as byte[]);
                 }
             }
 
             return null;
         }
 
-        public void SetMapPiece(Vec2i chunkCoord, MapPieceDB piece)
+        public void SetMapPieces(Dictionary<Vec2i, MapPieceDB> pieces)
         {
             using (SQLiteTransaction transaction = sqliteConn.BeginTransaction())
             {
-                using (DbCommand cmd = sqliteConn.CreateCommand())
+                foreach (var val in pieces)
                 {
-                    byte[] data = SerializerUtil.Serialize(piece);
-
-                    cmd.CommandText = "INSERT OR REPLACE INTO mappiece (position, data) VALUES (?,?)";
-                    cmd.Parameters.Add(CreateParameter("position", DbType.UInt64, chunkCoord.ToChunkIndex(), cmd));
-                    cmd.Parameters.Add(CreateParameter("data", DbType.Object, data, cmd));
-                    int affected = cmd.ExecuteNonQuery();
+                    setMapPieceCmd.Parameters["@pos"].Value = val.Key.ToChunkIndex();
+                    setMapPieceCmd.Parameters["@data"].Value = SerializerUtil.Serialize(val.Value);
+                    setMapPieceCmd.ExecuteNonQuery();
                 }
 
                 transaction.Commit();
@@ -126,6 +169,24 @@ namespace Vintagestory.GameContent
             }
         }
 
+
+
+        public override void Close()
+        {
+            setMapPieceCmd?.Dispose();
+            getMapPieceCmd?.Dispose();
+
+            base.Close();
+        }
+
+
+        public override void Dispose()
+        {
+            setMapPieceCmd?.Dispose();
+            getMapPieceCmd?.Dispose();
+
+            base.Dispose();
+        }
 
     }
 }

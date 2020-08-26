@@ -75,7 +75,7 @@ namespace Vintagestory.Essentials
                 Stop();
                 OnStuck?.Invoke();
                 return;
-            }         
+            }
 
 
             EntityControls controls = entity.MountedOn == null ? entity.Controls : entity.MountedOn.Controls;

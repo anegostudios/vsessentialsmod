@@ -56,11 +56,12 @@ namespace Vintagestory.GameContent
                 .AddShadedDialogBG(bgBounds, false)
                 .AddDialogTitleBar("Add waypoint", () => TryClose())
                 .BeginChildElements(bgBounds)
-                    .AddRichtext("Color (<a href=\"https://www.99colors.net/dot-net-colors\">List</a>)", CairoFont.WhiteSmallText(), leftColumn = leftColumn.FlatCopy())
-                    .AddTextInput(rightColumn = rightColumn.FlatCopy().WithFixedWidth(150), onColorChanged, CairoFont.TextInput(), "colorInput")
+                    .AddStaticText("Name", CairoFont.WhiteSmallText(), leftColumn = leftColumn.FlatCopy())
+                    .AddTextInput(rightColumn = rightColumn.FlatCopy().WithFixedWidth(200), onNameChanged, CairoFont.TextInput(), "nameInput")
+
+                    .AddRichtext("Color (<a href=\"https://www.99colors.net/dot-net-colors\">List</a>)", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
+                    .AddTextInput(rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(150), onColorChanged, CairoFont.TextInput(), "colorInput")
                     .AddDynamicCustomDraw(rightColumn.FlatCopy().WithFixedWidth(30).WithFixedOffset(160, 0), onDrawColorRect, "colorRect")
-                    .AddStaticText("Name", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
-                    .AddTextInput(rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), onNameChanged, CairoFont.TextInput(), "nameInput")
 
                     .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
                     .AddDropDown(

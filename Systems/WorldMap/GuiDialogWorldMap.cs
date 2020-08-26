@@ -15,24 +15,26 @@ namespace Vintagestory.GameContent
         public override bool PrefersUngrabbedMouse => true;
 
         EnumDialogType dialogType = EnumDialogType.HUD;
-        public override EnumDialogType DialogType => dialogType; 
-        public List<MapComponent> mapComponents = new List<MapComponent>();
+        public override EnumDialogType DialogType => dialogType;
+        
 
 
-        public GuiElementMap mapElem;
         OnViewChangedDelegate viewChanged;
         long listenerId;
-        GuiElementHoverText hoverTextElem;
         bool requireRecompose = false;
 
         int mapWidth=1200, mapHeight=800;
+
+        GuiComposer fullDialog;
+        GuiComposer hudDialog;
 
         public override double DrawOrder => 0.11;
 
         public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
         {
             this.viewChanged = viewChanged;
-            ComposeDialog();
+            fullDialog = ComposeDialog(EnumDialogType.Dialog);
+            hudDialog = ComposeDialog(EnumDialogType.HUD);
 
             capi.RegisterCommand("worldmapsize", "Set the size of the world map dialog", "width height", onCmdMapSize);
         }
@@ -41,19 +43,15 @@ namespace Vintagestory.GameContent
         {
             mapWidth = (int)args.PopInt(1200);
             mapHeight = (int)args.PopInt(800);
-            ComposeDialog();
-
+            fullDialog = ComposeDialog(EnumDialogType.Dialog);
             capi.ShowChatMessage(string.Format("Map size {0}x{1} set", mapWidth, mapHeight));
         }
 
-        public override bool TryOpen()
-        {
-            ComposeDialog();
-            return base.TryOpen();
-        }
 
-        private void ComposeDialog()
+        private GuiComposer ComposeDialog(EnumDialogType dlgType)
         {
+            GuiComposer compo;
+
             ElementBounds mapBounds = ElementBounds.Fixed(0, 28, mapWidth, mapHeight);
             ElementBounds layerList = mapBounds.RightCopy().WithFixedSize(1, 350);
 
@@ -66,7 +64,7 @@ namespace Vintagestory.GameContent
                 .WithAlignment(EnumDialogArea.CenterMiddle)
                 .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0);
 
-            if (dialogType == EnumDialogType.HUD)
+            if (dlgType == EnumDialogType.HUD)
             {
                 mapBounds = ElementBounds.Fixed(0, 0, 250, 250);
 
@@ -78,56 +76,75 @@ namespace Vintagestory.GameContent
                     ElementStdBounds.AutosizedMainDialog
                     .WithAlignment(EnumDialogArea.RightTop)
                     .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, GuiStyle.DialogToScreenPadding);
-            }
 
-            Vec3d centerPos = capi.World.Player.Entity.Pos.XYZ;
-
-            if (SingleComposer != null)
+                compo = hudDialog;
+            } else
             {
-                mapElem.mapComponents = null; // Let's not dispose that
-                SingleComposer.Dispose();
+                compo = fullDialog;
             }
 
-            SingleComposer = capi.Gui
-                .CreateCompo("worldmap", dialogBounds)
+            Cuboidd beforeBounds = null;
+            
+            if (compo != null)
+            {
+                beforeBounds = (compo.GetElement("mapElem") as GuiElementMap)?.CurrentBlockViewBounds;
+                compo.Dispose();
+            }
+
+            compo = capi.Gui
+                .CreateCompo("worldmap" + dlgType, dialogBounds)
                 .AddShadedDialogBG(bgBounds, false)
-                .AddIf(dialogType == EnumDialogType.Dialog)
+                .AddIf(dlgType == EnumDialogType.Dialog)
                     .AddDialogTitleBar("World Map", OnTitleBarClose)
                     .AddInset(mapBounds, 2)
                 .EndIf()
                 .BeginChildElements(bgBounds)
                     .AddHoverText("", CairoFont.WhiteDetailText(), 350, mapBounds.FlatCopy(), "hoverText")
-                    .AddInteractiveElement(new GuiElementMap(mapComponents, centerPos, capi, mapBounds), "mapElem")
+                    .AddInteractiveElement(new GuiElementMap(capi.ModLoader.GetModSystem<WorldMapManager>().MapLayers, capi, mapBounds, dlgType == EnumDialogType.HUD), "mapElem")
                 .EndChildElements()
                 .Compose()
             ;
-            SingleComposer.OnRecomposed += SingleComposer_OnRecomposed;
 
-            mapElem = SingleComposer.GetElement("mapElem") as GuiElementMap;
+            compo.OnRecomposed += SingleComposer_OnRecomposed;
 
+            GuiElementMap mapElem = compo.GetElement("mapElem") as GuiElementMap;
+            if (beforeBounds != null)
+            {
+                mapElem.chunkViewBoundsBefore = beforeBounds.ToCuboidi().Div(capi.World.BlockAccessor.ChunkSize);
+            }
             mapElem.viewChanged = viewChanged;
             mapElem.ZoomAdd(1, 0.5f, 0.5f);
-            
 
-            hoverTextElem = SingleComposer.GetHoverText("hoverText");
+
+
+            var hoverTextElem = compo.GetHoverText("hoverText");
             hoverTextElem.SetAutoWidth(true);
 
-            if (listenerId != 0)
+            if (listenerId == 0)
             {
-                capi.Event.UnregisterGameTickListener(listenerId);
+                listenerId = capi.Event.RegisterGameTickListener(
+                    (dt) =>
+                    {
+                        if (!IsOpened()) return;
+
+                        GuiElementMap singlec = SingleComposer.GetElement("mapElem") as GuiElementMap;
+                        singlec?.EnsureMapFullyLoaded();
+
+                        if (requireRecompose)
+                        {
+                            var dlgtype = dialogType;
+                            capi.ModLoader.GetModSystem<WorldMapManager>().ToggleMap(dlgtype);
+                            capi.ModLoader.GetModSystem<WorldMapManager>().ToggleMap(dlgtype);
+                            requireRecompose = false;
+                        }
+
+
+                    }
+                , 100);
             }
 
-            listenerId = capi.Event.RegisterGameTickListener(
-                (dt) => {
-                    mapElem.EnsureMapFullyLoaded();
-                    if (requireRecompose)
-                    {
-                        TryClose();
-                        TryOpen();
-                        requireRecompose = false;
-                    }
-                }
-            , 100);
+            capi.World.FrameProfiler.Mark("composeworldmap");
+            return compo;
         }
 
         private void SingleComposer_OnRecomposed()
@@ -139,9 +156,16 @@ namespace Vintagestory.GameContent
         {
             base.OnGuiOpened();
 
+            if (dialogType == EnumDialogType.HUD)
+            {
+                SingleComposer = hudDialog;
+            } else
+            {
+                SingleComposer = fullDialog;
+            }
+
+            GuiElementMap mapElem = SingleComposer.GetElement("mapElem") as GuiElementMap;
             if (mapElem != null) mapElem.chunkViewBoundsBefore = new Cuboidi();
-            //mapComponents.Clear();
-            //mmapElem.EnsureMapFullyLoaded();
 
             OnMouseMove(new MouseEvent(capi.Input.MouseX, capi.Input.MouseY));
         }
@@ -176,15 +200,6 @@ namespace Vintagestory.GameContent
         {
             base.OnGuiClosed();
 
-            capi.Event.UnregisterGameTickListener(listenerId);
-            listenerId = 0;
-
-            foreach (MapComponent cmp in mapComponents)
-            {
-                cmp.Dispose();
-            }
-
-            mapComponents.Clear();
         }
 
 
@@ -195,12 +210,8 @@ namespace Vintagestory.GameContent
             capi.Event.UnregisterGameTickListener(listenerId);
             listenerId = 0;
 
-            foreach (MapComponent cmp in mapComponents)
-            {
-                cmp.Dispose();
-            }
-
-            mapComponents.Clear();
+            fullDialog.Dispose();
+            hudDialog.Dispose();
         }
 
 
@@ -220,13 +231,15 @@ namespace Vintagestory.GameContent
                 StringBuilder hoverText = new StringBuilder();
                 hoverText.AppendLine(string.Format("{0}, {1}, {2}", (int)hoveredWorldPos.X, (int)hoveredWorldPos.Y, (int)hoveredWorldPos.Z));
 
-                foreach (MapComponent cmp in mapComponents)
+                var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
+                var hoverTextElem = SingleComposer.GetHoverText("hoverText");
+                
+                foreach (MapLayer layer in mpc.mapLayers)
                 {
-                    cmp.OnMouseMove(args, mapElem, hoverText);
+                    layer.OnMouseMoveClient(args, mpc, hoverText);
                 }
 
                 string text = hoverText.ToString().TrimEnd();
-
                 hoverTextElem.SetNewText(text);
             }
         }
@@ -236,7 +249,8 @@ namespace Vintagestory.GameContent
             double x = mouseX - SingleComposer.Bounds.absX;
             double y = mouseY - SingleComposer.Bounds.absY - (dialogType == EnumDialogType.Dialog ? GuiElement.scaled(30) : 0); // no idea why the 30 :/
 
-            mapElem.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref worldPos);
+            var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
+            mpc.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref worldPos);
             worldPos.Y++;
         }
 
@@ -258,11 +272,17 @@ namespace Vintagestory.GameContent
             capi.Render.CheckGlError("map-fina");
 
             bool showHover = SingleComposer.Bounds.PointInside(capi.Input.MouseX, capi.Input.MouseY) && Focused;
+            var hoverTextElem = SingleComposer.GetHoverText("hoverText");
 
             hoverTextElem.SetVisible(showHover);
             hoverTextElem.SetAutoDisplay(showHover);
         }
 
+        public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
+        {
+            var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
+            mpc.TranslateWorldPosToViewPos(worldPos, ref viewPos);
+        }
 
         GuiDialogAddWayPoint addWpDlg;
         public override void OnMouseUp(MouseEvent args)
@@ -273,14 +293,15 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            foreach (MapComponent cmp in mapComponents)
+            var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
+
+            foreach (MapLayer ml in mpc.mapLayers)
             {
-                cmp.OnMouseUpOnElement(args, mapElem);
+                ml.OnMouseUpClient(args, mpc);
                 if (args.Handled) return;
             }
 
-
-            if (args.Button == API.Common.EnumMouseButton.Right)
+            if (args.Button == EnumMouseButton.Right)
             {
                 Vec3d wpPos = new Vec3d();
                 loadWorldPos(args.X, args.Y, ref wpPos);

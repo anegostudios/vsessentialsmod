@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
 
         public Dictionary<long, EntityPartitionChunk> Partitions = new Dictionary<long, EntityPartitionChunk>();
 
-        Dictionary<long, GridAndChunkIndex> GridIndexByEntityId = new Dictionary<long, GridAndChunkIndex>();
+//        Dictionary<long, GridAndChunkIndex> GridIndexByEntityId = new Dictionary<long, GridAndChunkIndex>();
 
         int chunkSize;
         int chunkMapSizeX;
@@ -118,7 +118,6 @@ namespace Vintagestory.GameContent
             LargestTouchDistance = 0;
 
             Partitions.Clear();
-            GridIndexByEntityId.Clear();
 
             foreach (var val in entities)
             {
@@ -133,8 +132,8 @@ namespace Vintagestory.GameContent
         {
             EntityPos pos = entity.SidedPos;
 
-            int lgx = (int)(pos.X / gridSizeInBlocks) % partitionsLength;
-            int lgz = (int)(pos.Z / gridSizeInBlocks) % partitionsLength;
+            int lgx = ((int)pos.X / gridSizeInBlocks) % partitionsLength;
+            int lgz = ((int)pos.Z / gridSizeInBlocks) % partitionsLength;
             int gridIndex = lgz * partitionsLength + lgx;
             
             long nowInChunkIndex3d = MapUtil.Index3dL((int)pos.X / chunkSize, (int)pos.Y / chunkSize, (int)pos.Z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
@@ -145,51 +144,8 @@ namespace Vintagestory.GameContent
                 Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
             }
 
-            bool didChange = false;
-
-            GridAndChunkIndex indexes;
-            if (GridIndexByEntityId.TryGetValue(entity.EntityId, out indexes))
-            {
-                if (indexes.ChunkIndex != nowInChunkIndex3d)
-                {
-                    EntityPartitionChunk oldpartition = null;
-                    Partitions.TryGetValue(indexes.ChunkIndex, out oldpartition);
-                    oldpartition.Entities[indexes.GridIndex].Remove(entity);
-                    didChange = true;
-                }
-                if (indexes.GridIndex != gridIndex)
-                {
-                    partition.Entities[indexes.GridIndex].Remove(entity);
-                    didChange = true;
-                }
-            }
-            else didChange = true;
-
-
-            if (didChange && gridIndex >= 0) // Gridindex can be negative when a entity is outside world bounds 
-            {
-                partition.Entities[gridIndex].Add(entity);
-                GridIndexByEntityId[entity.EntityId] = new GridAndChunkIndex(lgz * partitionsLength + lgx, nowInChunkIndex3d);
-            }
+            partition.Entities[gridIndex].Add(entity);
         }
-
-
-
-        /*private void Event_OnEntityDespawn(Entity entity, EntityDespawnReason reason)
-        {
-            GridAndChunkIndex indexes;
-            if (GridIndexByEntityId.TryGetValue(entity.EntityId, out indexes))
-            {
-                GridIndexByEntityId.Remove(entity.EntityId);
-            } else return;
-
-            EntityPartitionChunk partition;
-            if (Partitions.TryGetValue(indexes.ChunkIndex, out partition))
-            {
-                partition.Entities[indexes.GridIndex].Remove(entity); 
-            }            
-        }*/
-
 
         public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
@@ -225,8 +181,12 @@ namespace Vintagestory.GameContent
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
-            int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
-            int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);
+            //int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
+            //int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);
+
+            int mincy = (int)((centerPos.Y - radius) / chunkSize);
+            int maxcy = (int)((centerPos.Y + radius) / chunkSize);
+
             int mingz = (int)((centerPos.Z - radius) / gridSizeInBlocks);
             int maxgz = (int)((centerPos.Z + radius) / gridSizeInBlocks);
 
@@ -237,19 +197,22 @@ namespace Vintagestory.GameContent
             EntityPartitionChunk partitionChunk = null;
 
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridYMax = api.World.BlockAccessor.MapSizeY / gridSizeInBlocks;
+            //int gridYMax = api.World.BlockAccessor.MapSizeY / gridSizeInBlocks;
             int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks;
+
+            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
-                for (int gridY = mingy; gridY <= maxgy; gridY++)
+                //for (int gridY = mingy; gridY <= maxgy; gridY++)
+                for (int cy = mincy; cy <= maxcy; cy++)
                 {
                     for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                     {
-                        if (gridX < 0 || gridY < 0 || gridZ < 0 || gridX >= gridXMax || gridY >= gridYMax || gridZ >= gridZMax) continue;
+                        if (gridX < 0 || cy < 0 || gridZ < 0 || gridX >= gridXMax || cy >= cyTop || gridZ >= gridZMax) continue;
 
                         int cx = gridX * gridSizeInBlocks / chunkSize;
-                        int cy = gridY * gridSizeInBlocks / chunkSize;
+                        //int cy = gridY * gridSizeInBlocks / chunkSize;
                         int cz = gridZ * gridSizeInBlocks / chunkSize;
 
                         long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
@@ -266,17 +229,14 @@ namespace Vintagestory.GameContent
                         int lgx = gridX % partitionsLength;
                         int lgz = gridZ % partitionsLength;
 
-
                         List<Entity> entities = partitionChunk.Entities[lgz * partitionsLength + lgx];
+                        
                         for (int i = 0; i < entities.Count; i++)
                         {
                             double distSq = entities[i].SidedPos.SquareDistanceTo(centerPos);
-                            if (distSq <= radiusSq)
+                            if (distSq <= radiusSq && !callback(entities[i]))
                             {
-                                if (!callback(entities[i]))
-                                {
-                                    return;
-                                }
+                                return;
                             }
                         }
                     }
@@ -295,8 +255,12 @@ namespace Vintagestory.GameContent
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
-            int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
-            int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);
+            /*int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
+            int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);*/
+
+            int mincy = (int)((centerPos.Y - radius) / chunkSize);
+            int maxcy = (int)((centerPos.Y + radius) / chunkSize);
+
             int mingz = (int)((centerPos.Z - radius) / gridSizeInBlocks);
             int maxgz = (int)((centerPos.Z + radius) / gridSizeInBlocks);
             
@@ -306,19 +270,22 @@ namespace Vintagestory.GameContent
             EntityPartitionChunk partitionChunk = null;
 
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+            //int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
             int gridZMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
+
+            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
-                for (int gridY = mingy; gridY <= maxgy; gridY++)
+                for (int cy = mincy; cy <= maxcy; cy++)
+                //for (int gridY = mingy; gridY <= maxgy; gridY++)
                 {
                     for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                     {
-                        if (gridX < 0 || gridY < 0 || gridZ < 0 || gridX >= gridXMax || gridY >= gridYMax || gridZ >= gridZMax) continue;
+                        if (gridX < 0 || cy < 0 || gridZ < 0 || gridX >= gridXMax || cy >= cyTop || gridZ >= gridZMax) continue;
 
                         int cx = gridX * gridSizeInBlocks / chunkSize;
-                        int cy = gridY * gridSizeInBlocks / chunkSize;
+                        //int cy = gridY * gridSizeInBlocks / chunkSize;
                         int cz = gridZ * gridSizeInBlocks / chunkSize;
 
                         long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);

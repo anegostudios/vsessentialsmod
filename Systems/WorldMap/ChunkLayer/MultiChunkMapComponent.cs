@@ -17,6 +17,7 @@ namespace Vintagestory.GameContent
         public Vec2i chunkCoord;
         public LoadedTexture Texture;
 
+
         Vec3d worldPos;
         Vec2f viewPos = new Vec2f();
 
@@ -44,6 +45,7 @@ namespace Vintagestory.GameContent
 
         public bool IsChunkSet(int dx, int dz)
         {
+            if (dx < 0 || dz < 0) return false;
             return chunkSet[dx, dz];
         }
 
@@ -72,7 +74,6 @@ namespace Vintagestory.GameContent
                 capi.Render.LoadOrUpdateTextureFromRgba(new int[size * size], false, 0, ref Texture);
             }
             
-            
             capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref tmpTexture);
 
             capi.Render.GlToggleBlend(false);
@@ -99,7 +100,9 @@ namespace Vintagestory.GameContent
         {
             map.TranslateWorldPosToViewPos(worldPos, ref viewPos);
 
+#if DEBUG
             if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+#endif
 
             capi.Render.Render2DTexture(
                 Texture.TextureId,
@@ -114,9 +117,34 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             base.Dispose();
+            
+        }
+
+        public void ActuallyDispose()
+        {
             Texture.Dispose();
         }
 
+        Vec2i tmpVec = new Vec2i();
+        public bool IsVisible(HashSet<Vec2i> curVisibleChunks)
+        {
+            for (int dx = 0; dx < ChunkLen; dx++)
+            {
+                for (int dz = 0; dz < ChunkLen; dz++)
+                {
+                    tmpVec.Set(chunkCoord.X + dx, chunkCoord.Y + dz);
+                    if (curVisibleChunks.Contains(tmpVec)) return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static void DisposeStatic()
+        {
+            tmpTexture?.Dispose();
+            tmpTexture = null;
+        }
     }
 
 

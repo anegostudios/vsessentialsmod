@@ -183,7 +183,6 @@ namespace Vintagestory.ServerMods.NoObf
                 worldProperties.Add(loc, entry.Value);
             }
 
-
             worldPropertiesVariants = new Dictionary<AssetLocation, VariantEntry[]>();
             foreach (var val in worldProperties)
             {
@@ -195,13 +194,20 @@ namespace Vintagestory.ServerMods.NoObf
                 if (val.Value.Code == null)
                 {
                     api.Server.LogError("Error in worldproperties {0}, code is null, so I won't load it", val.Key);
-                    return;
+                    continue;
                 }
 
                 worldPropertiesVariants[val.Value.Code] = new VariantEntry[variants.Length];
 
                 for (int i = 0; i < variants.Length; i++)
                 {
+                    if (variants[i].Code == null)
+                    {
+                        api.Server.LogError("Error in worldproperties {0}, variant {1}, code is null, so I won't load it", val.Key, i);
+                        worldPropertiesVariants[val.Value.Code] = worldPropertiesVariants[val.Value.Code].RemoveEntry(i);
+                        continue;
+                    }
+
                     worldPropertiesVariants[val.Value.Code][i] = new VariantEntry() { Code = variants[i].Code.Path };
                 }
             }
@@ -211,8 +217,6 @@ namespace Vintagestory.ServerMods.NoObf
         #region Entities
         void LoadEntities()
         {
-            List<EntityType> entities = new List<EntityType>();
-
             foreach (var val in entityTypes)
             {
                 if (!val.Value.Enabled) continue;
@@ -229,7 +233,7 @@ namespace Vintagestory.ServerMods.NoObf
         {
             List<EntityType> entities = new List<EntityType>();
 
-            List<ResolvedVariant> variants = null;
+            List<ResolvedVariant> variants;
             try
             {
                 variants = GatherVariants(entityType.Code, entityType.VariantGroups, entityType.Code, entityType.AllowedVariants, entityType.SkipVariants);
@@ -316,7 +320,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         void GatherItems(AssetLocation location, ItemType itemType, List<Item> items)
         {
-            List<ResolvedVariant> variants = null;
+            List<ResolvedVariant> variants;
             try
             {
                 variants = GatherVariants(itemType.Code, itemType.VariantGroups, itemType.Code, itemType.AllowedVariants, itemType.SkipVariants);
@@ -573,6 +577,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             block.LightHsv = typedBlockType.LightHsv;
             block.VertexFlags = typedBlockType.VertexFlags?.Clone() ?? new VertexFlags(0);
+            block.Frostable = typedBlockType.Frostable;
             block.Resistance = typedBlockType.Resistance;
             block.BlockMaterial = typedBlockType.BlockMaterial;
             block.Shape = typedBlockType.Shape?.Clone();

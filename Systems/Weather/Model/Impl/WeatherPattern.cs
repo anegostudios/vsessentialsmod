@@ -142,7 +142,7 @@ namespace Vintagestory.GameContent
             State.nowFogBrightness = config.Fog?.FogBrightness?.nextFloat(1, rand) ?? 1;
 
             State.nowBasePrecIntensity = (config.Precipitation?.BaseIntensity?.nextFloat(1, rand) ?? 0);
-            State.nowPrecParticleSize = config.Precipitation?.ParticleSize ?? 1;
+            //State.nowPrecParticleSize = config.Precipitation?.ParticleSize ?? 1;
             //State.nowPrecType = config.Precipitation?.Type ?? EnumPrecipitationType.Auto;*/
 
             /*State.nowNearLightningRate = config.Lightning?.NearRate / 100f ?? 0;

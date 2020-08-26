@@ -71,6 +71,8 @@ namespace Vintagestory.GameContent
             {
                 IClientWorldAccessor clientWorld = entity.World as IClientWorldAccessor;
 
+                if (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) return;
+
                 // We pretend the entity is flying to disable gravity so that EntityBehaviorInterpolatePosition system 
                 // can work better
                 controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId);

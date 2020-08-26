@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Cairo;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
     public class GuiElementMap : GuiElement
     {
-        public List<MapComponent> mapComponents;
+        public List<MapLayer> mapLayers;
         public bool IsDragingMap;
         public float ZoomLevel = 1;
 
@@ -26,15 +21,17 @@ namespace Vintagestory.GameContent
 
         public ICoreClientAPI Api => api;
 
+        bool snapToPlayer;
 
         /// <summary>
         /// In blocks
         /// </summary>
         public Cuboidd CurrentBlockViewBounds = new Cuboidd();
 
-        public GuiElementMap(List<MapComponent> mapComponents, Vec3d centerPos, ICoreClientAPI capi, ElementBounds bounds) : base(capi, bounds)
+        public GuiElementMap(List<MapLayer> mapLayers, ICoreClientAPI capi, ElementBounds bounds, bool snapToPlayer) : base(capi, bounds)
         {
-            this.mapComponents = mapComponents;
+            this.mapLayers = mapLayers;
+            this.snapToPlayer = snapToPlayer;
 
             prevPlayerPos.X = api.World.Player.Entity.Pos.X;
             prevPlayerPos.Z = api.World.Player.Entity.Pos.Z;
@@ -44,14 +41,12 @@ namespace Vintagestory.GameContent
         public override void ComposeElements(Context ctxStatic, ImageSurface surface)
         {
             Bounds.CalcWorldBounds();
-
-            //mapComponents.Clear();
             chunkViewBoundsBefore = new Cuboidi();
 
             BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
             CurrentBlockViewBounds = new Cuboidd(
-                start.X - Bounds.InnerWidth / 2, 0, start.Z - Bounds.InnerHeight / 2, 
-                start.X + Bounds.InnerWidth / 2, 0, start.Z + Bounds.InnerHeight / 2
+                start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel, 
+                start.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ZoomLevel
             );
         }
 
@@ -60,24 +55,9 @@ namespace Vintagestory.GameContent
         {
             api.Render.PushScissor(Bounds);
 
-            for (int i = 0; i < mapComponents.Count; i++)
+            for (int i = 0; i < mapLayers.Count; i++)
             {
-                MapComponent cmp = mapComponents[i];
-
-                if (cmp is MultiChunkMapComponent)
-                {
-                    cmp.Render(this, deltaTime);
-                }
-            }
-
-            for (int i = mapComponents.Count - 1; i >= 0; i--) // Cheap hax to improve rendering quality of the player icons
-            {
-                MapComponent cmp = mapComponents[i];
-
-                if (!(cmp is MultiChunkMapComponent))
-                {
-                    cmp.Render(this, deltaTime);
-                }
+                mapLayers[i].Render(this, deltaTime);
             }
 
             api.Render.PopScissor();
@@ -90,7 +70,23 @@ namespace Vintagestory.GameContent
             base.PostRenderInteractiveElements(deltaTime);
 
             EntityPlayer plr = api.World.Player.Entity;
-            CurrentBlockViewBounds.Translate((plr.Pos.X - prevPlayerPos.X), 0, (plr.Pos.Z - prevPlayerPos.Z));
+            double diffx = plr.Pos.X - prevPlayerPos.X;
+            double diffz = plr.Pos.Z - prevPlayerPos.Z;
+
+            if (Math.Abs(diffx) > 0.0002 || Math.Abs(diffz) > 0.0002)
+            {
+                if (snapToPlayer)
+                {
+                    var start = api.World.Player.Entity.Pos;
+                    CurrentBlockViewBounds.X1 = start.X - Bounds.InnerWidth / 2 / ZoomLevel;
+                    CurrentBlockViewBounds.Z1 = start.Z - Bounds.InnerHeight / 2 / ZoomLevel;
+                    CurrentBlockViewBounds.X2 = start.X + Bounds.InnerWidth / 2 / ZoomLevel;
+                    CurrentBlockViewBounds.Z2 = start.Z + Bounds.InnerHeight / 2 / ZoomLevel; 
+                } else
+                {
+                    CurrentBlockViewBounds.Translate(diffx, 0, diffz);
+                }
+            }
 
             prevPlayerPos.Set(plr.Pos.X, plr.Pos.Y, plr.Pos.Z);
 
@@ -250,15 +246,6 @@ namespace Vintagestory.GameContent
         }
 
 
-        internal void AddMapComponent(MapComponent cmp)
-        {
-            mapComponents.Add(cmp);
-        }
-
-        internal bool RemoveMapComponent(MapComponent cmp)
-        {
-            return mapComponents.Remove(cmp);
-        }
 
         public override void Dispose()
         {

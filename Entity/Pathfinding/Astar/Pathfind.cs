@@ -28,7 +28,7 @@ namespace Vintagestory.Essentials
 
         public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox)
         {
-            return astar.FindPath(start, end, maxFallHeight, stepHeight, entityCollBox);
+            return astar.FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, 9999, true);
         }
 
         public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, bool allowReachAlmost = false)

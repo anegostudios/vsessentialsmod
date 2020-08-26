@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -59,6 +60,11 @@ namespace Vintagestory.GameContent
         }
         
         public virtual void OnOffThreadTick(float dt)
+        {
+
+        }
+
+        public virtual void OnTick(float dt)
         {
 
         }
@@ -128,6 +134,20 @@ namespace Vintagestory.GameContent
         public virtual void OnShutDown()
         {
             
+        }
+
+        public virtual void Render(GuiElementMap mapElem, float dt)
+        {
+
+        }
+
+        public virtual void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
+        {
+            
+        }
+
+        public virtual void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
+        {
         }
     }
 

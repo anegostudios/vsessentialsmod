@@ -14,46 +14,54 @@ namespace Vintagestory.GameContent
         {
         }
 
+        
+
         public double GetBlendedCloudBrightness(Vec3d pos, float bMul = 1)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetBlendedCloudBrightness(bMul);
         }
 
         public double GetBlendedCloudOpaqueness(Vec3d pos)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetBlendedCloudOpaqueness();
         }
 
         public double GetBlendedCloudThicknessAt(Vec3d pos, int cloudTileX, int cloudTileZ)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetBlendedCloudThicknessAt(cloudTileX, cloudTileZ);
         }
 
         public double GetBlendedThinCloudModeness(Vec3d pos)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetBlendedThinCloudModeness();
         }
 
         public double GetBlendedUndulatingCloudModeness(Vec3d pos)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetBlendedUndulatingCloudModeness();
         }
 
         public double GetWindSpeed(Vec3d pos)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
 
             return pgetWindSpeed(pos.Y);
+        }
+
+        public EnumPrecipitationType GetPrecType(Vec3d pos)
+        {
+            LoadAdjacentSimsAndLerpValues(pos, false);
+            return pgGetPrecType();
         }
     }
 
@@ -65,13 +73,13 @@ namespace Vintagestory.GameContent
 
         public void LoadAdjacentSimsAndLerpValues(Vec3d pos)
         {
-            loadAdjacentSimsAndLerpValues(pos);
+            LoadAdjacentSimsAndLerpValues(pos, false);
         }
 
 
         public void LoadLerp(Vec3d pos)
         {
-            loadLerp(pos);
+            LoadLerp(pos, false);
         }
 
         public void UpdateAdjacentAndBlendWeatherData()
@@ -156,7 +164,8 @@ namespace Vintagestory.GameContent
             AdjacentSims[3] = ws.dummySim;
         }
 
-        protected void loadAdjacentSimsAndLerpValues(Vec3d pos)
+
+        public void LoadAdjacentSims(Vec3d pos)
         {
             int regSize = api.World.BlockAccessor.RegionSize;
 
@@ -188,25 +197,29 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
+        }
 
-            loadLerp(pos);
+        public void LoadAdjacentSimsAndLerpValues(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0)
+        {
+            LoadAdjacentSims(pos);
+            LoadLerp(pos, useArgValues, lerpRainCloudOverlay, lerpRainOverlay);
         }
 
 
-        float lerpRainCloudOverlay;
-        float lerpRainOverlay;
+        public float lerpRainCloudOverlay;
+        public float lerpRainOverlay;
         BlockPos tmpPos = new BlockPos();
         IMapRegion hereMapRegion;
 
-        protected void loadLerp(Vec3d pos)
+        public void LoadLerp(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0)
         {
             int regSize = api.World.BlockAccessor.RegionSize;
 
-            double plrRegionRelX = (pos.X / regSize) - (int)Math.Round(pos.X / regSize);
-            double plrRegionRelZ = (pos.Z / regSize) - (int)Math.Round(pos.Z / regSize);
+            double regionRelX = (pos.X / regSize) - (int)Math.Round(pos.X / regSize);
+            double regionRelZ = (pos.Z / regSize) - (int)Math.Round(pos.Z / regSize);
 
-            LerpTopBot = GameMath.Smootherstep(plrRegionRelX + 0.5);
-            LerpLeftRight = GameMath.Smootherstep(plrRegionRelZ + 0.5);
+            LerpTopBot = GameMath.Smootherstep(regionRelX + 0.5);
+            LerpLeftRight = GameMath.Smootherstep(regionRelZ + 0.5);
 
             rainOverlayData = ws.rainOverlayPattern;
             rainSnapData = ws.rainOverlaySnap;
@@ -214,22 +227,34 @@ namespace Vintagestory.GameContent
 
             if (hereMapRegion == null)
             {
-                lerpRainCloudOverlay = 0;
-                lerpRainOverlay = 0;
+                this.lerpRainCloudOverlay = 0;
+                this.lerpRainOverlay = 0;
             }
             else
             {
-                tmpPos.Set((int)pos.X, (int)pos.Y, (int)pos.Z);
+                if (useArgValues)
+                {
+                    this.lerpRainCloudOverlay = lerpRainCloudOverlay;
+                    this.lerpRainOverlay = lerpRainOverlay;
+                }
+                else
+                {
+                    tmpPos.Set((int)pos.X, (int)pos.Y, (int)pos.Z);
 
-                int noiseSizeClimate = hereMapRegion.ClimateMap.InnerSize;
-                double posXInRegionClimate = (pos.X / regSize - pos.X / regSize) * noiseSizeClimate;
-                double posZInRegionClimate = (pos.Z / regSize - pos.Z / regSize) * noiseSizeClimate;
-                int climate = hereMapRegion.ClimateMap.GetUnpaddedColorLerped((float)posXInRegionClimate, (float)posZInRegionClimate);
-                
+                    int noiseSizeClimate = hereMapRegion.ClimateMap.InnerSize;
+                    int climate = 128 | (128 << 8) | (128 << 16);
 
-                ClimateCondition conds = ws.GetClimateFast(tmpPos, climate);
-                lerpRainCloudOverlay = conds.RainCloudOverlay;
-                lerpRainOverlay = conds.Rainfall;
+                    if (noiseSizeClimate > 0)
+                    {
+                        double posXInRegionClimate = Math.Max(0, (pos.X / regSize - (int)pos.X / regSize) * noiseSizeClimate);
+                        double posZInRegionClimate = Math.Max(0, (pos.Z / regSize - (int)pos.Z / regSize) * noiseSizeClimate);
+                        climate = hereMapRegion.ClimateMap.GetUnpaddedColorLerped((float)posXInRegionClimate, (float)posZInRegionClimate);
+                    }
+
+                    ClimateCondition conds = ws.GetClimateFast(tmpPos, climate);
+                    this.lerpRainCloudOverlay = conds.RainCloudOverlay;
+                    this.lerpRainOverlay = conds.Rainfall;
+                }
             }
         }
 
@@ -245,7 +270,7 @@ namespace Vintagestory.GameContent
             blendedWeatherDataNoPrec.SetLerped(topBlendedWeatherData, botBlendedWeatherData, (float)LerpTopBot);
             blendedWeatherDataNoPrec.Ambient.CloudBrightness.Weight = 0;
 
-            BlendedWeatherData.SetLerped(blendedWeatherDataNoPrec, rainSnapData, lerpRainOverlay);
+            BlendedWeatherData.SetLerpedPrec(blendedWeatherDataNoPrec, rainSnapData, lerpRainOverlay);
         }
 
         protected void ensureCloudTileCacheIsFresh(Vec3i tilePos)
@@ -256,6 +281,16 @@ namespace Vintagestory.GameContent
             AdjacentSims[3].EnsureCloudTileCacheIsFresh(tilePos);
         }
 
+
+        protected EnumPrecipitationType pgGetPrecType()
+        {
+            if (LerpTopBot <= 0.5f)
+            {
+                return LerpLeftRight <= 0.5 ? AdjacentSims[0].GetPrecipitationType() : AdjacentSims[1].GetPrecipitationType();
+            }
+
+            return LerpLeftRight <= 0.5 ? AdjacentSims[2].GetPrecipitationType() : AdjacentSims[3].GetPrecipitationType();
+        }
 
         protected double pgetWindSpeed(double posY)
         {

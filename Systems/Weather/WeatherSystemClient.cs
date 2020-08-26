@@ -23,12 +23,12 @@ namespace Vintagestory.GameContent
 
         public bool haveLevelFinalize;
 
-        
 
-        protected WeatherSimulationSound simSounds;
-        protected WeatherSimulationParticles simParticles;
-        protected WeatherSimulationLightning simLightning;
-        protected AuroraRenderer auroraRenderer;
+
+        public WeatherSimulationSound simSounds;
+        public WeatherSimulationParticles simParticles;
+        public WeatherSimulationLightning simLightning;
+        public AuroraRenderer auroraRenderer;
 
         
 
@@ -53,6 +53,7 @@ namespace Vintagestory.GameContent
                  capi.Network.GetChannel("weather")
                 .SetMessageHandler<WeatherState>(OnWeatherUpdatePacket)
                 .SetMessageHandler<WeatherConfigPacket>(OnWeatherConfigUpdatePacket)
+                .SetMessageHandler<WeatherPatternAssetsPacket>(OnAssetsPacket)
              ;
 
             capi.Event.RegisterGameTickListener(OnClientGameTick, 50);
@@ -68,6 +69,22 @@ namespace Vintagestory.GameContent
             simParticles = new WeatherSimulationParticles(capi as ICoreClientAPI, this);
             simLightning = new WeatherSimulationLightning(capi as ICoreClientAPI, this);
             auroraRenderer = new AuroraRenderer(capi as ICoreClientAPI, this);
+        }
+
+        private void OnAssetsPacket(WeatherPatternAssetsPacket networkMessage)
+        {
+            WeatherPatternAssets p = JsonUtil.FromString<WeatherPatternAssets>(networkMessage.Data);
+            this.GeneralConfig = p.GeneralConfig;
+            this.GeneralConfig.Init(api.World);
+
+            this.WeatherConfigs = p.WeatherConfigs;
+            this.WindConfigs = p.WindConfigs;
+            this.WeatherEventConfigs = p.WeatherEventConfigs;
+
+            foreach (var val in weatherSimByMapRegion)
+            {
+                val.Value.ReloadPatterns(api.World.Seed);
+            }
         }
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
@@ -103,7 +120,8 @@ namespace Vintagestory.GameContent
                 dt = Math.Min(0.5f, dt);
 
                 // Windspeed should be stored inside ClimateConditions and not be a global constant
-                GlobalConstants.CurrentWindSpeedClient.X += ((float)WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y) - GlobalConstants.CurrentWindSpeedClient.X) * dt;
+                double windspeed = WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
+                GlobalConstants.CurrentWindSpeedClient.X += ((float)windspeed - GlobalConstants.CurrentWindSpeedClient.X) * dt;
 
                 capi.Ambient.CurrentModifiers["weather"] = WeatherDataAtPlayer.BlendedWeatherData.Ambient;
             }
@@ -169,7 +187,7 @@ namespace Vintagestory.GameContent
 
             if (msg.updateInstant)
             {
-                ReloadConfigs();
+//                ReloadConfigs();
                 weatherSim.ReloadPatterns(api.World.Seed);
 
                 for (int i = 0; i < weatherSim.WeatherPatterns.Length; i++)
@@ -191,6 +209,9 @@ namespace Vintagestory.GameContent
             //bool windChanged = weatherSim.CurWindPattern.State.Index != msg.WindPattern.Index;
             weatherSim.CurWindPattern = weatherSim.WindPatterns[msg.WindPattern.Index];
             weatherSim.CurWindPattern.State = msg.WindPattern;
+
+            weatherSim.CurWeatherEvent = weatherSim.WeatherEvents[msg.WeatherEvent.Index];
+            weatherSim.CurWeatherEvent.State = msg.WeatherEvent;
 
             if (msg.updateInstant)
             {
@@ -260,5 +281,7 @@ namespace Vintagestory.GameContent
         {
             get { return capi.Ambient.BlendedCloudYPos; }
         }
+
+        
     }
 }

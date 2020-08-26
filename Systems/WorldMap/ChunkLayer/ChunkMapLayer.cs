@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,13 +23,13 @@ namespace Vintagestory.GameContent
 
     public class ChunkMapLayer : RGBMapLayer
     {
-        int[] texDataTmp;
+        
         int chunksize;
         IWorldChunk[] chunksTmp;
 
         object chunksToGenLock = new object();
         UniqueQueue<Vec2i> chunksToGen = new UniqueQueue<Vec2i>();
-        Dictionary<Vec2i, MultiChunkMapComponent> loadedMapData = new Dictionary<Vec2i, MultiChunkMapComponent>();
+        ConcurrentDictionary<Vec2i, MultiChunkMapComponent> loadedMapData = new ConcurrentDictionary<Vec2i, MultiChunkMapComponent>();
         HashSet<Vec2i> curVisibleChunks = new HashSet<Vec2i>();
 
         public override MapLegendItem[] LegendItems => throw new NotImplementedException();
@@ -50,13 +51,19 @@ namespace Vintagestory.GameContent
         }
 
 
+        
+
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
             
+
             if (api.Side == EnumAppSide.Server)
             {
                 (api as ICoreServerAPI).Event.DidPlaceBlock += Event_DidPlaceBlock;
+            } else
+            {
+                (api as ICoreClientAPI).RegisterCommand("map", "world map stuff", "", onMapCmd);
             }
 
             if (api.Side == EnumAppSide.Client)
@@ -68,6 +75,35 @@ namespace Vintagestory.GameContent
                 if (errorMessage != null)
                 {
                     throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
+                }
+            }
+        }
+
+        private void onMapCmd(int groupId, CmdArgs args)
+        {
+            string cmd = args.PopWord();
+            ICoreClientAPI capi = api as ICoreClientAPI;
+
+            if (cmd == "purgedb")
+            {
+                mapdb.Purge();
+                capi.ShowChatMessage("Ok, db purged");
+            }
+
+            if (cmd == "redraw")
+            {
+                foreach (MultiChunkMapComponent cmp in loadedMapData.Values)
+                {
+                    cmp.ActuallyDispose();
+                }
+                loadedMapData.Clear();
+
+                lock (chunksToGenLock)
+                {
+                    foreach (Vec2i cord in curVisibleChunks)
+                    {
+                        chunksToGen.Enqueue(cord.Copy());
+                    }
                 }
             }
         }
@@ -104,33 +140,40 @@ namespace Vintagestory.GameContent
 
         private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
-            if (reason == EnumChunkDirtyReason.NewlyCreated || !mapSink.IsOpened) return;
-
-            tmpMccoord.Set(chunkCoord.X / MultiChunkMapComponent.ChunkLen, chunkCoord.Z / MultiChunkMapComponent.ChunkLen);
-            tmpCoord.Set(chunkCoord.X, chunkCoord.Z);
-            if (!loadedMapData.ContainsKey(tmpCoord) && !curVisibleChunks.Contains(tmpMccoord)) return;
+            //api.Logger.Notification("NowDirty @{0}/{1}", chunkCoord.X, chunkCoord.Z);
 
             lock (chunksToGenLock)
             {
+                if (!mapSink.IsOpened) return;
+
+                tmpMccoord.Set(chunkCoord.X / MultiChunkMapComponent.ChunkLen, chunkCoord.Z / MultiChunkMapComponent.ChunkLen);
+                tmpCoord.Set(chunkCoord.X, chunkCoord.Z);
+
+                if (!loadedMapData.ContainsKey(tmpMccoord) && !curVisibleChunks.Contains(tmpCoord)) return;
+
                 chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z));
+                chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z - 1));
+                chunksToGen.Enqueue(new Vec2i(chunkCoord.X - 1, chunkCoord.Z));
+                chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z + 1));
+                chunksToGen.Enqueue(new Vec2i(chunkCoord.X + 1, chunkCoord.Z + 1));
             }
         }
 
         public override void OnLoaded()
         {
             chunksize = api.World.BlockAccessor.ChunkSize;
-            texDataTmp = new int[chunksize * chunksize];
+            
             chunksTmp = new IWorldChunk[api.World.BlockAccessor.MapSizeY / chunksize];
+        }
+
+        public override void OnMapOpenedClient()
+        {
+
         }
 
         public override void OnMapClosedClient()
         {
-            foreach (MapComponent cmp in loadedMapData.Values)
-            {
-                cmp.Dispose();
-            }
 
-            loadedMapData.Clear();
             lock (chunksToGenLock)
             {
                 chunksToGen.Clear();
@@ -143,11 +186,13 @@ namespace Vintagestory.GameContent
         {
             if (loadedMapData != null)
             {
-                foreach (MapComponent cmp in loadedMapData.Values)
+                foreach (MultiChunkMapComponent cmp in loadedMapData.Values)
                 {
-                    cmp?.Dispose();
+                    cmp?.ActuallyDispose();
                 }
             }
+
+            MultiChunkMapComponent.DisposeStatic();
 
             base.Dispose();
         }
@@ -158,11 +203,18 @@ namespace Vintagestory.GameContent
             mapdb?.Dispose();
         }
 
-        float accum = 0f;
+        float mtThread1secAccum = 0f;
 
+        float genAccum = 0f;
+        float diskSaveAccum = 0f;
+        Dictionary<Vec2i, MapPieceDB> toSaveList = new Dictionary<Vec2i, MapPieceDB>();
 
         public override void OnOffThreadTick(float dt)
         {
+            genAccum += dt;
+            if (genAccum < 0.1) return;
+            genAccum = 0;
+
             int quantityToGen = chunksToGen.Count;
             while (quantityToGen > 0)
             {
@@ -180,6 +232,7 @@ namespace Vintagestory.GameContent
                 IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord);
                 if (mc == null)
                 {
+                    //api.Logger.Notification("From DB @{0}/{1}", cord.X, cord.Y);
                     MapPieceDB piece = mapdb.GetMapPiece(cord);
                     if (piece?.Pixels != null)
                     {
@@ -189,6 +242,8 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
+                //api.Logger.Notification("Genpixels @{0}/{1}", cord.X, cord.Y);
+
                 int[] pixels = (int[])GenerateChunkImage(cord, mc)?.Clone();
 
                 if (pixels == null)
@@ -197,63 +252,165 @@ namespace Vintagestory.GameContent
                     {
                         chunksToGen.Enqueue(cord);
                     }
+
                     continue;
                 }
 
-                mapdb.SetMapPiece(cord, new MapPieceDB() { Pixels = pixels });
+                toSaveList[cord.Copy()] = new MapPieceDB() { Pixels = pixels };
 
-                loadFromChunkPixels(cord, pixels);
+
+                /// North: Negative Z
+                /// East: Positive X
+                /// South: Positive Z
+                /// West: Negative X
+                /*bool north = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X, cord.Y - 1, chunkmapSizeX));
+                bool east = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X + 1, cord.Y, chunkmapSizeX));
+                bool south = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X, cord.Y + 1, chunkmapSizeX));
+                bool west = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X - 1, cord.Y, chunkmapSizeX));*/
+
+                loadFromChunkPixels(cord, pixels/*, (north ? 1 : 0 ) | (east ? 2 : 0) | (south ? 4 : 0) | (west ? 8 : 0)*/);
             }
 
-
-            accum += dt;
-            if (accum > 1)
+            if (toSaveList.Count > 100 || diskSaveAccum > 4f)
             {
+                diskSaveAccum = 0;
+                mapdb.SetMapPieces(toSaveList);
+                toSaveList.Clear();
+            }
+        }
+
+
+
+        public override void OnTick(float dt)
+        {
+            mtThread1secAccum += dt;
+            if (mtThread1secAccum > 1)
+            {
+                List<Vec2i> toRemove = new List<Vec2i>();
+
                 foreach (var val in loadedMapData)
                 {
                     MultiChunkMapComponent mcmp = val.Value;
 
-                    if (!mcmp.AnyChunkSet)
+                    if (!mcmp.AnyChunkSet || !mcmp.IsVisible(curVisibleChunks))
                     {
                         mcmp.TTL -= 1;
 
                         if (mcmp.TTL <= 0)
                         {
                             Vec2i mccord = val.Key;
-
-                            api.Event.EnqueueMainThreadTask(() =>
-                            {
-                                if (!mcmp.AnyChunkSet)
-                                {
-                                    mapSink.RemoveMapData(mcmp);
-                                    loadedMapData.Remove(mccord);
-                                    mcmp.Dispose();
-                                }
-                            }, "disposemcmcp");
+                            toRemove.Add(mccord);
+                            mcmp.ActuallyDispose();
                         }
-                    } else
+                    }
+                    else
                     {
                         mcmp.TTL = MultiChunkMapComponent.MaxTTL;
                     }
                 }
 
-                accum = 0;
+                foreach (var val in toRemove)
+                {
+                    loadedMapData.TryRemove(val, out _);
+                }
+
+                mtThread1secAccum = 0;
             }
         }
 
-
-        void loadFromChunkPixels(Vec2i cord, int[] pixels)
+        public override void Render(GuiElementMap mapElem, float dt)
         {
+            foreach (var val in loadedMapData)
+            {
+                val.Value.Render(mapElem, dt);
+            }
+        }
+
+        public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
+        {
+            foreach (var val in loadedMapData)
+            {
+                val.Value.OnMouseMove(args, mapElem, hoverText);
+            }
+        }
+
+        public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
+        {
+            foreach (var val in loadedMapData)
+            {
+                val.Value.OnMouseUpOnElement(args, mapElem);
+            }
+        }
+
+        void loadFromChunkPixels(Vec2i cord, int[] pixels/*, int sideSepia*/)
+        {
+            /*if (sideSepia == 255)
+            {
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    int pixel = pixels[i];
+                    int r = pixel & 0xff;
+                    int g = (pixel >> 8) & 0xff;
+                    int b = (pixel >> 16) & 0xff;
+
+                    // Sepia
+                    byte rs = (byte)Math.Min(255, (r * 0.393f) + (g * 0.769f) + (b * 0.189f));
+                    byte gs = (byte)Math.Min(255, (r * 0.349f) + (g * 0.686f) + (b * 0.168f));
+                    byte bs = (byte)Math.Min(255, (r * 0.272f) + (g * 0.534f) + (b * 0.131f));
+
+                    pixels[i] = (rs) | (gs << 8) | (bs << 16) | (255 << 24);
+                }
+            }
+            else if (sideSepia != 0)
+            {
+                bool northSepia = (sideSepia & 1) > 0;
+                bool eastSepia = (sideSepia & 2) > 0;
+                bool southSepia = (sideSepia & 4) > 0;
+                bool westSepia = (sideSepia & 8) > 0;
+
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    int pixel = pixels[i];
+                    int r = pixel & 0xff;
+                    int g = (pixel >> 8) & 0xff;
+                    int b = (pixel >> 16) & 0xff;
+
+                    int x = i % chunksize;
+                    int z = i / chunksize;
+
+                    int rnd = GameMath.MurmurHash3Mod(x, 0, z, chunksize / 2);
+
+                    /// North: Negative Z
+                    /// East: Positive X
+                    /// South: Positive Z
+                    /// West: Negative X
+                    bool sepia =
+                        northSepia && rnd > z ||
+                        eastSepia && rnd > chunksize - x ||
+                        southSepia && rnd > chunksize - z ||
+                        westSepia && rnd > x
+                    ;
+
+                    if (!sepia) continue;
+
+                    // Sepia
+                    byte rs = (byte)Math.Min(255, (r * 0.393f) + (g * 0.769f) + (b * 0.189f));
+                    byte gs = (byte)Math.Min(255, (r * 0.349f) + (g * 0.686f) + (b * 0.168f));
+                    byte bs = (byte)Math.Min(255, (r * 0.272f) + (g * 0.534f) + (b * 0.131f));
+
+                    pixels[i] = (rs) | (gs << 8) | (bs << 16) | (255 << 24);
+                }
+            }*/
+
+            Vec2i mcord = new Vec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+            Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
+
             api.Event.EnqueueMainThreadTask(() =>
             {
-                Vec2i mcord = new Vec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
-                Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
-
                 MultiChunkMapComponent mccomp;
                 if (!loadedMapData.TryGetValue(mcord, out mccomp))
                 {
                     loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
-                    mapSink.AddMapData(mccomp);
                 }
 
                 mccomp.setChunk(cord.X - baseCord.X, cord.Y - baseCord.Y, pixels);
@@ -280,14 +437,20 @@ namespace Vintagestory.GameContent
                 foreach (Vec2i cord in nowVisible)
                 {
                     tmpMccoord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+
                     MultiChunkMapComponent mcomp;
+
+                    int dx = cord.X % MultiChunkMapComponent.ChunkLen;
+                    int dz = cord.Y % MultiChunkMapComponent.ChunkLen;
+                    if (dx < 0 || dz < 0) continue;
 
                     if (loadedMapData.TryGetValue(tmpMccoord, out mcomp))
                     {
-                        int dx = cord.X % MultiChunkMapComponent.ChunkLen;
-                        int dz = cord.Y % MultiChunkMapComponent.ChunkLen;
                         if (mcomp.IsChunkSet(dx, dz)) continue;
                     }
+
+                    //api.Logger.Notification("Now Visible @{0}/{1}", cord.X, cord.Y);
+
 
                     chunksToGen.Enqueue(cord.Copy());
                 }
@@ -310,9 +473,11 @@ namespace Vintagestory.GameContent
         
 
 
-        public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc)
+        public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, bool withSnow = true)
         {
             ICoreClientAPI capi = api as ICoreClientAPI;
+
+            //capi.Logger.Notification("GenImg @{0}/{1}", chunkPos.X, chunkPos.Y);
 
             BlockPos tmpPos = new BlockPos();
             Vec2i localpos = new Vec2i();
@@ -332,8 +497,7 @@ namespace Vintagestory.GameContent
                 capi.World.BlockAccessor.GetMapChunk(chunkPos.X, chunkPos.Y - 1)            
             };
 
-            //  bool didRegen = false;
-
+            int[] texDataTmp = new int[chunksize * chunksize];
             for (int i = 0; i < texDataTmp.Length; i++)
             {
                 int y = mc.RainHeightMap[i];
@@ -390,6 +554,20 @@ namespace Vintagestory.GameContent
                 chunksTmp[cy].Unpack();
                 int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
                 Block block = api.World.Blocks[blockId];
+
+                /*if (i == 0)
+                {
+                    capi.Logger.Notification("GenImg @{0}/{1}, first block is {2}", chunkPos.X, chunkPos.Y, block.Code);
+                }*/
+
+                if (!withSnow && block.BlockMaterial == EnumBlockMaterial.Snow)
+                {
+                    y--;
+                    cy = y / chunksize;
+                    chunksTmp[cy].Unpack();
+                    blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
+                    block = api.World.Blocks[blockId];
+                }
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
 

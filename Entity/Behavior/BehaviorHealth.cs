@@ -137,7 +137,7 @@ namespace Vintagestory.GameContent
                     WeatherSystemBase wsys = entity.Api.ModLoader.GetModSystem<WeatherSystemBase>();
                     var state = wsys.GetPrecipitationState(entity.ServerPos.XYZ);
 
-                    if (state != null && state.ParticleSize > 0.8 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level/2)
+                    if (state != null && state.ParticleSize > 0.6 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level/2)
                     {
                         entity.ReceiveDamage(new DamageSource()
                         {

@@ -74,7 +74,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BlockBehavior\BehaviorClearSnowAccumOnRemove.cs" />
     <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
     <Compile Include="BlockEntityRenderer\BEAnimatableRenderer.cs" />
     <Compile Include="BlockEntity\BEGeneric.cs" />
@@ -151,7 +150,9 @@
     <Compile Include="Loading\LoadColorMaps.cs" />
     <Compile Include="Systems\Weather\Map\MapLayerWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Map\NoiseWeatherPattern.cs" />
-    <Compile Include="Systems\Weather\WeatherEvent.cs" />
+    <Compile Include="Systems\Weather\Model\Impl\WeatherEvent.cs" />
+    <Compile Include="Systems\Weather\Model\WeatherEventConfig.cs" />
+    <Compile Include="Systems\Weather\Model\ConditionalPatternConfig.cs" />
     <Compile Include="Systems\Weather\WeatherDataReader.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationSnowAccum.cs" />
     <Compile Include="Systems\Weather\WeatherSystemConfig.cs" />
@@ -189,18 +190,18 @@
     <Compile Include="Systems\Weather\CloudTile.cs" />
     <Compile Include="Systems\Weather\WeatherCommands.cs" />
     <Compile Include="Systems\Weather\WeatherDataSnapshot.cs" />
-    <Compile Include="Systems\Weather\WeatherPatternConfig.cs" />
+    <Compile Include="Systems\Weather\Model\WeatherPatternConfig.cs" />
     <Compile Include="Systems\Weather\WeatherState.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationLightning.cs" />
     <Compile Include="Systems\Weather\WeatherSystemBase.cs" />
     <Compile Include="Systems\Weather\WeatherSystemClient.cs" />
     <Compile Include="Systems\Weather\WeatherSystemServer.cs" />
-    <Compile Include="Systems\Weather\WeatherPattern.cs" />
+    <Compile Include="Systems\Weather\Model\Impl\WeatherPattern.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationRegion.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationParticles.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationSound.cs" />
-    <Compile Include="Systems\Weather\WindPattern.cs" />
-    <Compile Include="Systems\Weather\WindPatternConfig.cs" />
+    <Compile Include="Systems\Weather\Model\Impl\WindPattern.cs" />
+    <Compile Include="Systems\Weather\Model\WindPatternConfig.cs" />
     <Compile Include="Systems\WorldMap\ChunkLayer\ChunkMapLayer.cs" />
     <Compile Include="Systems\WorldMap\IMapDataSink.cs" />
     <Compile Include="Systems\WorldMap\ChunkLayer\MultiChunkMapComponent.cs" />
@@ -225,6 +226,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="BlockBehavior\" />
     <Folder Include="Entity\AI\Goal-Action\Goals\" />
     <Folder Include="Entity\AI\Goap\ActionImpl\" />
     <Folder Include="Entity\AI\Goap\GoalImpl\" />

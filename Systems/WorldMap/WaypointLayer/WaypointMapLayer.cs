@@ -313,12 +313,7 @@ namespace Vintagestory.GameContent
         
         public override void OnMapOpenedClient()
         {
-            bool rebuildAnyway = false;
-#if DEBUG
-            rebuildAnyway = true;
-#endif
-
-            if (texturesByIcon == null || rebuildAnyway)
+            if (texturesByIcon == null)
             {
                 if (texturesByIcon != null)
                 {
@@ -366,14 +361,6 @@ namespace Vintagestory.GameContent
 
         public override void OnMapClosedClient()
         {
-            if (texturesByIcon != null)
-            {
-                foreach (var val in texturesByIcon)
-                {
-                    val.Value.Dispose();
-                }
-            }
-            texturesByIcon = null;
         }
 
         public override void Dispose()
@@ -434,7 +421,6 @@ namespace Vintagestory.GameContent
 
             foreach (WaypointMapComponent comp in wayPointComponents)
             {
-                mapSink.RemoveMapData(comp);
                 comp.Dispose();
             }
 
@@ -445,7 +431,31 @@ namespace Vintagestory.GameContent
                 WaypointMapComponent comp = new WaypointMapComponent(i, ownWaypoints[i], this, api as ICoreClientAPI);  
 
                 wayPointComponents.Add(comp);
-                mapSink.AddMapData(comp);
+            }
+        }
+
+
+        public override void Render(GuiElementMap mapElem, float dt)
+        {
+            foreach (var val in wayPointComponents)
+            {
+                val.Render(mapElem, dt);
+            }
+        }
+
+        public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
+        {
+            foreach (var val in wayPointComponents)
+            {
+                val.OnMouseMove(args, mapElem, hoverText);
+            }
+        }
+
+        public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
+        {
+            foreach (var val in wayPointComponents)
+            {
+                val.OnMouseUpOnElement(args, mapElem);
             }
         }
 

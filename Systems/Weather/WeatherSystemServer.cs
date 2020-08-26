@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -16,6 +17,8 @@ namespace Vintagestory.GameContent
         
         internal WeatherSimulationSnowAccum snowSimSnowAccu;
 
+        protected WeatherPatternAssetsPacket packetForClient;
+
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -26,6 +29,7 @@ namespace Vintagestory.GameContent
         public override void StartServerSide(ICoreServerAPI api)
         {
             this.sapi = api;
+            LoadConfigs();
 
             serverChannel = api.Network.GetChannel("weather");
 
@@ -33,11 +37,76 @@ namespace Vintagestory.GameContent
             sapi.Event.GameWorldSave += OnSaveGameSaving;
             sapi.Event.SaveGameLoaded += Event_SaveGameLoaded;
             sapi.Event.OnGetClimate += Event_OnGetClimate;
-            
-           
+            sapi.Event.PlayerJoin += Event_PlayerJoin;
+
+
             snowSimSnowAccu = new WeatherSimulationSnowAccum(sapi, this);
         }
 
+
+        public void ReloadConfigs()
+        {
+            api.Assets.Reload(new AssetLocation("config/"));
+            LoadConfigs(true);
+
+            foreach (var val in sapi.World.AllOnlinePlayers)
+            {
+                serverChannel.SendPacket(packetForClient, val as IServerPlayer);
+            }
+        }
+
+        public void LoadConfigs(bool isReload = false)
+        {
+            // Thread safe assignment
+            var nowconfig = api.Assets.Get<WeatherSystemConfig>(new AssetLocation("config/weather.json"));
+            if (isReload) nowconfig.Init(api.World);
+
+            GeneralConfig = nowconfig;
+
+            var dictWeatherPatterns = api.Assets.GetMany<WeatherPatternConfig[]>(api.World.Logger, "config/weatherpatterns/");
+            var orderedWeatherPatterns = dictWeatherPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
+
+            WeatherConfigs = new WeatherPatternConfig[0];
+            foreach (var val in orderedWeatherPatterns)
+            {
+                WeatherConfigs = WeatherConfigs.Append(val);
+            }
+
+            var dictWindPatterns = api.Assets.GetMany<WindPatternConfig[]>(api.World.Logger, "config/windpatterns/");
+            var orderedWindPatterns = dictWindPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
+
+            WindConfigs = new WindPatternConfig[0];
+            foreach (var val in orderedWindPatterns)
+            {
+                WindConfigs = WindConfigs.Append(val);
+            }
+
+            var dictweatherEventConfigs = api.Assets.GetMany<WeatherEventConfig[]>(api.World.Logger, "config/weatherevents/");
+            var orderedweatherEventConfigs = dictweatherEventConfigs.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
+
+            WeatherEventConfigs = new WeatherEventConfig[0];
+            foreach (var val in orderedweatherEventConfigs)
+            {
+                WeatherEventConfigs = WeatherEventConfigs.Append(val);
+            }
+
+            api.World.Logger.Notification("Reloaded {0} weather patterns, {1} wind patterns and {2} weather events", WeatherConfigs.Length, WindConfigs.Length, WeatherEventConfigs.Length);
+
+            WeatherPatternAssets p = new WeatherPatternAssets()
+            {
+                GeneralConfig = GeneralConfig,
+                WeatherConfigs = WeatherConfigs,
+                WindConfigs = WindConfigs,
+                WeatherEventConfigs = WeatherEventConfigs
+            };
+
+            packetForClient = new WeatherPatternAssetsPacket() { Data = JsonUtil.ToString(p) };
+        }
+
+        private void Event_PlayerJoin(IServerPlayer byPlayer)
+        {
+            serverChannel.SendPacket(packetForClient, byPlayer);
+        }
 
         private void Event_SaveGameLoaded()
         {
@@ -71,9 +140,6 @@ namespace Vintagestory.GameContent
             }
         }
 
-
-        object updateSnowlayerQueueLock = new object();
-        Dictionary<BlockPos, Block> updateSnowLayerQueue = new Dictionary<BlockPos, Block>();
 
 
         private void OnServerGameTick(float dt)

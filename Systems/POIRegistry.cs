@@ -69,7 +69,7 @@ namespace Vintagestory.GameContent
             
             for (int cx = mincx; cx < maxcx; cx++)
             {
-                for (int cz = mincx; cz < maxcz; cz++)
+                for (int cz = mincz; cz < maxcz; cz++)
                 {
                     List<IPointOfInterest> pois = null;
                     tmp.Set(cx, cz);

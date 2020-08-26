@@ -21,7 +21,7 @@ namespace Vintagestory.Essentials
         public AStar(ICoreServerAPI api)
         {
             this.api = api;
-            blockAccess = api.WorldManager.GetCachingBlockAccessor(true, true);
+            blockAccess = api.World.GetCachingBlockAccessor(true, true);
         }
 
         HashSet<PathNode> openSet = new HashSet<PathNode>();
@@ -67,7 +67,7 @@ namespace Vintagestory.Essentials
                 closedSet.Add(nearestNode);
 
 
-                if (nearestNode == targetNode || (allowReachAlmost && Math.Abs(nearestNode.X - targetNode.X) <= 1 && Math.Abs(nearestNode.Z - targetNode.Z) <= 1 && nearestNode.Y == targetNode.Y))
+                if (nearestNode == targetNode || (allowReachAlmost && Math.Abs(nearestNode.X - targetNode.X) <= 1 && Math.Abs(nearestNode.Z - targetNode.Z) <= 1 && (nearestNode.Y == targetNode.Y || nearestNode.Y == targetNode.Y + 1)))
                 {
                     return retracePath(startNode, nearestNode);
                 }

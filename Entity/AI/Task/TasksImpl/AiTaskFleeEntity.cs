@@ -36,6 +36,8 @@ namespace Vintagestory.GameContent
         bool lowStabilityAttracted;
         bool ignoreDeepDayLight;
 
+        
+
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
         {
         }
@@ -125,7 +127,10 @@ namespace Vintagestory.GameContent
 
             if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) < minDayLight)
             {
-                return false;
+                if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
+                {
+                    return false;
+                }
             }
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);

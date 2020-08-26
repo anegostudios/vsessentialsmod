@@ -259,7 +259,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} in {1} failed probably because the syntax of the value is broken: {2}", patchIndex, patchSourcefile, e);
+                api.World.Logger.Error("Patch {0} (target: {3}) in {1} failed probably because the syntax of the value is broken: {2}", patchIndex, patchSourcefile, e, loc);
                 errorCount++;
                 return;
             }
@@ -270,13 +270,13 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Tavis.PathNotFoundException p)
             {
-                api.World.Logger.Error("Patch {0} in {1} failed because supplied path {2} is invalid: {3}", patchIndex, patchSourcefile, jsonPatch.Path, p.Message);
+                api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}", patchIndex, patchSourcefile, jsonPatch.Path, p.Message, loc);
                 errorCount++;
                 return;
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} in {1} failed, following Exception was thrown: {2}", patchIndex, patchSourcefile, e.Message);
+                api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed, following Exception was thrown: {2}", patchIndex, patchSourcefile, e.Message, loc);
                 errorCount++;
                 return;
             }

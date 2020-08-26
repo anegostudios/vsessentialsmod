@@ -56,6 +56,7 @@ namespace Vintagestory.GameContent
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
             pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 3);
             pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
+
             entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
 
             entity.World.FrameProfiler.Mark("entity-repulse");

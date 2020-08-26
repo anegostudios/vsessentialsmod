@@ -381,23 +381,31 @@ namespace Vintagestory.GameContent
 
             if (Api.Side == EnumAppSide.Server)
             {
-                if (!IsReplaceableBlock(finalPos))
+                Block block = World.BlockAccessor.GetBlock(finalPos);
+
+                if (!block.IsReplacableBy(Block))
                 {
                     for (int i = 0; i < 4; i++)
                     {
                         BlockFacing facing = BlockFacing.HORIZONTALS[i];
-                        if (World.BlockAccessor.GetBlock(finalPos.X + facing.Normali.X, finalPos.Y + facing.Normali.Y, finalPos.Z + facing.Normali.Z).Replaceable >= 6000)
+                        block = World.BlockAccessor.GetBlock(finalPos.X + facing.Normali.X, finalPos.Y + facing.Normali.Y, finalPos.Z + facing.Normali.Z);
+
+                        if (block.Replaceable >= 6000)
                         {
                             finalPos.X += facing.Normali.X;
                             finalPos.Y += facing.Normali.Y;
                             finalPos.Z += facing.Normali.Z;
+                            break;
                         }
                     }
                 }
 
-                if (IsReplaceableBlock(finalPos))
+                if (block.IsReplacableBy(Block))
                 {
-                    UpdateBlock(false, finalPos);
+                    if (!block.IsLiquid() || Block.BlockMaterial != EnumBlockMaterial.Snow)
+                    {
+                        UpdateBlock(false, finalPos);
+                    }
 
                     (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
                 }
@@ -439,13 +447,6 @@ namespace Vintagestory.GameContent
                 fallHandled = true;
                 spawnParticles(20f);
             }
-        }
-
-        private bool IsReplaceableBlock(BlockPos pos)
-        {
-            Block blockAtFinalPos = World.BlockAccessor.GetBlock(pos);
-            
-            return (blockAtFinalPos != null && (blockAtFinalPos.IsReplacableBy(Block)));
         }
 
         private void DropItems(BlockPos pos)

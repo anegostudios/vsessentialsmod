@@ -103,6 +103,7 @@ namespace Vintagestory.GameContent
             capi = api;
             capi.Event.BlockTexturesLoaded += OnLoaded;
             capi.Event.LevelFinalize += OnLvlFinalize;
+            capi.Event.RegisterGameTickListener(OnClientTick, 20);
 
             capi.Settings.AddWatcher<bool>("showMinimapHud", (on) => {
                 ToggleMap(EnumDialogType.HUD);
@@ -111,6 +112,13 @@ namespace Vintagestory.GameContent
             capi.Event.LeaveWorld += () =>
             {
                 isShuttingDown = true;
+                int i = 0;
+                while (mapLayerGenThread != null && mapLayerGenThread.IsAlive && i < 20)
+                {
+                    Thread.Sleep(20);
+                    i++;
+                }
+
                 worldMapDlg?.Dispose();
 
                 foreach (var layer in MapLayers)
@@ -127,6 +135,14 @@ namespace Vintagestory.GameContent
                .RegisterMessageType(typeof(OnMapToggle))
                .SetMessageHandler<MapLayerUpdate>(OnMapLayerDataReceivedClient)
             ;
+        }
+
+        private void OnClientTick(float dt)
+        {
+            foreach (MapLayer layer in MapLayers)
+            {
+                layer.OnTick(dt);
+            }
         }
 
         private void OnLvlFinalize()
@@ -199,7 +215,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        void ToggleMap(EnumDialogType asType)
+        public void ToggleMap(EnumDialogType asType)
         {
             bool isDlgOpened = worldMapDlg != null && worldMapDlg.IsOpened();
 
@@ -216,6 +232,9 @@ namespace Vintagestory.GameContent
                     if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
 
                     worldMapDlg.Open(asType);
+                    foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
+                    clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
+
                     return;
                 }
                 else
@@ -243,13 +262,6 @@ namespace Vintagestory.GameContent
             }
 
             worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, capi);
-
-            worldMapDlg.OnOpened += () =>
-            {
-                foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
-                clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
-            };
-
             worldMapDlg.OnClosed += () => {
                 foreach (MapLayer layer in MapLayers) layer.OnMapClosedClient();
                 clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = false });
@@ -257,6 +269,9 @@ namespace Vintagestory.GameContent
             };
 
             worldMapDlg.Open(asType);
+            foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
+            clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
+
             if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
         }
 
@@ -274,20 +289,10 @@ namespace Vintagestory.GameContent
             clientChannel.SendPacket(new OnViewChangedPacket() { NowVisible = nowVisible, NowHidden = nowHidden });
         }
 
-        public void AddMapData(MapComponent cmp)
-        {
-            worldMapDlg.mapElem.AddMapComponent(cmp);
-        }
-
-        public bool RemoveMapData(MapComponent cmp)
-        {
-            return worldMapDlg.mapElem.RemoveMapComponent(cmp);
-        }
-        
         
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
-            worldMapDlg.mapElem.TranslateWorldPosToViewPos(worldPos, ref viewPos);
+            worldMapDlg.TranslateWorldPosToViewPos(worldPos, ref viewPos);
         }
 
         public void SendMapDataToServer(MapLayer forMapLayer, byte[] data)

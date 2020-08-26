@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent
         public EnumPrecipitationType BlendedPrecType;
         public float PrecIntensity;
         public float PrecParticleSize;
-        //public EnumPrecipitationType nowPrecType;
+        public EnumPrecipitationType nowPrecType;
 
         public float nearLightningRate;
         public float distantLightningRate;
@@ -45,18 +45,6 @@ namespace Vintagestory.GameContent
 
             Ambient.CloudBrightness.Value = right.State.nowCloudBrightness * w + left.State.nowCloudBrightness * (1 - w);
             Ambient.CloudBrightness.Weight = 1;
-
-            //if (Weight > 0.5) weatherData.BlendedPrecType = NewWePattern.State.nowPrecType;
-            //else weatherData.BlendedPrecType = OldWePattern.State.nowPrecType;
-
-            /*weatherData.nowPrecType = weatherData.BlendedPrecType;
-            if (weatherData.nowPrecType == EnumPrecipitationType.Auto)
-            {
-                weatherData.nowPrecType = weatherData.climateCond.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
-            }*/
-
-            PrecParticleSize = right.State.nowPrecParticleSize * w + left.State.nowPrecParticleSize * (1 - w);
-            PrecIntensity = drynessMultiplier * (right.State.nowPrecIntensity * w + left.State.nowPrecIntensity * (1 - w));
 
             Ambient.CloudDensity.Value = right.State.nowbaseThickness * w + left.State.nowbaseThickness * (1 - w);
             Ambient.CloudDensity.Weight = 1;
@@ -89,8 +77,8 @@ namespace Vintagestory.GameContent
             Ambient.CloudBrightness.Value = left.State.nowCloudBrightness;
             Ambient.CloudBrightness.Weight = 1;
 
-            PrecParticleSize = left.State.nowPrecParticleSize;
-            PrecIntensity = drynessMultiplier * left.State.nowPrecIntensity;
+            //PrecParticleSize = left.State.nowPrecParticleSize;
+            //PrecIntensity = drynessMultiplier * left.State.nowPrecIntensity;
 
             Ambient.CloudDensity.Value = left.State.nowbaseThickness;
             Ambient.CloudDensity.Weight = 1;
@@ -105,17 +93,34 @@ namespace Vintagestory.GameContent
         public void SetLerped(WeatherDataSnapshot left, WeatherDataSnapshot right, float w)
         {
             Ambient.SetLerped(left.Ambient, right.Ambient, w);
-            BlendedPrecType = w < 0.5 ? left.BlendedPrecType : right.BlendedPrecType;
             PrecIntensity = left.PrecIntensity * (1 - w) + right.PrecIntensity * w;
             PrecParticleSize = left.PrecParticleSize * (1 - w) + right.PrecParticleSize * w;
-            //nowPrecType = w < 0.5 ? left.nowPrecType : right.nowPrecType;
 
+            nowPrecType = w < 0.5 ? left.nowPrecType : right.nowPrecType;
+            BlendedPrecType = w < 0.5 ? left.BlendedPrecType : right.BlendedPrecType;
             nearLightningRate = left.nearLightningRate * (1 - w) + right.nearLightningRate * w;
             distantLightningRate = left.distantLightningRate * (1 - w) + right.distantLightningRate * w;
             lightningMinTemp = left.lightningMinTemp * (1 - w) + right.lightningMinTemp * w;
             climateCond.SetLerped(left.climateCond, right.climateCond, w);
             curWindSpeed.X = left.curWindSpeed.X * (1 - w) + right.curWindSpeed.X * w;
             snowThresholdTemp = left.snowThresholdTemp * (1 - w) + right.snowThresholdTemp * w;
+        }
+
+        public void SetLerpedPrec(WeatherDataSnapshot left, WeatherDataSnapshot right, float w)
+        {
+            Ambient.SetLerped(left.Ambient, right.Ambient, w);
+            PrecIntensity = left.PrecIntensity * (1 - w) + right.PrecIntensity * w;
+            PrecParticleSize = left.PrecParticleSize * (1 - w) + right.PrecParticleSize * w;
+
+            nowPrecType = left.nowPrecType;
+            BlendedPrecType = left.BlendedPrecType;
+            nearLightningRate = left.nearLightningRate;
+            distantLightningRate = left.distantLightningRate;
+            lightningMinTemp = left.lightningMinTemp;
+            climateCond = left.climateCond;
+            curWindSpeed.X = left.curWindSpeed.X;
+            snowThresholdTemp = left.snowThresholdTemp;
+
         }
 
 

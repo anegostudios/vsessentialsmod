@@ -57,9 +57,10 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Holds a list of daily snow accum snapshot of previous 144 days (= 1 year)
         /// </summary>
-        public LimitedList<SnowAccumSnapshot> SnowAccumSnapshots;
+        public RingArray<SnowAccumSnapshot> SnowAccumSnapshots;
 
         public WindPattern CurWindPattern;
+        public WeatherEvent CurWeatherEvent;
 
         public float Weight;
         public double LastUpdateTotalHours;
@@ -79,6 +80,8 @@ namespace Vintagestory.GameContent
 
         public WeatherPattern[] WeatherPatterns;
         public WindPattern[] WindPatterns;
+        public WeatherEvent[] WeatherEvents;
+
         protected WeatherSystemBase ws;
         protected WeatherSystemServer wsServer;
         protected ICoreClientAPI capi;
@@ -102,7 +105,7 @@ namespace Vintagestory.GameContent
             this.ws = ws;
             this.regionX = regionX;
             this.regionZ = regionZ;
-            this.SnowAccumSnapshots = new LimitedList<SnowAccumSnapshot>(ws.api.World.Calendar.DaysPerYear + 1);
+            this.SnowAccumSnapshots = new RingArray<SnowAccumSnapshot>((int)(ws.api.World.Calendar.DaysPerYear * ws.api.World.Calendar.HoursPerDay) + 1);
 
 
             int regsize = ws.api.World.BlockAccessor.RegionSize;
@@ -146,6 +149,12 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < ws.WindConfigs.Length; i++) {
                 WindPatterns[i] = new WindPattern(ws.api, ws.WindConfigs[i], i, Rand, seed);
             }
+
+            WeatherEvents = new WeatherEvent[ws.WeatherEventConfigs.Length];
+            for (int i = 0; i < ws.WindConfigs.Length; i++)
+            {
+                WeatherEvents[i] = new WeatherEvent(ws.api, ws.WeatherEventConfigs[i], i, Rand, seed - 876);
+            }
         }
 
         internal void LoadRandomPattern()
@@ -159,6 +168,9 @@ namespace Vintagestory.GameContent
             CurWindPattern = WindPatterns[Rand.NextInt(WindPatterns.Length)];
             CurWindPattern.OnBeginUse();
 
+            CurWeatherEvent = RandomWeatherEvent();
+            CurWeatherEvent.OnBeginUse();
+
             Weight = 1;
 
             wsServer?.SendWeatherStateUpdate(new WeatherState()
@@ -168,6 +180,7 @@ namespace Vintagestory.GameContent
                 NewPattern = NewWePattern.State,
                 OldPattern = OldWePattern.State,
                 WindPattern = CurWindPattern.State,
+                WeatherEvent = CurWeatherEvent?.State,
                 TransitionDelay = 0,
                 Transitioning = false,
                 Weight = Weight,
@@ -188,6 +201,7 @@ namespace Vintagestory.GameContent
             NewWePattern = WeatherPatterns[0];
             OldWePattern = WeatherPatterns[0];
             CurWindPattern = WindPatterns[0];
+            CurWeatherEvent = WeatherEvents[0];
 
             IsInitialized = true;
         }
@@ -200,21 +214,17 @@ namespace Vintagestory.GameContent
 
         public void TickEveryInGameHourServer(double nowTotalHours)
         {
-            SnowAccumSnapshot latestSnap = SnowAccumSnapshots.LastElement();
-
-            if (latestSnap == null || nowTotalHours - latestSnap.TotalHours >= 1)
-            {
-                 SnowAccumSnapshots.Add(latestSnap = new SnowAccumSnapshot() { 
-                    TotalHours = nowTotalHours, 
-                    SumTemperatureByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution),
-                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
-                });
-            }
+            SnowAccumSnapshot latestSnap = new SnowAccumSnapshot() {
+                TotalHours = nowTotalHours, 
+               // SumTemperatureByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution),
+                SnowAccumulationByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
+            };
 
             // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations
             // lets try with just the 8 corner points of the region cuboid and lerp
             BlockPos tmpPos = new BlockPos();
             int regsize = ws.api.World.BlockAccessor.RegionSize;
+
 
             for (int ix = 0; ix < snowAccumResolution; ix++)
             {
@@ -225,14 +235,18 @@ namespace Vintagestory.GameContent
                         int y = iy == 0 ? ws.api.World.SeaLevel : ws.api.World.BlockAccessor.MapSizeY - 1;
 
                         tmpPos.Set(
-                            regionX * regsize + ix * (regsize - 1), 
+                            regionX * regsize + ix * (regsize - 1),
                             y,
                             regionZ * regsize + iz * (regsize - 1)
                         );
 
-                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.NowValues);
+                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.ForSuppliedDateValues, nowTotalHours + 0.5); // Sample from the middle of the hour
+                        if (nowcond == null)
+                        {
+                            return;
+                        }
 
-                        latestSnap.SumTemperatureByRegionCorner.AddValue(ix, iy, iz, nowcond.Temperature);
+                        //latestSnap.SumTemperatureByRegionCorner.AddValue(ix, iy, iz, nowcond.Temperature);
 
                         if (nowcond.Temperature > 0)
                         {
@@ -240,17 +254,23 @@ namespace Vintagestory.GameContent
                         }
                         else
                         {
-                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 2f);
+                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 3f);
                         }
+
                     }
                 }
             }
 
+            lock (lockTest)
+            {
+                SnowAccumSnapshots.Add(latestSnap);
+            }
             latestSnap.Checks++;
-
         }
 
-        
+        public static object lockTest = new object();
+
+
 
         public void TickEvery25ms(float dt)
         {
@@ -286,38 +306,56 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (ws.autoChangePatterns && ws.api.Side == EnumAppSide.Server && ws.api.World.Calendar.TotalHours > CurWindPattern.State.ActiveUntilTotalHours)
+            if (ws.autoChangePatterns && ws.api.Side == EnumAppSide.Server)
             {
-                CurWindPattern = WindPatterns[Rand.NextInt(WindPatterns.Length)];
-                CurWindPattern.OnBeginUse();
+                bool sendPacket = false;
 
-                wsServer.SendWeatherStateUpdate(new WeatherState()
+                if (ws.api.World.Calendar.TotalHours > CurWindPattern.State.ActiveUntilTotalHours)
                 {
-                    RegionX = regionX,
-                    RegionZ = regionZ,
-                    NewPattern = NewWePattern.State,
-                    OldPattern = OldWePattern.State,
-                    WindPattern = CurWindPattern.State,
-                    TransitionDelay = TransitionDelay,
-                    Transitioning = Transitioning,
-                    Weight = Weight,
-                    LcgCurrentSeed = Rand.currentSeed,
-                    LcgMapGenSeed = Rand.mapGenSeed,
-                    LcgWorldSeed = Rand.worldSeed
-                });
+                    CurWindPattern = WindPatterns[Rand.NextInt(WindPatterns.Length)];
+                    CurWindPattern.OnBeginUse();
+                    sendPacket = true;
+                }
+
+                if (ws.api.World.Calendar.TotalHours > CurWeatherEvent.State.ActiveUntilTotalHours || CurWeatherEvent.ShouldStop(weatherData.climateCond.Rainfall, weatherData.climateCond.Temperature))
+                {
+                    CurWeatherEvent = RandomWeatherEvent();
+                    CurWeatherEvent.OnBeginUse();
+                    sendPacket = true;
+                }
+
+                if (sendPacket)
+                {
+                    wsServer.SendWeatherStateUpdate(new WeatherState()
+                    {
+                        RegionX = regionX,
+                        RegionZ = regionZ,
+                        NewPattern = NewWePattern.State,
+                        OldPattern = OldWePattern.State,
+                        WindPattern = CurWindPattern.State,
+                        WeatherEvent = CurWeatherEvent?.State,
+                        TransitionDelay = TransitionDelay,
+                        Transitioning = Transitioning,
+                        Weight = Weight,
+                        LcgCurrentSeed = Rand.currentSeed,
+                        LcgMapGenSeed = Rand.mapGenSeed,
+                        LcgWorldSeed = Rand.worldSeed
+                    });
+                }
             }
+
 
 
             NewWePattern.Update(dt);
             OldWePattern.Update(dt);
             
             CurWindPattern.Update(dt);
+            CurWeatherEvent.Update(dt);
 
             float curWindSpeed = weatherData.curWindSpeed.X;
             float targetWindSpeed = (float)GetWindSpeed(ws.api.World.SeaLevel);
 
             curWindSpeed += GameMath.Clamp((targetWindSpeed - curWindSpeed) * dt, -0.001f, 0.001f);
-
             weatherData.curWindSpeed.X = curWindSpeed;
 
             quarterSecAccum += dt;
@@ -333,9 +371,11 @@ namespace Vintagestory.GameContent
 
                 quarterSecAccum = 0;
             }
+
+            weatherData.BlendedPrecType = CurWeatherEvent.State.PrecType;
         }
 
-        
+
 
         private void clientUpdate(float dt)
         {
@@ -343,11 +383,17 @@ namespace Vintagestory.GameContent
             
             regionCenterPos.Y = (int)eplr.Pos.Y;
 
-            weatherData.nearLightningRate = NewWePattern.State.nowNearLightningRate * Weight + OldWePattern.State.nowNearLightningRate * (1 - Weight);
-            weatherData.distantLightningRate = NewWePattern.State.nowDistantLightningRate * Weight + OldWePattern.State.nowDistantLightningRate * (1 - Weight);
-            weatherData.lightningMinTemp = NewWePattern.State.nowLightningMinTempature * Weight + OldWePattern.State.nowLightningMinTempature * (1 - Weight);
+            float targetNearLightningRate = CurWeatherEvent.State.NearLightningRate;
+            float targetDistantLightningRate = CurWeatherEvent.State.DistantLightningRate;
+            float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
+
+            weatherData.nearLightningRate += GameMath.Clamp((targetNearLightningRate - weatherData.nearLightningRate) * dt, -0.001f, 0.001f);
+            weatherData.distantLightningRate += GameMath.Clamp((targetDistantLightningRate - weatherData.distantLightningRate) * dt, -0.001f, 0.001f);
+            weatherData.lightningMinTemp += GameMath.Clamp((targetLightninMinTemp - weatherData.lightningMinTemp) * dt, -0.001f, 0.001f);
+            weatherData.BlendedPrecType = CurWeatherEvent.State.PrecType;
         }
 
+        
         public double GetWindSpeed(double posY)
         {
             if (CurWindPattern == null) return 0;
@@ -368,6 +414,11 @@ namespace Vintagestory.GameContent
             return strength;
         }
 
+        public EnumPrecipitationType GetPrecipitationType()
+        {
+            return weatherData.BlendedPrecType;
+        }
+
         public bool SetWindPattern(string code, bool updateInstant)
         {
             WindPattern pattern = WindPatterns.FirstOrDefault(p => p.config.Code == code);
@@ -376,22 +427,20 @@ namespace Vintagestory.GameContent
             CurWindPattern = pattern;
             CurWindPattern.OnBeginUse();
 
-            wsServer.SendWeatherStateUpdate(new WeatherState()
-            {
-                RegionX = regionX,
-                RegionZ = regionZ,
-                NewPattern = NewWePattern.State,
-                OldPattern = OldWePattern.State,
-                WindPattern = CurWindPattern.State,
-                TransitionDelay = 0,
-                Transitioning = false,
-                Weight = Weight,
-                updateInstant = updateInstant,
-                LcgCurrentSeed = Rand.currentSeed,
-                LcgMapGenSeed = Rand.mapGenSeed,
-                LcgWorldSeed = Rand.worldSeed
-            });
+            sendState(updateInstant);
+            return true;
+        }
 
+
+        public bool SetWeatherEvent(string code, bool updateInstant)
+        {
+            WeatherEvent pattern = WeatherEvents.FirstOrDefault(p => p.config.Code == code);
+            if (pattern == null) return false;
+
+            CurWeatherEvent = pattern;
+            CurWeatherEvent.OnBeginUse();
+
+            sendState(updateInstant);
             return true;
         }
 
@@ -409,6 +458,15 @@ namespace Vintagestory.GameContent
 
             UpdateWeatherData();
 
+            sendState(updateInstant);
+
+            return true;
+        }
+
+
+
+        void sendState(bool updateInstant)
+        {
             wsServer.SendWeatherStateUpdate(new WeatherState()
             {
                 RegionX = regionX,
@@ -416,6 +474,7 @@ namespace Vintagestory.GameContent
                 NewPattern = NewWePattern.State,
                 OldPattern = OldWePattern.State,
                 WindPattern = CurWindPattern.State,
+                WeatherEvent = CurWeatherEvent?.State,
                 TransitionDelay = 0,
                 Transitioning = false,
                 Weight = Weight,
@@ -425,8 +484,8 @@ namespace Vintagestory.GameContent
                 LcgWorldSeed = Rand.worldSeed
             });
 
-            return true;
         }
+
 
         public void TriggerTransition()
         {
@@ -451,6 +510,7 @@ namespace Vintagestory.GameContent
                 NewPattern = NewWePattern.State,
                 OldPattern = OldWePattern.State,
                 WindPattern = CurWindPattern.State,
+                WeatherEvent = CurWeatherEvent?.State,
                 TransitionDelay = TransitionDelay,
                 Transitioning = true,
                 Weight = Weight,
@@ -459,7 +519,30 @@ namespace Vintagestory.GameContent
                 LcgWorldSeed = Rand.worldSeed
             });
         }
-       
+
+        public WeatherEvent RandomWeatherEvent()
+        {
+            float totalChance = 0;
+            for (int i = 0; i < WeatherEvents.Length; i++)
+            {
+                WeatherEvents[i].updateHereChance(weatherData.climateCond.Rainfall, weatherData.climateCond.Temperature);
+                totalChance += WeatherEvents[i].hereChance;
+            }
+
+            float rndVal = (float)Rand.NextDouble() * totalChance;
+
+            for (int i = 0; i < WeatherEvents.Length; i++)
+            {
+                rndVal -= WeatherEvents[i].config.Weight;
+                if (rndVal <= 0)
+                {
+                    return WeatherEvents[i];
+                }
+            }
+
+            return WeatherEvents[WeatherEvents.Length - 1];
+        }
+
         public WeatherPattern RandomWeatherPattern()
         {
             float totalChance = 0;
@@ -537,6 +620,7 @@ namespace Vintagestory.GameContent
                 NewPattern = NewWePattern?.State ?? null,
                 OldPattern = OldWePattern?.State ?? null,
                 WindPattern = CurWindPattern?.State ?? null,
+                WeatherEvent = CurWeatherEvent?.State ?? null,
                 Weight = Weight,
                 TransitionDelay = TransitionDelay,
                 Transitioning = Transitioning,
@@ -544,7 +628,7 @@ namespace Vintagestory.GameContent
                 LcgCurrentSeed = Rand.currentSeed,
                 LcgMapGenSeed = Rand.mapGenSeed,
                 LcgWorldSeed = Rand.worldSeed,
-                SnowAccumSnapshots = SnowAccumSnapshots?.ToArray()
+                SnowAccumSnapshots = SnowAccumSnapshots?.Values
             };
 
             return SerializerUtil.Serialize(state);
@@ -570,7 +654,7 @@ namespace Vintagestory.GameContent
                     NewWePattern = WeatherPatterns[0];
                 }
 
-                if (state.OldPattern != null)
+                if (state.OldPattern != null && state.OldPattern.Index < WeatherPatterns.Length)
                 {
                     OldWePattern = WeatherPatterns[state.OldPattern.Index];
                     OldWePattern.State = state.OldPattern;
@@ -595,9 +679,21 @@ namespace Vintagestory.GameContent
 
                 double nowTotalHours = ws.api.World.Calendar.TotalHours;
                 // Cap that at max 1 year or we simulate forever on startup
-                LastUpdateTotalHours = Math.Max(LastUpdateTotalHours, nowTotalHours - 144 * 24);
+                LastUpdateTotalHours = Math.Max(LastUpdateTotalHours, nowTotalHours - 12 * 12 * 24);
 
-                SnowAccumSnapshots = new LimitedList<SnowAccumSnapshot>(ws.api.World.Calendar.DaysPerYear, state.SnowAccumSnapshots);
+                SnowAccumSnapshots = new RingArray<SnowAccumSnapshot>((int)(ws.api.World.Calendar.DaysPerYear * ws.api.World.Calendar.HoursPerDay) + 1, state.SnowAccumSnapshots);
+
+                if (state.WeatherEvent != null)
+                {
+                    CurWeatherEvent = WeatherEvents[state.WeatherEvent.Index];
+                    CurWeatherEvent.State = state.WeatherEvent;
+                }
+
+                if (CurWeatherEvent == null)
+                {
+                    CurWeatherEvent = RandomWeatherEvent();
+                    CurWeatherEvent.OnBeginUse();
+                }
             }
 
         }

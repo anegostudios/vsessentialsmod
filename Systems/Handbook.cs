@@ -40,6 +40,15 @@ namespace Vintagestory.GameContent
 
             api.Event.LevelFinalize += Event_LevelFinalize;
             api.RegisterLinkProtocol("handbook", onHandBookLinkClicked);
+            api.RegisterLinkProtocol("handbooksearch", onHandBookSearchLinkClicked);
+        }
+
+        private void onHandBookSearchLinkClicked(LinkTextComponent comp)
+        {
+            string text = comp.Href.Substring("handbooksearch://".Length);
+            if (!dialog.IsOpened()) dialog.TryOpen();
+
+            dialog.Search(text);            
         }
 
         private void onHandBookLinkClicked(LinkTextComponent comp)

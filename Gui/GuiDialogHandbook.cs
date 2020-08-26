@@ -15,6 +15,7 @@ namespace Vintagestory.GameContent
     public class BrowseHistoryElement
     {
         public GuiHandbookPage Page;
+        public string SearchText;
         public float PosY;
     }
 
@@ -43,7 +44,7 @@ namespace Vintagestory.GameContent
         Stack<BrowseHistoryElement> browseHistory = new Stack<BrowseHistoryElement>();
         
         string currentSearchText;
-        string currentCatgoryCode;
+        public string currentCatgoryCode;
 
 
         GuiComposer overviewGui;
@@ -92,7 +93,7 @@ namespace Vintagestory.GameContent
             capi.ShowChatMessage("Lang file and handbook entries now reloaded");
         }
 
-        void initOverviewGui()
+        public void initOverviewGui()
         {
             ElementBounds searchFieldBounds = ElementBounds.Fixed(GuiStyle.ElementToDialogPadding - 2, 45, 300, 30);
             ElementBounds stackListBounds = ElementBounds.Fixed(0, 0, 500, listHeight).FixedUnder(searchFieldBounds, 5);
@@ -116,12 +117,18 @@ namespace Vintagestory.GameContent
             bgBounds.WithChildren(insetBounds, stackListBounds, scrollbarBounds, closeButtonBounds);
 
             // 3. Finally Dialog
-            ElementBounds dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.None).WithAlignment(EnumDialogArea.CenterMiddle);
+            ElementBounds dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.None).WithAlignment(EnumDialogArea.CenterFixed).WithFixedPosition(0, 70);
 
             ElementBounds tabBounds = ElementBounds.Fixed(-200, 35, 200, 545);
 
             int curTab;
-
+            ElementBounds backButtonBounds = ElementBounds
+                .FixedSize(0, 0)
+                .FixedUnder(clipBounds, 2 * 5 + 5)
+                .WithAlignment(EnumDialogArea.LeftFixed)
+                .WithFixedPadding(20, 4)
+                .WithFixedAlignmentOffset(-6, 3)
+            ;
 
             overviewGui = capi.Gui
                 .CreateCompo("handbook-overview", dialogBounds)
@@ -135,6 +142,7 @@ namespace Vintagestory.GameContent
                         .AddHandbookStackList(stackListBounds, onLeftClickListElement, shownHandbookPages, "stacklist")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalueOverviewPage, scrollbarBounds, "scrollbar")
+                    .AddSmallButton(Lang.Get("general-back"), OnButtonBack, backButtonBounds, EnumButtonStyle.Normal, EnumTextOrientation.Center, "backButton")
                     .AddSmallButton(Lang.Get("Close Handbook"), OnButtonClose, closeButtonBounds)
                 .EndChildElements()
                 .Compose()
@@ -224,7 +232,7 @@ namespace Vintagestory.GameContent
             float posY = curPage.PosY;
 
             // 3. Finally Dialog
-            ElementBounds dialogBounds = bgBounds.ForkBoundingParent().WithAlignment(EnumDialogArea.None).WithAlignment(EnumDialogArea.CenterMiddle);
+            ElementBounds dialogBounds = bgBounds.ForkBoundingParent().WithAlignment(EnumDialogArea.None).WithAlignment(EnumDialogArea.CenterFixed).WithFixedPosition(0, 70);
             //dialogBounds.Code = "dialogbounds";
 
             RichTextComponentBase[] cmps = curPage.Page.GetPageText(capi, allstacks, OpenDetailPageFor);
@@ -280,7 +288,7 @@ namespace Vintagestory.GameContent
             int num;
             if (pageNumberByPageCode.TryGetValue(pageCode, out num)) {
                 GuiHandbookPage elem = allHandbookPages[num];
-                if (browseHistory.Count > 0 && elem == browseHistory.Peek().Page) return true;// stack.Equals(capi.World, browseHistory.Peek(), GlobalConstants.IgnoredStackAttributes)) return;
+                if (browseHistory.Count > 0 && elem == browseHistory.Peek().Page) return true;
 
                 browseHistory.Push(new BrowseHistoryElement()
                 {
@@ -297,8 +305,21 @@ namespace Vintagestory.GameContent
 
         private bool OnButtonBack()
         {
+            if (browseHistory.Count == 0) return true;
+
             browseHistory.Pop();
-            if (browseHistory.Count > 0) initDetailGui();
+            if (browseHistory.Count > 0)
+            {
+                if (browseHistory.Peek().SearchText != null)
+                {
+                    Search(browseHistory.Peek().SearchText);
+                }
+                else
+                {
+                    initDetailGui();
+                }
+            }
+
             return true;
         }
 
@@ -451,9 +472,27 @@ namespace Vintagestory.GameContent
             this.allstacks = allstacks.ToArray();
         }
 
+        public void Search(string text)
+        {
+            currentCatgoryCode = null;
+            SingleComposer = overviewGui;
+            overviewGui.GetTextInput("searchField").SetValue(text);
+
+            if (browseHistory.Count > 0 && browseHistory.Peek().SearchText == text) return;
+
+            capi.Gui.PlaySound("menubutton_press");
+
+            browseHistory.Push(new BrowseHistoryElement()
+            {
+                Page = null,
+                SearchText = text,
+                PosY = 0
+            });
+
+        }
 
 
-        public void FilterItemsBySearchText(string text)
+        private void FilterItemsBySearchText(string text)
         {
             currentSearchText = text;
             FilterItems();
@@ -499,13 +538,18 @@ namespace Vintagestory.GameContent
 
         public override void OnRenderGUI(float deltaTime)
         {
-            if (browseHistory.Count == 0)
+            if (browseHistory.Count == 0 || browseHistory.Peek().SearchText != null)
             {
                 SingleComposer = overviewGui;
             }
             else
             {
                 SingleComposer = detailViewGui;
+            }
+
+            if (SingleComposer == overviewGui)
+            {
+                overviewGui.GetButton("backButton").Enabled = browseHistory.Count > 0;
             }
 
             base.OnRenderGUI(deltaTime);

@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
         {
             if (strengthNoiseGen != null)
             {
-                double timeAxis = api.World.Calendar.TotalDays / 10.0;
+                double timeAxis = api.World.Calendar.TotalDays * 10;
                 Strength = State.BaseStrength + (float)GameMath.Clamp(strengthNoiseGen.Noise(0, timeAxis), 0, 1);
             }
         }

@@ -22,6 +22,31 @@ namespace Vintagestory.GameContent
         protected InventoryGeneric inv;
         protected GuiDialogCarcassContents dlg;
 
+        public float AnimalWeight
+        {
+            get
+            {
+                return entity.WatchedAttributes.GetFloat("animalWeight", 1);
+            }
+            set
+            {
+                entity.WatchedAttributes.SetFloat("animalWeight", value);
+            }
+        }
+
+        public double LastWeightUpdateTotalHours
+        {
+            get
+            {
+                return entity.WatchedAttributes.GetDouble("lastWeightUpdateTotalHours", 1);
+            }
+            set
+            {
+                entity.WatchedAttributes.SetDouble("lastWeightUpdateTotalHours", value);
+            }
+        }
+
+
         protected float dropQuantityMultiplier
         {
             get
@@ -85,6 +110,75 @@ namespace Vintagestory.GameContent
                 inv.SlotModified += Inv_SlotModified;
                 inv.OnInventoryClosed += Inv_OnInventoryClosed;
             }
+
+            harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
+        }
+
+        bool harshWinters;
+        float accum = 0;
+
+        public override void OnGameTick(float deltaTime)
+        {
+            if (entity.World.Side != EnumAppSide.Server) return;
+
+            accum += deltaTime;
+
+            if (accum > 1.5f)
+            {
+                if (!harshWinters)
+                {
+                    AnimalWeight = 1;
+                    return;
+                }
+
+                accum = 0;
+                double totalHours = entity.World.Calendar.TotalHours;
+                double startHours = LastWeightUpdateTotalHours;
+                double lastEatenTotalHours = entity.WatchedAttributes.GetDouble("lastMealEatenTotalHours", -9999);
+
+                double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * entity.World.Calendar.HoursPerDay;
+                double oneweekHours = 7 * entity.World.Calendar.HoursPerDay;
+
+                // Don't simulate longer than a year
+                startHours = Math.Max(startHours, totalHours - entity.World.Calendar.HoursPerDay * entity.World.Calendar.DaysPerYear);
+                BlockPos pos = entity.Pos.AsBlockPos;
+
+                float weight = AnimalWeight;
+
+                float step = 3;
+
+                while (startHours < totalHours - 1)
+                {
+                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDateValues, startHours);
+                    if (conds == null)
+                    {
+                        base.OnGameTick(deltaTime);
+                        return;
+                    }
+
+                    // no need to simulate every single hour
+                    startHours += step;
+
+                    double mealHourDiff = startHours - lastEatenTotalHours;
+
+                    bool ateSomeTimeAgo = mealHourDiff < fourmonthsHours;
+                    bool ateRecently = mealHourDiff < oneweekHours;
+
+                    if (conds.Temperature <= 0 && !ateSomeTimeAgo)
+                    {
+                        // Loose 0.1% of weight each hour = 2.4% per day
+                        weight = Math.Max(0.5f, weight - step * 0.001f);
+                    } else
+                    {
+                        weight = Math.Min(1f, weight + step * (0.001f + (ateRecently ? 0.05f : 0)));
+                    }
+                }
+
+                AnimalWeight = weight;
+                LastWeightUpdateTotalHours = startHours;
+            }
+
+            base.OnGameTick(deltaTime);
         }
 
         private void Inv_SlotModified(int slotid)
@@ -200,7 +294,17 @@ namespace Vintagestory.GameContent
                 jsonDrops[i].Resolve(entity.World, "BehaviorHarvestable");
 
                 ItemStack stack = jsonDrops[i].GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier);
+
                 if (stack == null) continue;
+
+                if (stack.Collectible.NutritionProps != null || stack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.NutritionProps != null)
+                {
+                    float weightedStackSize = stack.StackSize * AnimalWeight;
+                    float fraction = weightedStackSize - (int)weightedStackSize;
+                    stack.StackSize = (int)weightedStackSize + (entity.World.Rand.NextDouble() > fraction ? 1 : 0);
+                }
+
+                if (stack.StackSize == 0) continue;
 
                 todrop.Add(stack);
                 if (jsonDrops[i].LastDrop) break;
@@ -282,9 +386,31 @@ namespace Vintagestory.GameContent
                 string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
 
                 if (deathByEntityLangCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer")) {
-                    infotext.AppendLine(Lang.Get("Looks eaten by another creature. Won't be able to harvest as much from this carcass."));
+                    if (deathByEntityLangCode.Contains("wolf"))
+                    {
+                        infotext.AppendLine(Lang.Get("deadcreature-eaten-wolf"));
+                    } else
+                    {
+                        infotext.AppendLine(Lang.Get("deadcreature-eaten"));
+                    }
                 }
             }
+
+            if (AnimalWeight >= 0.95f)
+            {
+                infotext.AppendLine(Lang.Get("creature-weight-good"));
+            } else if (AnimalWeight >= 0.75f)
+            {
+                infotext.AppendLine(Lang.Get("creature-weight-ok"));
+            }
+            else if (AnimalWeight >= 0.5f)
+            {
+                infotext.AppendLine(Lang.Get("creature-weight-low"));
+            } else
+            {
+                infotext.AppendLine(Lang.Get("creature-weight-starving"));
+            }
+
 
             base.GetInfoText(infotext);
         }

@@ -31,6 +31,9 @@ namespace Vintagestory.GameContent
         public short CloudOpaqueness;
 
         public LCGRandom brightnessRand;
-        
+
+        internal bool rainValuesSet;
+        internal float lerpRainCloudOverlay;
+        internal float lerpRainOverlay;
     }
 }

@@ -16,6 +16,8 @@ namespace Vintagestory.GameContent
 
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
+        float belowTempSeekingRange = 25f;
+        float belowTempThreshold = -999;
         float maxFollowTime = 60;
         
         bool stopNow = false;
@@ -38,6 +40,9 @@ namespace Vintagestory.GameContent
         long lastSearchTotalMs;
 
         EntityPartitioning partitionUtil;
+
+        float accumTempTest;
+        bool lowTempMode;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
@@ -74,6 +79,18 @@ namespace Vintagestory.GameContent
             {
                 seekingRange = taskConfig["seekingRange"].AsFloat(25);
             }
+
+            if (taskConfig["belowTempSeekingRange"] != null)
+            {
+                belowTempSeekingRange = taskConfig["belowTempSeekingRange"].AsFloat(25);
+            }
+
+            if (taskConfig["belowTempThreshold"] != null)
+            {
+                belowTempThreshold = taskConfig["belowTempThreshold"].AsFloat(-999);
+            }
+            
+
 
             if (taskConfig["maxFollowTime"] != null)
             {
@@ -112,7 +129,8 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            if (rand.NextDouble() > 0.1f) return false; // was 0.04 before, but that made creatures react very slowly when in emotionstate aggressiveondamage. So lets double the reaction time when in that emotion state
+            // React immediately on hurt, otherwise only 1/10 chance of execution
+            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || !entity.HasEmotionState(whenInEmotionState))) return false;
 
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
@@ -127,10 +145,17 @@ namespace Vintagestory.GameContent
 
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
 
+            if (belowTempThreshold > -99)
+            {
+                lowTempMode = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues).Temperature <= belowTempThreshold;
+            }
+
+            float range = lowTempMode ? belowTempSeekingRange : seekingRange;
+
 
             lastSearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, (e) => {
+            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
 
                 for (int i = 0; i < seekEntityCodesExact.Length; i++)
@@ -163,7 +188,7 @@ namespace Vintagestory.GameContent
             {
                 if (alarmHerd && entity.HerdId > 0)
                 {
-                    entity.World.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, seekingRange, (e) =>
+                    entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, range, (e) =>
                     {
                         EntityAgent agent = e as EntityAgent;
                         if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == entity.HerdId)
@@ -334,10 +359,11 @@ namespace Vintagestory.GameContent
 
 
             float minDist = MinDistanceToTarget();
+            float range = lowTempMode ? belowTempSeekingRange : seekingRange;
 
             return
                 currentFollowTime < maxFollowTime &&
-                distance < seekingRange * seekingRange &&
+                distance < range * range &&
                 (distance > minDist || targetEntity.ServerControls.TriesToMove) &&
                 targetEntity.Alive &&
                 !inCreativeMode &&

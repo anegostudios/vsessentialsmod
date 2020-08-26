@@ -5,6 +5,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -350,6 +351,24 @@ namespace Vintagestory.GameContent
                 if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
             }
 
+            bool harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
+
+            ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
+            if (conds == null || conds.Temperature >= 2 || !harshWinters)
+            {
+                entity.Stats.Remove("hungerrate", "resistcold");
+            }
+            else
+            {
+                // 0..1
+                float diff = GameMath.Clamp(2 - conds.Temperature, 0, 10);
+
+                Room room = entity.World.Api.ModLoader.GetModSystem<RoomRegistry>().GetRoomForPosition(entity.Pos.AsBlockPos);
+
+                entity.Stats.Set("hungerrate", "resistcold", room.ExitCount == 0 ? diff/10f : 0, true);
+            }
+
+
             if (Saturation <= 0)
             {
                 // Let's say a fat reserve of 1000 is depleted in 3 ingame days using the default game speed of 1/60th
@@ -363,8 +382,6 @@ namespace Vintagestory.GameContent
                 {
                     entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Internal, Type = EnumDamageType.Hunger }, 0.125f);
                 }
-
-
 
                 sprintCounter = 0;
             }

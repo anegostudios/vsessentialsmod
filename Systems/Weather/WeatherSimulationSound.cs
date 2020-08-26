@@ -42,7 +42,7 @@ namespace Vintagestory.GameContent
         float curTrembleVolume = 0f;
 
         float quarterSecAccum;
-        float secAccum = 0;
+        //float secAccum = 0;
 
         bool searchComplete = true;
         float roomVolumePitchLoss;
@@ -172,8 +172,6 @@ namespace Vintagestory.GameContent
             float targetRainPitch=1;
             float targetHailPitch=1;
 
-            
-
             WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
 
             if (searchComplete)
@@ -190,11 +188,11 @@ namespace Vintagestory.GameContent
                 });
             }
 
-            //EnumPrecipitationType precType = weatherData.BlendedPrecType;
-            //if (precType == EnumPrecipitationType.Auto)
-            //{
-            EnumPrecipitationType precType = weatherSys.clientClimateCond?.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
-            //}
+            EnumPrecipitationType precType = weatherData.BlendedPrecType;
+            if (precType == EnumPrecipitationType.Auto)
+            {
+                precType = weatherSys.clientClimateCond?.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+            }
 
             float nearbyLeaviness = GameMath.Clamp(GlobalConstants.CurrentNearbyRelLeavesCountClient * 60, 0, 1);
 

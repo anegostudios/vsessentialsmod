@@ -10,13 +10,13 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-
     public abstract class WeatherSystemBase : ModSystem
     {
         public ICoreAPI api;
         public WeatherSystemConfig GeneralConfig;
         public WeatherPatternConfig[] WeatherConfigs;
         public WindPatternConfig[] WindConfigs;
+        public WeatherEventConfig[] WeatherEventConfigs;
 
         public bool autoChangePatterns = true;
         public Dictionary<long, WeatherSimulationRegion> weatherSimByMapRegion = new Dictionary<long, WeatherSimulationRegion>();
@@ -33,6 +33,8 @@ namespace Vintagestory.GameContent
         public WeatherPattern rainOverlayPattern;
         public WeatherDataSnapshot rainOverlaySnap;
 
+
+
         public virtual int CloudTileSize { get; set; } = 50;
 
 
@@ -40,12 +42,12 @@ namespace Vintagestory.GameContent
         public override void Start(ICoreAPI api)
         {
             this.api = api;
-            LoadConfigs();
 
             api.Network
                .RegisterChannel("weather")
                .RegisterMessageType(typeof(WeatherState))
                .RegisterMessageType(typeof(WeatherConfigPacket))
+               .RegisterMessageType(typeof(WeatherPatternAssetsPacket))
             ;
         }
 
@@ -74,56 +76,25 @@ namespace Vintagestory.GameContent
 
 
 
-        public void ReloadConfigs()
+        
+
+
+    public PrecipitationState GetPrecipitationState(Vec3d pos)
         {
-            api.Assets.Reload(new AssetLocation("config/"));
-            LoadConfigs(true);
+            return GetPrecipitationState(pos, api.World.Calendar.TotalDays);
         }
 
-        public void LoadConfigs(bool isReload = false) {
-
-            // Thread safe assignment
-            var nowconfig = api.Assets.Get<WeatherSystemConfig>(new AssetLocation("config/weather.json"));
-            if (isReload) nowconfig.Init(api.World);
-
-            GeneralConfig = nowconfig;
-
-            var dictWeatherPatterns = api.Assets.GetMany<WeatherPatternConfig[]>(api.World.Logger, "config/weatherpatterns/");
-            var orderedWeatherPatterns = dictWeatherPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
-
-            WeatherConfigs = new WeatherPatternConfig[0];
-            foreach (var val in orderedWeatherPatterns)
-            {
-                WeatherConfigs = WeatherConfigs.Append(val);
-            }
-
-            var dictWindPatterns = api.Assets.GetMany<WindPatternConfig[]>(api.World.Logger, "config/windpatterns/");
-            var orderedWindPatterns = dictWindPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
-
-            WindConfigs = new WindPatternConfig[0];
-            foreach (var val in orderedWindPatterns)
-            {
-                WindConfigs = WindConfigs.Append(val);
-            }
-
-            api.World.Logger.Notification("Reloaded {0} weather patterns and {1} wind patterns", WeatherConfigs.Length, WindConfigs.Length);
-        }
-
-
-        public PrecipitationState GetPrecipitationState(Vec3d pos)
+        public PrecipitationState GetPrecipitationState(Vec3d pos, double totalDays)
         {
-            float level = GetPrecipitation(pos.X, pos.Y, pos.Z);
+            float level = GetPrecipitation(pos.X, pos.Y, pos.Z, totalDays);
 
             return new PrecipitationState()
             {
-                Level = level,
-                ParticleSize = level,
-                Type = EnumPrecipitationType.Rain
+                Level = Math.Max(0, level - 0.5f),
+                ParticleSize = Math.Max(0, level - 0.5f),
+                Type = level > 0 ? WeatherDataSlowAccess.GetPrecType(pos) : EnumPrecipitationType.Auto
             };
         }
-
-
-
 
 
         public float GetPrecipitation(Vec3d pos)
@@ -139,7 +110,7 @@ namespace Vintagestory.GameContent
         public float GetPrecipitation(double posX, double posY, double posZ, double totalDays)
         {
             ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)posX, (int)posY, (int)posZ), EnumGetClimateMode.WorldGenValues, totalDays);
-            return GetRainCloudness(conds, posX, posZ, totalDays) - 0.5f;
+            return Math.Max(0, GetRainCloudness(conds, posX, posZ, totalDays) - 0.5f);
         }
 
 
@@ -160,12 +131,13 @@ namespace Vintagestory.GameContent
                 return (float)OverridePrecipitation + 0.5f;
             }
 
-            float value = getPrecipNoise(posX, posZ, totalDays) * 1.6f;
-
+            float offset = 0;
             if (conds != null)
             {
-                value = GameMath.Clamp(value - (1 - conds.Rainfall * conds.Rainfall), 0, 1.5f);
+                offset = GameMath.Clamp((conds.Rainfall - 0.5f) * 2f, -1, 1f);
             }
+
+            float value = getPrecipNoise(posX, posZ, totalDays, offset);
 
             return value;
         }
@@ -176,11 +148,12 @@ namespace Vintagestory.GameContent
         }
 
 
-        float getPrecipNoise(double posX, double posZ, double totalDays)
+        float getPrecipNoise(double posX, double posZ, double totalDays, float wgenRain)
         {
             return (float)GameMath.Max(
-                precipitationNoise.Noise(posX / 9 / 2, posZ / 9 / 2 + totalDays * 4, totalDays * 2) -
-                GameMath.Clamp(precipitationNoiseSub.Noise(posX / 4 / 2, posZ / 4 / 2 + totalDays * 6, totalDays * 6) * 5 - 1, 0, 1),
+                precipitationNoise.Noise(posX / 9 / 2, posZ / 9 / 2 + totalDays * 8, totalDays * 2) * 1.6f -
+                GameMath.Clamp(precipitationNoiseSub.Noise(posX / 4 / 2, posZ / 4 / 2 + totalDays * 12, totalDays * 6) * 5 - 1 - wgenRain, 0, 1)
+                + wgenRain,
                 0
             );
         }
@@ -241,7 +214,7 @@ namespace Vintagestory.GameContent
                 }
                 catch (Exception)
                 {
-                    api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one. Likely due to game version change.", regioncoord.X, regioncoord.Z);
+                    //api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one. Likely due to game version change.", regioncoord.X, regioncoord.Z);
                     weatherSim.LoadRandomPattern();
                     weatherSim.NewWePattern.OnBeginUse();
                 }
@@ -280,3 +253,4 @@ namespace Vintagestory.GameContent
 
     }
 }
+

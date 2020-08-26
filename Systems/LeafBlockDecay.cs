@@ -148,12 +148,12 @@ namespace Vintagestory.GameContent
 
         public static bool canDecay(Block block)
         {
-            return block.BlockMaterial == EnumBlockMaterial.Leaves && block.Attributes?["canDecay"]?.AsBool(false) == true;
+            return block.BlockMaterial == EnumBlockMaterial.Leaves && block.Attributes?.IsTrue("canDecay") == true;
         }
 
         public static bool preventsDecay(Block block)
         {
-            return block.Id != 0 && block.Attributes?["preventsDecay"]?.AsBool(false) == true;
+            return block.Id != 0 && block.Attributes?.IsTrue("preventsDecay") == true;
         }
 
 

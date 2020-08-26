@@ -42,7 +42,7 @@ namespace Vintagestory.GameContent
         public override void Render(GuiElementMap map, float dt)
         {
             //if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
-            if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
+            if (quadModel == null || quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
 
             map.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
 

@@ -43,7 +43,7 @@ namespace Vintagestory.GameContent
                 float deepnessSub = GameMath.Clamp(1 - (float)capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel, 0, 1);
 
                 double rndval = capi.World.Rand.NextDouble();
-                rndval -= weatherData.distantLightningRate;
+                rndval -= weatherData.distantLightningRate * weatherSys.clientClimateCond.RainCloudOverlay;
                 if (rndval <= 0)
                 {
                     lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
@@ -58,7 +58,7 @@ namespace Vintagestory.GameContent
                 }
                 else if (nearLightningCoolDown <= 0)
                 {
-                    rndval -= weatherData.nearLightningRate;
+                    rndval -= weatherData.nearLightningRate * weatherSys.clientClimateCond.RainCloudOverlay;
                     if (rndval <= 0)
                     {
                         lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;

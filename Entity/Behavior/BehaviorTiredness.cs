@@ -70,7 +70,7 @@ namespace Vintagestory.GameContent
             if (sleeping || entity.World.Side == EnumAppSide.Client) return;
 
             float hoursPassed = (float)(entity.World.Calendar.TotalHours - hoursTotal);
-            Tiredness = Math.Min(Tiredness + hoursPassed * 0.75f, entity.World.Calendar.HoursPerDay / 2);
+            Tiredness = GameMath.Clamp(Tiredness + hoursPassed * 0.75f, 0, entity.World.Calendar.HoursPerDay / 2);
             hoursTotal = entity.World.Calendar.TotalHours;
         }
 

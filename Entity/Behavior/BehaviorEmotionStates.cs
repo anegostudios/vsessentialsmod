@@ -31,6 +31,9 @@ namespace Vintagestory.GameContent
         public string[] NotifyEntityCodes = new string[0];
         public float NotifyChances = 0;
         public float NotifyRange = 12;
+
+        public float BelowTempDuration = 0;
+        public float BelowTempThreshold = -9999;
     }
 
     public class EntityBehaviorEmotionStates : EntityBehavior
@@ -178,10 +181,16 @@ namespace Vintagestory.GameContent
                     }
                 }
 
+                float duration = newstate.Duration;
+                if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues).Temperature < newstate.BelowTempDuration)
+                {
+                    duration = newstate.BelowTempDuration;
+                }
+
                 float newDuration = 0;
-                if (newstate.AccumType == EnumAccumType.Sum) newDuration = activedur + newstate.Duration;
-                if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activedur, newstate.Duration);
-                if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activedur > 0 ? activedur : newstate.Duration;
+                if (newstate.AccumType == EnumAccumType.Sum) newDuration = activedur + duration;
+                if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activedur, duration);
+                if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activedur > 0 ? activedur : duration;
 
                 ActiveStatesById[stateid] = newDuration;
                 entityAttrById.SetFloat(""+ stateid, newDuration);

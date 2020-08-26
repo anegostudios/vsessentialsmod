@@ -36,7 +36,6 @@ namespace Vintagestory.GameContent
             EntityMapComponent mp = null;
             if (MapComps.TryGetValue(byPlayer, out mp))
             {
-                if (mapSink.IsOpened) mapSink.RemoveMapData(mp);
                 mp.Dispose();
                 MapComps.Remove(byPlayer);
             }
@@ -53,7 +52,6 @@ namespace Vintagestory.GameContent
             {
                 EntityMapComponent cmp = new EntityMapComponent(capi, otherTexture, byPlayer.Entity);
                 MapComps[byPlayer] = cmp;
-                mapSink.AddMapData(cmp);
             }
         }
 
@@ -70,8 +68,6 @@ namespace Vintagestory.GameContent
 
         public override void OnMapOpenedClient()
         {
-            int chunksize = api.World.BlockAccessor.ChunkSize;
-
             if (ownTexture == null)
             {
                 ImageSurface surface = new ImageSurface(Format.Argb32, 32, 32);
@@ -101,17 +97,12 @@ namespace Vintagestory.GameContent
 
             foreach (IPlayer player in capi.World.AllOnlinePlayers)
             {
-                EntityMapComponent cmp = null;
+                EntityMapComponent cmp;
 
                 if (MapComps.TryGetValue(player, out cmp))
                 {
                     cmp?.Dispose();
                     MapComps.Remove(player);
-                }
-                
-                if (cmp != null)
-                {
-                    mapSink.RemoveMapData(cmp);
                 }
                 
 
@@ -124,14 +115,38 @@ namespace Vintagestory.GameContent
                 cmp = new EntityMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, player.Entity);
 
                 MapComps[player] = cmp;
-                mapSink.AddMapData(cmp);
+            }
+        }
+
+
+        public override void Render(GuiElementMap mapElem, float dt)
+        {
+            foreach (var val in MapComps)
+            {
+                val.Value.Render(mapElem, dt);
+            }
+        }
+
+        public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
+        {
+            foreach (var val in MapComps)
+            {
+                val.Value.OnMouseMove(args, mapElem, hoverText);
+            }
+        }
+
+        public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
+        {
+            foreach (var val in MapComps)
+            {
+                val.Value.OnMouseUpOnElement(args, mapElem);
             }
         }
 
         public override void OnMapClosedClient()
         {
-            Dispose();
-            MapComps.Clear();
+            //Dispose();
+            //MapComps.Clear();
         }
 
 

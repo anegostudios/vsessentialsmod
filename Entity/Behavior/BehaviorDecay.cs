@@ -79,11 +79,13 @@ namespace Vintagestory.GameContent
                 double z = entity.ServerPos.Z + entity.CollisionBox.Z1 - entity.OriginCollisionBox.Z1;
 
                 BlockPos bonepos = new BlockPos((int)x, (int)y, (int)z);
-                Block exblock = entity.World.BlockAccessor.GetBlock(bonepos);
+                var bl = entity.World.BlockAccessor;
+                Block exblock = bl.GetBlock(bonepos);
 
                 if (exblock.IsReplacableBy(decblock) && !exblock.IsLiquid())
                 {
-                    entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos);
+                    bl.SetBlock(decblock.BlockId, bonepos);
+                    bl.MarkBlockDirty(bonepos);
                 } else
                 {
                     foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
@@ -114,6 +116,11 @@ namespace Vintagestory.GameContent
             base.OnEntityDeath(damageSourceForDeath);
 
             TotalHoursDead = entity.World.Calendar.TotalHours;
+
+            if (damageSourceForDeath.Source == EnumDamageSource.Void)
+            {
+                (entity as EntityAgent).AllowDespawn = true;
+            }
         }
 
 

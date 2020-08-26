@@ -12,9 +12,6 @@ namespace Vintagestory.GameContent
     public interface IWorldMapManager
     {
         bool IsOpened { get; }
-        void AddMapData(MapComponent cmp);
-        bool RemoveMapData(MapComponent cmp);
-
         void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos);
 
         void SendMapDataToClient(MapLayer forMapLayer, IServerPlayer forPlayer, byte[] data);

@@ -10,6 +10,19 @@ using Vintagestory.API.Util;
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class WeatherPatternAssetsPacket {
+        public string Data;
+    }
+
+    public class WeatherPatternAssets
+    {
+        public WeatherSystemConfig GeneralConfig;
+        public WeatherPatternConfig[] WeatherConfigs;
+        public WindPatternConfig[] WindConfigs;
+        public WeatherEventConfig[] WeatherEventConfigs;
+    }
+
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class WeatherState
     {
         public int RegionX;
@@ -19,6 +32,7 @@ namespace Vintagestory.GameContent
         public WeatherPatternState OldPattern;
 
         public WindPatternState WindPattern;
+        public WeatherEventState WeatherEvent;
 
         public float TransitionDelay;
         public float Weight;
@@ -97,8 +111,9 @@ namespace Vintagestory.GameContent
         public float nowLightningMinTempature;
 
         public float nowPrecIntensity = 0;
-        //public EnumPrecipitationType nowPrecType = EnumPrecipitationType.Auto;
-        public float nowPrecParticleSize = 0.1f;
+        public EnumPrecipitationType nowPrecType = EnumPrecipitationType.Auto;
+        
+        //public float nowPrecParticleSize = 0.1f;
 
         public float nowBasePrecIntensity;
     }

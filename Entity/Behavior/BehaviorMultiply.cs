@@ -216,8 +216,7 @@ namespace Vintagestory.GameContent
 
         private bool TryGetPregnant()
         {
-            if (entity.World.Rand.NextDouble() > 0.01) return false;
-            if (!HasRequiredEntityNearby()) return false;
+            if (entity.World.Rand.NextDouble() > 0.03) return false;
             if (TotalDaysCooldownUntil > entity.World.Calendar.TotalDays) return false;
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
@@ -227,6 +226,9 @@ namespace Vintagestory.GameContent
             
             if (saturation >= PortionsEatenForMultiply)
             {
+                Entity maleentity = null;
+                if (RequiresNearbyEntityCode != null && (maleentity = GetRequiredEntityNearby()) == null) return false;
+
                 if (entity.World.Rand.NextDouble() < 0.2)
                 {
                     tree.SetFloat("saturation", saturation - 1);
@@ -234,6 +236,12 @@ namespace Vintagestory.GameContent
                 }
 
                 tree.SetFloat("saturation", saturation - PortionsEatenForMultiply);
+
+                if (maleentity != null)
+                {
+                    maleentity.WatchedAttributes.SetFloat("saturation", Math.Max(0, saturation - 1));
+                }
+
                 IsPregnant = true;
                 TotalDaysPregnancyStart = entity.World.Calendar.TotalDays;
                 entity.WatchedAttributes.MarkPathDirty("multiply");
@@ -256,14 +264,23 @@ namespace Vintagestory.GameContent
             return tree.GetFloat("saturation", 0);
         }
 
-        private bool HasRequiredEntityNearby()
+        private Entity GetRequiredEntityNearby()
         {
-            if (RequiresNearbyEntityCode == null) return true;
+            if (RequiresNearbyEntityCode == null) return null;
 
-            return entity.World.GetEntitiesAround(entity.ServerPos.XYZ, RequiresNearbyEntityRange, RequiresNearbyEntityRange, (e) =>
+            return entity.World.GetNearestEntity(entity.ServerPos.XYZ, RequiresNearbyEntityRange, RequiresNearbyEntityRange, (e) =>
             {
-                return e.WildCardMatch(new AssetLocation(RequiresNearbyEntityCode));
-            }).Length > 0;
+                if (e.WildCardMatch(new AssetLocation(RequiresNearbyEntityCode)))
+                {
+                    if (!e.WatchedAttributes.GetBool("doesEat") || (e.WatchedAttributes["hunger"] as ITreeAttribute)?.GetFloat("saturation") >= 1)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+
+            });
         }
 
         /*public bool IsGrowthCapped()
