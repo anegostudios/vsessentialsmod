@@ -72,7 +72,15 @@ namespace Vintagestory.GameContent
                 }
 
                 IAiTask task = (IAiTask)Activator.CreateInstance(taskType, (EntityAgent)entity);
-                task.LoadConfig(taskConfig, aiconfig);
+
+                try
+                {
+                    task.LoadConfig(taskConfig, aiconfig);
+                } catch (Exception e)
+                {
+                    entity.World.Logger.Error("Task with code {0} for entity {1}: Unable to load json code.", taskCode, entity.Code);
+                    throw e;
+                }
 
                 taskManager.AddTask(task);
             }

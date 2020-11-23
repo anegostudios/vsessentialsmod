@@ -62,7 +62,7 @@ namespace Vintagestory.GameContent
         {
             if (dx < 0 || dx >= ChunkLen || dz < 0 || dz >= ChunkLen) throw new ArgumentOutOfRangeException("dx/dz must be within [0," + (ChunkLen - 1) + "]");
 
-            if (tmpTexture == null)
+            if (tmpTexture == null || tmpTexture.Disposed)
             {
                 tmpTexture = new LoadedTexture(capi, 0, chunksize, chunksize);
             }

@@ -11,6 +11,7 @@ namespace Vintagestory.GameContent
 
     public interface IWorldMapManager
     {
+        bool IsShuttingDown { get; }
         bool IsOpened { get; }
         void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos);
 

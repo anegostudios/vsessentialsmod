@@ -20,7 +20,7 @@ namespace Vintagestory.GameContent
         AnimatorBase animator;
         protected Dictionary<string, AnimationMetaData> activeAnimationsByAnimCode = new Dictionary<string, AnimationMetaData>();
 
-        MeshRef meshref;
+        internal MeshRef meshref;
         int textureId;
 
         public float[] ModelMat = Mat4f.Create();
@@ -36,18 +36,23 @@ namespace Vintagestory.GameContent
             this.activeAnimationsByAnimCode = activeAnimationsByAnimCode;
             this.meshref = meshref;
             this.rotation = rotation;
-            if (rotation == null) rotation = new Vec3f();
+            if (rotation == null) this.rotation = new Vec3f();
 
-            textureId = capi.BlockTextureAtlas.GetPosition(capi.World.BlockAccessor.GetBlock(pos), "rusty").atlasTextureId;
+            textureId = capi.BlockTextureAtlas.AtlasTextureIds[0];//.GetPosition(capi.World.BlockAccessor.GetBlock(pos), "rusty").atlasTextureId;
 
-            capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimatable");
+            (capi as ICoreClientAPI).Event.EnqueueMainThreadTask(() =>
+            {
+                capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimatable");
+                capi.Event.RegisterRenderer(this, EnumRenderStage.ShadowFar, "beanimatable");
+                capi.Event.RegisterRenderer(this, EnumRenderStage.ShadowNear, "beanimatable");
+            }, "registerrenderers");
         }
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (!ShouldRender) return;
 
-            animator.OnFrame(activeAnimationsByAnimCode, dt);
+            bool shadowPass = stage != EnumRenderStage.Opaque;
             
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
@@ -65,39 +70,36 @@ namespace Vintagestory.GameContent
             prevProg?.Stop();
 
 
-            IShaderProgram prog = rpi.GetEngineShader(EnumShaderProgram.Entityanimated);
+            IShaderProgram prog = rpi.GetEngineShader(shadowPass ? EnumShaderProgram.Shadowmapentityanimated : EnumShaderProgram.Entityanimated);
             prog.Use();
+            Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)pos.X, (int)pos.Y, (int)pos.Z);
+            rpi.GlToggleBlend(true, EnumBlendMode.Standard);
 
-            prog.Uniform("rgbaAmbientIn", rpi.AmbientColor);
-            prog.Uniform("rgbaFogIn", rpi.FogColor);
-            prog.Uniform("fogMinIn", rpi.FogMin);
-            prog.Uniform("fogDensityIn", rpi.FogDensity);
+            if (!shadowPass)
+            {
+                prog.Uniform("rgbaAmbientIn", rpi.AmbientColor);
+                prog.Uniform("rgbaFogIn", rpi.FogColor);
+                prog.Uniform("fogMinIn", rpi.FogMin);
+                prog.Uniform("fogDensityIn", rpi.FogDensity);
+                prog.Uniform("rgbaLightIn", lightrgbs);
+                prog.Uniform("renderColor", ColorUtil.WhiteArgbVec);
+                prog.Uniform("alphaTest", 0.1f);
+                prog.UniformMatrix("modelMatrix", ModelMat);
+                prog.UniformMatrix("viewMatrix", rpi.CameraMatrixOriginf);
+                prog.Uniform("windWaveIntensity", (float)0);
+                prog.Uniform("skipRenderJointId", -2);
+                prog.Uniform("skipRenderJointId2", -2);
+                prog.Uniform("glitchEffectStrength", 0f);
+            } else
+            {
+                prog.UniformMatrix("modelViewMatrix", Mat4f.Mul(new float[16], capi.Render.CurrentModelviewMatrix, ModelMat));
+            }
+
             prog.BindTexture2D("entityTex", textureId, 0);
-            prog.Uniform("alphaTest", 0.1f);
             prog.UniformMatrix("projectionMatrix", rpi.CurrentProjectionMatrix);
 
-            
-            rpi.GlToggleBlend(true, EnumBlendMode.Standard);
-            
-
-            Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)pos.X, (int)pos.Y, (int)pos.Z);
-
-            prog.Uniform("rgbaLightIn", lightrgbs);
-            //prog.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
-            prog.UniformMatrix("modelMatrix", ModelMat);
-            prog.UniformMatrix("viewMatrix", rpi.CameraMatrixOriginf);
             prog.Uniform("addRenderFlags", 0);
-            prog.Uniform("windWaveIntensity", (float)0);
-
-            /*color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
-            color[1] = ((entity.RenderColor >> 8) & 0xff) / 255f;
-            color[2] = ((entity.RenderColor >> 0) & 0xff) / 255f;
-            color[3] = ((entity.RenderColor >> 24) & 0xff) / 255f;
-
-            prog.Uniform("renderColor", color);*/
-
-            prog.Uniform("renderColor", ColorUtil.WhiteArgbVec);
-
+            
 
             prog.UniformMatrices(
                 "elementTransforms",
@@ -115,6 +117,8 @@ namespace Vintagestory.GameContent
         public void Dispose()
         {
             capi.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);
+            capi.Event.UnregisterRenderer(this, EnumRenderStage.ShadowFar);
+            capi.Event.UnregisterRenderer(this, EnumRenderStage.ShadowNear);
             meshref?.Dispose();
         }
 

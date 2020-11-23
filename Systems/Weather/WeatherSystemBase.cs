@@ -23,8 +23,8 @@ namespace Vintagestory.GameContent
         protected SimplexNoise precipitationNoise;
         protected SimplexNoise precipitationNoiseSub;
 
-        public float? OverridePrecipitation;
-
+        public virtual float? OverridePrecipitation { get; set; }
+        public virtual double RainCloudDaysOffset { get; set; }
 
         public WeatherSimulationRegion dummySim;
 
@@ -49,6 +49,13 @@ namespace Vintagestory.GameContent
                .RegisterMessageType(typeof(WeatherConfigPacket))
                .RegisterMessageType(typeof(WeatherPatternAssetsPacket))
             ;
+
+            api.Event.OnGetWindSpeed += Event_OnGetWindSpeed;
+        }
+
+        private void Event_OnGetWindSpeed(Vec3d pos, ref Vec3d windSpeed)
+        {
+            windSpeed.X = WeatherDataSlowAccess.GetWindSpeed(pos);
         }
 
         public void Initialize()
@@ -118,6 +125,7 @@ namespace Vintagestory.GameContent
         protected void Event_OnGetClimate(ref ClimateCondition climate, BlockPos pos, EnumGetClimateMode mode = EnumGetClimateMode.WorldGenValues, double totalDays = 0)
         {
             if (mode == EnumGetClimateMode.WorldGenValues) return;
+
             float rainCloudness = GetRainCloudness(climate, pos.X + 0.5, pos.Z + 0.5, totalDays);
 
             climate.Rainfall = GameMath.Clamp(rainCloudness - 0.5f, 0, 1);
@@ -134,10 +142,10 @@ namespace Vintagestory.GameContent
             float offset = 0;
             if (conds != null)
             {
-                offset = GameMath.Clamp((conds.Rainfall - 0.5f) * 2f, -1, 1f);
+                offset = GameMath.Clamp((conds.Rainfall - 0.6f) * 2f, -1, 1f);
             }
 
-            float value = getPrecipNoise(posX, posZ, totalDays, offset);
+            float value = getPrecipNoise(posX, posZ, totalDays + RainCloudDaysOffset, offset);
 
             return value;
         }
@@ -151,8 +159,8 @@ namespace Vintagestory.GameContent
         float getPrecipNoise(double posX, double posZ, double totalDays, float wgenRain)
         {
             return (float)GameMath.Max(
-                precipitationNoise.Noise(posX / 9 / 2, posZ / 9 / 2 + totalDays * 8, totalDays * 2) * 1.6f -
-                GameMath.Clamp(precipitationNoiseSub.Noise(posX / 4 / 2, posZ / 4 / 2 + totalDays * 12, totalDays * 6) * 5 - 1 - wgenRain, 0, 1)
+                precipitationNoise.Noise(posX / 9 / 2 + totalDays * 18, posZ / 9 / 2, totalDays * 4) * 1.6f -
+                GameMath.Clamp(precipitationNoiseSub.Noise(posX / 4 / 2 + totalDays * 24, posZ / 4 / 2, totalDays * 6) * 5 - 1 - wgenRain, 0, 1)
                 + wgenRain,
                 0
             );

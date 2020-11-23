@@ -80,9 +80,11 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public float HarvestDuration
+
+        float baseHarvestDuration;
+        public float GetHarvestDuration(Entity forEntity) 
         {
-            get; protected set;
+            return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingSpeed");
         }
 
         public bool IsHarvested
@@ -218,7 +220,7 @@ namespace Vintagestory.GameContent
                 jsonDrops = typeAttributes["drops"].AsObject<BlockDropItemStack[]>();
             }
 
-            HarvestDuration = typeAttributes["duration"].AsFloat(5);   
+            baseHarvestDuration = typeAttributes["duration"].AsFloat(5);   
         }
 
 
@@ -282,6 +284,12 @@ namespace Vintagestory.GameContent
             entity.WatchedAttributes.SetBool("harvested", true);
 
             if (entity.World.Side == EnumAppSide.Client) return;
+
+
+            if (!entity.Attributes.GetBool("isMechanical", false))
+            {
+                dropQuantityMultiplier *= byPlayer.Entity.Stats.GetBlended("animalLootDropRate");
+            }
 
 
             List<ItemStack> todrop = new List<ItemStack>();

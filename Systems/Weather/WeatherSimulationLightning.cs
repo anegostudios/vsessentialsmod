@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
                     float pitch = GameMath.Clamp((float)rnd.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2 - deepnessSub / 2, 0.6f, 1.15f);
                     float volume = GameMath.Clamp(Math.Min(1, 0.25f + lightningTime + lightningIntensity / 2) - 2f * deepnessSub, 0, 1);
                     
-                    capi.World.PlaySoundAt(new AssetLocation("sounds/weather/lightning-distant.ogg"), 0, 0, 0, null, EnumSoundType.Ambient, pitch, 32, volume);
+                    capi.World.PlaySoundAt(new AssetLocation("sounds/weather/lightning-distant.ogg"), 0, 0, 0, null, EnumSoundType.Weather, pitch, 32, volume);
                 }
                 else if (nearLightningCoolDown <= 0)
                 {
@@ -80,7 +80,7 @@ namespace Vintagestory.GameContent
                         }
 
                         
-                        capi.World.PlaySoundAt(loc, 0, 0, 0, null, EnumSoundType.Ambient, pitch, 32, volume);
+                        capi.World.PlaySoundAt(loc, 0, 0, 0, null, EnumSoundType.Weather, pitch, 32, volume);
                     }
                 }
             }

@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
 
         EntityPartitioning partitionUtil;
 
-        float accumTempTest;
+        
         bool lowTempMode;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
@@ -147,13 +147,16 @@ namespace Vintagestory.GameContent
 
             if (belowTempThreshold > -99)
             {
-                lowTempMode = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues).Temperature <= belowTempThreshold;
+                ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
+                lowTempMode = conds != null && conds.Temperature <= belowTempThreshold;
             }
 
             float range = lowTempMode ? belowTempSeekingRange : seekingRange;
 
 
             lastSearchTotalMs = entity.World.ElapsedMilliseconds;
+
+            Vec3d ownPos = entity.ServerPos.XYZ;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
@@ -164,10 +167,13 @@ namespace Vintagestory.GameContent
                     {
                         if (e.Code.Path == "player")
                         {
+                            float rangeMul = e.Stats.GetBlended("animalSeekingRange");
+
                             IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            return 
-                                player == null || 
-                                (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing);
+                            return
+                                (rangeMul == 1 || e.ServerPos.DistanceTo(ownPos) < range * rangeMul) &&
+                                (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
+                            ;
                         }
                         return true;
                     }

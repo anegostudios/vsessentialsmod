@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
-using VintagestoryAPI.Util;
+using Vintagestory.API.Util;
 using AnimatedGif;
 using System.Diagnostics;
 using Vintagestory.API.Util;
@@ -39,10 +39,68 @@ namespace Vintagestory.GameContent
             this.sapi = sapi;
 
             sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
-//#if DEBUG
+#if DEBUG
             sapi.RegisterCommand("prectest", "Precipitation test export", "", cmdPrecTestServer, Privilege.controlserver);
             sapi.RegisterCommand("snowaccum", "Snow accum test", "", cmdSnowAccum, Privilege.controlserver);
-//#endif
+#endif
+
+            sapi.RegisterCommand("whenwillitstopraining", "When does it finally stop to rain around here?!", "", cmdWhenWillItStopRaining, Privilege.controlserver);
+        }
+
+        private void cmdWhenWillItStopRaining(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            rainStopFunc(player, groupId);
+
+        }
+
+        private void rainStopFunc(IServerPlayer player, int groupId, bool skipForward = false)
+        {
+            WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            Vec3d pos = player.Entity.Pos.XYZ;
+
+            float days = 0;
+            float daysrainless = 0f;
+            float firstRainLessDay = 0f;
+            bool found = false;
+            while (days < 21)
+            {
+                float precip = wsys.GetPrecipitation(pos.X, pos.Y, pos.Z, sapi.World.Calendar.TotalDays + days);
+                if (precip < 0.04f)
+                {
+                    if (!found)
+                    {
+                        firstRainLessDay = days;
+                    }
+
+                    found = true;
+
+                    daysrainless += 1f / sapi.World.Calendar.HoursPerDay;
+
+                }
+                else
+                {
+                    if (found) break;
+                }
+
+                days += 1f / sapi.World.Calendar.HoursPerDay;
+            }
+
+
+            if (daysrainless > 0)
+            {
+                if (skipForward)
+                {
+                    wsys.RainCloudDaysOffset += daysrainless;
+                    player.SendMessage(groupId, string.Format("Ok, forwarded rain simulation by {0:0.##} days. The rain should stop for about {1:0.##} days now", firstRainLessDay, daysrainless), EnumChatType.CommandSuccess);
+                    return;
+                }
+
+                player.SendMessage(groupId, string.Format("In about {0:0.##} days the rain should stop for about {1:0.##} days", firstRainLessDay, daysrainless), EnumChatType.CommandSuccess);
+            }
+            else
+            {
+                player.SendMessage(groupId, string.Format("No rain less days found for the next 3 in-game weeks :O"), EnumChatType.CommandSuccess);
+            }
         }
 
         private void cmdSnowAccum(IServerPlayer player, int groupId, CmdArgs args)
@@ -78,7 +136,7 @@ namespace Vintagestory.GameContent
 
             if (cmd == "info")
             {
-                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+                BlockPos plrPos = player.Entity.Pos.AsBlockPos; 
                 int chunksize = api.World.BlockAccessor.ChunkSize;
                 Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
                 IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
@@ -90,7 +148,6 @@ namespace Vintagestory.GameContent
 
                 int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
                 int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
-                IMapRegion mapreg = api.World.BlockAccessor.GetMapRegion(regionX, regionZ);
 
                 WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
                 long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
@@ -311,6 +368,18 @@ namespace Vintagestory.GameContent
 
             if (arg == "setprecip")
             {
+                if (args.Length == 0)
+                {
+                    if (wsysServer.OverridePrecipitation == null)
+                    {
+                        player.SendMessage(groupId, "Currently no precipitation override active.", EnumChatType.CommandSuccess);
+                    } else
+                    {
+                        player.SendMessage(groupId, string.Format("Override precipitation value is currently at {0}.", wsysServer.OverridePrecipitation), EnumChatType.CommandSuccess);
+                    }
+                    return;
+                }
+
                 string val = args.PopWord();
 
                 if (val == "auto")
@@ -325,7 +394,18 @@ namespace Vintagestory.GameContent
                     player.SendMessage(groupId, string.Format("Ok precipitation set to {0}", level), EnumChatType.CommandSuccess);
                 }
 
-                wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { OverridePrecipitation = wsysServer.OverridePrecipitation });
+                wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { 
+                    OverridePrecipitation = wsysServer.OverridePrecipitation,
+                    RainCloudDaysOffset = wsysServer.RainCloudDaysOffset
+                });
+
+                return;
+            }
+
+            if (arg == "stoprain")
+            {
+                rainStopFunc(player, groupId, true);
+                wsysServer.broadCastConfigUpdate();
                 return;
             }
 

@@ -23,6 +23,7 @@ namespace Vintagestory.GameContent
         public float Chance = 0;
         public int Slot = 0;
         public float Priority = 0;
+        public float StressLevel = 0;
         public EnumAccumType AccumType = EnumAccumType.Max;  // sum, max or noaccum
 
         public float whenHealthRelBelow = 999f;
@@ -138,8 +139,26 @@ namespace Vintagestory.GameContent
         }
 
 
+        public bool IsInEmotionState(string statecode)
+        {
+            for (int stateid = 0; stateid < availableStates.Count; stateid++)
+            {
+                EmotionState newstate = availableStates[stateid];
+
+                if (newstate.Code != statecode) continue;
+
+                return ActiveStatesById.ContainsKey(stateid);
+            }
+
+            return false;
+        }
 
         public bool TryTriggerState(string statecode)
+        {
+            return TryTriggerState(statecode, entity.World.Rand.NextDouble());
+        }
+
+        public bool TryTriggerState(string statecode, double chance)
         {
             bool triggered=false;
 
@@ -147,7 +166,7 @@ namespace Vintagestory.GameContent
             {
                 EmotionState newstate = availableStates[stateid];
             
-                if (newstate.Code != statecode || entity.World.Rand.NextDouble() > newstate.Chance) continue;
+                if (newstate.Code != statecode || chance > newstate.Chance) continue;
 
                 if (newstate.whenHealthRelBelow < healthRel)
                 {
@@ -209,6 +228,8 @@ namespace Vintagestory.GameContent
 
             List<int> active = ActiveStatesById.Keys.ToList();
 
+            float nowStressLevel = 0f;
+
             foreach (int stateid in active) 
             {
                 ActiveStatesById[stateid] -= 10*deltaTime;
@@ -221,9 +242,24 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
+                nowStressLevel += availableStates[stateid].StressLevel;
+
                 entityAttrById.SetFloat(stateid+"", leftDur);
                 entityAttrById.SetFloat(availableStates[stateid].Code, leftDur);
             }
+
+            float curlevel = entity.WatchedAttributes.GetFloat("stressLevel");
+            if (nowStressLevel > 0)
+            {
+                entity.WatchedAttributes.SetFloat("stressLevel", Math.Max(curlevel, nowStressLevel));
+            }
+            else
+            {
+                curlevel = Math.Max(0, curlevel - 1 / 20f);
+
+                entity.WatchedAttributes.SetFloat("stressLevel", curlevel);
+            }
+
 
             if (entity.World.EntityDebugMode) {
                 entity.DebugAttributes.SetString("emotionstates", string.Join(", ", active));

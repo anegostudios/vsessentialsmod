@@ -60,7 +60,7 @@ namespace Vintagestory.GameContent
 
         // Client and Server side stuff
         Thread mapLayerGenThread;
-        bool isShuttingDown = false;
+        public bool IsShuttingDown { get; set; }
 
         // Server side stuff
         ICoreServerAPI sapi;
@@ -111,11 +111,11 @@ namespace Vintagestory.GameContent
 
             capi.Event.LeaveWorld += () =>
             {
-                isShuttingDown = true;
+                IsShuttingDown = true;
                 int i = 0;
                 while (mapLayerGenThread != null && mapLayerGenThread.IsAlive && i < 20)
                 {
-                    Thread.Sleep(20);
+                    Thread.Sleep(50);
                     i++;
                 }
 
@@ -186,7 +186,7 @@ namespace Vintagestory.GameContent
 
             mapLayerGenThread = new Thread(new ThreadStart(() =>
             {
-                while (!isShuttingDown)
+                while (!IsShuttingDown)
                 {
                     foreach (MapLayer layer in MapLayers)
                     {
@@ -319,7 +319,7 @@ namespace Vintagestory.GameContent
             this.sapi = sapi;
 
             sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLoaded);
-            sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => IsShuttingDown = true);
 
             serverChannel =
                sapi.Network.RegisterChannel("worldmap")

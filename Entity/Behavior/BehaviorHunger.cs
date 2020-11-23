@@ -216,9 +216,8 @@ namespace Vintagestory.GameContent
             if (entity is EntityPlayer)
             {
                 EntityPlayer plr = (EntityPlayer)entity;
-                if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
-
                 EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
+                
                 if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
 
                 if (plr.Controls.TriesToMove || plr.Controls.Jump || plr.Controls.LeftMouseDown || plr.Controls.RightMouseDown)
@@ -302,7 +301,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier * 0.25f);
+                DairyLevel = Math.Max(0, DairyLevel - Math.Max(0.5f, 0.001f * DairyLevel) * satLossMultiplier * 0.25f / 2);
             }
 
             UpdateNutrientHealthBoost();
@@ -332,10 +331,11 @@ namespace Vintagestory.GameContent
             float grainRel = GrainLevel / MaxSaturation;
             float vegetableRel = VegetableLevel / MaxSaturation;
             float proteinRel = ProteinLevel / MaxSaturation;
+            float dairyRel = DairyLevel / MaxSaturation;
 
             EntityBehaviorHealth bh = entity.GetBehavior<EntityBehaviorHealth>();
 
-            float healthGain = 2.5f * (fruitRel + grainRel + vegetableRel + proteinRel);
+            float healthGain = 2.5f * (fruitRel + grainRel + vegetableRel + proteinRel + dairyRel);
 
             bh.MaxHealthModifiers["nutrientHealthMod"] = healthGain;
             bh.MarkDirty();
@@ -365,7 +365,7 @@ namespace Vintagestory.GameContent
 
                 Room room = entity.World.Api.ModLoader.GetModSystem<RoomRegistry>().GetRoomForPosition(entity.Pos.AsBlockPos);
 
-                entity.Stats.Set("hungerrate", "resistcold", room.ExitCount == 0 ? diff/10f : 0, true);
+                entity.Stats.Set("hungerrate", "resistcold", room.ExitCount == 0 ? 0 : diff / 40f, true);
             }
 
 

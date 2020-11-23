@@ -7,6 +7,11 @@ namespace Vintagestory.API.Common
     public interface IAiTask
     {
         /// <summary>
+        /// A unique identifer for this task
+        /// </summary>
+        string Id { get; }
+
+        /// <summary>
         /// Up to 8 tasks can be active concurrently. This number denotes the index of task. Most tasks run in slot 0.
         /// </summary>
         int Slot { get; }

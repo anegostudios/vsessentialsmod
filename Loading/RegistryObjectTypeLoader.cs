@@ -77,9 +77,9 @@ namespace Vintagestory.ServerMods.NoObf
             blockTypes = new Dictionary<AssetLocation, BlockType>();
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
             {
-                JToken property = null;
+                JToken property;
                 JObject blockTypeObject = entry.Value;
-                AssetLocation location = null;
+                AssetLocation location;
                 try
                 {
                     location = blockTypeObject.GetValue("code").ToObject<AssetLocation>();
@@ -91,8 +91,8 @@ namespace Vintagestory.ServerMods.NoObf
                     continue;
                 }
 
-
-                blockTypes.Add(entry.Key, new BlockType()
+                BlockType bt;
+                blockTypes.Add(entry.Key, bt = new BlockType()
                 {
                     Code = location,
                     VariantGroups = blockTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
@@ -101,6 +101,16 @@ namespace Vintagestory.ServerMods.NoObf
                     Enabled = blockTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
                     jsonObject = blockTypeObject
                 });
+
+                if (bt.SkipVariants != null)
+                {
+                    foreach (var loc in bt.SkipVariants) loc.Domain = entry.Key.Domain;
+                }
+                if (bt.AllowedVariants != null)
+                {
+                    foreach (var loc in bt.AllowedVariants) loc.Domain = entry.Key.Domain;
+                }
+
             }
 
             itemTypes = new Dictionary<AssetLocation, ItemType>();
@@ -112,7 +122,8 @@ namespace Vintagestory.ServerMods.NoObf
                 AssetLocation location = itemTypeObject.GetValue("code").ToObject<AssetLocation>();
                 location.Domain = entry.Key.Domain;
 
-                itemTypes.Add(entry.Key, new ItemType()
+                ItemType et;
+                itemTypes.Add(entry.Key, et = new ItemType()
                 {
                     Code = location,
                     VariantGroups = itemTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
@@ -121,6 +132,15 @@ namespace Vintagestory.ServerMods.NoObf
                     Enabled = itemTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
                     jsonObject = itemTypeObject
                 });
+
+                if (et.SkipVariants != null)
+                {
+                    foreach (var loc in et.SkipVariants) loc.Domain = entry.Key.Domain;
+                }
+                if (et.AllowedVariants != null)
+                {
+                    foreach (var loc in et.AllowedVariants) loc.Domain = entry.Key.Domain;
+                }
             }
 
             entityTypes = new Dictionary<AssetLocation, EntityType>();
@@ -142,7 +162,9 @@ namespace Vintagestory.ServerMods.NoObf
 
                 try
                 {
-                    entityTypes.Add(entry.Key, new EntityType()
+                    EntityType et;
+
+                    entityTypes.Add(entry.Key, et = new EntityType()
                     {
                         Code = location,
                         VariantGroups = entityTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
@@ -151,6 +173,16 @@ namespace Vintagestory.ServerMods.NoObf
                         Enabled = entityTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
                         jsonObject = entityTypeObject
                     });
+
+                    if (et.SkipVariants != null)
+                    {
+                        foreach (var loc in et.SkipVariants) loc.Domain = entry.Key.Domain;
+                    }
+                    if (et.AllowedVariants != null)
+                    {
+                        foreach (var loc in et.AllowedVariants) loc.Domain = entry.Key.Domain;
+                    }
+
                 } catch (Exception e)
                 {
                     api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
@@ -424,6 +456,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.HeldTpUseAnimation = typedItemType.HeldTpUseAnimation;
             item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
             item.MatterState = typedItemType.MatterState;
+            item.ParticleProperties = typedItemType.ParticleProperties;
 
             typedItemType.InitItem(api.World.Logger, item, variant);
 

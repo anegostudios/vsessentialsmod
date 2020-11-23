@@ -15,6 +15,8 @@ namespace Vintagestory.GameContent
 
 
         public ClimateCondition clientClimateCond;
+        public bool playerChunkLoaded;
+
         float quarterSecAccum = 0;
         BlockPos plrPos = new BlockPos();
         Vec3d plrPosd = new Vec3d();
@@ -30,9 +32,21 @@ namespace Vintagestory.GameContent
         public WeatherSimulationLightning simLightning;
         public AuroraRenderer auroraRenderer;
 
-        
 
-        public WeatherDataSnapshot BlendedWeatherData => WeatherDataAtPlayer.BlendedWeatherData;
+        private long blendedLastCheckedMS = -1L;
+        private WeatherDataSnapshot blendedWeatherDataCached = null;
+        public WeatherDataSnapshot BlendedWeatherData {
+            get
+            {
+                long ms = capi.ElapsedMilliseconds / 10L;  //Can't possibly need to update client-side weather more than 100 times per second
+                if (ms != blendedLastCheckedMS)
+                {
+                    blendedLastCheckedMS = ms;
+                    blendedWeatherDataCached = WeatherDataAtPlayer.BlendedWeatherData;
+                }
+                return blendedWeatherDataCached;
+            }
+        }
 
         public WeatherDataReaderPreLoad WeatherDataAtPlayer;
 
@@ -137,6 +151,8 @@ namespace Vintagestory.GameContent
             {
                 clientClimateCond = capi.World.BlockAccessor.GetClimateAt(plrPos, EnumGetClimateMode.NowValues);
                 quarterSecAccum = 0;
+
+                playerChunkLoaded |= capi.World.BlockAccessor.GetChunkAtBlockPos(plrPos) != null; // To avoid rain for one second right after joining
             }
 
             simLightning.ClientTick(dt);
@@ -159,6 +175,7 @@ namespace Vintagestory.GameContent
         private void OnWeatherConfigUpdatePacket(WeatherConfigPacket packet)
         {
             OverridePrecipitation = packet.OverridePrecipitation;
+            RainCloudDaysOffset = packet.RainCloudDaysOffset;
         }
 
         private void OnWeatherUpdatePacket(WeatherState msg)
@@ -263,9 +280,6 @@ namespace Vintagestory.GameContent
             renderer.CloudTick(0.1f);
         }
 
-       
-
-
         public override void Dispose()
         {
             base.Dispose();
@@ -282,6 +296,31 @@ namespace Vintagestory.GameContent
             get { return capi.Ambient.BlendedCloudYPos; }
         }
 
-        
+        /// <summary>
+        /// Get the current precipitation as seen by the client at pos
+        /// </summary>
+        /// <param name="rainOnly">If true, returns 0 if it is currently snowing</param>
+        /// <returns></returns>
+        public double GetActualRainLevel(BlockPos pos, bool rainOnly = false)
+        {
+            ClimateCondition conds = clientClimateCond;
+            if (conds == null || !playerChunkLoaded) return 0.0;
+            float precIntensity = conds.Rainfall;
+
+            if (rainOnly)
+            {
+                // TODO:  Testing whether it is snowing or not on the client is kinda slow - though the WeatherSimulationParticles must already know!
+
+                WeatherDataSnapshot weatherData = BlendedWeatherData;
+                EnumPrecipitationType precType = weatherData.BlendedPrecType;
+                if (precType == EnumPrecipitationType.Auto)
+                {
+                    precType = conds.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+                }
+                if (precType == EnumPrecipitationType.Snow) return 0d;
+            }
+
+            return precIntensity;
+        }
     }
 }

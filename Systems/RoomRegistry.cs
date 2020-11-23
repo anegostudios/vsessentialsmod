@@ -189,25 +189,25 @@ namespace Vintagestory.GameContent
                     Block nBlock = blockAccess.GetBlock(npos);
 
                     // We hit a wall, no need to scan further
-                    if (nBlock.SideSolid[facing.GetOpposite().Index] || nBlock.SideSolid[facing.Index])
+                    if (nBlock.SideSolid[facing.Opposite.Index] || nBlock.SideSolid[facing.Index])
                     {
-                        if (nBlock.BlockMaterial == EnumBlockMaterial.Stone || nBlock.BlockMaterial == EnumBlockMaterial.Soil || nBlock.BlockMaterial == EnumBlockMaterial.Ceramic) coolingWallCount++;
+                        if (nBlock.BlockMaterial == EnumBlockMaterial.Ore || nBlock.BlockMaterial == EnumBlockMaterial.Stone || nBlock.BlockMaterial == EnumBlockMaterial.Soil || nBlock.BlockMaterial == EnumBlockMaterial.Ceramic) coolingWallCount++;
                         else nonCoolingWallCount++;
                         
                         continue;
                     }
 
-                    // We hit a door or trapdoor - stop, but penalty!
+                    // We hit another type of wall
                     if (nBlock.Code?.Path.Contains("door") == true || nBlock.Code?.Path.Contains("farmland") == true)
                     {
                         nonCoolingWallCount+=3;
                         continue;
                     }
-                    
-                    // Only traverse within an 12x12x12 block cube
+
+                    // Only traverse within maxHalfSize range
                     bool inCube = Math.Abs(npos.X - pos.X) <= maxHalfSize && Math.Abs(npos.Y - pos.Y) <= maxHalfSize && Math.Abs(npos.Z - pos.Z) <= maxHalfSize;
 
-                    // Outside the 12x12x12. Count as exit and don't continue searching in this direction
+                    // Outside maxHalfSize range. Count as exit and don't continue searching in this direction
                     if (!inCube)
                     {
                         exitCount++;

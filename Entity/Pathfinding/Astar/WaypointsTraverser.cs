@@ -117,23 +117,38 @@ namespace Vintagestory.Essentials
         {
             if (!Active) return;
 
-            Vec3d target = waypoints[Math.Min(waypoints.Count - 1, waypointToReachIndex)];
+            int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex);
+            Vec3d target = waypoints[wayPointIndex];
+
+            // Due to the nature of gravity and going down slope we sometimes end up at the next waypoint. So lets also test for the next waypoint
+            // Doesn't seem to fully fix the issue though
+            int nextwayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + 1);
+            Vec3d nexttarget = waypoints[nextwayPointIndex];
 
             // For land dwellers only check horizontal distance
             double sqDistToTarget = Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 1, entity.ServerPos.Z));       // One block above is also ok
             double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
 
+            double sqDistToNextTarget = Math.Min(nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 1, entity.ServerPos.Z));       // One block above is also ok
+
             bool nearHorizontally = horsqDistToTarget < 1;
             bool nearAllDirs = sqDistToTarget < targetDistance * targetDistance;
-            
+
+            bool nearAllDirsNext = sqDistToNextTarget < targetDistance * targetDistance;
+
             //float speedMul = 1;// entity.Properties.Habitat == API.Common.EnumHabitat.Land && waypointToReachIndex >= waypoints.Count - 1 ? Math.Min(1, GameMath.Sqrt(horsqDistToTarget)) : 1;
             //Console.WriteLine(speedMul);
 
-            
 
-            if (nearAllDirs)
+
+            if (nearAllDirs || nearAllDirsNext)
             {
                 waypointToReachIndex++;
+                if (nearAllDirsNext && wayPointIndex != nextwayPointIndex)
+                {
+                    waypointToReachIndex++;
+                }
+
                 lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
 
                 if (waypointToReachIndex >= waypoints.Count)
@@ -218,9 +233,6 @@ namespace Vintagestory.Essentials
             if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
-
-                controls.FlyVector.X *= 0.85f;
-                controls.FlyVector.Z *= 0.85f;
 
                 Vec3d pos = entity.Pos.XYZ;
                 Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);

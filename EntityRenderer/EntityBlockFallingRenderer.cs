@@ -35,7 +35,11 @@ namespace Vintagestory.GameContent
 
             if (!blockFallingEntity.InitialBlockRemoved)
             {
-                BlockEntity be = api.World.BlockAccessor.GetBlockEntity(blockFallingEntity.initialPos);
+                int posx = blockFallingEntity.blockEntityAttributes?.GetInt("posx", blockFallingEntity.initialPos.X) ?? blockFallingEntity.initialPos.X;
+                int posy = blockFallingEntity.blockEntityAttributes?.GetInt("posy", blockFallingEntity.initialPos.Y) ?? blockFallingEntity.initialPos.Y;
+                int posz = blockFallingEntity.blockEntityAttributes?.GetInt("posz", blockFallingEntity.initialPos.Z) ?? blockFallingEntity.initialPos.Z;
+                
+                BlockEntity be = api.World.BlockAccessor.GetBlockEntity(new BlockPos(posx, posy, posz));
                 be?.OnTesselation(this, capi.Tesselator);
 
                 if (mesh.VerticesCount > 0)

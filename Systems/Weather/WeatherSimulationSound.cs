@@ -69,7 +69,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
 
@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
 
@@ -95,7 +95,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
 
@@ -108,7 +108,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
 
@@ -121,7 +121,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
 
@@ -133,7 +133,7 @@ namespace Vintagestory.GameContent
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
-                SoundType = EnumSoundType.Ambient,
+                SoundType = EnumSoundType.Weather,
                 Volume = 1
             });
         }

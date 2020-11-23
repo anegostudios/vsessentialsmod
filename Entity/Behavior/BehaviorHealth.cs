@@ -58,6 +58,8 @@ namespace Vintagestory.GameContent
             float totalMaxHealth = BaseMaxHealth;
             foreach (var val in MaxHealthModifiers) totalMaxHealth += val.Value;
 
+            totalMaxHealth += entity.Stats.GetBlended("maxhealthExtraPoints");
+
             bool wasFullHealth = Health >= MaxHealth;
 
             MaxHealth = totalMaxHealth;
@@ -79,6 +81,7 @@ namespace Vintagestory.GameContent
 
                 Health = typeAttributes["currenthealth"].AsFloat(20);
                 BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
+                UpdateMaxHealth();
                 return;
             }
 

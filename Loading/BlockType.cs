@@ -94,8 +94,6 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public Dictionary<string, bool> LightTraversable;
         [JsonProperty]
-        public AdvancedParticleProperties[] ParticleProperties = null;
-        [JsonProperty]
         public float Resistance = 6f; // How long it takes to break this block in seconds
         [JsonProperty]
         public EnumBlockMaterial BlockMaterial = EnumBlockMaterial.Stone; // Helps with finding out mining speed for each tool type

@@ -8,7 +8,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
-using VintagestoryAPI.Util;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -149,12 +149,15 @@ namespace Vintagestory.GameContent
             ;
 
             overviewGui.GetScrollbar("scrollbar").SetHeights(
-                (float)listHeight, (float)overviewGui.GetHandbookStackList("stacklist").insideBounds.fixedHeight
+                (float)listHeight, 
+                (float)overviewGui.GetHandbookStackList("stacklist").insideBounds.fixedHeight
             );
 
             overviewGui.GetTextInput("searchField").SetPlaceHolderText("Search...");
 
-            overviewGui.GetVerticalTab("verticalTabs").SetValue(curTab);
+            overviewGui.GetVerticalTab("verticalTabs").SetValue(curTab, false);
+
+            overviewGui.FocusElement(overviewGui.GetTextInput("searchField").TabIndex);
         }
 
         GuiTab[] genTabs(out int curTab)

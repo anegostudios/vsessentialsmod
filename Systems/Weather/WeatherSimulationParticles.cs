@@ -73,7 +73,7 @@ namespace Vintagestory.GameContent
         public static int waterColor = ColorUtil.ToRgba(230, 128, 178, 255);
         public static int lowStabColor = ColorUtil.ToRgba(230, 207, 53, 10);
 
-        public int particleColor;
+        public int rainParticleColor;
 
         static SimpleParticleProperties splashParticles = new SimpleParticleProperties()
         {
@@ -89,7 +89,8 @@ namespace Vintagestory.GameContent
             MinVelocity = new Vec3f(-1, 2, -1),
             AddVelocity = new Vec3f(2, 0, 2),
             MinSize = 0.07f,
-            MaxSize = 0.2f
+            MaxSize = 0.2f,
+            VertexFlags = 32
         };
 
         static WeatherParticleProps dustParticles = new WeatherParticleProps()
@@ -126,7 +127,7 @@ namespace Vintagestory.GameContent
             AddVelocity = new Vec3f(0.5f, 0, 0.5f),
             MinSize = 0.15f,
             MaxSize = 0.22f,
-            VertexFlags = (1 << 31)
+            VertexFlags = 32 | (1 << 31)
         };
 
 
@@ -193,7 +194,7 @@ namespace Vintagestory.GameContent
             this.capi = capi;
             this.ws = ws;
             rand = new Random(capi.World.Seed + 223123123);
-            particleColor = waterColor;
+            rainParticleColor = waterColor;
         }
 
         public void Initialize()
@@ -212,7 +213,7 @@ namespace Vintagestory.GameContent
             WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
 
             ClimateCondition conds = ws.clientClimateCond;
-            if (conds == null) return true; 
+            if (conds == null || !ws.playerChunkLoaded) return true; 
             
             EntityPos plrPos = capi.World.Player.Entity.Pos;
             float precIntensity = conds.Rainfall;
@@ -227,7 +228,7 @@ namespace Vintagestory.GameContent
             EnumPrecipitationType precType = weatherData.BlendedPrecType;
             if (precType == EnumPrecipitationType.Auto)
             {
-                precType = ws.clientClimateCond?.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
+                precType = conds.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
             }
 
             
@@ -336,23 +337,23 @@ namespace Vintagestory.GameContent
                 rainParticle.AddQuantity = 25 * plevel;
                 rainParticle.MinSize = 0.15f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
                 rainParticle.MaxSize = 0.22f * (0.5f + conds.Rainfall); // weatherData.PrecParticleSize;
-                rainParticle.Color = particleColor;
+                rainParticle.Color = rainParticleColor;
 
                 rainParticle.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -10f, -0.025f);
                 rainParticle.AddVelocity.Set(0.05f + 8 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
 
                 manager.Spawn(rainParticle);
 
-
+                
                 splashParticles.MinVelocity = new Vec3f(-1f, 3, -1f);
                 splashParticles.AddVelocity = new Vec3f(2, 0, 2);
                 splashParticles.LifeLength = 0.1f;
                 splashParticles.MinSize = 0.07f * conds.Rainfall;// weatherData.PrecParticleSize;
                 splashParticles.MaxSize = 0.2f * conds.Rainfall; // weatherData.PrecParticleSize;
                 splashParticles.ShouldSwimOnLiquid = true;
-                splashParticles.Color = particleColor;
+                splashParticles.Color = rainParticleColor;
 
-                float cnt = 75 * plevel;
+                float cnt = 100 * plevel;
                 
                 for (int i = 0; i < cnt; i++)
                 {
@@ -362,6 +363,14 @@ namespace Vintagestory.GameContent
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
                     Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
+
+                    double b = 0.75 + 0.25 * rand.NextDouble();
+                    int ca = 230 - rand.Next(100);
+                    int cr = (int)(((rainParticleColor >> 16) & 0xff) * b);
+                    int cg = (int)(((rainParticleColor >> 8) & 0xff) * b);
+                    int cb = (int)(((rainParticleColor >> 0) & 0xff) * b);
+
+                    splashParticles.Color = (ca << 24) | (cr << 16) | (cg << 8) | cb;
 
                     if (block.IsLiquid())
                     {

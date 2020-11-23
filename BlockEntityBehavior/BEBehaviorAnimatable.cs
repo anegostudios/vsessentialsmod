@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -57,23 +58,16 @@ namespace Vintagestory.GameContent
             base.ToTreeAttributes(tree);
         }
 
-
-
         public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
         {
-            if (animUtil.activeAnimationsByAnimCode.Count > 0)
-            {
-                return true;
-            }
-
-            return false;
+            return animUtil.activeAnimationsByAnimCode.Count > 0;
         }
     }
 
 
 
 
-    public class BlockEntityAnimationUtil
+    public class BlockEntityAnimationUtil : IRenderer
     {
         public AnimatorBase animator;
 
@@ -83,13 +77,18 @@ namespace Vintagestory.GameContent
 
         ICoreAPI api;
         BlockEntity be;
+
+        public double RenderOrder => 1;
+        public int RenderRange => 99;
+
         public BlockEntityAnimationUtil(ICoreAPI api, BlockEntity be)
         {
             this.api = api;
             this.be = be;
+            (api as ICoreClientAPI)?.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimutil");
         }
 
-        public void InitializeAnimator(string cacheDictKey, Vec3f rotation = null)
+        public void InitializeAnimator(string cacheDictKey, Vec3f rotation = null, Shape shape = null)
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
@@ -99,8 +98,12 @@ namespace Vintagestory.GameContent
 
             ITexPositionSource texSource = capi.Tesselator.GetTexSource(block);
             MeshData meshdata;
-            IAsset asset = api.Assets.TryGet(block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json"));
-            Shape shape = asset.ToObject<Shape>();
+
+            if (shape == null)
+            {
+                IAsset asset = api.Assets.TryGet(block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json"));
+                shape = asset.ToObject<Shape>();
+            }
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);
             BlockEntityAnimationUtil.CacheInvTransforms(shape.Elements);
@@ -114,19 +117,87 @@ namespace Vintagestory.GameContent
         }
 
 
+        public MeshData InitializeAnimator(string cacheDictKey, Shape shape, ITexPositionSource texSource, Vec3f rotation)
+        {
+            if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
+
+            ICoreClientAPI capi = api as ICoreClientAPI;
+
+            Block block = api.World.BlockAccessor.GetBlock(be.Pos);
+
+            MeshData meshdata;
+
+            if (shape == null)
+            {
+                IAsset asset = api.Assets.TryGet(block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json"));
+                shape = asset.ToObject<Shape>();
+            }
+
+            shape.ResolveReferences(api.World.Logger, cacheDictKey);
+            CacheInvTransforms(shape.Elements);
+            shape.ResolveAndLoadJoints();
+
+            capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
+
+            //InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
+
+            if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
+
+            InitializeAnimator(cacheDictKey, meshdata, shape, rotation);
+
+            return meshdata;
+        }
+
+        public void InitializeAnimator(string cacheDictKey, MeshData meshdata, Shape shape, Vec3f rotation) 
+        {
+            ICoreClientAPI capi = api as ICoreClientAPI;
+            animator = GetAnimator(api, cacheDictKey, shape);
+            
+
+            if (RuntimeEnv.MainThreadId == System.Threading.Thread.CurrentThread.ManagedThreadId)
+            {
+                render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, capi.Render.UploadMesh(meshdata));
+            } else
+            {
+                render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, null);
+                (api as ICoreClientAPI).Event.EnqueueMainThreadTask(() => {
+                    render.meshref = capi.Render.UploadMesh(meshdata);
+                }, "uploadmesh");
+            }
+        }
+
+
         public void InitializeAnimator(string cacheDictKey, Vec3f rotation, Shape blockShape, MeshRef meshref)
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
             animator = GetAnimator(api, cacheDictKey, blockShape);
 
+            (api as ICoreClientAPI).Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimutil");
             render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, meshref);
+        }
+
+
+        bool stopRenderTriggered = false;
+
+        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        {
+            if (animator == null || render == null) return; // not initialized yet
+
+            animator.OnFrame(activeAnimationsByAnimCode, deltaTime);
+
+            if (activeAnimationsByAnimCode.Count == 0 && animator.ActiveAnimationCount == 0 && render.ShouldRender && !stopRenderTriggered)
+            {
+                stopRenderTriggered = true;
+                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = false);
+            }
         }
 
         public void StartAnimation(AnimationMetaData meta)
         {
             if (!activeAnimationsByAnimCode.ContainsKey(meta.Code))
             {
+                stopRenderTriggered = false;
                 activeAnimationsByAnimCode[meta.Code] = meta;
                 api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = true);
             }
@@ -136,13 +207,7 @@ namespace Vintagestory.GameContent
 
         public void StopAnimation(string code)
         {
-            if (activeAnimationsByAnimCode.Remove(code))
-            {
-                if (activeAnimationsByAnimCode.Count == 0)
-                {
-                    api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = false);
-                }
-            }
+            activeAnimationsByAnimCode.Remove(code);
         }
 
 
@@ -212,6 +277,13 @@ namespace Vintagestory.GameContent
         internal void Dispose()
         {
             render?.Dispose();
+            (api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);
+        }
+
+
+        void IRenderer.Dispose()
+        {
+            
         }
     }
 }

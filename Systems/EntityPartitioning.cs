@@ -144,6 +144,8 @@ namespace Vintagestory.GameContent
                 Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
             }
 
+            if (gridIndex < 0) return;
+
             partition.Entities[gridIndex].Add(entity);
         }
 

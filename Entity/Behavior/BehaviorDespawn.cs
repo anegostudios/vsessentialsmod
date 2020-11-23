@@ -85,7 +85,7 @@ namespace Vintagestory.GameContent
 
         public override void GetInfoText(StringBuilder infotext)
         {
-            if (belowLightLevel != null && !LightLevelOk())
+            if (belowLightLevel != null && !LightLevelOk() && entity.Alive)
             {
                 infotext.AppendLine(Lang.Get("Deprived of light, might die soon"));
             }

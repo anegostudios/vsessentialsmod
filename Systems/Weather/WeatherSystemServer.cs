@@ -19,6 +19,35 @@ namespace Vintagestory.GameContent
 
         protected WeatherPatternAssetsPacket packetForClient;
 
+        float? overrideprecip;
+        public override float? OverridePrecipitation {
+            get
+            {
+                return overrideprecip;
+            }
+            set
+            {
+                overrideprecip = value;
+                sapi.WorldManager.SaveGame.StoreData("overrideprecipitation", overrideprecip == null ? null : SerializerUtil.Serialize((float)overrideprecip));
+            }
+        }
+
+        double daysoffset;
+        public override double RainCloudDaysOffset
+        {
+            get
+            {
+                return daysoffset;
+            }
+            set
+            {
+                daysoffset = value;
+                sapi.WorldManager.SaveGame.StoreData("precipitationdaysoffset", SerializerUtil.Serialize(daysoffset));
+            }
+        }
+
+
+
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -106,10 +135,39 @@ namespace Vintagestory.GameContent
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
             serverChannel.SendPacket(packetForClient, byPlayer);
+            sendConfigUpdate(byPlayer);
+        }
+
+        public void sendConfigUpdate(IServerPlayer byPlayer)
+        {
+            serverChannel.SendPacket(new WeatherConfigPacket()
+            {
+                OverridePrecipitation = OverridePrecipitation,
+                RainCloudDaysOffset = RainCloudDaysOffset
+            }, byPlayer);
+        }
+
+        public void broadCastConfigUpdate()
+        {
+            serverChannel.BroadcastPacket(new WeatherConfigPacket()
+            {
+                OverridePrecipitation = OverridePrecipitation,
+                RainCloudDaysOffset = RainCloudDaysOffset
+            });
         }
 
         private void Event_SaveGameLoaded()
         {
+            byte[] data = sapi.WorldManager.SaveGame.GetData("overrideprecipitation");
+            if (data != null)
+            {
+                overrideprecip = SerializerUtil.Deserialize<float>(data);
+            }
+            data = sapi.WorldManager.SaveGame.GetData("precipitationdaysoffset");
+            if (data != null) {
+                daysoffset = SerializerUtil.Deserialize<double>(data);
+            }
+
             base.Initialize();
             base.InitDummySim();
             WeatherDataSlowAccess = getWeatherDataReader();

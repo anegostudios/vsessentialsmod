@@ -355,6 +355,7 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
+            base.ContinueExecute(dt);
 
   //          if (!awaitReached) return false;
 

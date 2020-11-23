@@ -20,6 +20,8 @@ namespace Vintagestory.GameContent
         public long receivedTime;
     }
 
+    public delegate void OnEntityShapeTesselationDelegate(ref Shape entityShape, string shapePathForLogging);
+
     
     public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
@@ -63,6 +65,11 @@ namespace Vintagestory.GameContent
 
         ITexPositionSource defaultTexSource;
 
+        /// <summary>
+        /// This is called before entity.OnTesselation()
+        /// </summary>
+        public event OnEntityShapeTesselationDelegate OnTesselation;
+
 
         protected Dictionary<string, CompositeTexture> extraTexturesByTextureName
         {
@@ -105,8 +112,6 @@ namespace Vintagestory.GameContent
             DoRenderHeldItem = true;
             DisplayChatMessages = entity is EntityPlayer;
             
-            TesselateShape();
-
             // For players the player data is not there yet, so we load the thing later
             if (!(entity is EntityPlayer))
             {
@@ -129,6 +134,11 @@ namespace Vintagestory.GameContent
             api.Event.ReloadShapes += TesselateShape;
         }
 
+
+        public override void OnEntityLoaded()
+        {
+            TesselateShape();
+        }
 
         protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
         {
@@ -170,6 +180,8 @@ namespace Vintagestory.GameContent
         }
 
 
+        
+
 
         public virtual void TesselateShape()
         {
@@ -182,6 +194,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            OnTesselation?.Invoke(ref entityShape, compositeShape.Base.ToString());
             entity.OnTesselation(ref entityShape, compositeShape.Base.ToString());
 
             defaultTexSource = GetTextureSource();
@@ -260,6 +273,7 @@ namespace Vintagestory.GameContent
         protected virtual ITexPositionSource GetTextureSource()
         {
             int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
+            
             return capi.Tesselator.GetTextureSource(entity, extraTexturesByTextureName, altTexNumber);
         }
 
@@ -495,6 +509,7 @@ namespace Vintagestory.GameContent
                 prog.NormalShaded = 1;
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
+                prog.AlphaTest = renderInfo.AlphaTest;
 
                 prog.OverlayOpacity = renderInfo.OverlayOpacity;
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
@@ -545,12 +560,11 @@ namespace Vintagestory.GameContent
             {
                 prog.Stop();
 
-                AdvancedParticleProperties[] ParticleProperties = stack.Block?.ParticleProperties;
+                AdvancedParticleProperties[] ParticleProperties = stack.Collectible?.ParticleProperties;
 
-                if (stack.Block != null && !capi.IsGamePaused)
+                if (stack.Collectible != null && !capi.IsGamePaused)
                 {
-                    
-                    Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Block.TopMiddlePos.X, stack.Block.TopMiddlePos.Y, stack.Block.TopMiddlePos.Z, 1));
+                    Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Collectible.TopMiddlePos.X, stack.Collectible.TopMiddlePos.Y, stack.Collectible.TopMiddlePos.Z, 1));
                     EntityPlayer entityPlayer = capi.World.Player.Entity;
                     accum += dt;
                     if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > 0.025f)
@@ -606,14 +620,16 @@ namespace Vintagestory.GameContent
 
         protected void gearSlotModified(int slotid)
         {
-            if (slotid >= 12)
+			// Needed so that hair elements are removed from some clothes. Lets see if it breaks stuff or lags a lot
+            TesselateShape();
+            /*if (slotid >= 12)
             {
                 TesselateShape();
             }
             else
             {
                 reloadSkin();
-            }
+            }*/
         }
 
         public virtual void reloadSkin()
@@ -709,16 +725,16 @@ namespace Vintagestory.GameContent
         public override void DoRender2D(float dt)
         {
             if (isSpectator || (nameTagTexture == null && debugTagTexture == null)) return;
-            if ((entity as EntityPlayer)?.ServerControls.Sneak == true) return;
+            if ((entity as EntityPlayer)?.ServerControls.Sneak == true && debugTagTexture==null) return;
 
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
             Vec3d aboveHeadPos;
 
             if (capi.World.Player.Entity.EntityId == entity.EntityId) {
-                //if (rapi.CameraType == EnumCameraMode.FirstPerson && !capi.Settings.Bool["immersiveFpMode"]) return;
-                //aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
-                return;
+                if (rapi.CameraType == EnumCameraMode.FirstPerson && !capi.Settings.Bool["immersiveFpMode"]) return;
+                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
+                //return;
             } else
             {
                 aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.2, entity.Pos.Z);
@@ -889,7 +905,7 @@ namespace Vintagestory.GameContent
             BlockFacing climbonfacing = entity.ClimbingOnFace;
 
             // To fix climbing locust rotation weirdnes on east and west faces. Brute forced fix. There's probably a correct solution to this.
-            bool fuglyHack = (entity as EntityAgent)?.Controls.IsClimbing == true && entity.ClimbingOnFace?.Axis == EnumAxis.X;
+            bool fuglyHack = entity.Properties.RotateModelOnClimb && (entity as EntityAgent)?.Controls.IsClimbing == true && entity.ClimbingOnFace?.Axis == EnumAxis.X;
 
             Quaterniond.RotateX(quat, quat, bodyPitch + rotX * GameMath.DEG2RAD + (fuglyHack ? yaw : 0));
             Quaterniond.RotateY(quat, quat, fuglyHack ? 0 : yaw);

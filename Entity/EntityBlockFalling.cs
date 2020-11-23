@@ -21,6 +21,7 @@ namespace Vintagestory.GameContent
         int lingerTicks;
 
         public bool InitialBlockRemoved;
+        
 
         private AssetLocation blockCode;
         public BlockPos initialPos;
@@ -33,7 +34,7 @@ namespace Vintagestory.GameContent
         float impactDamageMul;
 
         bool fallHandled;
-        bool dustyFall;
+        float dustIntensity;
 
         byte[] lightHsv;
         AssetLocation fallSound;
@@ -50,6 +51,11 @@ namespace Vintagestory.GameContent
         float pushaccum;
 
         static HashSet<long> fallingNow = new HashSet<long>();
+
+
+        // Additional config options
+        public bool DoRemoveBlock = true;
+        
 
         static EntityBlockFalling()
         {
@@ -95,15 +101,15 @@ namespace Vintagestory.GameContent
         }
 
 
-        public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, bool dustyFall)
+        public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, float dustIntensity)
         {
             this.impactDamageMul = impactDamageMul;
             this.fallSound = fallSound;
             this.canFallSideways = canFallSideways;
-            this.dustyFall = dustyFall;
+            this.dustIntensity = dustIntensity;
 
             WatchedAttributes.SetBool("canFallSideways", canFallSideways);
-            WatchedAttributes.SetBool("dustyFall", dustyFall);
+            WatchedAttributes.SetFloat("dustIntensity", dustIntensity);
             if (fallSound != null)
             {
                 WatchedAttributes.SetString("fallSound", fallSound.ToShortString());
@@ -161,7 +167,7 @@ namespace Vintagestory.GameContent
             }
 
             canFallSideways = WatchedAttributes.GetBool("canFallSideways");
-            dustyFall = WatchedAttributes.GetBool("dustyFall");
+            dustIntensity = WatchedAttributes.GetFloat("dustIntensity");
 
 
             if (WatchedAttributes.HasAttribute("fallSound"))
@@ -272,8 +278,11 @@ namespace Vintagestory.GameContent
         {
             if (remove)
             {
-                World.BlockAccessor.SetBlock(0, pos);
-                World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(true));
+                if (DoRemoveBlock)
+                {
+                    World.BlockAccessor.SetBlock(0, pos);
+                    World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(true));
+                }
             } else
             {
                 World.BlockAccessor.SetBlock(Block.BlockId, pos);
@@ -289,7 +298,7 @@ namespace Vintagestory.GameContent
 
                     if (be != null)
                     {
-                        be.FromTreeAtributes(blockEntityAttributes, World);
+                        be.FromTreeAttributes(blockEntityAttributes, World);
                     }
                 }
             }
@@ -300,7 +309,7 @@ namespace Vintagestory.GameContent
 
         void spawnParticles(float smokeAdd)
         {
-            if (Api.Side == EnumAppSide.Server || !dustyFall) return;
+            if (Api.Side == EnumAppSide.Server || dustIntensity == 0) return;
 
             dustParticles.Color = Block.GetRandomColor(Api as ICoreClientAPI, blockAsStack);
             dustParticles.Color &= 0xffffff;
@@ -311,8 +320,8 @@ namespace Vintagestory.GameContent
             float veloMul = smokeAdd / 20f;
             dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)Pos.Motion.Y, -0.2f * veloMul);
             dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)Pos.Motion.Y + -veloMul, 0.4f * veloMul);
-            dustParticles.MinQuantity = smokeAdd;
-            dustParticles.AddQuantity = 6 * Math.Abs((float)Pos.Motion.Y) + smokeAdd;
+            dustParticles.MinQuantity = smokeAdd * dustIntensity;
+            dustParticles.AddQuantity = (6 * Math.Abs((float)Pos.Motion.Y) + smokeAdd) * dustIntensity;
 
             
             
@@ -350,6 +359,20 @@ namespace Vintagestory.GameContent
             if (fallHandled) return;
 
             BlockPos pos = SidedPos.AsBlockPos;
+            BlockPos finalPos = ServerPos.AsBlockPos;
+            Block block = null;
+
+            if (Api.Side == EnumAppSide.Server)
+            {
+                block = World.BlockAccessor.GetBlock(finalPos);
+
+                if (block.OnFallOnto(World, finalPos, Block, blockEntityAttributes))
+                {
+                    lingerTicks = 3;
+                    fallHandled = true;
+                    return;
+                }
+            }
 
             if (canFallSideways)
             {
@@ -376,13 +399,11 @@ namespace Vintagestory.GameContent
 
             spawnParticles(20f);
             
-            BlockPos finalPos = ServerPos.AsBlockPos;
+            
             Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
 
             if (Api.Side == EnumAppSide.Server)
             {
-                Block block = World.BlockAccessor.GetBlock(finalPos);
-
                 if (!block.IsReplacableBy(Block))
                 {
                     for (int i = 0; i < 4; i++)
@@ -483,6 +504,8 @@ namespace Vintagestory.GameContent
                 blockEntityAttributes.ToBytes(writer);
                 writer.Write(blockEntityClass);
             }
+
+            writer.Write(DoRemoveBlock);
         }
 
         public override void FromBytes(BinaryReader reader, bool forClient)
@@ -503,15 +526,15 @@ namespace Vintagestory.GameContent
                 blockEntityClass = reader.ReadString();
             }
 
-
-
             if (WatchedAttributes.HasAttribute("fallSound"))
             {
                 fallSound = new AssetLocation(WatchedAttributes.GetString("fallSound"));
             }
 
             canFallSideways = WatchedAttributes.GetBool("canFallSideways");
-            dustyFall = WatchedAttributes.GetBool("dustyFall");
+            dustIntensity = WatchedAttributes.GetFloat("dustIntensity");
+
+            DoRemoveBlock = reader.ReadBoolean();
         }
 
         public override bool ShouldReceiveDamage(DamageSource damageSource, float damage)

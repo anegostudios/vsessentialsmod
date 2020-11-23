@@ -33,7 +33,7 @@ namespace Vintagestory.GameContent
 
         private void Event_PlayerDespawn(IClientPlayer byPlayer)
         {
-            EntityMapComponent mp = null;
+            EntityMapComponent mp;
             if (MapComps.TryGetValue(byPlayer, out mp))
             {
                 mp.Dispose();
@@ -43,7 +43,7 @@ namespace Vintagestory.GameContent
 
         private void Event_PlayerSpawn(IClientPlayer byPlayer)
         {
-            if (capi.World.Config.GetBool("mapHideOtherPlayers", true) && byPlayer.PlayerUID != capi.World.Player.PlayerUID)
+            if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && byPlayer.PlayerUID != capi.World.Player.PlayerUID)
             {
                 return;
             }
@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
                 surface.Dispose();
             }
 
-            
+
 
             foreach (IPlayer player in capi.World.AllOnlinePlayers)
             {
@@ -111,6 +111,9 @@ namespace Vintagestory.GameContent
                     capi.World.Logger.Warning("Can't add player {0} to world map, missing entity :<", player.PlayerUID);
                     continue;
                 }
+
+                if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && player.PlayerUID != capi.World.Player.PlayerUID) continue;
+
 
                 cmp = new EntityMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, player.Entity);
 

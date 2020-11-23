@@ -128,8 +128,6 @@ namespace Vintagestory.Essentials
             if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
-                controls.FlyVector.X *= 0.85f;
-                controls.FlyVector.Z *= 0.85f;
 
                 Vec3d pos = entity.Pos.XYZ;
                 Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);

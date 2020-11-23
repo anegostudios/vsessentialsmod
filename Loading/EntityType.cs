@@ -28,6 +28,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public double EyeHeight = 0.1;
         [JsonProperty]
+        public float Weight = 25;
+        [JsonProperty]
         public bool CanClimb = false;
         [JsonProperty]
         public bool CanClimbAnywhere = false;
@@ -73,7 +75,7 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int i = 0; i < DropsCopy.Length; i++)
                     DropsCopy[i] = Drops[i].Clone();
             }
-            
+
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
@@ -82,6 +84,7 @@ namespace Vintagestory.ServerMods.NoObf
                 Habitat = Habitat,
                 HitBoxSize = HitBoxSize,
                 DeadHitBoxSize = DeadHitBoxSize,
+                Weight = Weight,
                 CanClimb = CanClimb,
                 CanClimbAnywhere = CanClimbAnywhere,
                 FallDamage = FallDamage,

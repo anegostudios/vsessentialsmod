@@ -138,17 +138,27 @@ namespace Vintagestory.GameContent
 
         public override void Update(float dt, ref float accuracy)
         {
-            float modacc = entity.Stats.GetBlended("rangedWeaponsAcc") - 1;
+            float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
             float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed");
 
-            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.1, 1.5), 0, 0.93f - modacc);
+            float modacc = 0.93f * rangedAcc;
+            if (rangedAcc >= 1)
+            {
+                // Asymptomatically reach of 100% accuracy
+                modacc = 0.93f + ((1 - 1 / (1 + 3 * rangedAcc)) - 0.5f) * 0.07f;
+            }
 
-            accuracy -= GameMath.Clamp((SecondsSinceAimStart - 1.75f) / 3, 0, 0.3f);
+            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.1, 1.5), 0, modacc);
+            accuracy *= Math.Max(0.1f, modacc);
+
+            accuracy -= GameMath.Clamp((SecondsSinceAimStart - 3f) / 3, 0, 0.25f);
 
             if (SecondsSinceAimStart >= 0.75f)
             {
                 accuracy += GameMath.Sin(SecondsSinceAimStart * 8) / 80f;
             }
+
+            
         }
     }
 
@@ -172,7 +182,7 @@ namespace Vintagestory.GameContent
                 accuracyPenalty = GameMath.Clamp(accuracyPenalty + dt / 0.75f, 0, 0.2f);
             } else
             {
-                accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 1.5f, 0, 0.2f);
+                accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 2f, 0, 0.2f);
             }
 
             accuracy -= accuracyPenalty;
@@ -201,7 +211,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 1.5f, 0, 0.3f);
+                accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 2f, 0, 0.3f);
             }
 
             accuracy -= accuracyPenalty;
@@ -220,7 +230,7 @@ namespace Vintagestory.GameContent
         {
             accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 3, 0, 0.4f);
 
-            accuracy -= accuracyPenalty;
+            //accuracy -= accuracyPenalty;
         }
 
         public override void OnHurt(float damage)

@@ -9,10 +9,31 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    public enum EnumTransientCondition
+    {
+        TimePassed,
+        Temperature
+    }
+
+    public class TransientProperties
+    {
+        public EnumTransientCondition Condition = EnumTransientCondition.TimePassed;
+        public float InGameHours = 24;
+        public float WhenBelowTemperature = -999;
+        public float WhenAboveTemperature = 999;
+
+        public float ResetBelowTemperature = -999;
+        public float StopBelowTemperature = -999;
+        public string ConvertTo;
+        public string ConvertFrom;
+    }
+
     public class BlockEntityTransient : BlockEntity
     {
         double lastCheckAtTotalDays = 0;
         double transitionHoursLeft = -1;
+
+        TransientProperties props;
 
         public virtual int CheckIntervalMs { get; set; } = 2000;
 
@@ -23,11 +44,15 @@ namespace Vintagestory.GameContent
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
-            if (Block.Attributes?["inGameHours"].Exists != true) return;
+            if (Block.Attributes?["transientProps"].Exists != true) return;
+
+            props = Block.Attributes["transientProps"].AsObject<TransientProperties>();
+            if (props == null) return;
+
 
             if (transitionHoursLeft <= 0)
             {
-                transitionHoursLeft = Block.Attributes["inGameHours"].AsFloat(24);
+                transitionHoursLeft = props.InGameHours;
             }
 
             if (api.Side == EnumAppSide.Server)
@@ -71,8 +96,21 @@ namespace Vintagestory.GameContent
                 transitionHoursLeft -= 1f;
 
                 ClimateCondition conds = Api.World.BlockAccessor.GetClimateAt(Pos, EnumGetClimateMode.ForSuppliedDateValues, lastCheckAtTotalDays);
-                bool reset = conds.Temperature < Block.Attributes["resetBelowTemperature"].AsFloat(-999);
-                bool stop = conds.Temperature < Block.Attributes["stopBelowTemperature"].AsFloat(-999);
+                if (conds == null) return;
+
+                if (props.Condition == EnumTransientCondition.Temperature)
+                {
+                    if (conds.Temperature < props.WhenBelowTemperature || conds.Temperature > props.WhenAboveTemperature)
+                    {
+                        tryTransition(props.ConvertTo);
+                    }
+
+                    continue;
+                }
+
+
+                bool reset = conds.Temperature < props.ResetBelowTemperature;
+                bool stop = conds.Temperature < props.StopBelowTemperature;
 
                 if (stop || reset)
                 {
@@ -80,15 +118,14 @@ namespace Vintagestory.GameContent
 
                     if (reset)
                     {
-                        transitionHoursLeft = Block.Attributes["inGameHours"].AsFloat(24);
+                        transitionHoursLeft = props.InGameHours;
                     }
 
                     continue;
                 }
 
                 if (transitionHoursLeft <= 0) { 
-                    string toCode = block.Attributes["convertTo"].AsString();
-                    tryTransition(toCode);
+                    tryTransition(props.ConvertTo);
                     break;
                 }
             }
@@ -101,7 +138,7 @@ namespace Vintagestory.GameContent
 
             if (block.Attributes == null) return;
 
-            string fromCode = block.Attributes["convertFrom"].AsString();
+            string fromCode = props.ConvertFrom;
             if (fromCode == null || toCode == null) return;
 
             if (fromCode.IndexOf(":") == -1) fromCode = block.Code.Domain + ":" + fromCode;
@@ -128,9 +165,9 @@ namespace Vintagestory.GameContent
             Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos);
         }
 
-        public override void FromTreeAtributes(ITreeAttribute tree, IWorldAccessor worldForResolving)
+        public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldForResolving)
         {
-            base.FromTreeAtributes(tree, worldForResolving);
+            base.FromTreeAttributes(tree, worldForResolving);
 
             transitionHoursLeft = tree.GetDouble("transitionHoursLeft");
 
@@ -154,7 +191,7 @@ namespace Vintagestory.GameContent
         public void SetPlaceTime(double totalHours)
         {
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
-            float hours = block.Attributes["inGameHours"].AsFloat(24);
+            float hours = props.InGameHours;
 
             transitionHoursLeft = hours + totalHours - Api.World.Calendar.TotalHours;
         }

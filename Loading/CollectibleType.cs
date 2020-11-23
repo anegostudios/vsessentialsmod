@@ -19,7 +19,7 @@ namespace Vintagestory.ServerMods.NoObf
     public abstract class CollectibleType : RegistryObjectType
     {
         [JsonProperty]
-        public float RenderAlphaTest = 0.01f;
+        public float RenderAlphaTest = 0.05f;
         [JsonProperty]
         public int StorageFlags = 1;
         [JsonProperty]
@@ -108,6 +108,10 @@ namespace Vintagestory.ServerMods.NoObf
 
         [JsonProperty]
         public string HeldTpUseAnimation = "placeblock";
+
+        [JsonProperty]
+        public AdvancedParticleProperties[] ParticleProperties = null;
+
 
 
         [OnDeserialized]

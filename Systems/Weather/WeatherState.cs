@@ -52,6 +52,7 @@ namespace Vintagestory.GameContent
     public class WeatherConfigPacket
     {
         public float? OverridePrecipitation;
+        public double RainCloudDaysOffset;
     }
     
 

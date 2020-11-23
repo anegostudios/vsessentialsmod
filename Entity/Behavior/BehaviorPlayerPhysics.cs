@@ -71,7 +71,9 @@ namespace Vintagestory.GameContent
             {
                 IClientWorldAccessor clientWorld = entity.World as IClientWorldAccessor;
 
-                if (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) return;
+                // Tyron Nov. 10 2020: This line of code was from August 2020 where it fixed jitter of other players related to climbing ladders?
+                // Cannot repro. But what I can repro is this line breaks player animations. They are stuck in a permanent land pose, so disabled for now.
+                //if (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) return;
 
                 // We pretend the entity is flying to disable gravity so that EntityBehaviorInterpolatePosition system 
                 // can work better

@@ -59,7 +59,7 @@ namespace Vintagestory.GameContent
 
             entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
 
-            entity.World.FrameProfiler.Mark("entity-repulse");
+            //entity.World.FrameProfiler.Mark("entity-repulse");
         }
 
 

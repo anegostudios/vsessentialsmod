@@ -53,12 +53,15 @@ namespace Vintagestory.GameContent
             this.minDist = taskConfig["minDist"].AsFloat(2f);
             this.minVerDist = taskConfig["minVerDist"].AsFloat(1f);
 
-            this.damageType = taskConfig["damageType"].AsObject<EnumDamageType>(EnumDamageType.BluntAttack);
+            string strdt = taskConfig["damageType"].AsString();
+            if (strdt != null)
+            {
+                this.damageType = (EnumDamageType)Enum.Parse(typeof(EnumDamageType), strdt, true);
+            }
             this.damageTier = taskConfig["damageTier"].AsInt(0);
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("extraInfoText");
             tree.SetString("dmgTier", Lang.Get("Damage tier: {0}", damageTier));
-            //tree.SetString("dmgType", Lang.Get("Damage type: {0}", damageType));
 
             if (taskConfig["entityCodes"] != null)
             {

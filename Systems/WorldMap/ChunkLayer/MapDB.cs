@@ -23,7 +23,7 @@ namespace Vintagestory.GameContent
         public int[] Pixels;
     }
 
-    public class MapDB : SQLiteDB
+    public class MapDB : SQLiteDBConnection
     {
         public override string DBTypeCode => "worldmap database";
 

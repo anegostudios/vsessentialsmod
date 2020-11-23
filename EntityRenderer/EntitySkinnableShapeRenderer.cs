@@ -7,7 +7,9 @@ namespace Vintagestory.GameContent
 {
     public class EntitySkinnableShapeRenderer : EntityShapeRenderer
     {
-        
+
+        public event Action<LoadedTexture, TextureAtlasPosition> OnReloadSkin;
+
         protected int skinTextureSubId;
 
 
@@ -41,6 +43,9 @@ namespace Vintagestory.GameContent
             if (!textureSpaceAllocated)
             {
                 TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
+                string skinBaseTextureKey = entity.Properties.Attributes?["skinBaseTextureKey"].AsString();
+                if (skinBaseTextureKey != null) origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.Textures[skinBaseTextureKey].Baked.TextureSubId];
+
                 int width = (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize.Width);
                 int height = (int)((origTexPos.y2 - origTexPos.y1) * AtlasSize.Height);
 
@@ -52,9 +57,12 @@ namespace Vintagestory.GameContent
             return base.GetTextureSource();
         }
 
+        public bool doReloadShapeAndSkin = true;
 
         public override void TesselateShape()
         {
+            if (!doReloadShapeAndSkin) return;
+
             base.TesselateShape();
 
             if (eagent.GearInventory != null)
@@ -63,10 +71,18 @@ namespace Vintagestory.GameContent
             }
         }
 
+
+        
+        
+
         public override void reloadSkin()
         {
+            if (!doReloadShapeAndSkin) return;
+
             TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
-            
+            string skinBaseTextureKey = entity.Properties.Attributes?["skinBaseTextureKey"].AsString();
+            if (skinBaseTextureKey != null) origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.Textures[skinBaseTextureKey].Baked.TextureSubId];
+
             LoadedTexture entityAtlas = new LoadedTexture(null) {
                 TextureId = origTexPos.atlasTextureId,
                 Width = capi.EntityTextureAtlas.Size.Width,
@@ -87,6 +103,7 @@ namespace Vintagestory.GameContent
 
             capi.Render.GlToggleBlend(true, EnumBlendMode.Overlay);
 
+            OnReloadSkin?.Invoke(entityAtlas, skinTexPos);
 
             int[] renderOrder = new int[]
             {
@@ -116,6 +133,7 @@ namespace Vintagestory.GameContent
 
                 ItemStack stack = gearInv[slotid]?.Itemstack;
                 if (stack == null) continue;
+                if (eagent.hideClothing) continue;
 
                 int itemTextureSubId = stack.Item.FirstTexture.Baked.TextureSubId;
 

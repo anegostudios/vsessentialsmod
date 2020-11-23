@@ -117,6 +117,7 @@ namespace Vintagestory.GameContent
                 if (task?.GetType() == taskType)
                 {
                     task.FinishExecute(true);
+                    ActiveTasksBySlot[task.Slot] = null;
                 }
             }
 
@@ -190,7 +191,16 @@ namespace Vintagestory.GameContent
                 entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
             }
         }
-        
+
+        public bool IsTaskActive(string id)
+        {
+            foreach (var val in ActiveTasksBySlot)
+            {
+                if (val != null && val.Id == id) return true;
+            }
+
+            return false;
+        }
 
         internal void Notify(string key, object data)
         {

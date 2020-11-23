@@ -16,6 +16,12 @@ namespace Vintagestory.API.Common
         public IWorldAccessor world;
         public AnimationMetaData animMeta;
 
+        /// <summary>
+        /// A unique identifier for this task
+        /// </summary>
+        public string Id { get; set; }
+
+
         protected float priority;
         protected float priorityForCancel;
         protected int slot;
@@ -28,7 +34,9 @@ namespace Vintagestory.API.Common
         protected AssetLocation sound;
         protected float soundRange;
         protected int soundStartMs;
+        protected int soundRepeatMs;
         protected float soundChance=1.01f;
+        protected long lastSoundTotalMs;
 
         protected string whenInEmotionState;
         protected string whenNotInEmotionState;
@@ -53,7 +61,7 @@ namespace Vintagestory.API.Common
             this.priority = taskConfig["priority"].AsFloat();
             this.priorityForCancel = taskConfig["priorityForCancel"].AsFloat(priority);
 
-
+            this.Id = taskConfig["id"].AsString();
             this.slot = (int)taskConfig["slot"]?.AsInt(0);
             this.mincooldown = (int)taskConfig["mincooldown"]?.AsInt(0);
             this.maxcooldown = (int)taskConfig["maxcooldown"]?.AsInt(100);
@@ -83,6 +91,7 @@ namespace Vintagestory.API.Common
                 sound = AssetLocation.Create(taskConfig["sound"].AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
                 soundRange = taskConfig["soundRange"].AsFloat(16);
                 soundStartMs = taskConfig["soundStartMs"].AsInt(0);
+                soundRepeatMs = taskConfig["soundRepeatMs"].AsInt(0);
             }
 
             cooldownUntilMs = entity.World.ElapsedMilliseconds + initialmincooldown + entity.World.Rand.Next(initialmaxcooldown - initialmincooldown);
@@ -122,10 +131,12 @@ namespace Vintagestory.API.Common
                 {
                     entity.World.RegisterCallback((dt) => {
                         entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                        lastSoundTotalMs = entity.World.ElapsedMilliseconds;
                     }, soundStartMs);
                 } else
                 {
                     entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                    lastSoundTotalMs = entity.World.ElapsedMilliseconds;
                 }
                 
             }
@@ -133,6 +144,12 @@ namespace Vintagestory.API.Common
 
         public virtual bool ContinueExecute(float dt)
         {
+            if (sound != null && soundRepeatMs > 0 && entity.World.ElapsedMilliseconds > lastSoundTotalMs + soundRepeatMs)
+            {
+                entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                lastSoundTotalMs = entity.World.ElapsedMilliseconds;
+            }
+
             return true;
         }
 

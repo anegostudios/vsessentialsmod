@@ -56,7 +56,6 @@ namespace Vintagestory.GameContent
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
-            
 
             if (api.Side == EnumAppSide.Server)
             {
@@ -68,10 +67,11 @@ namespace Vintagestory.GameContent
 
             if (api.Side == EnumAppSide.Client)
             {
+                api.World.Logger.Notification("Loading world map cache db...");
                 mapdb = new MapDB(api.World.Logger);
                 string errorMessage = null;
                 string mapdbfilepath = getMapDbFilePath();
-                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, true);
+                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, false, false);
                 if (errorMessage != null)
                 {
                     throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
@@ -218,6 +218,8 @@ namespace Vintagestory.GameContent
             int quantityToGen = chunksToGen.Count;
             while (quantityToGen > 0)
             {
+                if (mapSink.IsShuttingDown) break;
+
                 quantityToGen--;
                 Vec2i cord;
 
@@ -462,6 +464,8 @@ namespace Vintagestory.GameContent
                 MultiChunkMapComponent mc;
                 
                 mcord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+
+                if (cord.X < 0 || cord.Y < 0) continue;
 
                 if (loadedMapData.TryGetValue(mcord, out mc))
                 {

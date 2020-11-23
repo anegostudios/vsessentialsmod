@@ -141,7 +141,7 @@ namespace Vintagestory.GameContent
                 if (multiplyTree == null)
                 {
                     entity.WatchedAttributes.SetAttribute("multiply", multiplyTree = new TreeAttribute());
-                    TotalDaysLastBirth = entity.World.Calendar.TotalHours;
+                    TotalDaysLastBirth = -9999;
 
                     double daysNow = entity.World.Calendar.TotalHours / 24f;
                     TotalDaysCooldownUntil = daysNow + (MultiplyCooldownDaysMin + entity.World.Rand.NextDouble() * (MultiplyCooldownDaysMax - MultiplyCooldownDaysMin));
@@ -249,9 +249,6 @@ namespace Vintagestory.GameContent
                 return true;
             }
 
-            //double daysPassed = (entity.World.Calendar.TotalHours - DaysLastBirth) / 24f;
-            //DaysLastBirth = entity.World.Calendar.TotalHours;
-
             return false;
         }
 
@@ -283,66 +280,6 @@ namespace Vintagestory.GameContent
             });
         }
 
-        /*public bool IsGrowthCapped()
-        {
-            bool haveUnloadedchunk = false;
-
-            AssetLocation[] entityCodes = GrowthCapEntityCodes;
-            int count = CountEntitiesAround(entity.ServerPos.XYZ, GrowthCapRange, GrowthCapRange, (e) =>
-            {
-                return entityCodes.Contains(e.Code);
-            }, ref haveUnloadedchunk);
-
-            return haveUnloadedchunk || count >= GrowthCapQuantity;
-        }*/
-
-
-       /* public int CountEntitiesAround(Vec3d position, float horRange, float vertRange, ActionConsumable<Entity> matches, ref bool unloadedchunk)
-        {
-            int chunksize = entity.World.BlockAccessor.ChunkSize;
-            int mincx = (int)((position.X - horRange) / chunksize);
-            int maxcx = (int)((position.X + horRange) / chunksize);
-            int mincy = (int)((position.Y - vertRange) / chunksize);
-            int maxcy = (int)((position.Y + vertRange) / chunksize);
-            int mincz = (int)((position.Z - horRange) / chunksize);
-            int maxcz = (int)((position.Z + horRange) / chunksize);
-
-            int count = 0;
-
-            float horRangeSq = horRange * horRange;
-
-            for (int cx = mincx; cx <= maxcx; cx++)
-            {
-                for (int cy = mincy; cy <= maxcy; cy++)
-                {
-                    for (int cz = mincz; cz <= maxcz; cz++)
-                    {
-                        IWorldChunk chunk = this.entity.World.BlockAccessor.GetChunk(cx, cy, cz);
-                        if (chunk == null)
-                        {
-                            unloadedchunk = true;
-                            return 0;
-                        }
-
-                        if (chunk.Entities == null) continue;
-                        Entity ent;
-
-                        for (int i = 0; i < chunk.EntitiesCount; i++)
-                        {
-                            ent = chunk.Entities[i];
-
-                            if (ent == null || !ent.ServerPos.InRangeOf(position, horRangeSq, vertRange) || !matches(ent) || entity.State == EnumEntityState.Despawned) continue;
-
-                            count++;
-                        }
-                    }
-                }
-            }
-
-            return count;
-        }
-        */
-
         public override void OnEntityDespawn(EntityDespawnReason despawn)
         {
             entity.World.UnregisterCallback(callbackId);
@@ -368,7 +305,7 @@ namespace Vintagestory.GameContent
                     if (tree != null)
                     {
                         float saturation = tree.GetFloat("saturation", 0);
-                        infotext.AppendLine(Lang.Get("Saturation: {0}", saturation));
+                        infotext.AppendLine(Lang.Get("Portions eaten: {0}", saturation));
                     }
 
                     double daysLeft = TotalDaysCooldownUntil - entity.World.Calendar.TotalDays;

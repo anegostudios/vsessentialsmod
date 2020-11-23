@@ -17,7 +17,7 @@ namespace Vintagestory.GameContent
         Vec3d targetPos = new Vec3d();
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
-        float executionChance = 0.07f;
+        float executionChance = 0.1f;
         float fleeingDistance = 31f;
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
@@ -125,7 +125,8 @@ namespace Vintagestory.GameContent
             // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
-            if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) < minDayLight)
+            float sunlight = entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) / (float)entity.World.SunBrightness;
+            if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || sunlight < minDayLight)
             {
                 if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
                 {
@@ -149,11 +150,20 @@ namespace Vintagestory.GameContent
                     {
                         if (e is EntityAgent eagent)
                         {
+                            float rangeMul = 1f;
+
                             // Sneaking halves the detection range
                             if (eagent.Controls.Sneak && eagent.OnGround)
                             {
-                                if (e.ServerPos.DistanceTo(ownPos) > hereRange * 0.6f) return false;
+                                rangeMul *= 0.6f;
                             }
+                            // Trait bonus
+                            if (e.Code.Path == "player")
+                            {
+                                rangeMul = eagent.Stats.GetBlended("animalSeekingRange");
+                            }
+
+                            if (rangeMul != 1 && e.ServerPos.DistanceTo(ownPos) > hereRange * rangeMul) return false;
                         }
 
                         if (e.Code.Path == "player")
@@ -224,6 +234,18 @@ namespace Vintagestory.GameContent
             if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ) > fleeingDistance * fleeingDistance)
             {
                 return false;
+            }
+
+            if (world.Rand.NextDouble() < 0.25)
+            {
+                float sunlight = entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) / (float)entity.World.SunBrightness;
+                if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || sunlight < minDayLight)
+                {
+                    if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
+                    {
+                        return false;
+                    }
+                }
             }
 
             //if (entity.IsActivityRunning("invulnerable")) return false;
