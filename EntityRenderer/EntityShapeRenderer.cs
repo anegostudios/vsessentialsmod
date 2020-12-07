@@ -65,6 +65,8 @@ namespace Vintagestory.GameContent
 
         ITexPositionSource defaultTexSource;
 
+        protected bool shapeFresh;
+
         /// <summary>
         /// This is called before entity.OnTesselation()
         /// </summary>
@@ -130,14 +132,26 @@ namespace Vintagestory.GameContent
                 messageTextures = new List<MessageTexture>();
                 api.Event.ChatMessage += OnChatMessage;
             }
-            
-            api.Event.ReloadShapes += TesselateShape;
+
+            api.Event.ReloadShapes += MarkShapeModified;
+        }
+
+        public virtual void MarkShapeModified()
+        {
+            shapeFresh = false;
+
+            if (entity.IsRendered)
+            {
+                TesselateShape();
+            }
         }
 
 
+        bool loaded = false;
         public override void OnEntityLoaded()
         {
-            TesselateShape();
+            loaded = true;
+            MarkShapeModified();
         }
 
         protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
@@ -185,6 +199,12 @@ namespace Vintagestory.GameContent
 
         public virtual void TesselateShape()
         {
+            if (!loaded)
+            {
+                return;
+            }
+
+            shapeFresh = true;
             CompositeShape compositeShape = OverrideCompositeShape != null ? OverrideCompositeShape : entity.Properties.Client.Shape;
 
             Shape entityShape = OverrideEntityShape != null ? OverrideEntityShape : entity.Properties.Client.LoadedShape;
@@ -251,6 +271,11 @@ namespace Vintagestory.GameContent
                     {
                         capi.Render.DeleteMesh(meshRefOit);
                         meshRefOit = null;
+                    }
+
+                    if (capi.IsShuttingDown)
+                    {
+                        return;
                     }
 
                     if (opaqueMesh.VerticesCount > 0)
@@ -351,11 +376,17 @@ namespace Vintagestory.GameContent
 
         public override void BeforeRender(float dt)
         {
+            if (!shapeFresh)
+            {
+                TesselateShape();
+            }
+
             if (meshRefOpaque == null && meshRefOit == null) return;
 
             if (gearInv == null && eagent?.GearInventory != null)
             {
                 registerSlotModified();
+                shapeFresh = true;
             }
 
 
@@ -426,6 +457,7 @@ namespace Vintagestory.GameContent
                     } else
                     {
                         skipRenderJointId = entity.AnimManager.HeadController.HeadElement.JointId;
+
                         if (entity.AnimManager.HeadController.NeckElement != null)
                         {
                             skipRenderJointId2 = entity.AnimManager.HeadController.NeckElement.JointId;
@@ -594,6 +626,11 @@ namespace Vintagestory.GameContent
                 registerSlotModified();
             }
 
+            if (!shapeFresh)
+            {
+                TesselateShape();
+            }
+
             loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
             modelviewMatrix = ModelMat;
             meshRef = this.meshRefOpaque;
@@ -610,26 +647,17 @@ namespace Vintagestory.GameContent
                 if (inv != null) inv.SlotModified += backPackSlotModified;
             }
 
-            TesselateShape();
+            MarkShapeModified();
         }
 
         protected void backPackSlotModified(int slotId)
         {
-            TesselateShape();
+            MarkShapeModified();
         }
 
         protected void gearSlotModified(int slotid)
         {
-			// Needed so that hair elements are removed from some clothes. Lets see if it breaks stuff or lags a lot
-            TesselateShape();
-            /*if (slotid >= 12)
-            {
-                TesselateShape();
-            }
-            else
-            {
-                reloadSkin();
-            }*/
+            MarkShapeModified();
         }
 
         public virtual void reloadSkin()
@@ -825,7 +853,7 @@ namespace Vintagestory.GameContent
                 debugTagTexture = null;
             }
 
-            capi.Event.ReloadShapes -= TesselateShape;
+            capi.Event.ReloadShapes -= MarkShapeModified;
 
             if (DisplayChatMessages)
             {

@@ -403,7 +403,7 @@ namespace Vintagestory.GameContent
             if (posY > ws.api.World.SeaLevel)
             {
                 // Greater wind at greater heights
-                strength *= Math.Max(1, (posY - ws.api.World.SeaLevel) / 100.0);
+                strength *= Math.Max(1, 0.9 + (posY - ws.api.World.SeaLevel) / 100.0);
             }
             else
             {

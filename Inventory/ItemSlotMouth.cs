@@ -20,9 +20,9 @@ namespace Vintagestory.GameContent
             MaxSlotStackSize = 1;
         }
 
-        public override bool CanTakeFrom(ItemSlot sourceSlot)
+        public override bool CanTakeFrom(ItemSlot sourceSlot, EnumMergePriority priority = EnumMergePriority.AutoMerge)
         {
-            return base.CanTakeFrom(sourceSlot) && mouthable(sourceSlot);
+            return base.CanTakeFrom(sourceSlot, priority) && mouthable(sourceSlot);
         }
 
         public override bool CanHold(ItemSlot itemstackFromSourceSlot)

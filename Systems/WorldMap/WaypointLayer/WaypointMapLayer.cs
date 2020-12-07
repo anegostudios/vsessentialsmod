@@ -62,6 +62,24 @@ namespace Vintagestory.GameContent
 
                 sapi.Event.GameWorldSave += OnSaveGameGettingSaved;
                 sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list]", OnCmdWayPoint, Privilege.chat);
+                sapi.RegisterCommand("tpwp", "Teleport yourself to a waypoint starting with the supplied name", "[name]", OnCmdTpTo, Privilege.tp);
+            }
+        }
+
+        private void OnCmdTpTo(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
+
+            string name = args.PopWord().ToLowerInvariant();
+
+            foreach (var wp in ownwpaypoints)
+            {
+                if (wp.Title != null && wp.Title.ToLowerInvariant().StartsWith(name))
+                {
+                    player.Entity.TeleportTo(wp.Position);
+                    player.SendMessage(groupId, Lang.Get("Ok teleported you to waypoint {0}.", wp.Title), EnumChatType.CommandSuccess);
+                    return;
+                }
             }
         }
 

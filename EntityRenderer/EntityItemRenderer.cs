@@ -72,6 +72,7 @@ namespace Vintagestory.GameContent
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
                 prog.DontWarpVertices = 0;
                 prog.NormalShaded = 1;
+                prog.AlphaTest = renderInfo.AlphaTest;
 
                 if (entity.Swimming)
                 {

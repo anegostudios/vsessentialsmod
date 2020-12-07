@@ -31,7 +31,16 @@ namespace Vintagestory.GameContent
 
         public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
-            api.Event.ReloadTextures += reloadSkin;
+            api.Event.ReloadTextures += () =>
+            {
+                var texturesByLoc = (entity as EntityAgent).extraTextureByLocation;
+                var texturesByName = (entity as EntityAgent).extraTexturesByTextureName;
+
+                texturesByLoc.Clear();
+                texturesByName.Clear();
+                textureSpaceAllocated = false;
+                MarkShapeModified();
+            };
         }
 
 
@@ -59,10 +68,15 @@ namespace Vintagestory.GameContent
 
         public bool doReloadShapeAndSkin = true;
 
-        public override void TesselateShape()
+        public override void MarkShapeModified()
         {
             if (!doReloadShapeAndSkin) return;
 
+            base.MarkShapeModified();
+        }
+
+        public override void TesselateShape()
+        {
             base.TesselateShape();
 
             if (eagent.GearInventory != null)
@@ -134,6 +148,7 @@ namespace Vintagestory.GameContent
                 ItemStack stack = gearInv[slotid]?.Itemstack;
                 if (stack == null) continue;
                 if (eagent.hideClothing) continue;
+                if (stack.Item.FirstTexture == null) continue; // Invalid/Unknown/Corrupted item
 
                 int itemTextureSubId = stack.Item.FirstTexture.Baked.TextureSubId;
 

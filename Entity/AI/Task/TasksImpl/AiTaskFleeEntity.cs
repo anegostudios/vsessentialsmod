@@ -152,7 +152,7 @@ namespace Vintagestory.GameContent
                         {
                             float rangeMul = 1f;
 
-                            // Sneaking halves the detection range
+                            // Sneaking reduces the detection range
                             if (eagent.Controls.Sneak && eagent.OnGround)
                             {
                                 rangeMul *= 0.6f;
@@ -160,7 +160,7 @@ namespace Vintagestory.GameContent
                             // Trait bonus
                             if (e.Code.Path == "player")
                             {
-                                rangeMul = eagent.Stats.GetBlended("animalSeekingRange");
+                                rangeMul *= eagent.Stats.GetBlended("animalSeekingRange");
                             }
 
                             if (rangeMul != 1 && e.ServerPos.DistanceTo(ownPos) > hereRange * rangeMul) return false;

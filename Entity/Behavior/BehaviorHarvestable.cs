@@ -22,6 +22,17 @@ namespace Vintagestory.GameContent
         protected InventoryGeneric inv;
         protected GuiDialogCarcassContents dlg;
 
+        bool GotCrushed
+        {
+            get
+            {
+                return
+                    (entity.WatchedAttributes.HasAttribute("deathReason") && (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason") == EnumDamageSource.Fall) ||
+                    (entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Crushing)
+                ;
+            }
+        }
+
         public float AnimalWeight
         {
             get
@@ -51,14 +62,9 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                if (entity.WatchedAttributes.HasAttribute("deathReason"))
+                if (GotCrushed)
                 {
-                    EnumDamageSource dmgSource = (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason");
-
-                    if (dmgSource == EnumDamageSource.Fall)
-                    {
-                        return 0.5f;
-                    }
+                    return 0.5f;
                 }
 
                 string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
@@ -84,7 +90,7 @@ namespace Vintagestory.GameContent
         float baseHarvestDuration;
         public float GetHarvestDuration(Entity forEntity) 
         {
-            return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingSpeed");
+            return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingTime");
         }
 
         public bool IsHarvested
@@ -297,11 +303,19 @@ namespace Vintagestory.GameContent
 
             for (int i = 0; i < jsonDrops.Length; i++)
             {
-                if (jsonDrops[i].Tool != null && (byPlayer == null || jsonDrops[i].Tool != byPlayer.InventoryManager.ActiveTool)) continue;
+                BlockDropItemStack dstack = jsonDrops[i];
+                if (dstack.Tool != null && (byPlayer == null || dstack.Tool != byPlayer.InventoryManager.ActiveTool)) continue;
 
-                jsonDrops[i].Resolve(entity.World, "BehaviorHarvestable");
+                dstack.Resolve(entity.World, "BehaviorHarvestable");
 
-                ItemStack stack = jsonDrops[i].GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier);
+                float extraMul = 1f;
+                if (dstack.DropModbyStat != null)
+                {
+                    // If the stat does not exist, then GetBlended returns 1 \o/
+                    extraMul = byPlayer.Entity.Stats.GetBlended(dstack.DropModbyStat);
+                }
+
+                ItemStack stack = dstack.GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier * extraMul);
 
                 if (stack == null) continue;
 
@@ -315,7 +329,7 @@ namespace Vintagestory.GameContent
                 if (stack.StackSize == 0) continue;
 
                 todrop.Add(stack);
-                if (jsonDrops[i].LastDrop) break;
+                if (dstack.LastDrop) break;
             }
 
             //entity.World.Logger.Debug("setharvested drops resolved");
@@ -381,14 +395,9 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Alive)
             {
-                if (entity.WatchedAttributes.HasAttribute("deathReason"))
+                if (GotCrushed)
                 {
-                    EnumDamageSource dmgSource = (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason");
-
-                    if (dmgSource == EnumDamageSource.Fall)
-                    {
-                        infotext.AppendLine(Lang.Get("Looks crushed. Won't be able to harvest as much from this carcass."));
-                    }
+                    infotext.AppendLine(Lang.Get("Looks crushed. Won't be able to harvest as much from this carcass."));
                 }
                 
                 string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");

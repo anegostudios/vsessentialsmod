@@ -113,6 +113,8 @@ namespace Vintagestory.GameContent
         private void Event_SaveGameLoaded()
         {
             enabled = sapi.World.Config.GetBool("snowAccum", true);
+            GlobalConstants.MeltingFreezingEnabled = enabled;
+
             if (!enabled) return;
 
             snowLayerScannerThread.Start();

@@ -439,6 +439,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.NutritionProps = typedItemType.NutritionProps;
             item.TransitionableProps = typedItemType.TransitionableProps;
             item.GrindingProps = typedItemType.GrindingProps;
+            item.CrushingProps = typedItemType.CrushingProps;
             item.Shape = typedItemType.Shape;
             item.Tool = typedItemType.Tool;
             item.AttackPower = typedItemType.AttackPower;
@@ -644,6 +645,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.NutritionProps = typedBlockType.NutritionProps;
             block.TransitionableProps = typedBlockType.TransitionableProps;
             block.GrindingProps = typedBlockType.GrindingProps;
+            block.CrushingProps = typedBlockType.CrushingProps;
             block.LiquidLevel = typedBlockType.LiquidLevel;
             block.AttackPower = typedBlockType.AttackPower;
             block.MiningSpeed = typedBlockType.MiningSpeed;

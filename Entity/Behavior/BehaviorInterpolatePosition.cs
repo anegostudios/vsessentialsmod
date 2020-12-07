@@ -18,6 +18,7 @@ namespace Vintagestory.GameContent
 
         
         float accum;
+        bool serverposApplied;
         
         public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
         {
@@ -49,7 +50,12 @@ namespace Vintagestory.GameContent
                 // "|| accum > 1" mitigates items at the edge of block constantly jumping up and down
                 if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05f) || accum > 1)
                 {
-                    entity.Pos.SetPos(entity.ServerPos);
+                    if (!serverposApplied)
+                    {
+                        entity.Pos.SetPos(entity.ServerPos);
+                    }
+
+                    serverposApplied = true;
 
                     return;
                 }
@@ -105,7 +111,8 @@ namespace Vintagestory.GameContent
             rollDiff = entity.ServerPos.Roll - entity.Pos.Roll;
             yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
             pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
-            
+            serverposApplied = false;
+
             accum = 0;
         }
 

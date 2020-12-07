@@ -82,6 +82,8 @@ namespace Vintagestory.ServerMods.NoObf
         public TransitionableProperties[] TransitionableProps = null;
         [JsonProperty]
         public GrindingProperties GrindingProps = null;
+        [JsonProperty]
+        public CrushingProperties CrushingProps = null;
 
         [JsonProperty]
         public bool LiquidSelectable = false;

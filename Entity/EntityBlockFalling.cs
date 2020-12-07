@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using Vintagestory.API.Client;
@@ -11,53 +12,12 @@ using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
-    /// <summary>
-    /// Entity that represents a falling block like sand. When spawned it sets an air block at the initial 
-    /// position. When it hits the ground it despawns and sets the original block back at that location.
-    /// </summary>
-    public class EntityBlockFalling : Entity
+    public class FallingBlockParticlesModSystem : ModSystem
     {
-        private int ticksAlive;
-        int lingerTicks;
-
-        public bool InitialBlockRemoved;
-        
-
-        private AssetLocation blockCode;
-        public BlockPos initialPos;
-        private ItemStack[] drops;
-        public TreeAttribute blockEntityAttributes;
-        public string blockEntityClass;
-
-        public BlockEntity removedBlockentity;
-
-        float impactDamageMul;
-
-        bool fallHandled;
-        float dustIntensity;
-
-        byte[] lightHsv;
-        AssetLocation fallSound;
-        ILoadedSound sound;
-        float soundStartDelay;
-
-        ItemStack blockAsStack;
-        bool canFallSideways;
-
         static SimpleParticleProperties dustParticles;
         static SimpleParticleProperties bitsParticles;
 
-        Vec3d fallMotion = new Vec3d();
-        float pushaccum;
-
-        static HashSet<long> fallingNow = new HashSet<long>();
-
-
-        // Additional config options
-        public bool DoRemoveBlock = true;
-        
-
-        static EntityBlockFalling()
+        static FallingBlockParticlesModSystem()
         {
             dustParticles = new SimpleParticleProperties(1, 3, ColorUtil.ToRgba(40, 220, 220, 220), new Vec3d(), new Vec3d(), new Vec3f(-0.25f, -0.25f, -0.25f), new Vec3f(0.25f, 0.25f, 0.25f), 1, 1, 0.3f, 0.3f, EnumParticleModel.Quad);
             dustParticles.AddQuantity = 5;
@@ -88,6 +48,152 @@ namespace Vintagestory.GameContent
             bitsParticles.MaxSize = 1.5f;
         }
 
+        ICoreClientAPI capi;
+        HashSet<EntityBlockFalling> fallingBlocks = new HashSet<EntityBlockFalling>();
+        ConcurrentQueue<EntityBlockFalling> toRegister = new ConcurrentQueue<EntityBlockFalling>();
+        ConcurrentQueue<EntityBlockFalling> toRemove = new ConcurrentQueue<EntityBlockFalling>();
+
+        public override bool ShouldLoad(EnumAppSide forSide)
+        {
+            return forSide == EnumAppSide.Client;
+        }
+
+        public override void StartClientSide(ICoreClientAPI api)
+        {
+            this.capi = api;
+            api.Event.RegisterAsyncParticleSpawner(asyncParticleSpawn);
+        }
+
+        public void Register(EntityBlockFalling entity)
+        {
+            toRegister.Enqueue(entity);
+        }
+
+        public void Unregister(EntityBlockFalling entity)
+        {
+            toRemove.Enqueue(entity);
+        }
+
+        public int ActiveFallingBlocks => fallingBlocks.Count;
+
+        
+        private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
+        {
+            int alive = manager.ParticlesAlive(EnumParticleModel.Quad);
+
+            // Reduce particle spawn the more falling blocks there are
+            // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIwLjk1Xih4LzUpIiwiY29sb3IiOiIjMDAwMDAwIn0seyJ0eXBlIjoxMDAwLCJ3aW5kb3ciOlsiMCIsIjIwMCIsIjAiLCIxIl19XQ--
+            float particlemul = Math.Max(0.05f, (float)Math.Pow(0.95f, alive / 200f));
+
+            foreach (var bef in fallingBlocks)
+            {
+                //if (api.Side == EnumAppSide.Server || dustIntensity == 0) return;
+
+                float smokeAdd = 0f;
+                if (bef.nowImpacted)
+                {
+                    smokeAdd = 20f;
+                    bef.nowImpacted = false;
+                }
+
+                if (bef.Block.Id != 0)
+                {
+                    dustParticles.Color = bef.Block.GetRandomColor(capi, bef.blockAsStack);
+                    dustParticles.Color &= 0xffffff;
+                    dustParticles.Color |= (150 << 24);
+                    dustParticles.MinPos.Set(bef.Pos.X - 0.2 - 0.5, bef.Pos.Y, bef.Pos.Z - 0.2 - 0.5);
+                    dustParticles.MinSize = 1f;
+
+                    float veloMul = smokeAdd / 20f;
+                    dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)bef.Pos.Motion.Y, -0.2f * veloMul);
+                    dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)bef.Pos.Motion.Y + -veloMul, 0.4f * veloMul);
+                    dustParticles.MinQuantity = smokeAdd * bef.dustIntensity * particlemul / 2f;
+                    dustParticles.AddQuantity = (6 * Math.Abs((float)bef.Pos.Motion.Y) + smokeAdd) * bef.dustIntensity * particlemul / 2f;
+
+                    manager.Spawn(dustParticles);
+                }
+
+                bitsParticles.MinPos.Set(bef.Pos.X - 0.2 - 0.5, bef.Pos.Y - 0.5, bef.Pos.Z - 0.2 - 0.5);
+
+                bitsParticles.MinVelocity.Set(-2f, 30f * (float)bef.Pos.Motion.Y, -2f);
+                bitsParticles.AddVelocity.Set(4f, 0.2f * (float)bef.Pos.Motion.Y, 4f);
+                bitsParticles.MinQuantity = particlemul;
+                bitsParticles.AddQuantity = 6 * Math.Abs((float)bef.Pos.Motion.Y) * particlemul;
+                bitsParticles.Color = dustParticles.Color;
+
+                capi.World.SpawnParticles(bitsParticles);
+            }
+
+            int cnt = toRegister.Count;
+            while (cnt-- > 0)
+            {
+                if (toRegister.TryDequeue(out EntityBlockFalling bef))
+                {
+                    fallingBlocks.Add(bef);
+                }
+            }
+
+            cnt = toRemove.Count;
+            while (cnt-- > 0)
+            {
+                if (toRemove.TryDequeue(out EntityBlockFalling bef))
+                {
+                    fallingBlocks.Remove(bef);
+                }
+            }
+
+            return true;
+        }
+    }
+
+
+
+    /// <summary>
+    /// Entity that represents a falling block like sand. When spawned it sets an air block at the initial 
+    /// position. When it hits the ground it despawns and sets the original block back at that location.
+    /// </summary>
+    public class EntityBlockFalling : Entity
+    {
+        private int ticksAlive;
+        int lingerTicks;
+
+        public bool InitialBlockRemoved;
+        
+
+        private AssetLocation blockCode;
+        public BlockPos initialPos;
+        private ItemStack[] drops;
+        public TreeAttribute blockEntityAttributes;
+        public string blockEntityClass;
+
+        public BlockEntity removedBlockentity;
+
+        float impactDamageMul;
+
+        bool fallHandled;
+        internal float dustIntensity;
+        internal float nowDustIntensity;
+
+        byte[] lightHsv;
+        AssetLocation fallSound;
+        ILoadedSound sound;
+        float soundStartDelay;
+
+        internal ItemStack blockAsStack;
+        bool canFallSideways;
+
+
+        Vec3d fallMotion = new Vec3d();
+        float pushaccum;
+
+        static HashSet<long> fallingNow = new HashSet<long>();
+
+
+        // Additional config options
+        public bool DoRemoveBlock = true;
+
+        internal bool nowImpacted;
+
         public EntityBlockFalling() { }
 
         public override float MaterialDensity => 99999;
@@ -100,6 +206,8 @@ namespace Vintagestory.GameContent
             }
         }
 
+        EntityBehaviorPassivePhysics physicsBh;
+        FallingBlockParticlesModSystem particleSys;
 
         public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, float dustIntensity)
         {
@@ -118,7 +226,7 @@ namespace Vintagestory.GameContent
             this.Code = new AssetLocation("blockfalling");
             this.blockCode = block.Code;
             this.removedBlockentity = blockEntity;
-            this.initialPos = initialPos;
+            this.initialPos = initialPos.Copy(); // Must have a Copy() here!
 
             ServerPos.SetPos(initialPos);
             ServerPos.X += 0.5;
@@ -163,6 +271,7 @@ namespace Vintagestory.GameContent
                     SoundType = EnumSoundType.Ambient
 
                 });
+                sound.Start();
                 soundStartDelay = 0.05f + (float)capi.World.Rand.NextDouble() / 3f;
             }
 
@@ -174,15 +283,29 @@ namespace Vintagestory.GameContent
             {
                 fallSound = new AssetLocation(WatchedAttributes.GetString("fallSound"));
             }
+
+            if (api.World.Side == EnumAppSide.Client)
+            {
+                particleSys = api.ModLoader.GetModSystem<FallingBlockParticlesModSystem>();
+                particleSys.Register(this);
+                physicsBh = GetBehavior<EntityBehaviorPassivePhysics>();
+            }
         }
 
-        
+
         /// <summary>
         /// Delays behaviors from ticking to reduce flickering
         /// </summary>
         /// <param name="dt"></param>
         public override void OnGameTick(float dt)
         {
+            // (1 - 0.95^(x/100)) / 2
+            // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIoMS0wLjk1Xih4LzEwMCkpLzIiLCJjb2xvciI6IiMwMDAwMDAifSx7InR5cGUiOjEwMDAsIndpbmRvdyI6WyIwIiwiMzAwMCIsIjAiLCIxIl19XQ--
+            if (physicsBh != null)
+            {
+                physicsBh.clientPhysicsTickTimeThreshold = (float)((1 - Math.Pow(0.95, particleSys.ActiveFallingBlocks / 100.0)) / 4.0);
+            }
+
             if (soundStartDelay > 0)
             {
                 soundStartDelay -= dt;
@@ -214,7 +337,11 @@ namespace Vintagestory.GameContent
 
             if (!Collided && !fallHandled)
             {
-                spawnParticles(0);
+                nowDustIntensity = 1;
+                //spawnParticles(0);
+            } else
+            {
+                nowDustIntensity = 0;
             }
 
 
@@ -271,8 +398,10 @@ namespace Vintagestory.GameContent
             if (Api.World.Side == EnumAppSide.Client)
             {
                 fallingNow.Remove(EntityId);
+                particleSys.Unregister(this);
             }
         }
+
 
         private void UpdateBlock(bool remove, BlockPos pos)
         {
@@ -307,35 +436,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        void spawnParticles(float smokeAdd)
-        {
-            if (Api.Side == EnumAppSide.Server || dustIntensity == 0) return;
-
-            dustParticles.Color = Block.GetRandomColor(Api as ICoreClientAPI, blockAsStack);
-            dustParticles.Color &= 0xffffff;
-            dustParticles.Color |= (150 << 24);
-            dustParticles.MinPos.Set(Pos.X - 0.2 - 0.5, Pos.Y, Pos.Z - 0.2 - 0.5);
-            dustParticles.MinSize = 1f;
-
-            float veloMul = smokeAdd / 20f;
-            dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)Pos.Motion.Y, -0.2f * veloMul);
-            dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)Pos.Motion.Y + -veloMul, 0.4f * veloMul);
-            dustParticles.MinQuantity = smokeAdd * dustIntensity;
-            dustParticles.AddQuantity = (6 * Math.Abs((float)Pos.Motion.Y) + smokeAdd) * dustIntensity;
-
-            
-            
-            Api.World.SpawnParticles(dustParticles);
-
-            bitsParticles.MinPos.Set(Pos.X - 0.2 - 0.5, Pos.Y - 0.5, Pos.Z - 0.2 - 0.5);
-            
-            bitsParticles.MinVelocity.Set(-2f, 30f * (float)Pos.Motion.Y, -2f);
-            bitsParticles.AddVelocity.Set(4f, 0.2f * (float)Pos.Motion.Y, 4f);
-            bitsParticles.AddQuantity = 12 * Math.Abs((float)Pos.Motion.Y);
-            bitsParticles.Color = dustParticles.Color;
-
-            Api.World.SpawnParticles(bitsParticles);
-        }
+        
 
 
         private void OnChunkRetesselated(bool on)
@@ -391,13 +492,14 @@ namespace Vintagestory.GameContent
                         }
 
                         fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
-                        spawnParticles(0);
+                        //spawnParticles(0);
                         return;
                     }
                 }
             }
 
-            spawnParticles(20f);
+            //spawnParticles(20f);
+            nowImpacted = true;
             
             
             Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
@@ -434,15 +536,22 @@ namespace Vintagestory.GameContent
                 {
                     // Space is occupied by maybe a torch or some other block we shouldn't replace
                     DropItems(finalPos);
+
                 }
 
                 
                 if (impactDamageMul > 0)
                 {
-                    Entity[] entities = World.GetEntitiesInsideCuboid(finalPos, finalPos.AddCopy(1, 1, 1));
+                    Entity[] entities = World.GetEntitiesInsideCuboid(finalPos, finalPos.AddCopy(1, 1, 1), (e) => !(e is EntityBlockFalling));
+                    bool didhit = false;
                     foreach (var entity in entities)
                     {
-                        entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Block, Type = EnumDamageType.Crushing, SourceBlock = Block, SourcePos = finalPos.ToVec3d() }, 6 * (float)Math.Abs(motionY) * impactDamageMul);
+                        bool nowhit = entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Block, Type = EnumDamageType.Crushing, SourceBlock = Block, SourcePos = finalPos.ToVec3d() }, 18 * (float)Math.Abs(motionY) * impactDamageMul);
+                        if (nowhit && !didhit)
+                        {
+                            didhit = nowhit;
+                            Api.World.PlaySoundAt(this.Block.Sounds.Hit, entity);
+                        }
                     }
                 }
             }
@@ -466,9 +575,13 @@ namespace Vintagestory.GameContent
 
                 lingerTicks = 50;
                 fallHandled = true;
-                spawnParticles(20f);
+                //spawnParticles(20f);
+                nowImpacted = true;
+                particleSys.Unregister(this);
             }
         }
+
+        
 
         private void DropItems(BlockPos pos)
         {

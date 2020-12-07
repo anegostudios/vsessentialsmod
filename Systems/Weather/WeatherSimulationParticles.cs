@@ -348,8 +348,8 @@ namespace Vintagestory.GameContent
                 splashParticles.MinVelocity = new Vec3f(-1f, 3, -1f);
                 splashParticles.AddVelocity = new Vec3f(2, 0, 2);
                 splashParticles.LifeLength = 0.1f;
-                splashParticles.MinSize = 0.07f * conds.Rainfall;// weatherData.PrecParticleSize;
-                splashParticles.MaxSize = 0.2f * conds.Rainfall; // weatherData.PrecParticleSize;
+                splashParticles.MinSize = 0.07f * (0.5f + 0.65f * conds.Rainfall);// weatherData.PrecParticleSize;
+                splashParticles.MaxSize = 0.2f * (0.5f + 0.65f * conds.Rainfall); // weatherData.PrecParticleSize;
                 splashParticles.ShouldSwimOnLiquid = true;
                 splashParticles.Color = rainParticleColor;
 

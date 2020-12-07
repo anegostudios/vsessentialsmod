@@ -158,6 +158,10 @@ namespace Vintagestory.GameContent
             overviewGui.GetVerticalTab("verticalTabs").SetValue(curTab, false);
 
             overviewGui.FocusElement(overviewGui.GetTextInput("searchField").TabIndex);
+
+            if (curTab == 0) currentCatgoryCode = null;
+            else currentCatgoryCode = categoryCodes[curTab - 1];
+            FilterItems();
         }
 
         GuiTab[] genTabs(out int curTab)
@@ -270,6 +274,8 @@ namespace Vintagestory.GameContent
             OnNewScrollbarvalueDetailPage(posY);
 
             detailViewGui.GetVerticalTab("verticalTabs").SetValue(curTab, false);
+
+            
         }
 
         private void OnDetailViewTabClicked(int t1, GuiTab t2)

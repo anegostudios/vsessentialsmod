@@ -31,19 +31,19 @@ namespace Vintagestory.GameContent
         public override void OnBlockUnloaded()
         {
             base.OnBlockUnloaded();
-            animUtil.Dispose();
+            animUtil?.Dispose();
         }
 
         public override void OnBlockBroken()
         {
             base.OnBlockBroken();
-            animUtil.Dispose();
+            animUtil?.Dispose();
         }
 
         public override void OnBlockRemoved()
         {
             base.OnBlockRemoved();
-            animUtil.Dispose();
+            animUtil?.Dispose();
         }
 
 
@@ -184,7 +184,10 @@ namespace Vintagestory.GameContent
         {
             if (animator == null || render == null) return; // not initialized yet
 
-            animator.OnFrame(activeAnimationsByAnimCode, deltaTime);
+            if (activeAnimationsByAnimCode.Count > 0 || animator.ActiveAnimationCount > 0)
+            {
+                animator.OnFrame(activeAnimationsByAnimCode, deltaTime);
+            }
 
             if (activeAnimationsByAnimCode.Count == 0 && animator.ActiveAnimationCount == 0 && render.ShouldRender && !stopRenderTriggered)
             {
