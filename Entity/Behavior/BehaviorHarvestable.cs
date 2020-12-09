@@ -312,7 +312,7 @@ namespace Vintagestory.GameContent
                 if (dstack.DropModbyStat != null)
                 {
                     // If the stat does not exist, then GetBlended returns 1 \o/
-                    extraMul = byPlayer.Entity.Stats.GetBlended(dstack.DropModbyStat);
+                    extraMul = byPlayer?.Entity?.Stats.GetBlended(dstack.DropModbyStat) ?? 0;
                 }
 
                 ItemStack stack = dstack.GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier * extraMul);

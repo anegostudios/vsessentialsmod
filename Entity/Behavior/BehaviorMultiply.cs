@@ -159,7 +159,7 @@ namespace Vintagestory.GameContent
             callbackId = entity.World.RegisterCallback(CheckMultiply, 3000);
 
             if (entity.World.Calendar == null) return;
-
+            
             double daysNow = entity.World.Calendar.TotalDays;
 
             if (!IsPregnant)

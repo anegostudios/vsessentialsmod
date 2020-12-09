@@ -31,16 +31,7 @@ namespace Vintagestory.GameContent
 
         public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
-            api.Event.ReloadTextures += () =>
-            {
-                var texturesByLoc = (entity as EntityAgent).extraTextureByLocation;
-                var texturesByName = (entity as EntityAgent).extraTexturesByTextureName;
-
-                texturesByLoc.Clear();
-                texturesByName.Clear();
-                textureSpaceAllocated = false;
-                MarkShapeModified();
-            };
+            api.Event.ReloadTextures += reloadSkin;
         }
 
 
