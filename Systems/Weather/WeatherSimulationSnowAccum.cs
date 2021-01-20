@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
             this.sapi = sapi;
             this.ws = ws;
 
-            // Get a non-relighting blokc accessor, because snowlayers do not block light and do not remove light blocking blocks.
+            // Get a non-relighting block accessor, because snowlayers do not block light and do not remove light blocking blocks.
             ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
             ba.UpdateSnowAccumMap = false;
 

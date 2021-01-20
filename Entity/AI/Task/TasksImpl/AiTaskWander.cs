@@ -193,7 +193,7 @@ namespace Vintagestory.GameContent
 
                         // Cannot be in water
                         block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                        if (!block.IsLiquid()) curTarget.W = 0;
+                        if (block.IsLiquid()) curTarget.W = 0;
                         break;
 
                     case EnumHabitat.Land:
@@ -215,8 +215,6 @@ namespace Vintagestory.GameContent
                             Vec3d startAhead = entity.ServerPos.XYZ.Ahead(1, 0, angleHor); // Otherwise they are forever stuck if they stand over the edge
 
                             int prevY = (int)startAhead.Y;
-
-
 
                             GameMath.BresenHamPlotLine2d((int)startAhead.X, (int)startAhead.Z, (int)target1BlockAhead.X, (int)target1BlockAhead.Z, (x, z) =>
                             {
@@ -249,6 +247,20 @@ namespace Vintagestory.GameContent
                         block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
                         if (!block.IsLiquid()) curTarget.W = 0;
                         break;
+                }
+
+                if (curTarget.W > 0)
+                {
+                    // Try to not hug the wall so much
+                    for (int i = 0; i < BlockFacing.HORIZONTALS.Length; i++)
+                    {
+                        BlockFacing face = BlockFacing.HORIZONTALS[i];
+                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X + face.Normali.X, (int)curTarget.Y, (int)curTarget.Z + face.Normali.Z);
+                        if (block.SideSolid[face.Opposite.Index])
+                        {
+                            curTarget.W *= 0.5;
+                        }
+                    }
                 }
 
 

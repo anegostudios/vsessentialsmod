@@ -624,7 +624,6 @@ namespace Vintagestory.ServerMods.NoObf
             block.Ambientocclusion = typedBlockType.Ambientocclusion;
             block.CollisionBoxes = typedBlockType.CollisionBoxes == null ? null : (Cuboidf[])typedBlockType.CollisionBoxes.Clone();
             block.SelectionBoxes = typedBlockType.SelectionBoxes == null ? null : (Cuboidf[])typedBlockType.SelectionBoxes.Clone();
-            block.ParticleCollisionBoxes = typedBlockType.ParticleCollisionBoxes == null ? null : (Cuboidf[])typedBlockType.ParticleCollisionBoxes.Clone();
             block.MaterialDensity = typedBlockType.MaterialDensity;
             block.GuiTransform = typedBlockType.GuiTransform;
             block.FpHandTransform = typedBlockType.FpHandTransform;
@@ -660,7 +659,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 block.Sounds = typedBlockType.Sounds.Clone();
             }
-            block.RandomDrawOffset = typedBlockType.RandomDrawOffset;
+            block.RandomDrawOffset = typedBlockType.RandomDrawOffset ? 1 : 0;
             block.RandomizeRotations = typedBlockType.RandomizeRotations;
             block.RandomizeAxes = typedBlockType.RandomizeAxes;
             block.CombustibleProps = typedBlockType.CombustibleProps;
@@ -687,14 +686,6 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int i = 0; i < block.SelectionBoxes.Length; i++)
                 {
                     block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            if (block.ParticleCollisionBoxes != null)
-            {
-                for (int i = 0; i < block.ParticleCollisionBoxes.Length; i++)
-                {
-                    block.ParticleCollisionBoxes[i].RoundToFracsOfOne10thousand();
                 }
             }
 

@@ -464,12 +464,9 @@ namespace Vintagestory.GameContent
             Vec3d testVec = new Vec3d();
             Vec3d testMotion = new Vec3d();
 
-
             Cuboidd stepableBox = findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, walkVec);
 
-            
 
-            // Must have walked into a slab
             if (stepableBox != null)
             {
                 return

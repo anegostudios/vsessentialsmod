@@ -60,7 +60,7 @@ namespace Vintagestory.GameContent
 
         public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
         {
-            return animUtil.activeAnimationsByAnimCode.Count > 0;
+            return animUtil.activeAnimationsByAnimCode.Count > 0 || (animUtil.animator != null && animUtil.animator.ActiveAnimationCount > 0);
         }
     }
 
@@ -139,8 +139,6 @@ namespace Vintagestory.GameContent
 
             capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
 
-            //InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
-
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
             InitializeAnimator(cacheDictKey, meshdata, shape, rotation);
@@ -150,6 +148,11 @@ namespace Vintagestory.GameContent
 
         public void InitializeAnimator(string cacheDictKey, MeshData meshdata, Shape shape, Vec3f rotation) 
         {
+            if (meshdata == null)
+            {
+                throw new ArgumentException("meshdata cannot be null");
+            }
+
             ICoreClientAPI capi = api as ICoreClientAPI;
             animator = GetAnimator(api, cacheDictKey, shape);
             

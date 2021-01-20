@@ -225,7 +225,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return Math.Max(extraTargetDist + 0.6f, (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2 + 0.05f);
+            return Math.Max(extraTargetDist + 0.6f, entity.CollisionBox.XSize / 2 + 0.05f);
         }
 
         public override void StartExecute()

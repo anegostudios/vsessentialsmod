@@ -100,7 +100,7 @@ namespace Vintagestory.GameContent
             {
                 sapi.World.BlockAccessor.SetBlock(0, pos);
 
-                for (int i = 0; i < BlockFacing.ALLFACES.Length; i++)
+                for (int i = 0; i < BlockFacing.NumberOfFaces; i++)
                 {
                     sapi.World.BlockAccessor.MarkBlockDirty(pos.AddCopy(BlockFacing.ALLFACES[i]));
                 }

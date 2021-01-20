@@ -221,7 +221,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.1f, (targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1) / 2 + (entity.CollisionBox.X2 - entity.CollisionBox.X1) / 4);
+            return System.Math.Max(0.1f, targetEntity.CollisionBox.XSize / 2 + entity.CollisionBox.XSize / 4);
         }
 
         public override void StartExecute()
@@ -322,7 +322,7 @@ namespace Vintagestory.GameContent
             }
 
             Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
             double distance = targetBox.ShortestDistanceFrom(pos);
 
 

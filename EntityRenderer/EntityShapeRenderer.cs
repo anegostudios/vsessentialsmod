@@ -140,10 +140,10 @@ namespace Vintagestory.GameContent
         {
             shapeFresh = false;
 
-            if (entity.IsRendered)
+            /*if (entity.IsRendered) - tyron 19dec 2020: do we need this? if many slots are marked dirty at once, this will cause multiple tesselatins. We already tesselate in BeforeRender() anyway
             {
                 TesselateShape();
-            }
+            }*/
         }
 
 
@@ -619,21 +619,26 @@ namespace Vintagestory.GameContent
 
         }
 
-        public override void PrepareForGuiRender(float dt, double posX, double posY, double posZ, float yawDelta, float size, out MeshRef meshRef, out float[] modelviewMatrix)
+        public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
             if (gearInv == null && eagent?.GearInventory != null)
             {
                 registerSlotModified();
             }
 
+            loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
+
+            if (meshRefOpaque != null)
+            {
+                capi.Render.CurrentActiveShader.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
+                capi.Render.CurrentActiveShader.UniformMatrix("modelViewMatrix", Mat4f.Mul(ModelMat, capi.Render.CurrentModelviewMatrix, ModelMat));
+                capi.Render.RenderMesh(meshRefOpaque);
+            }
+
             if (!shapeFresh)
             {
                 TesselateShape();
             }
-
-            loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
-            modelviewMatrix = ModelMat;
-            meshRef = this.meshRefOpaque;
         }
 
         void registerSlotModified()
@@ -687,6 +692,8 @@ namespace Vintagestory.GameContent
                 capi.Render.CurrentActiveShader.Uniform("windWaveIntensity", (float)WindWaveIntensity);
                 capi.Render.CurrentActiveShader.Uniform("skipRenderJointId", skipRenderJointId);
                 capi.Render.CurrentActiveShader.Uniform("skipRenderJointId2", skipRenderJointId2);
+                capi.Render.CurrentActiveShader.Uniform("entityId", (int)entity.EntityId);
+                capi.Render.CurrentActiveShader.Uniform("waterWaveCounter", capi.Render.ShaderUniforms.WaterWaveCounter);
 
                 color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
                 color[1] = ((entity.RenderColor >> 8) & 0xff) / 255f;
@@ -719,6 +726,7 @@ namespace Vintagestory.GameContent
             {
                 capi.Render.RenderMesh(meshRefOit);
             }
+
         }
 
 
@@ -760,9 +768,8 @@ namespace Vintagestory.GameContent
             Vec3d aboveHeadPos;
 
             if (capi.World.Player.Entity.EntityId == entity.EntityId) {
-                if (rapi.CameraType == EnumCameraMode.FirstPerson && !capi.Settings.Bool["immersiveFpMode"]) return;
+                if (rapi.CameraType == EnumCameraMode.FirstPerson) return;
                 aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
-                //return;
             } else
             {
                 aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.2, entity.Pos.Z);

@@ -7,6 +7,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -21,6 +22,8 @@ namespace Vintagestory.GameContent
         public int NonCoolingWallCount;
 
         public Cuboidi Location;
+
+        public bool AnyChunkUnloaded;
     }
 
     public class ChunkRooms {
@@ -46,7 +49,7 @@ namespace Vintagestory.GameContent
         int chunkMapSizeZ;
 
         ICoreAPI api;
-        IBlockAccessor blockAccess;
+        ICachingBlockAccessor blockAccess;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -82,9 +85,29 @@ namespace Vintagestory.GameContent
         private void Event_ChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
             long index3d = MapUtil.Index3dL(chunkCoord.X, chunkCoord.Y, chunkCoord.Z, chunkMapSizeX, chunkMapSizeZ);
+            ChunkRooms chunkrooms;
+            Cuboidi cuboid;
+            FastSetOfLongs set = new FastSetOfLongs();
+            set.Add(index3d);
             lock (roomsByChunkIndexLock)
             {
-                roomsByChunkIndex.Remove(index3d);
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+                if (chunkrooms != null)
+                {
+                    for (int i = 0; i < chunkrooms.Rooms.Count; i++)
+                    {
+                        cuboid = chunkrooms.Rooms[i].Location;
+                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.Start.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.Start.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.End.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.End.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.Start.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.Start.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.End.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.End.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                    }
+                }
+                foreach (long index in set) roomsByChunkIndex.Remove(index);
             }
         }
 
@@ -166,9 +189,11 @@ namespace Vintagestory.GameContent
             int nonSkyLightCount = 0;
             int exitCount = 0;
 
-            (blockAccess as ICachingBlockAccessor).Begin();
+            blockAccess.Begin();
 
             HashSet<Vec2i> skyLightXZChecked = new HashSet<Vec2i>();
+
+            bool allChunksLoaded = true;
 
             int minx=pos.X, miny = pos.Y, minz = pos.Z, maxx = pos.X + 1, maxy = pos.Y + 1, maxz = pos.Z + 1;
 
@@ -187,20 +212,15 @@ namespace Vintagestory.GameContent
                     }
 
                     Block nBlock = blockAccess.GetBlock(npos);
+                    allChunksLoaded &= blockAccess.LastChunkLoaded;
+                    int heatRetention = nBlock.GetHeatRetention(npos, facing);
 
                     // We hit a wall, no need to scan further
-                    if (nBlock.SideSolid[facing.Opposite.Index] || nBlock.SideSolid[facing.Index])
+                    if (heatRetention != 0)
                     {
-                        if (nBlock.BlockMaterial == EnumBlockMaterial.Ore || nBlock.BlockMaterial == EnumBlockMaterial.Stone || nBlock.BlockMaterial == EnumBlockMaterial.Soil || nBlock.BlockMaterial == EnumBlockMaterial.Ceramic) coolingWallCount++;
-                        else nonCoolingWallCount++;
-                        
-                        continue;
-                    }
+                        if (heatRetention < 0) coolingWallCount -=heatRetention;
+                        else nonCoolingWallCount += heatRetention;
 
-                    // We hit another type of wall
-                    if (nBlock.Code?.Path.Contains("door") == true || nBlock.Code?.Path.Contains("farmland") == true)
-                    {
-                        nonCoolingWallCount+=3;
                         continue;
                     }
 
@@ -286,6 +306,7 @@ namespace Vintagestory.GameContent
                 SkylightCount = skyLightCount,
                 NonSkylightCount = nonSkyLightCount,
                 ExitCount = exitCount,
+                AnyChunkUnloaded = !allChunksLoaded,
                 Location = new Cuboidi(minx, miny, minz, maxx, maxy, maxz)
             };
         }

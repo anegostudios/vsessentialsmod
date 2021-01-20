@@ -41,20 +41,17 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap map, float dt)
         {
-            //if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
             if (quadModel == null || quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
 
             map.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
-
-            float x = (float)(map.Bounds.renderX + viewPos.X);
-            float y = (float)(map.Bounds.renderY + viewPos.Y);
-
             if (waypoint.Pinned)
             {
                 map.Api.Render.PushScissor(null);
-                x = (float)GameMath.Clamp(x, map.Bounds.renderX + 2, map.Bounds.renderX + map.Bounds.InnerWidth - 2);
-                y = (float)GameMath.Clamp(y, map.Bounds.renderY + 2, map.Bounds.renderY + map.Bounds.InnerHeight - 2);
+                map.ClampButPreserveAngle(ref viewPos, 2);
             }
+
+            float x = (float)(map.Bounds.renderX + viewPos.X);
+            float y = (float)(map.Bounds.renderY + viewPos.Y);
 
             ICoreClientAPI api = map.Api;
 
@@ -109,8 +106,13 @@ namespace Vintagestory.GameContent
             
             double x = viewPos.X + mapElem.Bounds.renderX;
             double y = viewPos.Y + mapElem.Bounds.renderY;
+
             if (waypoint.Pinned)
             {
+                mapElem.ClampButPreserveAngle(ref viewPos, 2);
+                x = viewPos.X + mapElem.Bounds.renderX;
+                y = viewPos.Y + mapElem.Bounds.renderY;
+
                 x = (float)GameMath.Clamp(x, mapElem.Bounds.renderX + 2, mapElem.Bounds.renderX + mapElem.Bounds.InnerWidth - 2);
                 y = (float)GameMath.Clamp(y, mapElem.Bounds.renderY + 2, mapElem.Bounds.renderY + mapElem.Bounds.InnerHeight - 2);
             }
@@ -135,11 +137,17 @@ namespace Vintagestory.GameContent
 
                 double x = viewPos.X + mapElem.Bounds.renderX;
                 double y = viewPos.Y + mapElem.Bounds.renderY;
+
                 if (waypoint.Pinned)
                 {
+                    mapElem.ClampButPreserveAngle(ref viewPos, 2);
+                    x = viewPos.X + mapElem.Bounds.renderX;
+                    y = viewPos.Y + mapElem.Bounds.renderY;
+
                     x = (float)GameMath.Clamp(x, mapElem.Bounds.renderX + 2, mapElem.Bounds.renderX + mapElem.Bounds.InnerWidth - 2);
                     y = (float)GameMath.Clamp(y, mapElem.Bounds.renderY + 2, mapElem.Bounds.renderY + mapElem.Bounds.InnerHeight - 2);
                 }
+
                 double dX = args.X - x;
                 double dY = args.Y - y;
 

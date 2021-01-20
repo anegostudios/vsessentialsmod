@@ -200,9 +200,11 @@ namespace Vintagestory.GameContent
         public void Initialize()
         {
             capi.Event.RegisterAsyncParticleSpawner(asyncParticleSpawn);
+
+            lblock = capi.World.GetBlock(new AssetLocation("water-still-7"));
         }
 
-
+        Block lblock;
         Vec3f parentVeloSnow = new Vec3f();
         BlockPos tmpPos = new BlockPos();
         Vec3d particlePos = new Vec3d();
@@ -233,8 +235,11 @@ namespace Vintagestory.GameContent
 
             
             particlePos.Set(capi.World.Player.Entity.Pos.X, capi.World.Player.Entity.Pos.Y, capi.World.Player.Entity.Pos.Z);
-            
 
+            
+            int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapForMap, lblock.SeasonColorMapForMap, ColorUtil.WhiteArgb, (int)particlePos.X, (int)particlePos.Y, (int)particlePos.Z, false);
+            byte[] col = ColorUtil.ToBGRABytes(onwaterSplashParticleColor);
+            onwaterSplashParticleColor = ColorUtil.ToRgba(94, col[0], col[1], col[2]);
 
             centerPos.Set((int)particlePos.X, 0, (int)particlePos.Z);
             for (int lx = 0; lx < 16; lx++)
@@ -364,22 +369,22 @@ namespace Vintagestory.GameContent
 
                     Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
 
-                    double b = 0.75 + 0.25 * rand.NextDouble();
-                    int ca = 230 - rand.Next(100);
-                    int cr = (int)(((rainParticleColor >> 16) & 0xff) * b);
-                    int cg = (int)(((rainParticleColor >> 8) & 0xff) * b);
-                    int cb = (int)(((rainParticleColor >> 0) & 0xff) * b);
-
-                    splashParticles.Color = (ca << 24) | (cr << 16) | (cg << 8) | cb;
-
                     if (block.IsLiquid())
                     {
                         splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
                         splashParticles.AddVelocity.Y = 1.5f;
                         splashParticles.LifeLength = 0.17f;
+                        splashParticles.Color = onwaterSplashParticleColor;
                     }
                     else
                     {
+                        double b = 0.75 + 0.25 * rand.NextDouble();
+                        int ca = 230 - rand.Next(100);
+                        int cr = (int)(((rainParticleColor >> 16) & 0xff) * b);
+                        int cg = (int)(((rainParticleColor >> 8) & 0xff) * b);
+                        int cb = (int)(((rainParticleColor >> 0) & 0xff) * b);
+
+                        splashParticles.Color = (ca << 24) | (cr << 16) | (cg << 8) | cb;
                         splashParticles.AddVelocity.Y = 0f;
                         splashParticles.LifeLength = 0.1f;
                         splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y + 0.05, pz);

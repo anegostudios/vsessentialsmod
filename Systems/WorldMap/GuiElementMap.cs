@@ -164,9 +164,26 @@ namespace Vintagestory.GameContent
 
             double blocksWidth = CurrentBlockViewBounds.X2 - CurrentBlockViewBounds.X1;
             double blocksLength = CurrentBlockViewBounds.Z2 - CurrentBlockViewBounds.Z1;
-            
+
             viewPos.X = (float)((worldPos.X - CurrentBlockViewBounds.X1) / blocksWidth * Bounds.InnerWidth);
             viewPos.Y = (float)((worldPos.Z - CurrentBlockViewBounds.Z1) / blocksLength * Bounds.InnerHeight);
+        }
+
+        public void ClampButPreserveAngle(ref Vec2f viewPos, int border)
+        {
+            if (viewPos.X >= border && viewPos.X <= Bounds.InnerWidth - 2 &&
+                viewPos.Y >= border && viewPos.Y <= Bounds.InnerHeight - 2)
+                return;
+
+            var centerX = Bounds.InnerWidth / 2 - border;
+            var centerY = Bounds.InnerHeight / 2 - border;
+
+            var relX = (viewPos.X - centerX) / centerX;
+            var relY = (viewPos.Y - centerY) / centerY;
+            var factor = Math.Max(Math.Abs(relX), Math.Abs(relY));
+
+            viewPos.X = (float)((viewPos.X - centerX) / factor + centerX);
+            viewPos.Y = (float)((viewPos.Y - centerY) / factor + centerY);
         }
 
         public void TranslateViewPosToWorldPos(Vec2f viewPos, ref Vec3d worldPos)

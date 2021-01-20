@@ -209,7 +209,7 @@ namespace Vintagestory.GameContent
 
             soundChance = Math.Max(0.025f, soundChance - 0.2f);
 
-            float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
+            float size = targetEntity.CollisionBox.XSize;
 
             //pathTraverser.NavigateTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
             pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);

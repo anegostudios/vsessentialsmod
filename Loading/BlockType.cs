@@ -106,8 +106,6 @@ namespace Vintagestory.ServerMods.NoObf
         private RotatableCube SelectionBoxR = DefaultCollisionBoxR.Clone();
         [JsonProperty("CollisionSelectionBox")]
         private RotatableCube CollisionSelectionBoxR = null;
-        [JsonProperty("ParticleCollisionBox")]
-        private RotatableCube ParticleCollisionBoxR = null;
 
         [JsonProperty("CollisionBoxes")]
         private RotatableCube[] CollisionBoxesR = null;
@@ -115,12 +113,9 @@ namespace Vintagestory.ServerMods.NoObf
         private RotatableCube[] SelectionBoxesR = null;
         [JsonProperty("CollisionSelectionBoxes")]
         private RotatableCube[] CollisionSelectionBoxesR = null;
-        [JsonProperty("ParticleCollisionBoxes")]
-        private RotatableCube[] ParticleCollisionBoxesR = null;
 
         public Cuboidf[] CollisionBoxes = null;
         public Cuboidf[] SelectionBoxes = null;
-        public Cuboidf[] ParticleCollisionBoxes = null;
 
         [JsonProperty]
         public bool Climbable = false;
@@ -186,24 +181,22 @@ namespace Vintagestory.ServerMods.NoObf
             // Only one collision/selectionbox 
             if (CollisionBoxR != null) CollisionBoxes = ToCuboidf(CollisionBoxR);
             if (SelectionBoxR != null) SelectionBoxes = ToCuboidf(SelectionBoxR);
-            if (ParticleCollisionBoxR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxR);
 
             // Multiple collision/selectionboxes
             if (CollisionBoxesR != null) CollisionBoxes = ToCuboidf(CollisionBoxesR);
             if (SelectionBoxesR != null) SelectionBoxes = ToCuboidf(SelectionBoxesR);
-            if (ParticleCollisionBoxesR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxesR);
 
             // Merged collision+selectioboxes
             if (CollisionSelectionBoxR != null)
             {
                 CollisionBoxes = ToCuboidf(CollisionSelectionBoxR);
-                SelectionBoxes = CloneArray(CollisionBoxes);
+                SelectionBoxes = ToCuboidf(CollisionSelectionBoxR);
             }
 
             if (CollisionSelectionBoxesR != null)
             {
                 CollisionBoxes = ToCuboidf(CollisionSelectionBoxesR);
-                SelectionBoxes = CloneArray(CollisionBoxes);
+                SelectionBoxes = ToCuboidf(CollisionSelectionBoxesR);
             }
 
             ResolveStringBoolDictFaces(SideSolidOpaqueAo);
@@ -233,15 +226,6 @@ namespace Vintagestory.ServerMods.NoObf
             LightHsv[0] = (byte)GameMath.Clamp(LightHsv[0], 0, ColorUtil.HueQuantities - 1);
             LightHsv[1] = (byte)GameMath.Clamp(LightHsv[1], 0, ColorUtil.SatQuantities - 1);
             LightHsv[2] = (byte)GameMath.Clamp(LightHsv[2], 0, ColorUtil.BrightQuantities - 1);
-        }
-
-        private Cuboidf[] CloneArray(Cuboidf[] array)
-        {
-            if (array == null) return null;
-            int l = array.Length;
-            Cuboidf[] result = new Cuboidf[l];
-            for (int i = 0; i < l; i++) result[i] = array[i].Clone();
-            return result;
         }
 
         private void ResolveDict(Dictionary<string, bool> sideSolidOpaqueAo, ref Dictionary<string, bool> targetDict)
@@ -292,8 +276,6 @@ namespace Vintagestory.ServerMods.NoObf
                         logger.Error("Failed calling Initialize() on block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, block.Code, behaviorType.properties.ToString(), e);
                     }
                     
-                    behavior.properties = behaviorType.properties;
-
                     behaviors.Add(behavior);
                 }
 

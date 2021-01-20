@@ -31,7 +31,16 @@ namespace Vintagestory.GameContent
 
         public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
-            api.Event.ReloadTextures += reloadSkin;
+            api.Event.ReloadTextures += () =>
+            {
+                var texturesByLoc = (entity as EntityAgent).extraTextureByLocation;
+                var texturesByName = (entity as EntityAgent).extraTexturesByTextureName;
+
+                texturesByLoc.Clear();
+                texturesByName.Clear();
+                textureSpaceAllocated = false;
+                MarkShapeModified();
+            };
         }
 
 
@@ -68,6 +77,8 @@ namespace Vintagestory.GameContent
 
         public override void TesselateShape()
         {
+            if (eagent is EntityPlayer && eagent.GearInventory == null) return; // Player is not fully initialized yet
+
             base.TesselateShape();
 
             if (eagent.GearInventory != null)

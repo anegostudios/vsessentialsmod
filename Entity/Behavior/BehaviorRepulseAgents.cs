@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
                 entity.SidedPos.Z + (entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2)
             );
 
-            ownTouchDistance = (entity.CollisionBox.X2 - entity.CollisionBox.X1)/2;
+            ownTouchDistance = entity.CollisionBox.XSize/2;
             
             pushVector.Set(0, 0, 0);
             
@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
 
         private void WalkEntity(Entity e)
         {
-            double hisTouchDistance = (e.CollisionBox.X2 - e.CollisionBox.X1) / 2;
+            double hisTouchDistance = e.CollisionBox.XSize / 2;
             EntityPos epos = e.SidedPos;
 
             hisPos.Set(

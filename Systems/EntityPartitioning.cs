@@ -121,7 +121,7 @@ namespace Vintagestory.GameContent
 
             foreach (var val in entities)
             {
-                LargestTouchDistance = Math.Max(LargestTouchDistance, (val.CollisionBox.X2 - val.CollisionBox.X1) / 2);
+                LargestTouchDistance = Math.Max(LargestTouchDistance, val.CollisionBox.XSize / 2);
 
                 PartitionEntity(val);
             }
@@ -179,7 +179,7 @@ namespace Vintagestory.GameContent
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback">Return false to stop the walk</param>
-        public void WalkEntities(Vec3d centerPos, double radius, API.Common.ActionConsumable<Entity> callback)
+        public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);

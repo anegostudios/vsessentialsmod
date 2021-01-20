@@ -191,23 +191,20 @@ namespace Vintagestory.GameContent
             return getOrCreateWeatherSimForRegion(index2d, mapregion);
         }
 
-
-        public WeatherSimulationRegion getOrCreateWeatherSimForRegion(int regionX, int regionZ, IMapRegion mapregion)
-        {
-            long index2d = MapRegionIndex2D(regionX, regionZ);
-            return getOrCreateWeatherSimForRegion(index2d, mapregion);
-        }
+        object weatherSimByMapRegionLock = new object();
 
         public WeatherSimulationRegion getOrCreateWeatherSimForRegion(long index2d, IMapRegion mapregion)
         {
             Vec3i regioncoord = MapRegionPosFromIndex2D(index2d);
-
             WeatherSimulationRegion weatherSim;
-            if (weatherSimByMapRegion.TryGetValue(index2d, out weatherSim))
-            {
-                return weatherSim;
-            }
 
+            lock (weatherSimByMapRegionLock)
+            {
+                if (weatherSimByMapRegion.TryGetValue(index2d, out weatherSim))
+                {
+                    return weatherSim;
+                }
+            }
 
             weatherSim = new WeatherSimulationRegion(this, regioncoord.X, regioncoord.Z);
             weatherSim.Initialize();
@@ -235,7 +232,11 @@ namespace Vintagestory.GameContent
             }
 
             weatherSim.MapRegion = mapregion;
-            weatherSimByMapRegion[index2d] = weatherSim;
+
+            lock (weatherSimByMapRegionLock)
+            {
+                weatherSimByMapRegion[index2d] = weatherSim;
+            }
 
             return weatherSim;
         }

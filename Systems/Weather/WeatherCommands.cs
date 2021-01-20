@@ -50,12 +50,17 @@ namespace Vintagestory.GameContent
         private void cmdWhenWillItStopRaining(IServerPlayer player, int groupId, CmdArgs args)
         {
             rainStopFunc(player, groupId);
-
         }
 
         private void rainStopFunc(IServerPlayer player, int groupId, bool skipForward = false)
         {
             WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            if (wsys.OverridePrecipitation != null)
+            {
+                player.SendMessage(groupId, string.Format("Override precipitation set, rain pattern will not change. Fix by typing /weather setprecip auto."), EnumChatType.CommandSuccess);
+                return;
+            }
+
             Vec3d pos = player.Entity.Pos.XYZ;
 
             float days = 0;
@@ -216,7 +221,9 @@ namespace Vintagestory.GameContent
                 var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos);
                 wsys.snowSimSnowAccu.accum = 1f;
 
-                var ba = sapi.World.BulkBlockAccessor;
+                var ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
+                ba.UpdateSnowAccumMap = false;
+
                 wsys.snowSimSnowAccu.processBlockUpdates(chunkPos, updatepacket, ba);
                 ba.Commit();
 

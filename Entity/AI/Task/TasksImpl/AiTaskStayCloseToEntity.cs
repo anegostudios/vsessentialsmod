@@ -82,7 +82,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
-            float size = targetEntity.CollisionBox.X2 - targetEntity.CollisionBox.X1;
+            float size = targetEntity.CollisionBox.XSize;
 
             pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, false, 1000, true);
 

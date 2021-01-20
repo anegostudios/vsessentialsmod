@@ -92,7 +92,7 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
@@ -197,7 +197,7 @@ namespace Vintagestory.GameContent
         bool hasDirectContact(Entity targetEntity)
         {
             Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead((entity.CollisionBox.X2 - entity.CollisionBox.X1) / 2, 0, entity.ServerPos.Yaw);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
             double dist = targetBox.ShortestDistanceFrom(pos);
             double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
             if (dist >= minDist || vertDist >= minVerDist) return false;

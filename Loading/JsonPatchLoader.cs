@@ -276,7 +276,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed, following Exception was thrown: {2}", patchIndex, patchSourcefile, e.Message, loc);
+                api.World.Logger.Error("Patch {0} (target: {3}) in {1} failed, following Exception was thrown: {2}", patchIndex, patchSourcefile, e.Message, loc);
                 errorCount++;
                 return;
             }
