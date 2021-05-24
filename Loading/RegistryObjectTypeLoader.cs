@@ -80,10 +80,11 @@ namespace Vintagestory.ServerMods.NoObf
                 JToken property;
                 JObject blockTypeObject = entry.Value;
                 AssetLocation location;
+                string entryDomain = entry.Key.Domain;
                 try
                 {
                     location = blockTypeObject.GetValue("code").ToObject<AssetLocation>();
-                    location.Domain = entry.Key.Domain;
+                    location.SetDomain_Checked(entryDomain);
                 }
                 catch (Exception e)
                 {
@@ -104,11 +105,11 @@ namespace Vintagestory.ServerMods.NoObf
 
                 if (bt.SkipVariants != null)
                 {
-                    foreach (var loc in bt.SkipVariants) loc.Domain = entry.Key.Domain;
+                    foreach (var loc in bt.SkipVariants) loc.SetDomain_Checked(entryDomain);
                 }
                 if (bt.AllowedVariants != null)
                 {
-                    foreach (var loc in bt.AllowedVariants) loc.Domain = entry.Key.Domain;
+                    foreach (var loc in bt.AllowedVariants) loc.SetDomain_Checked(entryDomain);
                 }
 
             }
@@ -120,7 +121,8 @@ namespace Vintagestory.ServerMods.NoObf
                 JObject itemTypeObject = entry.Value;
 
                 AssetLocation location = itemTypeObject.GetValue("code").ToObject<AssetLocation>();
-                location.Domain = entry.Key.Domain;
+                string entryDomain = entry.Key.Domain;
+                location.SetDomain_Checked(entryDomain);
 
                 ItemType et;
                 itemTypes.Add(entry.Key, et = new ItemType()
@@ -135,11 +137,11 @@ namespace Vintagestory.ServerMods.NoObf
 
                 if (et.SkipVariants != null)
                 {
-                    foreach (var loc in et.SkipVariants) loc.Domain = entry.Key.Domain;
+                    foreach (var loc in et.SkipVariants) loc.SetDomain_Checked(entryDomain);
                 }
                 if (et.AllowedVariants != null)
                 {
-                    foreach (var loc in et.AllowedVariants) loc.Domain = entry.Key.Domain;
+                    foreach (var loc in et.AllowedVariants) loc.SetDomain_Checked(entryDomain);
                 }
             }
 
@@ -149,10 +151,11 @@ namespace Vintagestory.ServerMods.NoObf
                 JToken property = null;
                 JObject entityTypeObject = entry.Value;
                 AssetLocation location = null;
+                string entryDomain = entry.Key.Domain;
                 try
                 {
                     location = entityTypeObject.GetValue("code").ToObject<AssetLocation>();
-                    location.Domain = entry.Key.Domain;
+                    location.SetDomain_Checked(entryDomain);
                 }
                 catch (Exception e)
                 {
@@ -176,11 +179,11 @@ namespace Vintagestory.ServerMods.NoObf
 
                     if (et.SkipVariants != null)
                     {
-                        foreach (var loc in et.SkipVariants) loc.Domain = entry.Key.Domain;
+                        foreach (var loc in et.SkipVariants) loc.SetDomain_Checked(entryDomain);
                     }
                     if (et.AllowedVariants != null)
                     {
-                        foreach (var loc in et.AllowedVariants) loc.Domain = entry.Key.Domain;
+                        foreach (var loc in et.AllowedVariants) loc.SetDomain_Checked(entryDomain);
                     }
 
                 } catch (Exception e)
@@ -210,7 +213,7 @@ namespace Vintagestory.ServerMods.NoObf
                 loc.Path = loc.Path.Replace("worldproperties/", "");
                 loc.RemoveEnding();
                 
-                entry.Value.Code.Domain = entry.Key.Domain;
+                entry.Value.Code.SetDomain_Checked(entry.Key.Domain);
 
                 worldProperties.Add(loc, entry.Value);
             }
@@ -427,6 +430,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.Textures = typedItemType.Textures;
             item.MaterialDensity = typedItemType.MaterialDensity;
             
+            
             item.GuiTransform = typedItemType.GuiTransform?.Clone();
             item.FpHandTransform = typedItemType.FpHandTransform?.Clone();
             item.TpHandTransform = typedItemType.TpHandTransform?.Clone();
@@ -459,7 +463,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.MatterState = typedItemType.MatterState;
             item.ParticleProperties = typedItemType.ParticleProperties;
 
-            typedItemType.InitItem(api.World.Logger, item, variant);
+            typedItemType.InitItem(api.ClassRegistry, api.World.Logger, item, variant);
 
             typedItemType.jsonObject = null;
 
@@ -614,16 +618,19 @@ namespace Vintagestory.ServerMods.NoObf
             block.Frostable = typedBlockType.Frostable;
             block.Resistance = typedBlockType.Resistance;
             block.BlockMaterial = typedBlockType.BlockMaterial;
-            block.Shape = typedBlockType.Shape?.Clone();
-            block.Lod0Shape = typedBlockType.Lod0Shape?.Clone();
-            block.ShapeInventory = typedBlockType.ShapeInventory?.Clone();
+            block.Shape = typedBlockType.Shape;
+            block.Lod0Shape = typedBlockType.Lod0Shape;
+            block.Lod2Shape = typedBlockType.Lod2Shape;
+            block.ShapeInventory = typedBlockType.ShapeInventory;
+            block.DoNotRenderAtLod2 = typedBlockType.DoNotRenderAtLod2;
             block.TexturesInventory = typedBlockType.TexturesInventory;
             block.Textures = typedBlockType.Textures;
             block.ClimateColorMap = typedBlockType.ClimateColorMap;
             block.SeasonColorMap = typedBlockType.SeasonColorMap;
             block.Ambientocclusion = typedBlockType.Ambientocclusion;
-            block.CollisionBoxes = typedBlockType.CollisionBoxes == null ? null : (Cuboidf[])typedBlockType.CollisionBoxes.Clone();
-            block.SelectionBoxes = typedBlockType.SelectionBoxes == null ? null : (Cuboidf[])typedBlockType.SelectionBoxes.Clone();
+            block.CollisionBoxes = typedBlockType.CollisionBoxes;
+            block.SelectionBoxes = typedBlockType.SelectionBoxes;
+            block.ParticleCollisionBoxes = typedBlockType.ParticleCollisionBoxes;
             block.MaterialDensity = typedBlockType.MaterialDensity;
             block.GuiTransform = typedBlockType.GuiTransform;
             block.FpHandTransform = typedBlockType.FpHandTransform;
@@ -662,6 +669,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.RandomDrawOffset = typedBlockType.RandomDrawOffset ? 1 : 0;
             block.RandomizeRotations = typedBlockType.RandomizeRotations;
             block.RandomizeAxes = typedBlockType.RandomizeAxes;
+            block.RandomSizeAdjust = typedBlockType.RandomSizeAdjust;
             block.CombustibleProps = typedBlockType.CombustibleProps;
             block.StorageFlags = (EnumItemStorageFlags)typedBlockType.StorageFlags;
             block.RenderAlphaTest = typedBlockType.RenderAlphaTest;
@@ -686,6 +694,14 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int i = 0; i < block.SelectionBoxes.Length; i++)
                 {
                     block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
+                }
+            }
+
+            if (block.ParticleCollisionBoxes != null)
+            {
+                for (int i = 0; i < block.ParticleCollisionBoxes.Length; i++)
+                {
+                    block.ParticleCollisionBoxes[i].RoundToFracsOfOne10thousand();
                 }
             }
 

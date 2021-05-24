@@ -7,6 +7,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Client;
+using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.GameContent
 {
@@ -247,6 +248,15 @@ namespace Vintagestory.GameContent
                         block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
                         if (!block.IsLiquid()) curTarget.W = 0;
                         break;
+
+                    case EnumHabitat.Underwater:
+                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (!block.IsLiquid()) curTarget.W = 0;
+                        else curTarget.W = 1 / (Math.Abs(dy) + 1);  //prefer not too much vertical change when underwater
+
+                        //TODO: reject (or de-weight) targets not in direct line of sight (avoiding terrain)
+
+                        break;
                 }
 
                 if (curTarget.W > 0)
@@ -264,7 +274,7 @@ namespace Vintagestory.GameContent
                 }
 
 
-               if (preferredLightLevel != null)
+                if (preferredLightLevel != null && curTarget.W != 0)
                 {
                     tmpPos.Set((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
                     int lightdiff = Math.Abs((int)preferredLightLevel - entity.World.BlockAccessor.GetLightLevel(tmpPos, EnumLightLevelType.MaxLight));
@@ -275,6 +285,7 @@ namespace Vintagestory.GameContent
                 if (bestTarget == null || curTarget.W > bestTarget.W)
                 {
                     bestTarget = new Vec4d(curTarget.X, curTarget.Y, curTarget.Z, curTarget.W);
+                    if (curTarget.W >= 1.0) break;  //have a good enough target, no need for further tries
                 }
             }
 

@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -42,6 +43,8 @@ namespace Vintagestory.GameContent
 
             float frameTime = GlobalConstants.PhysicsFrameTime;
             bool isSelf = entity.World.Side == EnumAppSide.Client && (entity.World as IClientWorldAccessor).Player.Entity == entity;
+            smoothStepping = isSelf;
+
             if (isSelf)
             {
                 frameTime = 1 / 60f;

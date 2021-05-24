@@ -96,6 +96,16 @@ namespace Vintagestory.GameContent
             } else
             {
                 callbackId = entity.World.RegisterCallback(CheckGrowth, 3000);
+                double age = entity.World.Calendar.TotalHours - TimeSpawned;
+                if (age >=  0.1 * HoursToGrow)
+                {
+                    float newAge = (float)(age / HoursToGrow - 0.1);
+                    if (newAge >= 1.01f * growTree.GetFloat("age"))
+                    {
+                        growTree.SetFloat("age", newAge);
+                        entity.WatchedAttributes.MarkPathDirty("grow");
+                    }
+                }
             }
 
             entity.World.FrameProfiler.Mark("entity-checkgrowth");

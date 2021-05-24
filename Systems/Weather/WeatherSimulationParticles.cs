@@ -199,9 +199,12 @@ namespace Vintagestory.GameContent
 
         public void Initialize()
         {
-            capi.Event.RegisterAsyncParticleSpawner(asyncParticleSpawn);
-
             lblock = capi.World.GetBlock(new AssetLocation("water-still-7"));
+
+            if (lblock != null)
+            {
+                capi.Event.RegisterAsyncParticleSpawner(asyncParticleSpawn);
+            }
         }
 
         Block lblock;
@@ -237,7 +240,7 @@ namespace Vintagestory.GameContent
             particlePos.Set(capi.World.Player.Entity.Pos.X, capi.World.Player.Entity.Pos.Y, capi.World.Player.Entity.Pos.Z);
 
             
-            int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapForMap, lblock.SeasonColorMapForMap, ColorUtil.WhiteArgb, (int)particlePos.X, (int)particlePos.Y, (int)particlePos.Z, false);
+            int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapResolved, lblock.SeasonColorMapResolved, ColorUtil.WhiteArgb, (int)particlePos.X, (int)particlePos.Y, (int)particlePos.Z, false);
             byte[] col = ColorUtil.ToBGRABytes(onwaterSplashParticleColor);
             onwaterSplashParticleColor = ColorUtil.ToRgba(94, col[0], col[1], col[2]);
 

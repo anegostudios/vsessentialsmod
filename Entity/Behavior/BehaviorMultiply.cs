@@ -205,7 +205,7 @@ namespace Vintagestory.GameContent
 
                     childEntity.Pos.SetFrom(childEntity.ServerPos);
                     entity.World.SpawnEntity(childEntity);
-                    entity.Attributes.SetString("origin", "reproduction");
+                    childEntity.Attributes.SetString("origin", "reproduction");
                     childEntity.WatchedAttributes.SetInt("generation", generation + 1);
                 }
                 
@@ -239,7 +239,9 @@ namespace Vintagestory.GameContent
 
                 if (maleentity != null)
                 {
-                    maleentity.WatchedAttributes.SetFloat("saturation", Math.Max(0, saturation - 1));
+                    ITreeAttribute maletree = maleentity.WatchedAttributes.GetTreeAttribute("hunger");
+                    saturation = maletree.GetFloat("saturation", 0);
+                    maletree.SetFloat("saturation", Math.Max(0, saturation - 1));
                 }
 
                 IsPregnant = true;

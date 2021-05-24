@@ -23,7 +23,22 @@ namespace Vintagestory.GameContent
 
         public Cuboidi Location;
 
-        public bool AnyChunkUnloaded;
+        /// <summary>
+        /// If greater than 0, a chunk is unloaded.  Counts upwards and when it reaches a certain value, this room will be removed from the registry and re-checked: this allows valid fully loaded rooms to be detected quite quickly in the normal world loading process
+        /// The potential issue is a room with a container, on the very edge of the server's loaded world, with neighbouring chunks remaining unloaded for potentially a long time.  This will never be loaded, so we don't want to recheck its status fully too often: not every tick, that would be too costly
+        /// </summary>
+        public int AnyChunkUnloaded;
+
+        public bool IsFullyLoaded(ChunkRooms roomsList)
+        {
+            if (AnyChunkUnloaded == 0) return true;
+
+            if (++AnyChunkUnloaded > 10)
+            {
+                roomsList.RemoveRoom(this);
+            }
+            return false;
+        }
     }
 
     public class ChunkRooms {
@@ -37,6 +52,14 @@ namespace Vintagestory.GameContent
                 Rooms.Add(room);
             }
         }
+        public void RemoveRoom(Room room)
+        {
+            lock (roomsLock)
+            {
+                Rooms.Remove(room);
+            }
+        }
+
     }
 
     public class RoomRegistry : ModSystem
@@ -143,8 +166,8 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-                if (firstEnclosedRoom != null) return firstEnclosedRoom;
-                if (firstOpenedRoom != null) return firstOpenedRoom;
+                if (firstEnclosedRoom != null && firstEnclosedRoom.IsFullyLoaded(chunkrooms)) return firstEnclosedRoom;
+                if (firstOpenedRoom != null && firstOpenedRoom.IsFullyLoaded(chunkrooms)) return firstOpenedRoom;
 
                 room = FindRoomForPosition(pos, chunkrooms);
                 chunkrooms.AddRoom(room);
@@ -243,10 +266,8 @@ namespace Vintagestory.GameContent
                     maxz = Math.Max(maxz, bpos.Z);
 
                     Vec2i vec = new Vec2i(npos.X, npos.Z);
-                    if (!skyLightXZChecked.Contains(vec))
+                    if (skyLightXZChecked.Add(vec))  //HashSet.Add returns true if the element is added to the HashSet<T> object; false if the element is already present.
                     {
-                        skyLightXZChecked.Add(vec);
-
                         int light = api.World.BlockAccessor.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
 
                         if (light >= api.World.SunBrightness - 1)
@@ -259,10 +280,9 @@ namespace Vintagestory.GameContent
                     }
                     
 
-                    if (!visitedPositions.Contains(npos))
+                    if (visitedPositions.Add(npos))  //HashSet.Add returns true if the element is added to the HashSet<T> object; false if the element is already present.
                     {
                         bfsQueue.Enqueue(npos);
-                        visitedPositions.Add(npos);
                     }
                 }
             }
@@ -306,7 +326,7 @@ namespace Vintagestory.GameContent
                 SkylightCount = skyLightCount,
                 NonSkylightCount = nonSkyLightCount,
                 ExitCount = exitCount,
-                AnyChunkUnloaded = !allChunksLoaded,
+                AnyChunkUnloaded = allChunksLoaded ? 0 : 1,
                 Location = new Cuboidi(minx, miny, minz, maxx, maxy, maxz)
             };
         }

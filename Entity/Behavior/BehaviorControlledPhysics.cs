@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -29,7 +30,7 @@ namespace Vintagestory.GameContent
 
         ICoreClientAPI capi;
 
-
+        protected bool smoothStepping;
 
         public override void OnEntityDespawn(EntityDespawnReason despawn)
         {
@@ -63,6 +64,7 @@ namespace Vintagestory.GameContent
                 capi = (entity.World.Api as ICoreClientAPI);
                 duringRenderFrame = true;
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "controlledphysics");
+
             }
 
             accumulator = (float)entity.World.Rand.NextDouble() * GlobalConstants.PhysicsFrameTime;
@@ -281,11 +283,20 @@ namespace Vintagestory.GameContent
             }
 
             collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition, stepHeight);
-
+            
             if (!entity.Properties.CanClimbAnywhere)
             {
-                controls.IsStepping = HandleSteppingOnBlocks(pos, moveDelta, dtFac, controls);
+                if (smoothStepping)
+                {
+                    controls.IsStepping = HandleSteppingOnBlocksSmooth(pos, moveDelta, dtFac, controls);
+                } else
+                {
+                    controls.IsStepping = HandleSteppingOnBlocks(pos, moveDelta, dtFac, controls);
+                }
+                
+
             }
+
             
             HandleSneaking(pos, controls, dt);
 
@@ -451,6 +462,235 @@ namespace Vintagestory.GameContent
             }
         }
 
+
+
+
+        
+
+        private bool HandleSteppingOnBlocksSmooth(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
+        {
+
+            if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
+
+            Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
+
+            //how far ahead to scan for steppable blocks 
+            //TODO needs to be increased for large and fast creatures (e.g. wolves)
+            double max = 0.75;//Math.Max(entityCollisionBox.MaxX - entityCollisionBox.MinX, entityCollisionBox.MaxZ - entityCollisionBox.MinZ);
+            double searchBoxLength = max + (controls.Sprint ? 0.25 : controls.Sneak ? 0.05 : 0.2); 
+            
+            Vec2d center = new Vec2d((entityCollisionBox.X1 + entityCollisionBox.X2) / 2, (entityCollisionBox.Z1 + entityCollisionBox.Z2) / 2);
+            var searchHeight = Math.Max(entityCollisionBox.Y1 + stepHeight, entityCollisionBox.Y2);
+            entityCollisionBox.Translate(pos.X, pos.Y, pos.Z);
+
+            Vec3d walkVec = controls.WalkVector.Clone();
+            Vec3d walkVecNormalized = walkVec.Clone().Normalize();
+            
+            Cuboidd entitySensorBox;
+
+            var outerX = walkVecNormalized.X * searchBoxLength;
+            var outerZ = walkVecNormalized.Z * searchBoxLength;
+
+            entitySensorBox = new Cuboidd
+            {
+                X1 = Math.Min(0, outerX),
+                X2 = Math.Max(0, outerX),
+
+                Z1 = Math.Min(0, outerZ),
+                Z2 = Math.Max(0, outerZ),
+
+
+                Y1 = entity.CollisionBox.Y1 - (entity.CollidedVertically ? 0 : 0.05), //also check below if not on ground
+                Y2 = searchHeight
+            };
+
+            entitySensorBox.Translate(center.X, 0, center.Y);
+            entitySensorBox.Translate(pos.X, pos.Y, pos.Z);
+
+            Vec3d testVec = new Vec3d();
+            Vec2d testMotion = new Vec2d();
+
+
+            List<Cuboidd> stepableBoxes = FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBox, moveDelta.Y, walkVec);
+
+            if (stepableBoxes != null && stepableBoxes.Count > 0)
+            {
+                if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, walkVec.Z), dtFac, stepableBoxes, entityCollisionBox)) return true;
+
+                Cuboidd entitySensorBoxXAligned = entitySensorBox.Clone();
+                if (entitySensorBoxXAligned.Z1 == pos.Z + center.Y)
+                {
+                    entitySensorBoxXAligned.Z2 = entitySensorBoxXAligned.Z1;
+                }
+                else
+                {
+                    entitySensorBoxXAligned.Z1 = entitySensorBoxXAligned.Z2;
+                }
+
+
+
+                if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, 0), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXAligned, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox)) return true;
+
+
+                Cuboidd entitySensorBoxZAligned = entitySensorBox.Clone();
+                if (entitySensorBoxZAligned.X1 == pos.X + center.X)
+                {
+                    entitySensorBoxZAligned.X2 = entitySensorBoxZAligned.X1;
+                } else
+                {
+                    entitySensorBoxZAligned.X1 = entitySensorBoxZAligned.X2;
+                }
+
+
+                if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
+
+            }
+
+            return false;
+        }
+
+
+        private bool TryStepSmooth(EntityControls controls, EntityPos pos, Vec2d walkVec, float dtFac, List<Cuboidd> stepableBoxes, Cuboidd entityCollisionBox)
+        {
+            if (stepableBoxes == null || stepableBoxes.Count == 0) return false;
+            double gravityOffset = 0.03; // This added constant value is a fugly hack because outposition has gravity added, but has not adjusted its position to the ground floor yet
+
+            var walkVecOrtho = new Vec2d(walkVec.Y, -walkVec.X).Normalize();
+
+            double newYPos = pos.Y;
+            bool foundStep = false;
+            foreach (var stepableBox in stepableBoxes)
+            {
+                double heightDiff = stepableBox.Y2 - entityCollisionBox.Y1 + gravityOffset;
+                Vec3d steppos = new Vec3d(GameMath.Clamp(outposition.X, stepableBox.MinX, stepableBox.MaxX), outposition.Y + heightDiff, GameMath.Clamp(outposition.Z, stepableBox.MinZ, stepableBox.MaxZ));
+
+                var maxX = Math.Abs(walkVecOrtho.X * 0.3) + 0.001;
+                var minX = -maxX;
+
+                var maxZ = Math.Abs(walkVecOrtho.Y * 0.3) + 0.001;
+                var minZ = -maxZ;
+                
+                var col = new Cuboidf((float)minX, entity.CollisionBox.Y1, (float)minZ, (float)maxX, entity.CollisionBox.Y2, (float)maxZ);
+                bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, col , steppos, false);
+
+                if (canStep)
+                {
+                    double elevateFactor = controls.Sprint ? 0.10 : controls.Sneak ? 0.025 : 0.05;
+                    if (!stepableBox.IntersectsOrTouches(entityCollisionBox))
+                    {
+                        newYPos = Math.Max(newYPos, Math.Min(pos.Y + elevateFactor * dtFac, stepableBox.Y2 - entity.CollisionBox.Y1 + gravityOffset));
+                    }
+                    else
+                    {
+                        newYPos = Math.Max(newYPos, pos.Y + elevateFactor * dtFac);
+                    }
+                    foundStep = true;
+
+                }
+            }
+            if (foundStep)
+            {
+                pos.Y = newYPos;
+                collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition);
+            }
+            return foundStep;
+        }
+
+        /// <summary>
+        /// Get all blocks colliding with entityBoxRel
+        /// </summary>
+        /// <param name="blockAccessor"></param>
+        /// <param name="entityBoxRel"></param>
+        /// <param name="pos"></param>
+        /// <param name="blocks">The found blocks</param>
+        /// <param name="alsoCheckTouch"></param>
+        /// <returns>If any blocks have been found</returns>
+        public bool GetCollidingCollisionBox(IBlockAccessor blockAccessor, Cuboidf entityBoxRel, Vec3d pos, out CachedCuboidList blocks, bool alsoCheckTouch = true)
+        {
+            blocks = new CachedCuboidList();
+            BlockPos blockPos = new BlockPos();
+            Vec3d blockPosVec = new Vec3d();
+            Cuboidd entityBox = entityBoxRel.ToDouble().Translate(pos);
+
+            
+            int minX = (int)(entityBoxRel.MinX + pos.X);
+            int minY = (int)(entityBoxRel.MinY + pos.Y - 1);  // -1 for the extra high collision box of fences
+            int minZ = (int)(entityBoxRel.MinZ + pos.Z);
+            int maxX = (int)Math.Ceiling(entityBoxRel.MaxX + pos.X);
+            int maxY = (int)Math.Ceiling(entityBoxRel.MaxY + pos.Y);
+            int maxZ = (int)Math.Ceiling(entityBoxRel.MaxZ + pos.Z);
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    for (int z = minZ; z <= maxZ; z++)
+                    {
+                        Block block = blockAccessor.GetBlock(x, y, z);
+                        blockPos.Set(x, y, z);
+                        blockPosVec.Set(x, y, z);
+
+                        Cuboidf[] collisionBoxes = block.GetCollisionBoxes(blockAccessor, blockPos);
+
+                        for (int i = 0; collisionBoxes != null && i < collisionBoxes.Length; i++)
+                        {
+                            Cuboidf collBox = collisionBoxes[i];
+                            if (collBox == null) continue;
+                            
+                            bool colliding = alsoCheckTouch ? entityBox.IntersectsOrTouches(collBox, blockPosVec) : entityBox.Intersects(collBox, blockPosVec);
+                            if (colliding)
+                            {
+                                blocks.Add(collBox, blockPos, block);
+                                
+                            }
+                        }
+                    }
+                }
+            }
+
+            return blocks.Count > 0;
+        }
+
+        private List<Cuboidd> FindSteppableCollisionboxSmooth(Cuboidd entityCollisionBox, Cuboidd entitySensorBox, double motionY, Vec3d walkVector)
+        {
+            
+            var stepableBoxes = new List<Cuboidd>();
+            GetCollidingCollisionBox(entity.World.BlockAccessor, entitySensorBox.ToFloat(), new Vec3d(), out var blocks, true);
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                Cuboidd collisionbox = blocks.cuboids[i];
+                Block block = blocks.blocks[i];
+
+                if (!block.CanStep) continue;
+
+                EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
+                //if (intersect == EnumIntersect.NoIntersect) continue;
+
+                // Already stuck somewhere? Can't step stairs
+                // Would get stuck vertically if I go up? Can't step up either
+                if ((intersect == EnumIntersect.Stuck && !block.AllowStepWhenStuck) || (intersect == EnumIntersect.IntersectY && motionY > 0))
+                {
+                    return null;
+                }
+
+                double heightDiff = collisionbox.Y2 - entityCollisionBox.Y1;
+
+                //if (heightDiff <= -0.02 || !IsBoxInFront(entityCollisionBox, walkVector, collisionbox)) continue;
+                if (heightDiff <= (entity.CollidedVertically ? 0 : -0.05)) continue;
+                if (heightDiff <= stepHeight)
+                {
+                    //if (IsBoxInFront(entityCollisionBox, walkVector, collisionbox))
+                    {
+                        stepableBoxes.Add(collisionbox);
+                    }
+                }
+            }
+
+            return stepableBoxes;
+        }
+
+
         private bool HandleSteppingOnBlocks(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
             if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
@@ -529,6 +769,10 @@ namespace Vintagestory.GameContent
 
             return stepableBox;
         }
+
+
+
+
 
 
 

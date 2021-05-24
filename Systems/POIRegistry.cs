@@ -35,6 +35,26 @@ namespace Vintagestory.GameContent
     }
 
 
+    public interface IAnimalNest : IPointOfInterest
+    {
+        bool IsSuitableFor(Entity entity);
+
+        /// <summary>
+        /// Return true if occupied by an entity, which is not the same as the entity specified in the parameter
+        /// </summary>
+        bool Occupied(Entity entity);
+
+        void SetOccupier(Entity entity);
+
+        /// <summary>
+        /// Returns true if an egg was successfully added
+        /// </summary>
+        bool TryAddEgg(Entity entity, string chickCode, double incubationTime);
+
+        float DistanceWeighting { get; }
+    }
+
+
 
     /// <summary>
     /// Point-of-Interest registry
@@ -116,6 +136,46 @@ namespace Vintagestory.GameContent
                         if (distSq > radiusSq) continue;
 
                         if (distSq < nearestDistSq && matcher(pois[i])) 
+                        {
+                            nearestPoi = pois[i];
+                            nearestDistSq = distSq;
+                        }
+                    }
+                }
+            }
+
+            return nearestPoi;
+        }
+
+        public IPointOfInterest GetWeightedNearestPoi(Vec3d centerPos, float radius, PoiMatcher matcher = null)
+        {
+            int mincx = (int)(centerPos.X - radius) / chunksize;
+            int mincz = (int)(centerPos.Z - radius) / chunksize;
+            int maxcx = (int)(centerPos.X + radius) / chunksize;
+            int maxcz = (int)(centerPos.Z + radius) / chunksize;
+
+            float radiusSq = radius * radius;
+
+            float nearestDistSq = 9999999;
+            IPointOfInterest nearestPoi = null;
+
+            for (int cx = mincx; cx <= maxcx; cx++)
+            {
+                for (int cz = mincz; cz <= maxcz; cz++)
+                {
+                    List<IPointOfInterest> pois = null;
+                    tmp.Set(cx, cz);
+                    PoisByChunkColumn.TryGetValue(tmp, out pois);
+                    if (pois == null) continue;
+
+                    for (int i = 0; i < pois.Count; i++)
+                    {
+                        Vec3d poipos = pois[i].Position;
+                        float weight = pois[i] is IAnimalNest nest ? nest.DistanceWeighting : 1f; 
+                        float distSq = poipos.SquareDistanceTo(centerPos) * weight;
+                        if (distSq > radiusSq) continue;
+
+                        if (distSq < nearestDistSq && matcher(pois[i]))
                         {
                             nearestPoi = pois[i];
                             nearestDistSq = distSq;

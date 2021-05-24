@@ -53,7 +53,7 @@ namespace Vintagestory.GameContent
         ICoreClientAPI capi;
         IClientNetworkChannel clientChannel;
 
-        GuiDialogWorldMap worldMapDlg;
+        public GuiDialogWorldMap worldMapDlg;
         public List<MapLayer> MapLayers = new List<MapLayer>();
         public bool IsOpened => worldMapDlg?.IsOpened() == true;
 

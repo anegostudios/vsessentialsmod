@@ -33,6 +33,7 @@ namespace Vintagestory.GameContent
             Register("getoutofwater", typeof(AiTaskGetOutOfWater));
             Register("idle", typeof(AiTaskIdle));
             Register("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
+            Register("seekblockandlay", typeof(AiTaskSeekBlockAndLay));
             Register("useinventory", typeof(AiTaskUseInventory));
         }
     }
@@ -187,6 +188,14 @@ namespace Vintagestory.GameContent
                     AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out code);
 
                     tasks += code + "("+task.Priority+")";
+#if DEBUG
+                    // temporary for debugging
+                    if (entity.Properties.Habitat == EnumHabitat.Underwater && task is AiTaskWander wand)
+                    {
+                        tasks += String.Format(" Heading to: {0:0.00},{1:0.00},{2:0.00}", wand.MainTarget.X - 500000, wand.MainTarget.Y, wand.MainTarget.Z - 500000);
+                    }
+#endif
+
                 }
                 entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
             }

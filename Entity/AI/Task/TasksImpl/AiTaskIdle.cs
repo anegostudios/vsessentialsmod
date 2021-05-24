@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
@@ -130,7 +131,8 @@ namespace Vintagestory.GameContent
                 if (duringDayTimeFrames != null)
                 {
                     bool match = false;
-                    double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * 24f;
+                    // introduce a bit of randomness so that (e.g.) hens do not all wake up simultaneously at 06:00, which looks artificial
+                    double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * 24f + (entity.World.Rand.NextDouble() * 0.3f - 0.15f);
                     for (int i = 0; !match && i < duringDayTimeFrames.Length; i++)
                     {
                         match |= duringDayTimeFrames[i].Matches(hourOfDay);

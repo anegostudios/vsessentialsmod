@@ -25,10 +25,13 @@ namespace Vintagestory.GameContent
         Vec4f particleOutTransform = new Vec4f();
         Vec4f glowRgb = new Vec4f();
 
+        bool rotateWhenFalling;
+
         public EntityItemRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
             entityitem = (EntityItem)entity;
             inslot = entityitem.Slot;
+            rotateWhenFalling = inslot.Itemstack.Collectible?.Attributes?["rotateWhenFalling"].AsBool(true) ?? true;
 
             scaleRand = (float)api.World.Rand.NextDouble() / 20f - 1/40f;
 
@@ -51,11 +54,12 @@ namespace Vintagestory.GameContent
 
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground);
             if (renderInfo.ModelRef == null) return;
-            inslot.Itemstack.Collectible.OnBeforeRender(capi, inslot.Itemstack, EnumItemRenderTarget.Ground, ref renderInfo);
+
+            //inslot.Itemstack.Collectible.OnBeforeRender(capi, inslot.Itemstack, EnumItemRenderTarget.Ground, ref renderInfo); - why is this called here? its already called by GetItemStackRenderInfo
 
             IStandardShaderProgram prog = null;
             LoadModelMatrix(renderInfo, isShadowPass, dt);
-                
+            
             if (isShadowPass)
             {
                 rapi.CurrentActiveShader.BindTexture2D("tex2d", renderInfo.TextureId, 0);
@@ -173,7 +177,6 @@ namespace Vintagestory.GameContent
 
         private void LoadModelMatrix(ItemRenderInfo renderInfo, bool isShadowPass, float dt)
         {
-            IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);
@@ -202,7 +205,7 @@ namespace Vintagestory.GameContent
                     yangle *= 0.55f;
                     zangle *= 0.55f;
                 }
-                else
+                else if (rotateWhenFalling)
                 {
                     float easeIn = Math.Min(1, (ellapseMs - touchGroundMS) / 200);
                     float angleGain = freefall ? 1000 * dt / 7 * easeIn : 0;

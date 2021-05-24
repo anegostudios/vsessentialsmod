@@ -25,7 +25,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        public void InitItem(ILogger logger, Item item, OrderedDictionary<string, string> searchReplace)
+        public void InitItem(IClassRegistryAPI instancer, ILogger logger, Item item, OrderedDictionary<string, string> searchReplace)
         {
             if (Shape != null && !Shape.VoxelizeTexture && jsonObject["guiTransform"]?["rotate"] == null)
             {
@@ -34,21 +34,42 @@ namespace Vintagestory.ServerMods.NoObf
 
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);
 
-            List<string> toRemove = new List<string>();
-            int i = 0;
-            foreach (var val in Textures)
-            {
-                if (val.Value.Base == null)
-                {
-                    logger.Error("The texture definition #{0} in item with code {1} is invalid. The base property is null. Will skip.", i, item.Code);
-                    toRemove.Add(val.Key);
-                }
-                i++;
-            }
 
-            foreach (var val in toRemove)
+            CollectibleBehaviorType[] behaviorTypes = Behaviors;
+
+            if (behaviorTypes != null)
             {
-                Textures.Remove(val);
+                List<CollectibleBehavior> collbehaviors = new List<CollectibleBehavior>();
+
+                for (int i = 0; i < behaviorTypes.Length; i++)
+                {
+                    CollectibleBehaviorType behaviorType = behaviorTypes[i];
+                    CollectibleBehavior behavior;
+
+                    if (instancer.GetCollectibleBehaviorClass(behaviorType.name) != null)
+                    {
+                        behavior = instancer.CreateCollectibleBehavior(item, behaviorType.name);
+                    } else 
+                    { 
+                        logger.Warning(Lang.Get("Collectible behavior {0} for item {1} not found", behaviorType.name, item.Code));
+                        continue;
+                    }
+
+                    if (behaviorType.properties == null) behaviorType.properties = new JsonObject(new JObject());
+
+                    try
+                    {
+                        behavior.Initialize(behaviorType.properties);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error("Failed calling Initialize() on collectible behavior {0} for item {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, item.Code, behaviorType.properties.ToString(), e);
+                    }
+
+                    collbehaviors.Add(behavior);
+                }
+
+                item.CollectibleBehaviors = collbehaviors.ToArray();
             }
         }
     }

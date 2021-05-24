@@ -69,7 +69,11 @@ namespace Vintagestory.GameContent
             Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
             if (block.PushVector != null)
             {
-                pos.Motion.Add(block.PushVector);
+                // Fix for those unfair cases where there is downward flowing water in a 1 deep hole and you cant get out
+                if (block.PushVector.Y >= 0 || !entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y - 1, (int)pos.Z).SideSolid[BlockFacing.UP.Index])
+                {
+                    pos.Motion.Add(block.PushVector);
+                }
             }
             
             // http://fooplot.com/plot/kg6l1ikyx2

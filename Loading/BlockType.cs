@@ -25,7 +25,7 @@ namespace Vintagestory.ServerMods.NoObf
         public BlockType()
         {
             Class = "Block";
-            Shape = new CompositeShape() { Base = new AssetLocation("game", "block/basic/cube") };
+            Shape = new CompositeShape() { Base = new AssetLocation(GlobalConstants.DefaultDomain, "block/basic/cube") };
             GuiTransform = ModelTransform.BlockDefaultGui();
             FpHandTransform = ModelTransform.BlockDefaultFp();
             TpHandTransform = ModelTransform.BlockDefaultTp();
@@ -35,8 +35,6 @@ namespace Vintagestory.ServerMods.NoObf
 
         [JsonProperty]
         public string EntityClass;
-        [JsonProperty]
-        public BlockBehaviorType[] Behaviors = new BlockBehaviorType[0];
         [JsonProperty]
         public BlockEntityBehaviorType[] EntityBehaviors = new BlockEntityBehaviorType[0];
         [JsonProperty]
@@ -48,6 +46,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public bool RandomizeRotations;
         [JsonProperty]
+        public float RandomSizeAdjust;
+        [JsonProperty]
         public EnumChunkRenderPass RenderPass = EnumChunkRenderPass.Opaque;
         [JsonProperty]
         public EnumFaceCullMode FaceCullMode = EnumFaceCullMode.Default;
@@ -56,11 +56,15 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public CompositeShape Lod0Shape = null;
         [JsonProperty]
+        public CompositeShape Lod2Shape = null;
+        [JsonProperty]
+        public bool DoNotRenderAtLod2 = false;
+        [JsonProperty]
         public bool Ambientocclusion = true;
         [JsonProperty]
         public BlockSounds Sounds;
         [JsonProperty]
-        public Dictionary<string, CompositeTexture> TexturesInventory = new Dictionary<string, CompositeTexture>();
+        public Dictionary<string, CompositeTexture> TexturesInventory;
 
         [JsonProperty]
         public Dictionary<string, bool> SideOpaque;
@@ -106,6 +110,8 @@ namespace Vintagestory.ServerMods.NoObf
         private RotatableCube SelectionBoxR = DefaultCollisionBoxR.Clone();
         [JsonProperty("CollisionSelectionBox")]
         private RotatableCube CollisionSelectionBoxR = null;
+        [JsonProperty("ParticleCollisionBox")]
+        private RotatableCube ParticleCollisionBoxR = null;
 
         [JsonProperty("CollisionBoxes")]
         private RotatableCube[] CollisionBoxesR = null;
@@ -113,9 +119,12 @@ namespace Vintagestory.ServerMods.NoObf
         private RotatableCube[] SelectionBoxesR = null;
         [JsonProperty("CollisionSelectionBoxes")]
         private RotatableCube[] CollisionSelectionBoxesR = null;
+        [JsonProperty("ParticleCollisionBoxes")]
+        private RotatableCube[] ParticleCollisionBoxesR = null;
 
         public Cuboidf[] CollisionBoxes = null;
         public Cuboidf[] SelectionBoxes = null;
+        public Cuboidf[] ParticleCollisionBoxes = null;
 
         [JsonProperty]
         public bool Climbable = false;
@@ -181,22 +190,24 @@ namespace Vintagestory.ServerMods.NoObf
             // Only one collision/selectionbox 
             if (CollisionBoxR != null) CollisionBoxes = ToCuboidf(CollisionBoxR);
             if (SelectionBoxR != null) SelectionBoxes = ToCuboidf(SelectionBoxR);
+            if (ParticleCollisionBoxR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxR);
 
             // Multiple collision/selectionboxes
             if (CollisionBoxesR != null) CollisionBoxes = ToCuboidf(CollisionBoxesR);
             if (SelectionBoxesR != null) SelectionBoxes = ToCuboidf(SelectionBoxesR);
+            if (ParticleCollisionBoxesR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxesR);
 
             // Merged collision+selectioboxes
             if (CollisionSelectionBoxR != null)
             {
                 CollisionBoxes = ToCuboidf(CollisionSelectionBoxR);
-                SelectionBoxes = ToCuboidf(CollisionSelectionBoxR);
+                SelectionBoxes = CloneArray(CollisionBoxes);
             }
 
             if (CollisionSelectionBoxesR != null)
             {
                 CollisionBoxes = ToCuboidf(CollisionSelectionBoxesR);
-                SelectionBoxes = ToCuboidf(CollisionSelectionBoxesR);
+                SelectionBoxes = CloneArray(CollisionBoxes);
             }
 
             ResolveStringBoolDictFaces(SideSolidOpaqueAo);
@@ -228,6 +239,15 @@ namespace Vintagestory.ServerMods.NoObf
             LightHsv[2] = (byte)GameMath.Clamp(LightHsv[2], 0, ColorUtil.BrightQuantities - 1);
         }
 
+        private Cuboidf[] CloneArray(Cuboidf[] array)
+        {
+            if (array == null) return null;
+            int l = array.Length;
+            Cuboidf[] result = new Cuboidf[l];
+            for (int i = 0; i < l; i++) result[i] = array[i].Clone();
+            return result;
+        }
+
         private void ResolveDict(Dictionary<string, bool> sideSolidOpaqueAo, ref Dictionary<string, bool> targetDict)
         {
             bool wasNull = targetDict == null;
@@ -249,23 +269,34 @@ namespace Vintagestory.ServerMods.NoObf
 
         public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, OrderedDictionary<string, string> searchReplace)
         {
-            BlockBehaviorType[] behaviorTypes = Behaviors;
+            CollectibleBehaviorType[] behaviorTypes = Behaviors;
 
             if (behaviorTypes != null)
             {
-                List<BlockBehavior> behaviors = new List<BlockBehavior>();
+                List<BlockBehavior> blockbehaviors = new List<BlockBehavior>();
+                List<CollectibleBehavior> collbehaviors = new List<CollectibleBehavior>();
 
                 for (int i = 0; i < behaviorTypes.Length; i++)
                 {
-                    BlockBehaviorType behaviorType = behaviorTypes[i];
+                    CollectibleBehaviorType behaviorType = behaviorTypes[i];
+                    CollectibleBehavior behavior = null;
 
-                    if (instancer.GetBlockBehaviorClass(behaviorType.name) == null)
+                    if (instancer.GetCollectibleBehaviorClass(behaviorType.name) != null)
                     {
-                        logger.Warning(Lang.Get("Block behavior {0} for block {1} not found", behaviorType.name, block.Code));
+                        behavior = instancer.CreateCollectibleBehavior(block, behaviorType.name);
+                    }
+
+                    if (instancer.GetBlockBehaviorClass(behaviorType.name) != null)
+                    {
+                        behavior = instancer.CreateBlockBehavior(block, behaviorType.name);
+                    }
+
+                    if (behavior == null)
+                    {
+                        logger.Warning(Lang.Get("Block or Collectible behavior {0} for block {1} not found", behaviorType.name, block.Code));
                         continue;
                     }
 
-                    BlockBehavior behavior = instancer.CreateBlockBehavior(block, behaviorType.name);
                     if (behaviorType.properties == null) behaviorType.properties = new JsonObject(new JObject());
 
                     try
@@ -273,13 +304,18 @@ namespace Vintagestory.ServerMods.NoObf
                         behavior.Initialize(behaviorType.properties);
                     } catch (Exception e)
                     {
-                        logger.Error("Failed calling Initialize() on block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, block.Code, behaviorType.properties.ToString(), e);
+                        logger.Error("Failed calling Initialize() on collectible or block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, block.Code, behaviorType.properties.ToString(), e);
                     }
-                    
-                    behaviors.Add(behavior);
+
+                    collbehaviors.Add(behavior);
+                    if (behavior is BlockBehavior bbh)
+                    {
+                        blockbehaviors.Add(bbh);
+                    }
                 }
 
-                block.BlockBehaviors = behaviors.ToArray();
+                block.BlockBehaviors = blockbehaviors.ToArray();
+                block.CollectibleBehaviors = collbehaviors.ToArray();
             }
 
             if (CropProps != null)
@@ -334,7 +370,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 if (EmitSideAo != null && EmitSideAo.ContainsKey(facing.Code))
                 {
-                    block.EmitSideAo[facing.Index] = EmitSideAo[facing.Code];
+                    if (EmitSideAo[facing.Code]) block.EmitSideAo |= (byte) facing.Flag;
                 }
 
                 if (SideSolid != null && SideSolid.ContainsKey(facing.Code))
@@ -346,23 +382,6 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     block.SideOpaque[facing.Index] = SideOpaque[facing.Code];
                 }
-            }
-
-            List<string> toRemove = new List<string>();
-            int j = 0;
-            foreach (var val in Textures)
-            {
-                if (val.Value.Base == null)
-                {
-                    logger.Error("The texture definition #{0} in block with code {1} is invalid. The base property is null. Will skip.", j, block.Code);                    
-                    toRemove.Add(val.Key);
-                }
-                j++;
-            }
-
-            foreach (var val in toRemove)
-            {
-                Textures.Remove(val);
             }
         }
 

@@ -24,7 +24,7 @@ namespace Vintagestory.GameContent
         {
             return 
                 (!controls.IsFlying && entity.Properties.Habitat != EnumHabitat.Air)
-                && (entity.Properties.Habitat != EnumHabitat.Sea || !entity.Swimming)
+                && (entity.Properties.Habitat != EnumHabitat.Sea && entity.Properties.Habitat != EnumHabitat.Underwater || !entity.Swimming)
                 && !controls.IsClimbing
             ;
         }

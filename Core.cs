@@ -12,6 +12,9 @@ namespace Vintagestory.ServerMods
 	{
         ICoreServerAPI sapi;
         ICoreAPI api;
+        ICoreClientAPI capi;
+
+        IShaderProgram prog;
 
         public override double ExecuteOrder()
         {
@@ -36,7 +39,29 @@ namespace Vintagestory.ServerMods
             //api.RegisterDialog("BlockEntityStove", typeof(GuiDialogBlockEntityStove));
             //api.RegisterDialog("BlockEntityQuern", typeof(GuiDialogBlockEntityQuern));
 
+            api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
+
+            capi = api;
         }
+
+        private void Event_BlockTexturesLoaded()
+        {
+            capi.Event.ReloadShader += LoadShader;
+            LoadShader();
+        }
+
+        public bool LoadShader()
+        {
+            prog = capi.Shader.NewShaderProgram();
+
+            prog.VertexShader = capi.Shader.NewShader(EnumShaderType.VertexShader);
+            prog.FragmentShader = capi.Shader.NewShader(EnumShaderType.FragmentShader);
+
+            capi.Shader.RegisterFileShaderProgram("instanced", prog);
+
+            return prog.Compile();
+        }
+
 
 
         public override void StartServerSide(ICoreServerAPI api)
@@ -67,7 +92,7 @@ namespace Vintagestory.ServerMods
         
         private void RegisterDefaultBlockBehaviors()
         {
-            
+            api.RegisterBlockBehaviorClass("Decor", typeof(BlockBehaviorDecor));
         }
 
 

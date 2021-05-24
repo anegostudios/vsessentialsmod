@@ -33,12 +33,13 @@ namespace Vintagestory.GameContent
         {
             api.Event.ReloadTextures += () =>
             {
-                var texturesByLoc = (entity as EntityAgent).extraTextureByLocation;
+                // no longer needed, its now auto reloaded by the engine
+                /*var texturesByLoc = (entity as EntityAgent).extraTextureByLocation; 
                 var texturesByName = (entity as EntityAgent).extraTexturesByTextureName;
 
                 texturesByLoc.Clear();
                 texturesByName.Clear();
-                textureSpaceAllocated = false;
+                textureSpaceAllocated = false;*/
                 MarkShapeModified();
             };
         }

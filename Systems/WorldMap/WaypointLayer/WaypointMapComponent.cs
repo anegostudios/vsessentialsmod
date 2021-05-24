@@ -161,6 +161,8 @@ namespace Vintagestory.GameContent
                     }
                     editWpDlg = new GuiDialogEditWayPoint(capi, waypoint, waypointIndex);
                     editWpDlg.TryOpen();
+                    editWpDlg.OnClosed += () => capi.Gui.RequestFocus(capi.ModLoader.GetModSystem<WorldMapManager>().worldMapDlg);
+
                     args.Handled = true;
                 }
             }

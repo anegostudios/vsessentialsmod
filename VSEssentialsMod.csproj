@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>VSEssentials</RootNamespace>
     <AssemblyName>VSEssentials</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -38,6 +38,14 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'PerfTest|AnyCPU'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\bin\Release\Mods\</OutputPath>
+    <DefineConstants>TRACE;PERFTEST</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.0.0.8, Culture=neutral, processorArchitecture=MSIL">
@@ -74,6 +82,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BlockBehavior\BehaviorDecor.cs" />
     <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
     <Compile Include="BlockEntityRenderer\BEAnimatableRenderer.cs" />
     <Compile Include="BlockEntity\BEGeneric.cs" />
@@ -88,6 +97,7 @@
     <Compile Include="Entity\AI\Goap\AIGoapAction.cs" />
     <Compile Include="Entity\AI\Goap\AIGoal.cs" />
     <Compile Include="Entity\AI\Goap\GoapCondition.cs" />
+    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekBlockAndLay.cs" />
     <Compile Include="Entity\AI\Task\TasksImpl\AiTaskUseInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
     <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
@@ -148,6 +158,11 @@
     <Compile Include="Entity\EntityLocomotion\EntityMotionDrag.cs" />
     <Compile Include="Entity\EntityLocomotion\EntityOnGround.cs" />
     <Compile Include="Loading\LoadColorMaps.cs" />
+    <Compile Include="Systems\CharacterExtraDialogs.cs" />
+    <Compile Include="Systems\Cloth\ClothConstraint.cs" />
+    <Compile Include="Systems\Cloth\ClothPoint.cs" />
+    <Compile Include="Systems\Cloth\ClothSystem.cs" />
+    <Compile Include="Systems\Cloth\ClothManager.cs" />
     <Compile Include="Systems\Weather\Map\MapLayerWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Map\NoiseWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Model\Impl\WeatherEvent.cs" />
@@ -164,7 +179,7 @@
     <Compile Include="Systems\WorldMap\GuiDialogWorldMap.cs" />
     <Compile Include="InerhitableRotatableCube.cs" />
     <Compile Include="Loading\BasicBlocksLoader.cs" />
-    <Compile Include="Loading\BlockBehaviorType.cs" />
+    <Compile Include="Loading\CollectibleBehaviorType.cs" />
     <Compile Include="Loading\BlockCropPropertiesType.cs" />
     <Compile Include="Loading\BlockType.cs" />
     <Compile Include="Loading\CollectibleType.cs" />
@@ -226,7 +241,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="BlockBehavior\" />
     <Folder Include="Entity\AI\Goal-Action\Goals\" />
     <Folder Include="Entity\AI\Goap\ActionImpl\" />
     <Folder Include="Entity\AI\Goap\GoalImpl\" />

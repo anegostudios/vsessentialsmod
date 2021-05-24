@@ -243,10 +243,10 @@ namespace Vintagestory.GameContent
                 {
                     try
                     {
-                        capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(), compositeShape.QuantityElements, compositeShape.SelectiveElements);
+                        capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(compositeShape.rotateX, compositeShape.rotateY, compositeShape.rotateZ), compositeShape.QuantityElements, compositeShape.SelectiveElements);
 
                         meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
-
+                        
                     }
                     catch (Exception e)
                     {
@@ -319,6 +319,9 @@ namespace Vintagestory.GameContent
         protected void OnDebugInfoChanged()
         {
             bool showDebuginfo = capi.Settings.Bool["showEntityDebugInfo"];
+#if DEBUG
+            //if (entity.Properties.Habitat == EnumHabitat.Underwater) showDebuginfo = true;
+#endif
 
             if (showDebuginfo && !entity.DebugAttributes.AllDirty && !entity.DebugAttributes.PartialDirty && debugTagTexture != null) return;
 
@@ -892,9 +895,9 @@ namespace Vintagestory.GameContent
             Mat4f.Identity(ModelMat);            
             Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.Y - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
 
-            float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
-            float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
-            float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
+            float rotX = entity.Properties.Client.Shape?.rotateX ?? 0;
+            float rotY = entity.Properties.Client.Shape?.rotateY ?? 0;
+            float rotZ = entity.Properties.Client.Shape?.rotateZ ?? 0;
 
             Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
             

@@ -227,10 +227,38 @@ namespace Vintagestory.Essentials
                 }
             }
 
-         //   entity.World.SpawnParticles(0.3f, ColorUtil.WhiteAhsl, target, target, new Vec3f(), new Vec3f(), 0.1f, 0.1f, 3f, EnumParticleModel.Cube);
+            //   entity.World.SpawnParticles(0.3f, ColorUtil.WhiteAhsl, target, target, new Vec3f(), new Vec3f(), 0.1f, 0.1f, 3f, EnumParticleModel.Cube);
 
+            if (entity.Properties.Habitat == EnumHabitat.Underwater)
+            {
+                controls.FlyVector.Set(controls.WalkVector);
 
-            if (entity.Swimming)
+                Vec3d pos = entity.Pos.XYZ;
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
+                float bottomSubmergedness = waterY - (float)pos.Y;
+
+                // 0 = at swim line  1 = completely submerged
+                float swimlineSubmergedness = GameMath.Clamp(bottomSubmergedness - ((float)entity.SwimmingOffsetY), 0, 1);
+                swimlineSubmergedness = 1f - Math.Min(1f, swimlineSubmergedness + 0.5f);
+                if (swimlineSubmergedness > 0f)
+                {
+                    //Push the fish back underwater if part is poking out ...  (may need future adaptation for sharks[?], probably by changing SwimmingOffsetY)
+                    controls.FlyVector.Y = GameMath.Clamp(controls.FlyVector.Y, -0.04f, -0.02f) * (1f - swimlineSubmergedness);
+                }
+                else
+                {
+                    float factor = movingSpeed * GlobalConstants.OverallSpeedMultiplier / (float) Math.Sqrt(targetVec.X * targetVec.X + targetVec.Z * targetVec.Z);
+                    controls.FlyVector.Y = targetVec.Y * factor;
+                }
+
+                if (entity.CollidedHorizontally)
+                {
+                    //TODO
+                }
+            }
+            else if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
 

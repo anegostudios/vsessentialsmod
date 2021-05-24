@@ -73,10 +73,8 @@ namespace Vintagestory.GameContent
         bool isShuttingDown = false;
 
 
-        object chunkstoCheckQueueLock = new object();
         UniqueQueue<Vec2i> chunkColsstoCheckQueue = new UniqueQueue<Vec2i>();
 
-        object updateSnowLayerQueueLock = new object();
         UniqueQueue<UpdateSnowLayerChunk> updateSnowLayerQueue = new UniqueQueue<UpdateSnowLayerChunk>();
 
         int chunksize;
@@ -87,6 +85,7 @@ namespace Vintagestory.GameContent
         public bool enabled;
 
         IBulkBlockAccessor ba;
+        IBulkBlockAccessor cuba;
 
         public WeatherSimulationSnowAccum(ICoreServerAPI sapi, WeatherSystemBase ws)
         {
@@ -96,9 +95,12 @@ namespace Vintagestory.GameContent
             // Get a non-relighting block accessor, because snowlayers do not block light and do not remove light blocking blocks.
             ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
             ba.UpdateSnowAccumMap = false;
+            cuba = sapi.World.GetBlockAccessorMapChunkLoading(false, false);
+            cuba.UpdateSnowAccumMap = false;
 
             initRandomShuffles();
 
+            sapi.Event.ChunkColumnSnowUpdate += Event_ChunkColumnLoading;
             sapi.Event.ChunkColumnLoaded += Event_ChunkColumnLoaded;
             sapi.Event.SaveGameLoaded += Event_SaveGameLoaded;
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
@@ -132,7 +134,7 @@ namespace Vintagestory.GameContent
                 {
                     Vec2i chunkCoord = sapi.WorldManager.MapChunkPosFromChunkIndex2D(val.Key);
 
-                    lock (chunkstoCheckQueueLock)
+                    lock (chunkColsstoCheckQueue)
                     {
                         chunkColsstoCheckQueue.Enqueue(chunkCoord);
                     }
@@ -142,7 +144,7 @@ namespace Vintagestory.GameContent
 
         public void AddToCheckQueue(Vec2i chunkCoord)
         {
-            lock (chunkstoCheckQueueLock)
+            lock (chunkColsstoCheckQueue)
             {
                 chunkColsstoCheckQueue.Enqueue(chunkCoord);
             }
@@ -159,7 +161,7 @@ namespace Vintagestory.GameContent
                 int max = 10;
                 UpdateSnowLayerChunk[] q = new UpdateSnowLayerChunk[max];
 
-                lock (updateSnowLayerQueueLock)
+                lock (updateSnowLayerQueue)
                 {
                     while (updateSnowLayerQueue.Count > 0)
                     {
@@ -171,7 +173,9 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < cnt; i++)
                 {
-                    processBlockUpdates(q[i].Coords, q[i], ba);
+                    IMapChunk mc = sapi.WorldManager.GetMapChunk(q[i].Coords.X, q[i].Coords.Y);
+                    if (mc == null) continue; // No longer loaded, we can just ditch it and re-do the thing again next time it gets loaded again
+                    processBlockUpdates(mc, q[i], ba);
                 }
 
                 ba.Commit();
@@ -179,15 +183,11 @@ namespace Vintagestory.GameContent
         }
 
 
-        internal void processBlockUpdates(Vec2i coord, UpdateSnowLayerChunk updateChunk, IBulkBlockAccessor ba)
+        internal void processBlockUpdates(IMapChunk mc, UpdateSnowLayerChunk updateChunk, IBulkBlockAccessor ba)
         {
-            int chunkX = coord.X;
-            int chunkZ = coord.Y;
             var setblocks = updateChunk.SetBlocks;
             double lastSnowAccumUpdateTotalHours = updateChunk.LastSnowAccumUpdateTotalHours;
 
-            IMapChunk mc = sapi.WorldManager.GetMapChunk(chunkX, chunkZ);
-            if (mc == null) return; // No longer loaded, we can just ditch it and re-do the thing again next time it gets loaded again
             Vec2i tmpVec = new Vec2i();
 
             foreach (var sval in setblocks)
@@ -211,13 +211,71 @@ namespace Vintagestory.GameContent
         {
             if (!ProcessChunks) return;
 
-            lock (chunkstoCheckQueueLock)
+            int regionX = (chunkCoord.X * chunksize) / regionsize;
+            int regionZ = (chunkCoord.Y * chunksize) / regionsize;
+
+            WeatherSimulationRegion simregion = ws.getOrCreateWeatherSimForRegion(regionX, regionZ);
+
+            IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkCoord.X, chunkCoord.Y);
+
+            if (mc != null && simregion != null)
             {
-                chunkColsstoCheckQueue.Enqueue(chunkCoord);
+                lock (chunkColsstoCheckQueue)
+                {
+                    chunkColsstoCheckQueue.Enqueue(chunkCoord);
+                }
             }
         }
 
+        private void Event_ChunkColumnLoading(IServerMapChunk mc, int chunkX, int chunkZ, IWorldChunk[] chunks)
+        {
+            if (!ProcessChunks) return;
 
+            int regionX = (chunkX * chunksize) / regionsize;
+            int regionZ = (chunkZ * chunksize) / regionsize;
+
+            WeatherSimulationRegion simregion = ws.getOrCreateWeatherSimForRegion(regionX, regionZ);
+
+            if (simregion != null)
+            {
+                if (TryImmediateSnowUpdate(simregion, mc, new Vec2i(chunkX, chunkZ), chunks)) return;
+            }
+        }
+
+        private bool TryImmediateSnowUpdate(WeatherSimulationRegion simregion, IServerMapChunk mc, Vec2i chunkCoord, IWorldChunk[] chunksCol)
+        {
+            UpdateSnowLayerChunk dummy = new UpdateSnowLayerChunk()
+            {
+                Coords = chunkCoord
+            };
+            lock (updateSnowLayerQueue)
+            {
+                if (updateSnowLayerQueue.Contains(dummy)) return false;
+            }
+
+            double nowTotalHours = ws.api.World.Calendar.TotalHours;
+            if (nowTotalHours - simregion.LastUpdateTotalHours > 1) // Lets wait until WeatherSimulationRegion is done updating
+            {
+                return false;
+            }
+
+            UpdateSnowLayerChunk ch = GetSnowUpdate(simregion, mc, chunkCoord, chunksCol);
+            if (ch == null) return true;  // The only path returning null, if we provided a full set of chunksCol, will be where newCount == 0
+            if (ch.SetBlocks.Count == 0)
+            {
+                return true;
+            }
+
+            cuba.SetChunks(chunkCoord, chunksCol);
+            processBlockUpdates(mc, ch, cuba);
+            cuba.Commit();
+
+            lock (updateSnowLayerQueue)
+            {
+                updateSnowLayerQueue.Enqueue(dummy);
+            }
+            return true;
+        }
 
         private void onThreadTick()
         {
@@ -229,7 +287,7 @@ namespace Vintagestory.GameContent
                 while (chunkColsstoCheckQueue.Count > 0 && i++ < 10)
                 {
                     Vec2i chunkCoord;
-                    lock (chunkstoCheckQueueLock)
+                    lock (chunkColsstoCheckQueue)
                     {
                         chunkCoord = chunkColsstoCheckQueue.Dequeue();
                     }
@@ -385,13 +443,32 @@ namespace Vintagestory.GameContent
             };
 
             // Lets wait until we're done with the current job for this chunk
-            if (updateSnowLayerQueue.Contains(ch)) return;
+            lock (updateSnowLayerQueue)
+            {
+                if (updateSnowLayerQueue.Contains(ch)) return;
+            }
+
+            if (simregion == null) return;
 
             double nowTotalHours = ws.api.World.Calendar.TotalHours;
             if (nowTotalHours - simregion.LastUpdateTotalHours > 1) // Lets wait until WeatherSimulationRegion is done updating
             {
                 return;
             }
+
+            ch = GetSnowUpdate(simregion, mc, chunkPos, null);
+
+            if (ch != null)
+            {
+                lock (updateSnowLayerQueue)
+                {
+                    updateSnowLayerQueue.Enqueue(ch);
+                }
+            }
+        }
+
+        private UpdateSnowLayerChunk GetSnowUpdate(WeatherSimulationRegion simregion, IServerMapChunk mc, Vec2i chunkPos, IWorldChunk[] chunksCol)
+        {
 
             byte[] data = mc.GetData("lastSnowAccumUpdateTotalHours");
             double lastSnowAccumUpdateTotalHours = data == null ? 0 : SerializerUtil.Deserialize<double>(data);
@@ -402,11 +479,9 @@ namespace Vintagestory.GameContent
             SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
             {
                 //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
-                SnowAccumulationByRegionCorner = new API.FloatDataMap3D(reso, reso, reso)
+                SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
             };
             float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
-
-            if (simregion == null) return;
 
             // Can't grow bigger than one full snow block
             float max = ws.GeneralConfig.SnowLayerBlocks.Count + 0.5f;
@@ -437,7 +512,7 @@ namespace Vintagestory.GameContent
 
             }
 
-            if (newCount == 0) return;
+            if (newCount == 0) return null;
 
             bool ignoreOldAccum = false;
             if (lastSnowAccumUpdateTotalHours - startTotalHours >= sapi.World.Calendar.DaysPerYear * sapi.World.Calendar.HoursPerDay)
@@ -445,10 +520,7 @@ namespace Vintagestory.GameContent
                 ignoreOldAccum = true;
             }
 
-
-
-
-            ch = UpdateSnowLayer(sumsnapshot, ignoreOldAccum, mc, chunkPos);
+            UpdateSnowLayerChunk ch = UpdateSnowLayer(sumsnapshot, ignoreOldAccum, mc, chunkPos, chunksCol);
 
             if (ch != null)
             {
@@ -456,16 +528,12 @@ namespace Vintagestory.GameContent
 
                 ch.LastSnowAccumUpdateTotalHours = lastSnowAccumUpdateTotalHours;
                 ch.Coords = chunkPos.Copy();
-
-                lock (updateSnowLayerQueueLock)
-                {
-                    updateSnowLayerQueue.Enqueue(ch);
-                }
             }
+            return ch;
         }
 
 
-        public UpdateSnowLayerChunk UpdateSnowLayer(SnowAccumSnapshot sumsnapshot, bool ignoreOldAccum, IServerMapChunk mc, Vec2i chunkPos)
+        public UpdateSnowLayerChunk UpdateSnowLayer(SnowAccumSnapshot sumsnapshot, bool ignoreOldAccum, IServerMapChunk mc, Vec2i chunkPos, IWorldChunk[] chunksCol)
         {
             UpdateSnowLayerChunk updateChunk = new UpdateSnowLayerChunk();
             var layers = ws.GeneralConfig.SnowLayerBlocks;
@@ -486,7 +554,7 @@ namespace Vintagestory.GameContent
             int[] posIndices = randomShuffles[sapi.World.Rand.Next(randomShuffles.Length)];
 
             int prevChunkY = -99999;
-            IServerChunk chunk = null;
+            IWorldChunk chunk = null;
 
             for (int i = 0; i < posIndices.Length; i++)
             {
@@ -500,9 +568,9 @@ namespace Vintagestory.GameContent
                     chunkZ * chunksize + posIndex / chunksize
                 );
 
-                if (prevChunkY != chunkY || chunk == null)
+                if (prevChunkY != chunkY)
                 {
-                    chunk = sapi.WorldManager.GetChunk(chunkX, chunkY, chunkZ);
+                    chunk = chunksCol?[chunkY] ?? sapi.WorldManager.GetChunk(chunkX, chunkY, chunkZ);
                     prevChunkY = chunkY;
                 }
                 if (chunk == null) return null;
@@ -557,12 +625,12 @@ namespace Vintagestory.GameContent
                 float shouldIndexf = GameMath.Clamp((hereShouldLevel - 1.1f), -1, ws.GeneralConfig.SnowLayerBlocks.Count - 1);
                 int shouldIndex = shouldIndexf < 0 ? -1 : (int)shouldIndexf;
 
-                placePos.Set(pos.X, pos.Y + 1, pos.Z);
+                placePos.Set(pos.X, Math.Min(pos.Y + 1, sapi.World.BlockAccessor.MapSizeY - 1), pos.Z);
                 chunkY = placePos.Y / chunksize;
 
-                if (prevChunkY != chunkY || chunk == null)
+                if (prevChunkY != chunkY)
                 {
-                    chunk = sapi.WorldManager.GetChunk(chunkX, chunkY, chunkZ);
+                    chunk = chunksCol?[chunkY] ?? sapi.WorldManager.GetChunk(chunkX, chunkY, chunkZ);
                     prevChunkY = chunkY;
                 }
                 if (chunk == null) return null;

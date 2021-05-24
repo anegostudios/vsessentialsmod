@@ -217,7 +217,7 @@ namespace Vintagestory.GameContent
             SnowAccumSnapshot latestSnap = new SnowAccumSnapshot() {
                 TotalHours = nowTotalHours, 
                // SumTemperatureByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution),
-                SnowAccumulationByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
+                SnowAccumulationByRegionCorner = new FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
             };
 
             // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations

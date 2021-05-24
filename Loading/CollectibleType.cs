@@ -19,6 +19,9 @@ namespace Vintagestory.ServerMods.NoObf
     public abstract class CollectibleType : RegistryObjectType
     {
         [JsonProperty]
+        public CollectibleBehaviorType[] Behaviors = new CollectibleBehaviorType[0];
+
+        [JsonProperty]
         public float RenderAlphaTest = 0.05f;
         [JsonProperty]
         public int StorageFlags = 1;
@@ -72,7 +75,7 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public CompositeTexture Texture;
         [JsonProperty]
-        public Dictionary<string, CompositeTexture> Textures = new Dictionary<string, CompositeTexture>();
+        public Dictionary<string, CompositeTexture> Textures;
 
         [JsonProperty]
         public CombustibleProperties CombustibleProps = null;
@@ -131,6 +134,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (Texture != null)
             {
+                if (Textures == null) Textures = new TextureDictionary();
                 Textures["all"] = Texture;
             }
 

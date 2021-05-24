@@ -314,6 +314,7 @@ namespace Vintagestory.GameContent
                 addWpDlg = new GuiDialogAddWayPoint(capi);
                 addWpDlg.WorldPos = wpPos;
                 addWpDlg.TryOpen();
+                addWpDlg.OnClosed += () => capi.Gui.RequestFocus(this);
             }
 
             base.OnMouseUp(args);

@@ -107,6 +107,7 @@ namespace Vintagestory.ServerMods.NoObf
                     GlowLevel = Client.GlowLevel,
                     Shape = Client.Shape,
                     Size = Client.Size,
+                    SizeGrowthFactor = Client.SizeGrowthFactor,
                     Animations = Client.Animations,
                     AnimationsByMetaCode = Client.AnimationsByMetaCode,
                 };
@@ -144,6 +145,8 @@ namespace Vintagestory.ServerMods.NoObf
         public JsonObject[] Behaviors;
         [JsonProperty]
         public float Size = 1f;
+        [JsonProperty]
+        public float SizeGrowthFactor = 0f;
         [JsonProperty]
         public AnimationMetaData[] Animations;
 

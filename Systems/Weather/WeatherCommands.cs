@@ -13,6 +13,7 @@ using Vintagestory.API.Util;
 using AnimatedGif;
 using System.Diagnostics;
 using Vintagestory.API.Util;
+using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.GameContent
 {
@@ -164,7 +165,7 @@ namespace Vintagestory.GameContent
                 SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
                 {
                     //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
-                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(reso, reso, reso)
+                    SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
                 };
                 float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
 
@@ -212,19 +213,19 @@ namespace Vintagestory.GameContent
 
                 SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
                 {
-                    SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
-                    SnowAccumulationByRegionCorner = new API.FloatDataMap3D(reso, reso, reso)
+                    SumTemperatureByRegionCorner = new FloatDataMap3D(reso, reso, reso),
+                    SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
                 };
 
                 sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
 
-                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos);
+                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, null);
                 wsys.snowSimSnowAccu.accum = 1f;
 
                 var ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
                 ba.UpdateSnowAccumMap = false;
 
-                wsys.snowSimSnowAccu.processBlockUpdates(chunkPos, updatepacket, ba);
+                wsys.snowSimSnowAccu.processBlockUpdates(mc, updatepacket, ba);
                 ba.Commit();
 
                 player.SendMessage(groupId, "Ok, test snow accum gen complete", EnumChatType.CommandSuccess);
