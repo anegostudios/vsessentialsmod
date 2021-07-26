@@ -264,31 +264,31 @@ namespace Vintagestory.GameContent
             parentVeloSnow.Y = 0;
             parentVeloSnow.Z = 0;
 
-            // Don't spawn if wind speed below 70% or if the player is 10 blocks above ground
-            if (weatherData.curWindSpeed.X > 0.7f && particlePos.Y - rainYPos < 10)
+            // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
+            if (weatherData.curWindSpeed.X > 0.5f && particlePos.Y - rainYPos < 10)
             {
                 float dx = (float)(plrPos.Motion.X * 40) - 50 * weatherData.curWindSpeed.X;
                 float dy = (float)(plrPos.Motion.Y * 40);
                 float dz = (float)(plrPos.Motion.Z * 40);
 
-                dustParticles.MinPos.Set(particlePos.X - 40 + dx, particlePos.Y + 15 + dy, particlePos.Z - 40 + dz);
+                dustParticles.MinPos.Set(particlePos.X - 40 + dx, particlePos.Y + 5 + 5 * Math.Abs(weatherData.curWindSpeed.X) + dy, particlePos.Z - 40 + dz);
                 dustParticles.AddPos.Set(80, -20, 80);
-                dustParticles.GravityEffect = -0.1f - (float)rand.NextDouble() * 0.1f;
+                dustParticles.GravityEffect = 0.1f;
                 dustParticles.ParticleModel = EnumParticleModel.Quad;
                 dustParticles.LifeLength = 1f;
                 dustParticles.DieOnRainHeightmap = true;
                 dustParticles.WindAffectednes = 8f;
                 dustParticles.MinQuantity = 0;
-                dustParticles.AddQuantity = 6 * (weatherData.curWindSpeed.X - 0.7f);
+                dustParticles.AddQuantity = 8 * (weatherData.curWindSpeed.X - 0.5f);
 
                 dustParticles.MinSize = 0.1f;
                 dustParticles.MaxSize = 0.4f;
 
-                dustParticles.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -0.2f, -0.025f);
-                dustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
+                dustParticles.MinVelocity.Set(-0.025f + 10 * weatherData.curWindSpeed.X, 0f, -0.025f);
+                dustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, -0.25f, 0.05f);
 
 
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < 12; i++)
                 {
                     double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
                     double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
@@ -296,6 +296,10 @@ namespace Vintagestory.GameContent
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
                     Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
                     if (block.IsLiquid()) continue;
+                    if (block.BlockMaterial != EnumBlockMaterial.Sand)
+                    {
+                        if (rand.NextDouble() < 0.5f) continue;
+                    }
 
                     tmpPos.Set((int)px, py, (int)pz);
                     dustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));

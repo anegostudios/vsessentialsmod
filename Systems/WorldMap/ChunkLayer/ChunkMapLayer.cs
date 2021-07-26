@@ -123,8 +123,7 @@ namespace Vintagestory.GameContent
             IWorldChunk chunk = api.World.BlockAccessor.GetChunkAtBlockPos(blockSel.Position.X, y, blockSel.Position.Z);
             if (chunk == null) return;
 
-            chunk.Unpack_ReadOnly();
-            int blockId = chunk.Blocks[(ly * chunksize + lz) * chunksize + lx];
+            int blockId = chunk.Unpack_AndReadBlock((ly * chunksize + lz) * chunksize + lx);
 
             if (blockId == 0)
             {
@@ -555,8 +554,7 @@ namespace Vintagestory.GameContent
                 if (slopeness > 0) b = 1.18f;
                 if (slopeness < 0) b = 0.82f;
 
-                chunksTmp[cy].Unpack_ReadOnly();
-                int blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
+                int blockId = chunksTmp[cy].Unpack_AndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize));
                 Block block = api.World.Blocks[blockId];
 
                 /*if (i == 0)
@@ -568,8 +566,7 @@ namespace Vintagestory.GameContent
                 {
                     y--;
                     cy = y / chunksize;
-                    chunksTmp[cy].Unpack_ReadOnly();
-                    blockId = chunksTmp[cy].Blocks[MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize)];
+                    blockId = chunksTmp[cy].Unpack_AndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize));
                     block = api.World.Blocks[blockId];
                 }
 

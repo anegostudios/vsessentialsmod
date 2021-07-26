@@ -60,11 +60,7 @@ namespace Vintagestory.GameContent
         {
             p1 = pointsByIndex[PointIndex1];
             p2 = pointsByIndex[PointIndex2];
-        }
 
-        [OnDeserialized]
-        private void OnDeserialized(StreamingContext ctx)
-        {
             rest_length = GameMath.Sqrt(squared_rest_length);
             inverse_length = 1f / rest_length;
             renderCenterPos = p1.Pos + (p1.Pos - p2.Pos) / 2;

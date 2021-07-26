@@ -102,13 +102,18 @@ namespace Vintagestory.GameContent
 
             dt = Math.Min(dt, 0.1f);
 
+            // Add some tiny amounts of random horizontal motion to give it a chance to wiggle out of an edge case
+            // This might break badly because its not client<->server sync
+            float rndx = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
+            float rndz = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
+
             entity.SidedPos.X += pushDir.Normali.X * dt * 0.4f;
             entity.SidedPos.Y += pushDir.Normali.Y * dt * 0.4f;
             entity.SidedPos.Z += pushDir.Normali.Z * dt * 0.4f;
 
-            entity.SidedPos.Motion.X = pushDir.Normali.X * dt;
+            entity.SidedPos.Motion.X = pushDir.Normali.X * dt + rndx;
             entity.SidedPos.Motion.Y = pushDir.Normali.Y * dt * 2;
-            entity.SidedPos.Motion.Z = pushDir.Normali.Z * dt;
+            entity.SidedPos.Motion.Z = pushDir.Normali.Z * dt + rndz;
 
             entity.Properties.Habitat = EnumHabitat.Air;
         }

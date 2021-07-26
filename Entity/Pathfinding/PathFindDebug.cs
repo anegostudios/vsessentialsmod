@@ -40,7 +40,8 @@ namespace Vintagestory.Essentials
             BlockPos plrPos = player.Entity.ServerPos.XYZ.AsBlockPos;
             PathfindSystem pfs = sapi.ModLoader.GetModSystem<PathfindSystem>();
 
-            Cuboidf narrow = new Cuboidf(-0.45f, 0, -0.45f, 0.45f, 1.5f, 0.45f);
+            Cuboidf narrow = new Cuboidf(-0.4f, 0, -0.4f, 0.4f, 1.5f, 0.4f);
+            Cuboidf narrower = new Cuboidf(-0.2f, 0, -0.2f, 0.2f, 1.5f, 0.2f);
             Cuboidf wide = new Cuboidf(-0.6f, 0, -0.6f, 0.6f, 1.5f, 0.6f);
 
             Cuboidf collbox = narrow;

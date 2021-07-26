@@ -479,6 +479,7 @@ namespace Vintagestory.GameContent
             foreach (var val in wayPointComponents)
             {
                 val.OnMouseUpOnElement(args, mapElem);
+                if (args.Handled) break;
             }
         }
 

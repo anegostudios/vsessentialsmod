@@ -204,7 +204,6 @@ namespace Vintagestory.GameContent
 
             if (msg.updateInstant)
             {
-//                ReloadConfigs();
                 weatherSim.ReloadPatterns(api.World.Seed);
 
                 for (int i = 0; i < weatherSim.WeatherPatterns.Length; i++)
@@ -213,10 +212,10 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            weatherSim.NewWePattern = weatherSim.WeatherPatterns[msg.NewPattern.Index];
+            weatherSim.NewWePattern = weatherSim.WeatherPatterns[Math.Min(weatherSim.WeatherPatterns.Length - 1, msg.NewPattern.Index)];
             weatherSim.NewWePattern.State = msg.NewPattern;
 
-            weatherSim.OldWePattern = weatherSim.WeatherPatterns[msg.OldPattern.Index];
+            weatherSim.OldWePattern = weatherSim.WeatherPatterns[Math.Min(weatherSim.WeatherPatterns.Length - 1 , msg.OldPattern.Index)];
             weatherSim.OldWePattern.State = msg.OldPattern;
 
             weatherSim.TransitionDelay = msg.TransitionDelay;
@@ -224,10 +223,10 @@ namespace Vintagestory.GameContent
             weatherSim.Weight = msg.Weight;
 
             //bool windChanged = weatherSim.CurWindPattern.State.Index != msg.WindPattern.Index;
-            weatherSim.CurWindPattern = weatherSim.WindPatterns[msg.WindPattern.Index];
+            weatherSim.CurWindPattern = weatherSim.WindPatterns[Math.Min(weatherSim.WindPatterns.Length - 1, msg.WindPattern.Index)];
             weatherSim.CurWindPattern.State = msg.WindPattern;
 
-            weatherSim.CurWeatherEvent = weatherSim.WeatherEvents[msg.WeatherEvent.Index];
+            weatherSim.CurWeatherEvent = weatherSim.WeatherEvents[Math.Min(weatherSim.WeatherEvents.Length - 1, msg.WeatherEvent.Index)];
             weatherSim.CurWeatherEvent.State = msg.WeatherEvent;
 
             if (msg.updateInstant)

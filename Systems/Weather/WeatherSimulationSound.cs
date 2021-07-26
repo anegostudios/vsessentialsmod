@@ -42,12 +42,10 @@ namespace Vintagestory.GameContent
         float curTrembleVolume = 0f;
 
         float quarterSecAccum;
-        //float secAccum = 0;
 
         bool searchComplete = true;
         float roomVolumePitchLoss;
 
-        //public float windSoundIntensity;
 
         BlockPos plrPos = new BlockPos();
 
@@ -65,7 +63,6 @@ namespace Vintagestory.GameContent
                 Location = new AssetLocation("sounds/weather/tracks/verylowtremble.ogg"),
                 ShouldLoop = true,
                 DisposeOnFinish = false,
-
                 Position = new Vec3f(0, 0, 0),
                 RelativePosition = true,
                 Range = 16,
@@ -215,8 +212,8 @@ namespace Vintagestory.GameContent
 
                     if (!rainSoundsOn && (targetRainVolumeLeafy > 0.01 || targetRainVolumeLeafless > 0.01))
                     {
-                        for (int i = 0; i < rainSoundsLeafless.Length; i++) { rainSoundsLeafless[i].Start(); }
-                        for (int i = 0; i < rainSoundsLeafy.Length; i++) { rainSoundsLeafy[i].Start(); }
+                        for (int i = 0; i < rainSoundsLeafless.Length; i++) { rainSoundsLeafless[i]?.Start(); }
+                        for (int i = 0; i < rainSoundsLeafy.Length; i++) { rainSoundsLeafy[i]?.Start(); }
 
                         lowTrembleSound?.Start();
                         rainSoundsOn = true;

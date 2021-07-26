@@ -161,8 +161,17 @@ namespace Vintagestory.GameContent
 
             for (int cx = mincx; cx <= maxcx; cx++)
             {
+                double chunkDistX = 0;  // x-distance from centerPos to nearest position in this chunk
+                if (cx * chunksize > centerPos.X) chunkDistX = cx * chunksize - centerPos.X;
+                else if ((cx + 1) * chunksize < centerPos.X) chunkDistX = centerPos.X - (cx + 1) * chunksize;
+
                 for (int cz = mincz; cz <= maxcz; cz++)
                 {
+                    double cdistZ = 0;  // z-distance from centerPos to nearest position in this chunk
+                    if (cz * chunksize > centerPos.Z) cdistZ = cz * chunksize - centerPos.Z;
+                    else if ((cz + 1) * chunksize < centerPos.Z) cdistZ = centerPos.Z - (cz + 1) * chunksize;
+                    if (chunkDistX * chunkDistX + cdistZ * cdistZ > nearestDistSq) continue;  // skip the search if this whole chunk is further than the nearest found so far
+
                     List<IPointOfInterest> pois = null;
                     tmp.Set(cx, cz);
                     PoisByChunkColumn.TryGetValue(tmp, out pois);

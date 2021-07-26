@@ -31,7 +31,7 @@ namespace Vintagestory.GameContent
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
-            if (entity.Swimming && controls.TriesToMove) return;
+            if (entity.Swimming && controls.TriesToMove && entity.Alive) return;
             if (!entity.ApplyGravity) return;
 
 

@@ -12,7 +12,7 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskSeekEntity : AiTaskBase
     {
-        EntityAgent targetEntity;
+        Entity targetEntity;
         Vec3d targetPos;
 
         float moveSpeed = 0.02f;
@@ -159,7 +159,7 @@ namespace Vintagestory.GameContent
 
             Vec3d ownPos = entity.ServerPos.XYZ;
 
-            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => {
+            targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => {
                 if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
 
                 for (int i = 0; i < seekEntityCodesExact.Length; i++)
@@ -371,7 +371,7 @@ namespace Vintagestory.GameContent
             return
                 currentFollowTime < maxFollowTime &&
                 distance < range * range &&
-                (distance > minDist || targetEntity.ServerControls.TriesToMove) &&
+                (distance > minDist || (targetEntity is EntityAgent ea && ea.ServerControls.TriesToMove)) &&
                 targetEntity.Alive &&
                 !inCreativeMode &&
                 !stopNow
@@ -393,7 +393,7 @@ namespace Vintagestory.GameContent
         {
             if (key == "seekEntity")
             {
-                targetEntity = (EntityAgent)data;
+                targetEntity = (Entity)data;
                 targetPos = targetEntity.ServerPos.XYZ;
                 return true;
             }

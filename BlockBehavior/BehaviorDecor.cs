@@ -35,7 +35,7 @@ namespace Vintagestory.GameContent
             if (properties["alternateZOffset"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.AlternateZOffset;
             if (properties["notFullFace"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.NotFullFace;
             if (properties["removable"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.Removable;
-            block.decorThickness = properties["thickness"].AsFloat(0.03125f);
+            block.DecorThickness = properties["thickness"].AsFloat(0.03125f);
 
             base.Initialize(properties);
         }
@@ -56,8 +56,7 @@ namespace Vintagestory.GameContent
                         failureCode = "decorrequiressolid";
                         return false;
                     }
-                    IWorldChunk c = world.BlockAccessor.GetChunkAtBlockPos(pos);
-                    if (c == null) break;
+                    
 
                     Block blockToPlace;
                     if (sidedVariants)
@@ -85,14 +84,8 @@ namespace Vintagestory.GameContent
                         blockToPlace = this.block;
                     }
                     
-
-                    if (c.AddDecor(world.BlockAccessor, pos, blockSel.Face.Index, blockToPlace))
+                    if (world.BlockAccessor.AddDecor(blockToPlace, pos, blockSel.Face))
                     {
-                        if (world.Api.Side == EnumAppSide.Server)
-                        {
-                            c.MarkModified();
-                        }
-                        else world.BlockAccessor.MarkBlockDirty(pos);
                         return true;
                     }
                     

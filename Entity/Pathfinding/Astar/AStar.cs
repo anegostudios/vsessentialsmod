@@ -24,8 +24,8 @@ namespace Vintagestory.Essentials
             blockAccess = api.World.GetCachingBlockAccessor(true, true);
         }
 
-        HashSet<PathNode> openSet = new HashSet<PathNode>();
-        HashSet<PathNode> closedSet = new HashSet<PathNode>();
+        public HashSet<PathNode> openSet = new HashSet<PathNode>();
+        public HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
         public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, bool allowReachAlmost = false)
         {
@@ -66,6 +66,7 @@ namespace Vintagestory.Essentials
                 openSet.Remove(nearestNode);
                 closedSet.Add(nearestNode);
 
+                //Console.WriteLine(string.Format("Distance: {0}/{1}/{2}", nearestNode.X - targetNode.X, nearestNode.Y - targetNode.Y, nearestNode.Z - targetNode.Z));
 
                 if (nearestNode == targetNode || (allowReachAlmost && Math.Abs(nearestNode.X - targetNode.X) <= 1 && Math.Abs(nearestNode.Z - targetNode.Z) <= 1 && (nearestNode.Y == targetNode.Y || nearestNode.Y == targetNode.Y + 1)))
                 {
@@ -192,12 +193,14 @@ namespace Vintagestory.Essentials
                 tmpVec.Set(node.X + centerOffsetX, node.Y + stepHeight, node.Z + centerOffsetZ);
                 bool collideAbove = api.World.CollisionTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false);
 
+                tmpPos.Set(node.X, node.Y, node.Z);
+                Block block = blockAccess.GetBlock(tmpPos);
+                if (!block.CanStep) return false;
+
                 if (!collideAbove)
                 {
                     if (isDiagonal)
                     {
-                        tmpPos.Set(node.X, node.Y, node.Z);
-                        Block block = blockAccess.GetBlock(tmpPos);
                         Cuboidf[] collboxes = block.GetCollisionBoxes(blockAccess, tmpPos);
 
                         if (collboxes != null && collboxes.Length > 0)

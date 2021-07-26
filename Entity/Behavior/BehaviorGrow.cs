@@ -17,10 +17,7 @@ namespace Vintagestory.GameContent
         JsonObject typeAttributes;
         long callbackId;
 
-        internal float HoursToGrow
-        {
-            get { return typeAttributes["hoursToGrow"].AsFloat(96); }
-        }
+        internal float HoursToGrow { get; set; }
 
         internal AssetLocation[] AdultEntityCodes
         {
@@ -44,6 +41,7 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, typeAttributes);
 
             this.typeAttributes = typeAttributes;
+            HoursToGrow = typeAttributes["hoursToGrow"].AsFloat(96);
 
             growTree = entity.WatchedAttributes.GetTreeAttribute("grow");
 

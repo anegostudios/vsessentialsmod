@@ -37,6 +37,7 @@ namespace Vintagestory.GameContent
         bool lowStabilityAttracted;
         bool ignoreDeepDayLight;
 
+        float tamingGenerations = 10f;
         
 
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
@@ -48,6 +49,11 @@ namespace Vintagestory.GameContent
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
             base.LoadConfig(taskConfig, aiConfig);
+
+            if (taskConfig["tamingGenerations"] != null)
+            {
+                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
+            }
 
             if (taskConfig["movespeed"] != null)
             {
@@ -136,7 +142,7 @@ namespace Vintagestory.GameContent
             }
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
+            float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             Vec3d ownPos = entity.ServerPos.XYZ;

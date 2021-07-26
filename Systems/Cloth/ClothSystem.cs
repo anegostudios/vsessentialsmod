@@ -15,6 +15,16 @@ namespace Vintagestory.GameContent
     }
 
     [ProtoContract]
+    public class PointList 
+    {
+        [ProtoMember(1)]
+        public List<ClothPoint> Points = new List<ClothPoint>();
+    }
+
+
+    // How to synchronize this over the network?
+    // Idea: We run the simulation client and server, but server 
+    [ProtoContract]
     public class ClothSystem
     {
         [ProtoMember(1)]
@@ -22,10 +32,11 @@ namespace Vintagestory.GameContent
         [ProtoMember(2)]
         EnumClothType clothType;
         [ProtoMember(3)]
-        List<List<ClothPoint>> Points2d = new List<List<ClothPoint>>();
+        List<PointList> Points2d = new List<PointList>();
         [ProtoMember(4)]
         List<ClothConstraint> Constraints = new List<ClothConstraint>();
-
+        [ProtoMember(5)]
+        public bool Active { get; set; }
 
         /// <summary>
         /// 10 joints per meter
@@ -36,10 +47,10 @@ namespace Vintagestory.GameContent
         public bool boyant = false;
 
         protected ICoreClientAPI capi;
-        protected ICoreAPI api;
+        public ICoreAPI api;
 
 
-        protected BlockPos originPos;
+        
         public Vec3d windSpeed = new Vec3d();
 
         public ParticlePhysics pp;
@@ -54,7 +65,7 @@ namespace Vintagestory.GameContent
         protected MeshData debugUpdateMesh;
         protected MeshRef debugMeshRef;
 
-
+        
 
         public bool PinnedAnywhere
         {
@@ -62,7 +73,7 @@ namespace Vintagestory.GameContent
             {
                 foreach (var pointlist in Points2d)
                 {
-                    foreach (var point in pointlist)
+                    foreach (var point in pointlist.Points)
                     {
                         if (point.Pinned) return true;
                     }
@@ -72,12 +83,40 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public ClothPoint FirstPoint => Points2d[0][0];
+        public Vec3d CenterPosition
+        {
+            get
+            {
+                // Loop twice to not loose decimal precision
+
+                Vec3d pos = new Vec3d();
+                int cnt = 0;
+                foreach (var pointlist in Points2d)
+                {
+                    foreach (var point in pointlist.Points)
+                    {
+                        cnt++;
+                    }
+                }
+
+                foreach (var pointlist in Points2d)
+                {
+                    foreach (var point in pointlist.Points)
+                    {
+                        pos.Add(point.Pos.X / cnt, point.Pos.Y / cnt, point.Pos.Z / cnt);
+                    }
+                }
+
+                return pos;
+            }
+        }
+
+        public ClothPoint FirstPoint => Points2d[0].Points[0];
         public ClothPoint LastPoint
         {
             get
             {
-                var points = Points2d[Points2d.Count - 1];
+                var points = Points2d[Points2d.Count - 1].Points;
                 return points[points.Count - 1];
             }
         }
@@ -85,7 +124,7 @@ namespace Vintagestory.GameContent
         public ClothPoint[] Ends => new ClothPoint[] { FirstPoint, LastPoint };
 
         public int Width => Points2d.Count;
-        public int Length => Points2d[0].Count;
+        public int Length => Points2d[0].Points.Count;
 
 
         public static ClothSystem CreateCloth(ICoreAPI api, ClothManager cm, BlockPos originPos, float xsize, float zsize)
@@ -99,29 +138,18 @@ namespace Vintagestory.GameContent
         }
 
 
+        private ClothSystem() { }
 
         private ClothSystem(ICoreAPI api, ClothManager cm, BlockPos originPos, float xsize, float zsize, EnumClothType clothType, AssetLocation ropeSectionModel = null)
         {
             this.clothType = clothType;
             this.ropeSectionModel = ropeSectionModel;
 
-            this.api = api;
-            this.capi = api as ICoreClientAPI;
-            pp = cm.partPhysics;
-
-            this.originPos = originPos;
-
-            if (capi != null && LineDebug)
-            {
-                debugUpdateMesh = new MeshData(20, 15, false, false, true, true);
-            }
-
-            noiseGen = NormalizedSimplexNoise.FromDefaultOctaves(4, 100, 0.9, api.World.Seed + originPos.GetHashCode());
+            Init(api, cm);
             Random rand = api.World.Rand;
 
             bool hor = rand.NextDouble() < 0.5;
             int vertexIndex = 0;
-            
 
             float step = 1 / Resolution;
             int numzpoints = (int)Math.Round(zsize * Resolution);
@@ -132,15 +160,13 @@ namespace Vintagestory.GameContent
                 numzpoints = 1;
             }
 
-
             float roughness = 0.05f;
             int k = 0;
-
             int pointIndex = 0;
 
             for (int z = 0; z < numzpoints; z++)
             {
-                Points2d.Add(new List<ClothPoint>());
+                Points2d.Add(new PointList());
 
                 for (int x = 0; x < numxpoints; x++)
                 {
@@ -157,15 +183,15 @@ namespace Vintagestory.GameContent
 
                     var point = new ClothPoint(this, pointIndex++, originPos.X + dx, originPos.Y + dy, originPos.Z + dz);
 
-                    Points2d[z].Add(point);
+                    Points2d[z].Points.Add(point);
 
                     int color = (k++ % 2) > 0 ? ColorUtil.WhiteArgb : ColorUtil.BlackArgb;
 
                     // add a vertical constraint
                     if (z > 0)
                     {
-                        ClothPoint p1 = Points2d[z - 1][x];
-                        ClothPoint p2 = Points2d[z][x];
+                        ClothPoint p1 = Points2d[z - 1].Points[x];
+                        ClothPoint p2 = Points2d[z].Points[x];
 
                         var constraint = new ClothConstraint(p1, p2);
                         Constraints.Add(constraint);
@@ -186,8 +212,8 @@ namespace Vintagestory.GameContent
                     // add a new horizontal constraints
                     if (x > 0)
                     {
-                        ClothPoint p1 = Points2d[z][x - 1];
-                        ClothPoint p2 = Points2d[z][x];
+                        ClothPoint p1 = Points2d[z].Points[x - 1];
+                        ClothPoint p2 = Points2d[z].Points[x];
 
                         var constraint = new ClothConstraint(p1, p2);
                         Constraints.Add(constraint);
@@ -219,13 +245,28 @@ namespace Vintagestory.GameContent
             }
         }
 
+        
+
+        public void Init(ICoreAPI api, ClothManager cm)
+        {
+            this.api = api;
+            this.capi = api as ICoreClientAPI;
+            pp = cm.partPhysics;
+
+            noiseGen = NormalizedSimplexNoise.FromDefaultOctaves(4, 100, 0.9, api.World.Seed + CenterPosition.GetHashCode());
+
+            if (capi != null && LineDebug)
+            {
+                debugUpdateMesh = new MeshData(20, 15, false, false, true, true);
+            }
+        }
 
 
         public void WalkPoints(API.Common.Action<ClothPoint> onPoint)
         {
-            foreach (var points in Points2d)
+            foreach (var pl in Points2d)
             {
-                foreach (var point in points)
+                foreach (var point in pl.Points)
                 {
                     onPoint(point);
                 }
@@ -235,18 +276,10 @@ namespace Vintagestory.GameContent
 
         public int UpdateMesh(MeshData updateMesh, float dt)
         {
-
-            var cf = updateMesh.CustomFloats;
-
+            var cfloats = updateMesh.CustomFloats;
             Vec3d campos = capi.World.Player.Entity.CameraPos;
+            int basep = cfloats.Count;
 
-
-            int basep = cf.Count;
-
-            /*if (cf.Values.Length - basep < point2Line.Count * 20)
-            {
-                cf.GrowBuffer(point2Line.Count * 20);
-            }*/
 
             Vec4f lightRgba = api.World.BlockAccessor.GetLightRGBs(Constraints[Constraints.Count / 2].Point1.Pos.AsBlockPos);
 
@@ -298,14 +331,14 @@ namespace Vintagestory.GameContent
 
 
                     int j = basep + i * 20;
-                    cf.Values[j++] = lightRgba.R;
-                    cf.Values[j++] = lightRgba.G;
-                    cf.Values[j++] = lightRgba.B;
-                    cf.Values[j++] = lightRgba.A;
+                    cfloats.Values[j++] = lightRgba.R;
+                    cfloats.Values[j++] = lightRgba.G;
+                    cfloats.Values[j++] = lightRgba.B;
+                    cfloats.Values[j++] = lightRgba.A;
 
                     for (int k = 0; k < 16; k++)
                     {
-                        cf.Values[j + k] = tmpMat[k];
+                        cfloats.Values[j + k] = tmpMat[k];
                     }
                 }
             }
@@ -343,6 +376,8 @@ namespace Vintagestory.GameContent
         {
             if (LineDebug && capi != null)
             {
+                BlockPos originPos = CenterPosition.AsBlockPos;
+
                 for (int i = 0; i < Constraints.Count; i++)
                 {
                     ClothPoint p1 = Constraints[i].Point1;
@@ -393,8 +428,6 @@ namespace Vintagestory.GameContent
         float accum = 0f;
         public void updateFixedStep(float dt)
         {
-            windSpeed = api.World.BlockAccessor.GetWindSpeedAt(originPos) * (0.2 + noiseGen.Noise(0, api.World.Calendar.TotalHours * 50) * 0.8);
-
             accum += dt;
             if (accum > 1) accum = 0.25f;
 
@@ -405,7 +438,6 @@ namespace Vintagestory.GameContent
                 accum -= step;
                 tickNow(step);
             }
-
         }
 
         void tickNow(float pdt) { 
@@ -420,13 +452,80 @@ namespace Vintagestory.GameContent
             // move each point with a pull from gravity
             for (int i = 0; i < Points2d.Count; i++)
             {
-                for (int j = 0; j < Points2d[i].Count; j++)
+                for (int j = 0; j < Points2d[i].Points.Count; j++)
                 {
-                    Points2d[i][j].update(pdt);
+                    Points2d[i].Points[j].update(pdt);
                 }
             }
-
         }
 
+
+        public void slowTick3s()
+        {
+            windSpeed = api.World.BlockAccessor.GetWindSpeedAt(CenterPosition) * (0.2 + noiseGen.Noise(0, api.World.Calendar.TotalHours * 50) * 0.8);
+        }
+
+        public void restoreReferences()
+        {
+            if (!Active) return;
+
+            Dictionary<int, ClothPoint> pointsByIndex = new Dictionary<int, ClothPoint>();
+            WalkPoints((p) => {
+                pointsByIndex[p.PointIndex] = p;
+                p.restoreReferences(this, api.World);
+            });
+
+            foreach (var c in Constraints)
+            {
+                c.RestorePoints(pointsByIndex);
+            }            
+        }
+
+        public void updateActiveState(EnumActiveStateChange stateChange)
+        {
+            if (Active && stateChange == EnumActiveStateChange.RegionNowLoaded) return;
+            if (!Active && stateChange == EnumActiveStateChange.RegionNowUnloaded) return;
+
+            bool wasActive = Active;
+
+            Active = true;
+            WalkPoints((p) => {
+                Active &= api.World.BlockAccessor.GetChunkAtBlockPos((int)p.Pos.X, (int)p.Pos.Y, (int)p.Pos.Z) != null;
+            });
+
+            if (!wasActive && Active) restoreReferences();
+        }
+
+
+
+
+        public void CollectDirtyPoints(List<ClothPointPacket> packets)
+        {
+            for (int i = 0; i < Points2d.Count; i++)
+            {
+                for (int j = 0; j < Points2d[i].Points.Count; j++)
+                {
+                    var point = Points2d[i].Points[j];
+                    if (point.Dirty)
+                    {
+                        packets.Add(new ClothPointPacket() { ClothId = ClothId, PointX = i, PointY = j, Point = point });
+                        point.Dirty = false;
+                    }
+                }
+            }
+        }
+
+        public void updatePoint(ClothPointPacket msg)
+        {
+            ClothPoint point = Points2d[msg.PointX].Points[msg.PointY];
+            point.updateFromPoint(msg.Point, api.World);
+        }
+    }
+
+    public enum EnumActiveStateChange
+    {
+        Default,
+        RegionNowLoaded,
+        RegionNowUnloaded
     }
 }

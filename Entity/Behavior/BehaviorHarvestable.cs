@@ -199,7 +199,7 @@ namespace Vintagestory.GameContent
 
         private void Inv_OnInventoryClosed(IPlayer player)
         {
-            if (inv.IsEmpty && entity.GetBehavior<EntityBehaviorDeadDecay>()!=null)
+            if (inv.Empty && entity.GetBehavior<EntityBehaviorDeadDecay>()!=null)
             {
                 entity.GetBehavior<EntityBehaviorDeadDecay>().DecayNow();
             }

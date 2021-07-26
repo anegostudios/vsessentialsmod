@@ -8,6 +8,7 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -31,6 +32,11 @@ namespace Vintagestory.GameContent
         ICoreClientAPI capi;
 
         protected bool smoothStepping;
+
+        protected float accum1s;
+        protected Vec3d windForce = new Vec3d();
+
+        bool applyWindForce;
 
         public override void OnEntityDespawn(EntityDespawnReason despawn)
         {
@@ -61,13 +67,14 @@ namespace Vintagestory.GameContent
 
             if (entity.World.Side == EnumAppSide.Client)
             {
-                capi = (entity.World.Api as ICoreClientAPI);
+                capi = entity.World.Api as ICoreClientAPI;
                 duringRenderFrame = true;
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "controlledphysics");
-
             }
 
             accumulator = (float)entity.World.Rand.NextDouble() * GlobalConstants.PhysicsFrameTime;
+
+            applyWindForce = entity.World.Config.GetBool("windAffectedEntityMovement", false);
         }
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
@@ -92,13 +99,21 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            accum1s += deltaTime;
+            if (accum1s > 1.5f)
+            {
+                accum1s = 0;
+                updateWindForce();
+            }
+
             accumulator += deltaTime;
 
             if (accumulator > 1)
             {
                 accumulator = 1;
             }
-            
+
+
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
@@ -108,8 +123,29 @@ namespace Vintagestory.GameContent
             
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
             entity.World.FrameProfiler.Mark("entity-controlledphysics-end");
+
         }
 
+        protected virtual void updateWindForce()
+        {
+            if (!entity.Alive || !applyWindForce)
+            {
+                windForce.Set(0, 0, 0);
+                return;
+            }
+
+            int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.Pos.X, (int)entity.Pos.Z);
+            if (rainy > entity.Pos.Y)
+            {
+                windForce.Set(0, 0, 0);
+                return;
+            }
+
+            Vec3d windSpeed = entity.World.BlockAccessor.GetWindSpeedAt(entity.Pos.XYZ);
+            windForce.X = Math.Max(0, Math.Abs(windSpeed.X) - 0.8) / 40f * Math.Sign(windSpeed.X);
+            windForce.Y = Math.Max(0, Math.Abs(windSpeed.Y) - 0.8) / 40f * Math.Sign(windSpeed.Y);
+            windForce.Z = Math.Max(0, Math.Abs(windSpeed.Z) - 0.8) / 40f * Math.Sign(windSpeed.Z);
+        }
 
         public virtual void GameTick(Entity entity, float dt) {
             EntityControls controls = ((EntityAgent)entity).Controls;
@@ -138,7 +174,13 @@ namespace Vintagestory.GameContent
                 AdjustCollisionBoxToAnimation(dtFac);
             }
 
-            
+
+            if (controls.TriesToMove && entity.OnGround && !entity.Swimming)
+            {
+                pos.Motion.Add(windForce);
+            }
+
+
             foreach (EntityLocomotion locomotor in Locomotors)
             {
                 if (locomotor.Applicable(entity, pos, controls))
@@ -278,8 +320,8 @@ namespace Vintagestory.GameContent
                 }
 
                 // what was this for? it causes jitter
-                //moveDelta.Y = pos.Motion.Y * dt * 60f;
-                //nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
+                // moveDelta.Y = pos.Motion.Y * dt * 60f;
+                // nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
             collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition, stepHeight);
@@ -469,7 +511,6 @@ namespace Vintagestory.GameContent
 
         private bool HandleSteppingOnBlocksSmooth(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
-
             if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
 
             Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
@@ -500,7 +541,9 @@ namespace Vintagestory.GameContent
                 Z2 = Math.Max(0, outerZ),
 
 
-                Y1 = entity.CollisionBox.Y1 - (entity.CollidedVertically ? 0 : 0.05), //also check below if not on ground
+                //Y1 = entity.CollisionBox.Y1 - (entity.CollidedVertically ? 0 : 0.05), //also check below if not on ground
+                Y1 = entity.CollisionBox.Y1 + 0.01 - (!entity.CollidedVertically && !controls.Jump ? 0.05 : 0), //also check below if not on ground and not jumping 
+
                 Y2 = searchHeight
             };
 
@@ -662,7 +705,11 @@ namespace Vintagestory.GameContent
                 Cuboidd collisionbox = blocks.cuboids[i];
                 Block block = blocks.blocks[i];
 
-                if (!block.CanStep) continue;
+                if (!block.CanStep)
+                {
+                    // Blocks which are low relative to this entity (e.g. small troughs are low for the player) can still be stepped on
+                    if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
+                }
 
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 //if (intersect == EnumIntersect.NoIntersect) continue;
@@ -746,7 +793,11 @@ namespace Vintagestory.GameContent
                 Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
                 Block block = collisionTester.CollisionBoxList.blocks[i];
 
-                if (!block.CanStep) continue;
+                if (!block.CanStep)
+                {
+                    // Blocks which are low relative to this entity (e.g. small troughs are low for the player) can still be stepped on
+                    if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
+                }
 
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 if (intersect == EnumIntersect.NoIntersect) continue;

@@ -29,12 +29,19 @@ namespace Vintagestory.ServerMods.NoObf
         public bool useValue;
     }
 
+    public class PatchModDependence
+    {
+        public string modid;
+        public bool invert = false;
+    }
+
     public class JsonPatch
     {
         public EnumJsonPatchOp Op;
         public AssetLocation File;
         public string FromPath;
         public string Path;
+        public PatchModDependence[] DependsOn;
 
         [Obsolete("Use Side instead")]
         public EnumAppSide? SideType
@@ -85,6 +92,8 @@ namespace Vintagestory.ServerMods.NoObf
             int totalCount = 0;
             int unmetConditionCount = 0;
 
+            HashSet<string> loadedModIds = new HashSet<string>(api.ModLoader.Mods.Select((m) => m.Info.ModID).ToList());
+
             foreach (IAsset asset in entries)
             {
                 JsonPatch[] patches = null;
@@ -115,6 +124,23 @@ namespace Vintagestory.ServerMods.NoObf
                                 unmetConditionCount++;
                                 continue;
                             }
+                        }
+                    }
+
+                    if (patch.DependsOn != null)
+                    {
+                        bool enabled = true;
+
+                        foreach (var dependence in patch.DependsOn)
+                        {
+                            bool loaded = loadedModIds.Contains(dependence.modid);
+                            enabled = enabled && (loaded ^ dependence.invert);
+                        }
+
+                        if (!enabled)
+                        {
+                            unmetConditionCount++;
+                            continue;
                         }
                     }
 
@@ -168,10 +194,15 @@ namespace Vintagestory.ServerMods.NoObf
 
         private void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
         {
-
             EnumAppSide targetSide = jsonPatch.Side == null ? jsonPatch.File.Category.SideType : (EnumAppSide)jsonPatch.Side;
 
             if (targetSide != EnumAppSide.Universal && jsonPatch.Side != api.Side) return;
+
+            if (jsonPatch.File == null)
+            {
+                api.World.Logger.Error("Patch {0} in {1} failed because it mising the target file property", patchIndex, patchSourcefile);
+                return;
+            }
 
             var loc = jsonPatch.File.Clone();
 

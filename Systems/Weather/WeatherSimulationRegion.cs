@@ -151,7 +151,7 @@ namespace Vintagestory.GameContent
             }
 
             WeatherEvents = new WeatherEvent[ws.WeatherEventConfigs.Length];
-            for (int i = 0; i < ws.WindConfigs.Length; i++)
+            for (int i = 0; i < ws.WeatherEventConfigs.Length; i++)
             {
                 WeatherEvents[i] = new WeatherEvent(ws.api, ws.WeatherEventConfigs[i], i, Rand, seed - 876);
             }
@@ -280,7 +280,8 @@ namespace Vintagestory.GameContent
             } else
             {
                 double nowTotalHours = ws.api.World.Calendar.TotalHours;
-                while (nowTotalHours - LastUpdateTotalHours > 1)
+                int i = 0;
+                while (nowTotalHours - LastUpdateTotalHours > 1 && i++ < 1000)
                 {
                     TickEveryInGameHourServer(LastUpdateTotalHours);
                     LastUpdateTotalHours++;
@@ -648,7 +649,7 @@ namespace Vintagestory.GameContent
 
                 if (state.NewPattern != null)
                 {
-                    NewWePattern = WeatherPatterns[state.NewPattern.Index];
+                    NewWePattern = WeatherPatterns[GameMath.Clamp(state.NewPattern.Index, 0, WeatherPatterns.Length - 1)];
                     NewWePattern.State = state.NewPattern;
                 } else
                 {
@@ -657,7 +658,7 @@ namespace Vintagestory.GameContent
 
                 if (state.OldPattern != null && state.OldPattern.Index < WeatherPatterns.Length)
                 {
-                    OldWePattern = WeatherPatterns[state.OldPattern.Index];
+                    OldWePattern = WeatherPatterns[GameMath.Clamp(state.OldPattern.Index, 0, WeatherPatterns.Length - 1)];
                     OldWePattern.State = state.OldPattern;
                 } else
                 {
@@ -666,7 +667,7 @@ namespace Vintagestory.GameContent
 
                 if (state.WindPattern != null)
                 {
-                    CurWindPattern = WindPatterns[state.WindPattern.Index];
+                    CurWindPattern = WindPatterns[GameMath.Clamp(state.WindPattern.Index, 0, WindPatterns.Length - 1)];
                     CurWindPattern.State = state.WindPattern;
                 }
 

@@ -256,6 +256,11 @@ namespace Vintagestory.ServerMods
                             {
                                 ingred.Code.Path = ingred.Code.Path.Replace("*", variants[i % variants.Length]);
                             }
+
+                            if (ingred.ReturnedStack?.Code != null)
+                            {
+                                ingred.ReturnedStack.Code.Path.Replace("{" + variantCode + "}", variants[i % variants.Length]);
+                            }
                         }
 
                         rec.Output.FillPlaceHolder(variantCode, variants[i % variants.Length]);

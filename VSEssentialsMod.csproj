@@ -83,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BlockBehavior\BehaviorDecor.cs" />
+    <Compile Include="BlockBehavior\BehaviorRopeTieable.cs" />
     <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
     <Compile Include="BlockEntityRenderer\BEAnimatableRenderer.cs" />
     <Compile Include="BlockEntity\BEGeneric.cs" />
@@ -103,6 +104,7 @@
     <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
     <Compile Include="Entity\Behavior\BehaviorHarvestable.cs" />
     <Compile Include="Entity\Behavior\BehaviorMouthInventory.cs" />
+    <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
     <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
     <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
@@ -115,6 +117,7 @@
     <Compile Include="Entity\AI\Task\IAiTask.cs" />
     <Compile Include="Gui\GuiDialogCarcassContents.cs" />
     <Compile Include="Gui\GuiDialogHandbook.cs" />
+    <Compile Include="IntermodTools.cs" />
     <Compile Include="Inventory\ItemSlotMouth.cs" />
     <Compile Include="JsonExport.cs" />
     <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />

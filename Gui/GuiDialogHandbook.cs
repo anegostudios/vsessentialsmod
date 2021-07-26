@@ -512,6 +512,7 @@ namespace Vintagestory.GameContent
         public void FilterItems() 
         { 
             string text = currentSearchText?.ToLowerInvariant();
+            string[] texts = text == null ? new string[0] : text.Split(new string[] { " or " }, StringSplitOptions.RemoveEmptyEntries).OrderBy(str => str.Length).ToArray();
 
             List<WeightedHandbookPage> foundPages = new List<WeightedHandbookPage>();
 
@@ -523,12 +524,14 @@ namespace Vintagestory.GameContent
                 if (currentCatgoryCode != null && page.CategoryCode != currentCatgoryCode) continue;
 
                 float weight = 1;
+                bool skip = texts.Length > 0;
 
-                if (text != null && text.Length != 0)
+                for (int j = 0; j < texts.Length; j++)
                 {
-                    weight = page.TextMatchWeight(text);
-                    if (weight <= 0) continue;
+                    weight = page.TextMatchWeight(texts[j]);
+                    if (weight > 0) { skip = false; break; }
                 }
+                if (skip) continue;
 
                 foundPages.Add(new WeightedHandbookPage() { Page = page, Weight = weight });
             }

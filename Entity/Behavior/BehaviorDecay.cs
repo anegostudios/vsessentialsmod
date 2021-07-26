@@ -18,10 +18,7 @@ namespace Vintagestory.GameContent
         JsonObject typeAttributes;
         
 
-        public float HoursToDecay
-        {
-            get { return typeAttributes["hoursToDecay"].AsFloat(96); }
-        }
+        public float HoursToDecay { get; set; }
 
         public double TotalHoursDead
         {
@@ -41,6 +38,7 @@ namespace Vintagestory.GameContent
             (entity as EntityAgent).AllowDespawn = false;
 
             this.typeAttributes = typeAttributes;
+            HoursToDecay = typeAttributes["hoursToDecay"].AsFloat(96);
 
             decayTree = entity.WatchedAttributes.GetTreeAttribute("decay");
 

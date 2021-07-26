@@ -12,6 +12,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -31,6 +32,8 @@ namespace Vintagestory.ServerMods.NoObf
         public float AttackPower = 0.5f;
         [JsonProperty]
         public int Durability;
+        [JsonProperty]
+        public Size3f Dimensions = new Size3f(0.5f, 0.5f, 0.5f);
         [JsonProperty]
         public EnumItemDamageSource[] DamagedBy;
         [JsonProperty]

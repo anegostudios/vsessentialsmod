@@ -13,6 +13,7 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics
     {
+
         public EntityBehaviorPlayerPhysics(Entity entity) : base(entity)
         {
             
@@ -34,6 +35,13 @@ namespace Vintagestory.GameContent
 
         public override void onPhysicsTick(float deltaTime)
         {
+            accum1s += deltaTime;
+            if (accum1s > 1.5f)
+            {
+                accum1s = 0;
+                updateWindForce();
+            }
+
             accumulator += deltaTime;
 
             if (accumulator > 1)
@@ -86,8 +94,6 @@ namespace Vintagestory.GameContent
             }
 
             EntityPos pos = entity.World is IServerWorldAccessor ? entity.ServerPos : entity.Pos;
-
-            
 
 
             if (controls.TriesToMove && player is IClientPlayer)

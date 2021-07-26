@@ -71,7 +71,7 @@ namespace Vintagestory.GameContent
     {
         public AnimatorBase animator;
 
-        public BEAnimatableRenderer render;
+        public BEAnimatableRenderer renderer;
 
         public Dictionary<string, AnimationMetaData> activeAnimationsByAnimCode = new Dictionary<string, AnimationMetaData>();
 
@@ -159,12 +159,12 @@ namespace Vintagestory.GameContent
 
             if (RuntimeEnv.MainThreadId == System.Threading.Thread.CurrentThread.ManagedThreadId)
             {
-                render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, capi.Render.UploadMesh(meshdata));
+                renderer = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, capi.Render.UploadMesh(meshdata));
             } else
             {
-                render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, null);
+                renderer = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, null);
                 (api as ICoreClientAPI).Event.EnqueueMainThreadTask(() => {
-                    render.meshref = capi.Render.UploadMesh(meshdata);
+                    renderer.meshref = capi.Render.UploadMesh(meshdata);
                 }, "uploadmesh");
             }
         }
@@ -177,7 +177,7 @@ namespace Vintagestory.GameContent
             animator = GetAnimator(api, cacheDictKey, blockShape);
 
             (api as ICoreClientAPI).Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimutil");
-            render = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, meshref);
+            renderer = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, meshref);
         }
 
 
@@ -185,27 +185,27 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
-            if (animator == null || render == null) return; // not initialized yet
+            if (animator == null || renderer == null) return; // not initialized yet
 
             if (activeAnimationsByAnimCode.Count > 0 || animator.ActiveAnimationCount > 0)
             {
                 animator.OnFrame(activeAnimationsByAnimCode, deltaTime);
             }
 
-            if (activeAnimationsByAnimCode.Count == 0 && animator.ActiveAnimationCount == 0 && render.ShouldRender && !stopRenderTriggered)
+            if (activeAnimationsByAnimCode.Count == 0 && animator.ActiveAnimationCount == 0 && renderer.ShouldRender && !stopRenderTriggered)
             {
                 stopRenderTriggered = true;
-                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = false);
+                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => renderer.ShouldRender = false);
             }
         }
 
         public void StartAnimation(AnimationMetaData meta)
         {
-            if (!activeAnimationsByAnimCode.ContainsKey(meta.Code))
+            if (!activeAnimationsByAnimCode.ContainsKey(meta.Code) && renderer != null)
             {
                 stopRenderTriggered = false;
                 activeAnimationsByAnimCode[meta.Code] = meta;
-                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => render.ShouldRender = true);
+                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => renderer.ShouldRender = true);
             }
         }
 
@@ -282,7 +282,7 @@ namespace Vintagestory.GameContent
 
         internal void Dispose()
         {
-            render?.Dispose();
+            renderer?.Dispose();
             (api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);
         }
 

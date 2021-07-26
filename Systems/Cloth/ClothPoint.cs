@@ -4,23 +4,24 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
     [ProtoContract]
     public class ClothPoint
     {
-        [ProtoMember(0)]
-        public int PointIndex;
         [ProtoMember(1)]
-        public float Mass;
+        public int PointIndex;
         [ProtoMember(2)]
-        public float InvMass;
+        public float Mass;
         [ProtoMember(3)]
-        public Vec3d Pos;
+        public float InvMass;
         [ProtoMember(4)]
-        public Vec3d Velocity = new Vec3d();
+        public Vec3d Pos;
         [ProtoMember(5)]
+        public Vec3d Velocity = new Vec3d();
+        [ProtoMember(6)]
         public Vec3d Tension = new Vec3d();
 
         [ProtoMember(7)]
@@ -35,8 +36,9 @@ namespace Vintagestory.GameContent
         Vec3f pinnedToOffset;
         [ProtoMember(12)]
         float pinnedToOffsetStartYaw;
-        
-        
+
+
+        public bool Dirty { get; internal set; }
 
 
         public EnumCollideFlags CollideFlags;
@@ -56,13 +58,16 @@ namespace Vintagestory.GameContent
         // Damping factor. Velocities are multiplied by this
         private float dampFactor = 0.9f;
 
+        float accum1s;
+
         public ClothPoint(ClothSystem cs)
         {
             this.cs = cs;
             Pos = new Vec3d();
-
             init();
         }
+
+        protected ClothPoint() { }
 
         public ClothPoint(ClothSystem cs, int pointIndex, double x, double y, double z)
         {
@@ -88,20 +93,17 @@ namespace Vintagestory.GameContent
         public BlockPos PinnedToBlockPos => pinnedToBlockPos;
         public bool Pinned => pinned;
 
-        public void Pin()
-        {
-            pinned = true;
-            pinnedTo = null;
-        }
 
         public void PinTo(Entity toEntity, Vec3f pinOffset)
         {
             pinned = true;
             pinnedTo = toEntity;
+            pinnedToEntityId = toEntity.EntityId;
             pinnedToOffset = pinOffset;
             pinnedToOffsetStartYaw = toEntity.SidedPos.Yaw;
             pinOffsetTransform = Matrixf.Create();
             pinnedToBlockPos = null;
+            MarkDirty();
         }
 
         public void PinTo(BlockPos blockPos, Vec3f offset)
@@ -111,12 +113,21 @@ namespace Vintagestory.GameContent
             pinned = true;
             Pos.Set(pinnedToBlockPos).Add(pinnedToOffset);
             pinnedTo = null;
+            pinnedToEntityId = 0;
+            MarkDirty();
         }
 
         public void UnPin()
         {
             pinned = false;
             pinnedTo = null;
+            pinnedToEntityId = 0;
+            MarkDirty();
+        }
+
+        public void MarkDirty()
+        {
+            Dirty = true;
         }
 
         public void update(float dt)
@@ -165,6 +176,18 @@ namespace Vintagestory.GameContent
                 } else
                 {
                     Velocity.Set(0, 0, 0);
+
+                    accum1s += dt;
+
+                    if (accum1s >= 1)
+                    {
+                        accum1s = 0;
+                        Block block = cs.api.World.BlockAccessor.GetBlock(PinnedToBlockPos);
+                        if (!block.HasBehavior<BlockBehaviorRopeTieable>())
+                        {
+                            UnPin();
+                        }
+                    }
                 }
                 
                 return;
@@ -200,6 +223,53 @@ namespace Vintagestory.GameContent
 
             Velocity.Set(nextVelocity);
             Tension.Set(0, 0, 0);
+        }
+
+
+        public void restoreReferences(ClothSystem cs, IWorldAccessor world)
+        {
+            this.cs = cs;
+
+            if (pinnedToEntityId != 0)
+            {
+                pinnedTo = world.GetEntityById(pinnedToEntityId);
+                if (pinnedTo == null)
+                {
+                    UnPin();
+                }
+                else
+                {
+                    PinTo(pinnedTo, pinnedToOffset);
+                }
+            }
+        }
+
+        public void updateFromPoint(ClothPoint point, IWorldAccessor world)
+        {
+            PointIndex = point.PointIndex;
+            Mass = point.Mass;
+            InvMass = point.InvMass;
+            Pos.Set(point.Pos);
+            Velocity.Set(point.Pos);
+            Tension.Set(point.Tension);
+            GravityStrength = point.GravityStrength;
+            pinned = point.pinned;
+            pinnedToEntityId = point.pinnedToEntityId;
+            if (pinnedToEntityId != 0)
+            {
+                pinnedTo = world.GetEntityById(pinnedToEntityId);
+                if (pinnedTo != null)
+                {
+                    PinTo(pinnedTo, pinnedToOffset);
+                }
+                else UnPin();
+                
+            }
+
+            pinnedToBlockPos = pinnedToBlockPos.SetOrCreate(point.pinnedToBlockPos);
+            pinnedToOffset = pinnedToOffset.SetOrCreate(point.pinnedToOffset);
+
+            pinnedToOffsetStartYaw = point.pinnedToOffsetStartYaw;
         }
     }
 

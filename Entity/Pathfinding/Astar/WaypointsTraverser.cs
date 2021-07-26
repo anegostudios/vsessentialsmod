@@ -56,7 +56,25 @@ namespace Vintagestory.Essentials
             {
                 waypoints = new List<Vec3d>();
                 nopath = true;
-            } else
+
+                // Debug visualization
+                /*List<BlockPos> poses = new List<BlockPos>();
+                List<int> colors = new List<int>();
+                int i = 0;
+                foreach (var node in entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().astar.closedSet)
+                {
+                    poses.Add(node);
+                    colors.Add(ColorUtil.ColorFromRgba(Math.Min(255, i * 2), 0, 0, 150));
+                    i++;
+                }
+
+                IPlayer player = entity.World.AllOnlinePlayers[0];
+                entity.World.HighlightBlocks(player, 2, poses, 
+                    colors, 
+                    API.Client.EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
+                );*/
+            }
+            else
             {
                 // Debug visualization
                 /*List<BlockPos> poses = new List<BlockPos>();
@@ -107,11 +125,14 @@ namespace Vintagestory.Essentials
             curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
 
             stuckCounter = 0;
+            lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
 
             return true;
         }
 
-        Vec3d prevPos = new Vec3d();
+        Vec3d prevPos = new Vec3d(0, -2000, 0);
+        Vec3d prevPrevPos = new Vec3d(0, -1000, 0);
+        float prevPosAccum;
 
         public override void OnGameTick(float dt)
         {
@@ -126,10 +147,16 @@ namespace Vintagestory.Essentials
             Vec3d nexttarget = waypoints[nextwayPointIndex];
 
             // For land dwellers only check horizontal distance
-            double sqDistToTarget = Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 1, entity.ServerPos.Z));       // One block above is also ok
+            double sqDistToTarget = Math.Min(
+                Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
+                target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
+            );
             double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
 
-            double sqDistToNextTarget = Math.Min(nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 1, entity.ServerPos.Z));       // One block above is also ok
+            double sqDistToNextTarget = Math.Min(
+                Math.Min(nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
+                nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
+            );
 
             bool nearHorizontally = horsqDistToTarget < 1;
             bool nearAllDirs = sqDistToTarget < targetDistance * targetDistance;
@@ -164,13 +191,24 @@ namespace Vintagestory.Essentials
 
             bool stuck =
                 (entity.CollidedVertically && entity.Controls.IsClimbing) ||
-                (entity.ServerPos.SquareDistanceTo(prevPos) < 0.005 * 0.005) ||  // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
                 (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0) ||
-                (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == API.Common.EnumHabitat.Land) ||
+                (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land) ||
                 (waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
             ;
 
-            prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
+            double distsq = prevPrevPos.SquareDistanceTo(prevPos);
+            stuck |= (distsq < 0.01 * 0.01) ? (entity.World.Rand.NextDouble() < GameMath.Clamp(1 - distsq * 1.2, 0.1, 0.9)) : false;
+
+
+            // Test movement progress between two points in 150 millisecond intervalls
+            prevPosAccum += dt;
+            if (prevPosAccum > 0.2)
+            {
+                prevPosAccum = 0;
+                prevPrevPos.Set(prevPos);
+                prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            }
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
             

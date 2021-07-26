@@ -287,37 +287,6 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            // Find all rooms inside this boundary
-            // Lame but what can we do salasinji
-            /*BlockPos cpos = new BlockPos();
-            for (int x = minx; x < maxx; x++)
-            {
-                for (int y = miny; y < maxy; y++)
-                {
-                    for (int z = minz; z < maxz; z++)
-                    {
-                        cpos.Set(x, y, z);
-                        if (visitedPositions.Contains(cpos)) continue;
-
-                        Block cBlock = api.World.BlockAccessor.GetBlock(cpos);
-                        if (cBlock.Replaceable > 6000)
-                        {
-                            bool contains = false;
-                            for (int i = 0; !contains && i < otherRooms.Rooms.Count; i++)
-                            {
-                                Room exroom = otherRooms.Rooms[i];
-                                contains = exroom.Location.Contains(pos);
-                            }
-
-                            if (!contains)
-                            {
-                                Room room = FindRoomForPosition(cpos, otherRooms, visitedPositions);
-                                otherRooms.AddRoom(room);
-                            }
-                        }
-                    }
-                }
-            }*/
 
             return new Room()
             {

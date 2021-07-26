@@ -97,7 +97,7 @@ namespace Vintagestory.GameContent
             if (itemstack != null && itemstack.StackSize > 0)
             {
                 collected = entity.TryGiveItemStack(itemstack);
-            }            
+            }
                 
             if (itemstack != null && itemstack.StackSize <= 0)
             {
@@ -106,6 +106,7 @@ namespace Vintagestory.GameContent
 
             if (collected)
             {
+                itemstack.Collectible.OnCollected(itemstack, entity);
                 entity.World.PlaySoundAt(new AssetLocation("sounds/player/collect"), entity);
                 return true;
             }

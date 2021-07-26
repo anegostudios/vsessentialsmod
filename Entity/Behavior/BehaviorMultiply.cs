@@ -12,30 +12,29 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public class EntityBehaviorMultiply : EntityBehavior
+    public class EntityBehaviorMultiply : EntityBehaviorMultiplyBase
     {
-        ITreeAttribute multiplyTree;
-        JsonObject attributes;
+        JsonObject typeAttributes;
         long callbackId;
 
         internal float PregnancyDays
         {
-            get { return attributes["pregnancyDays"].AsFloat(3f); }
+            get { return typeAttributes["pregnancyDays"].AsFloat(3f); }
         }
 
         internal AssetLocation SpawnEntityCode
         {
-            get { return new AssetLocation(attributes["spawnEntityCode"].AsString("")); }
+            get { return new AssetLocation(typeAttributes["spawnEntityCode"].AsString("")); }
         }
 
         internal string RequiresNearbyEntityCode
         {
-            get { return attributes["requiresNearbyEntityCode"].AsString(""); }
+            get { return typeAttributes["requiresNearbyEntityCode"].AsString(""); }
         }
 
         internal float RequiresNearbyEntityRange
         {
-            get { return attributes["requiresNearbyEntityRange"].AsFloat(5); }
+            get { return typeAttributes["requiresNearbyEntityRange"].AsFloat(5); }
         }
 
         /*internal int GrowthCapQuantity
@@ -53,28 +52,13 @@ namespace Vintagestory.GameContent
             get { return AssetLocation.toLocations(attributes["growthCapEntityCodes"].AsStringArray(new string[0])); }
         }*/
 
-        public double MultiplyCooldownDaysMin
-        {
-            get { return attributes["multiplyCooldownDaysMin"].AsFloat(6); }
-        }
-
-        public double MultiplyCooldownDaysMax
-        {
-            get { return attributes["multiplyCooldownDaysMax"].AsFloat(12); }
-        }
-
-        public float PortionsEatenForMultiply
-        {
-            get { return attributes["portionsEatenForMultiply"].AsFloat(3); }
-        }
-
         public float SpawnQuantityMin
         {
-            get { return attributes["spawnQuantityMin"].AsFloat(1); }
+            get { return typeAttributes["spawnQuantityMin"].AsFloat(1); }
         }
         public float SpawnQuantityMax
         {
-            get { return attributes["spawnQuantityMax"].AsFloat(2); }
+            get { return typeAttributes["spawnQuantityMax"].AsFloat(2); }
         }
 
 
@@ -90,12 +74,6 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetDouble("totalDaysPregnancyStart", value); }
         }
 
-        public double TotalDaysCooldownUntil
-        {
-            get { return multiplyTree.GetDouble("totalDaysCooldownUntil"); }
-            set { multiplyTree.SetDouble("totalDaysCooldownUntil", value); }
-        }
-
         public bool IsPregnant
         {
             get { return multiplyTree.GetBool("isPregnant"); }
@@ -104,7 +82,7 @@ namespace Vintagestory.GameContent
 
         bool eatAnyway = false;
 
-        public bool ShouldEat
+        public override bool ShouldEat
         {
             get
             {
@@ -128,24 +106,11 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(properties, attributes);
 
-            this.attributes = attributes;
-
-
-            eatAnyway = attributes["eatAnyway"].AsBool(false);
-
-
-            multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");
+            this.typeAttributes = attributes;
 
             if (entity.World.Side == EnumAppSide.Server)
             {
-                if (multiplyTree == null)
-                {
-                    entity.WatchedAttributes.SetAttribute("multiply", multiplyTree = new TreeAttribute());
-                    TotalDaysLastBirth = -9999;
-
-                    double daysNow = entity.World.Calendar.TotalHours / 24f;
-                    TotalDaysCooldownUntil = daysNow + (MultiplyCooldownDaysMin + entity.World.Rand.NextDouble() * (MultiplyCooldownDaysMax - MultiplyCooldownDaysMin));
-                }
+                TotalDaysLastBirth = -9999;
 
                 callbackId = entity.World.RegisterCallback(CheckMultiply, 3000);
             }
@@ -240,8 +205,11 @@ namespace Vintagestory.GameContent
                 if (maleentity != null)
                 {
                     ITreeAttribute maletree = maleentity.WatchedAttributes.GetTreeAttribute("hunger");
-                    saturation = maletree.GetFloat("saturation", 0);
-                    maletree.SetFloat("saturation", Math.Max(0, saturation - 1));
+                    if (maletree != null)
+                    {
+                        saturation = maletree.GetFloat("saturation", 0);
+                        maletree.SetFloat("saturation", Math.Max(0, saturation - 1));
+                    }
                 }
 
                 IsPregnant = true;
@@ -252,15 +220,6 @@ namespace Vintagestory.GameContent
             }
 
             return false;
-        }
-
-
-        float GetSaturation()
-        {
-            ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-            if (tree == null) return 0;
-
-            return tree.GetFloat("saturation", 0);
         }
 
         private Entity GetRequiredEntityNearby()
@@ -330,8 +289,6 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-
-            base.GetInfoText(infotext);
         }
     }
 }

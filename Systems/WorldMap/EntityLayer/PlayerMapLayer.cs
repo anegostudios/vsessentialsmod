@@ -68,27 +68,29 @@ namespace Vintagestory.GameContent
 
         public override void OnMapOpenedClient()
         {
+            int size = (int)GuiElement.scaled(32);
+
             if (ownTexture == null)
             {
-                ImageSurface surface = new ImageSurface(Format.Argb32, 32, 32);
+                ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
                 Context ctx = new Context(surface);
                 ctx.SetSourceRGBA(0, 0, 0, 0);
                 ctx.Paint();
-                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 0, 0, 0, 1 }, new double[] { 1, 1, 1, 1 });
+                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, size, size, new double[] { 0, 0, 0, 1 }, new double[] { 1, 1, 1, 1 });
                 
-                ownTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), 16, 16);
+                ownTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size/2, size / 2);
                 ctx.Dispose();
                 surface.Dispose();
             }
             
             if (otherTexture == null)
             {
-                ImageSurface surface = new ImageSurface(Format.Argb32, 32, 32);
+                ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
                 Context ctx = new Context(surface);
                 ctx.SetSourceRGBA(0, 0, 0, 0);
                 ctx.Paint();
-                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, 32, 32, new double[] { 0.3, 0.3, 0.3, 1 }, new double[] { 0.7, 0.7, 0.7, 1 });
-                otherTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), 16, 16);
+                capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, size, size, new double[] { 0.3, 0.3, 0.3, 1 }, new double[] { 0.7, 0.7, 0.7, 1 });
+                otherTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size / 2, size / 2);
                 ctx.Dispose();
                 surface.Dispose();
             }

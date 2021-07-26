@@ -48,6 +48,8 @@ namespace Vintagestory.GameContent
 
         bool stopNow;
 
+        float tamingGenerations = 10f;
+
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
@@ -56,6 +58,11 @@ namespace Vintagestory.GameContent
             this.maxduration = taskConfig["maxduration"].AsInt(4000);
             this.chance = taskConfig["chance"].AsFloat(1.1f);
             string code = taskConfig["onBlockBelowCode"].AsString(null);
+
+            if (taskConfig["tamingGenerations"] != null)
+            {
+                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
+            }
 
             if (code != null && code.Length > 0)
             {
@@ -100,7 +107,7 @@ namespace Vintagestory.GameContent
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
+            float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             stopRange *= fearReductionFactor;

@@ -83,7 +83,7 @@ namespace Vintagestory.ServerMods.NoObf
                 string entryDomain = entry.Key.Domain;
                 try
                 {
-                    location = blockTypeObject.GetValue("code").ToObject<AssetLocation>();
+                    location = blockTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>();
                     location.SetDomain_Checked(entryDomain);
                 }
                 catch (Exception e)
@@ -96,10 +96,10 @@ namespace Vintagestory.ServerMods.NoObf
                 blockTypes.Add(entry.Key, bt = new BlockType()
                 {
                     Code = location,
-                    VariantGroups = blockTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                    SkipVariants = blockTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                    AllowedVariants = blockTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                    Enabled = blockTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
+                    VariantGroups = blockTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                    SkipVariants = blockTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                    AllowedVariants = blockTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                    Enabled = blockTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
                     jsonObject = blockTypeObject
                 });
 
@@ -120,7 +120,7 @@ namespace Vintagestory.ServerMods.NoObf
                 JToken property = null;
                 JObject itemTypeObject = entry.Value;
 
-                AssetLocation location = itemTypeObject.GetValue("code").ToObject<AssetLocation>();
+                AssetLocation location = itemTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>();
                 string entryDomain = entry.Key.Domain;
                 location.SetDomain_Checked(entryDomain);
 
@@ -128,10 +128,10 @@ namespace Vintagestory.ServerMods.NoObf
                 itemTypes.Add(entry.Key, et = new ItemType()
                 {
                     Code = location,
-                    VariantGroups = itemTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                    SkipVariants = itemTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                    AllowedVariants = itemTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                    Enabled = itemTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
+                    VariantGroups = itemTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                    SkipVariants = itemTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                    AllowedVariants = itemTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                    Enabled = itemTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
                     jsonObject = itemTypeObject
                 });
 
@@ -154,7 +154,7 @@ namespace Vintagestory.ServerMods.NoObf
                 string entryDomain = entry.Key.Domain;
                 try
                 {
-                    location = entityTypeObject.GetValue("code").ToObject<AssetLocation>();
+                    location = entityTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>();
                     location.SetDomain_Checked(entryDomain);
                 }
                 catch (Exception e)
@@ -170,10 +170,10 @@ namespace Vintagestory.ServerMods.NoObf
                     entityTypes.Add(entry.Key, et = new EntityType()
                     {
                         Code = location,
-                        VariantGroups = entityTypeObject.TryGetValue("variantgroups", out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                        SkipVariants = entityTypeObject.TryGetValue("skipVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                        AllowedVariants = entityTypeObject.TryGetValue("allowedVariants", out property) ? property.ToObject<AssetLocation[]>() : null,
-                        Enabled = entityTypeObject.TryGetValue("enabled", out property) ? property.ToObject<bool>() : true,
+                        VariantGroups = entityTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
+                        SkipVariants = entityTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                        AllowedVariants = entityTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>() : null,
+                        Enabled = entityTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
                         jsonObject = entityTypeObject
                     });
 
@@ -451,6 +451,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.ToolTier = typedItemType.ToolTier;
             item.HeldSounds = typedItemType.HeldSounds?.Clone();
             item.Durability = typedItemType.Durability;
+            item.Dimensions = typedItemType.Dimensions?.Clone();
             item.MiningSpeed = typedItemType.MiningSpeed;
             item.AttackRange = typedItemType.AttackRange;
             item.StorageFlags = (EnumItemStorageFlags)typedItemType.StorageFlags;
@@ -596,6 +597,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.WalkSpeedMultiplier = typedBlockType.WalkspeedMultiplier;
             block.DragMultiplier = typedBlockType.DragMultiplier;
             block.Durability = typedBlockType.Durability;
+            block.Dimensions = typedBlockType.Dimensions?.Clone();
             block.DamagedBy = (EnumItemDamageSource[])typedBlockType.DamagedBy?.Clone();
             block.Tool = typedBlockType.Tool;
             block.DrawType = typedBlockType.DrawType;

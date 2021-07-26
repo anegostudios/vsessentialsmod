@@ -222,7 +222,7 @@ namespace Vintagestory.GameContent
                 IMapRegion mapregion = sapi.WorldManager.GetMapRegion(val.Key);
                 if (mapregion != null)
                 {
-                    mapregion.ModData["weather"] = val.Value.ToBytes();
+                    mapregion.SetModdata("weather", val.Value.ToBytes());
                 } else
                 {
                     toRemove.Add(val.Key);

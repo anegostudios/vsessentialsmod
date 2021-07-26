@@ -35,6 +35,7 @@ namespace Vintagestory.GameContent
 
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
+        float tamingGenerations = 10f;
 
         public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
@@ -45,6 +46,11 @@ namespace Vintagestory.GameContent
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
             base.LoadConfig(taskConfig, aiConfig);
+
+            if (taskConfig["tamingGenerations"] != null)
+            {
+                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
+            }
 
             this.damage = taskConfig["damage"].AsFloat(2);
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
@@ -95,7 +101,7 @@ namespace Vintagestory.GameContent
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0f, (10f - generation) / 10f);
+            float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             if (fearReductionFactor <= 0) return false;
@@ -170,7 +176,7 @@ namespace Vintagestory.GameContent
 
                 bool alive = targetEntity.Alive;
                 
-                ((EntityAgent)targetEntity).ReceiveDamage(
+                targetEntity.ReceiveDamage(
                     new DamageSource() { 
                         Source = EnumDamageSource.Entity, 
                         SourceEntity = entity, 

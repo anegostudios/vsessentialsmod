@@ -902,7 +902,7 @@ namespace Vintagestory.GameContent
             Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
             
             // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
-            if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass)
+            if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass && eagent.Alive)
             {
                 if (entity.Properties.Habitat != EnumHabitat.Air && entity.Alive && !eagent.Controls.IsClimbing)
                 {
@@ -932,7 +932,11 @@ namespace Vintagestory.GameContent
                 {
                     stepPitch = GameMath.Clamp(entity.Pos.Y - entity.ServerPos.Y + 0.1, 0, 0.3) - GameMath.Clamp(entity.ServerPos.Y - entity.Pos.Y - 0.1, 0, 0.3);
                 }
-            }            
+            }
+            if (eagent?.Alive == false)
+            {
+                stepPitch = Math.Max(0, stepPitch - 2 * dt);
+            }
 
             double[] quat = Quaterniond.Create();
 

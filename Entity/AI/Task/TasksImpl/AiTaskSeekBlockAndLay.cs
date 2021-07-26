@@ -56,6 +56,8 @@ namespace Vintagestory.GameContent
 
         long lastPOISearchTotalMs;
 
+        double attemptLayEggTotalHours;
+
         public AiTaskSeekBlockAndLay(EntityAgent entity) : base(entity)
         {
             porregistry = entity.Api.ModLoader.GetModSystem<POIRegistry>();
@@ -131,9 +133,14 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
+
+            PortionsEatenForLay = 3;
+
             // Now the behavior will certainly happen, we can consume food
             // Hen needs to be not hungry, in order to EITHER lay an egg OR sit and incubate for a long time
-            if (!ConsumeFood(PortionsEatenForLay)) return false;
+            if (!DidConsumeFood(PortionsEatenForLay)) return false;
+
+            if (attemptLayEggTotalHours <= 0) attemptLayEggTotalHours = entity.World.Calendar.TotalHours;
 
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
@@ -186,7 +193,7 @@ namespace Vintagestory.GameContent
             nowStuck = false;
             sitTimeNow = 0;
             laid = false;
-            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000);
+            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000, true);
             sitAnimStarted = false;
         }
 
@@ -194,7 +201,7 @@ namespace Vintagestory.GameContent
         {
             if (targetPoi.Occupied(entity))
             {
-                LayEggOnGround();
+                onBadTarget();
                 return false;
             }
 
@@ -213,24 +220,23 @@ namespace Vintagestory.GameContent
             if (distance <= minDist)
             {
                 pathTraverser.Stop();
+                if (animMeta != null)
+                {
+                    entity.AnimManager.StopAnimation(animMeta.Code);
+                }
 
                 EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
-                //if (bh != null && !bh.IsPregnant) return false;
 
                 if (targetPoi.IsSuitableFor(entity) != true)
                 {
-                    LayEggOnGround();
+                    onBadTarget();
                     return false;
                 }
+
                 targetPoi.SetOccupier(entity);
                 
                 if (sitAnimMeta != null && !sitAnimStarted)
                 {
-                    if (animMeta != null)
-                    {
-                        entity.AnimManager.StopAnimation(animMeta.Code);
-                    }
-
                     entity.AnimManager.StartAnimation(sitAnimMeta);                        
 
                     sitAnimStarted = true;
@@ -247,6 +253,8 @@ namespace Vintagestory.GameContent
                     // To mitigate this issue, we increase the rooster search range to 9 blocks in the JSON
                     if (targetPoi.TryAddEgg(entity, GetRequiredEntityNearby() == null ? null : chickCode, incubationDays))
                     {
+                        ConsumeFood(PortionsEatenForLay);
+                        attemptLayEggTotalHours = -1;
                         MakeLaySound();
                         failedSeekTargets.Remove(targetPoi);
                         return false;
@@ -265,16 +273,17 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500))
-                    {
-                        LayEggOnGround();
-                        return false;
-                    }
+                    pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500);
                 }
             }
 
 
-            if (nowStuck && entity.World.ElapsedMilliseconds > stuckatMs + 20000)
+            if (nowStuck)
+            {
+                return false;
+            }
+
+            if (attemptLayEggTotalHours > 0 && entity.World.Calendar.TotalHours - attemptLayEggTotalHours > 12)
             {
                 LayEggOnGround();
                 return false;
@@ -310,6 +319,16 @@ namespace Vintagestory.GameContent
             stuckatMs = entity.World.ElapsedMilliseconds;
             nowStuck = true;
 
+            onBadTarget();
+        }
+
+        void onBadTarget()
+        {
+            if (attemptLayEggTotalHours >= 0 && entity.World.Calendar.TotalHours - attemptLayEggTotalHours > 12)
+            {
+                LayEggOnGround();
+            }
+
             FailedAttempt attempt = null;
             failedSeekTargets.TryGetValue(targetPoi, out attempt);
             if (attempt == null)
@@ -319,7 +338,6 @@ namespace Vintagestory.GameContent
 
             attempt.Count++;
             attempt.LastTryMs = world.ElapsedMilliseconds;
-            
         }
 
         private void OnGoalReached()
@@ -327,6 +345,17 @@ namespace Vintagestory.GameContent
             pathTraverser.Active = true;
             failedSeekTargets.Remove(targetPoi);
         }
+
+        private bool DidConsumeFood(float portion)
+        {
+            ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
+            if (tree == null) return false;
+
+            float saturation = tree.GetFloat("saturation", 0);
+
+            return saturation >= portion;
+        }
+
 
         private bool ConsumeFood(float portion)
         {
@@ -381,6 +410,12 @@ namespace Vintagestory.GameContent
                 TryPlace(block, -1, 0, 0) ||
                 TryPlace(block, 0, 0, 1)
             ;
+
+            if (placed)
+            {
+                ConsumeFood(PortionsEatenForLay);
+                attemptLayEggTotalHours = -1;
+            }
         }
 
         private bool TryPlace(Block block, int dx, int dy, int dz)

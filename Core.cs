@@ -146,6 +146,7 @@ namespace Vintagestory.ServerMods
 
             api.RegisterEntityBehaviorClass("grow", typeof(EntityBehaviorGrow));
             api.RegisterEntityBehaviorClass("multiply", typeof(EntityBehaviorMultiply));
+            api.RegisterEntityBehaviorClass("multiplybase", typeof(EntityBehaviorMultiplyBase));
             api.RegisterEntityBehaviorClass("aimingaccuracy", typeof(EntityBehaviorAimingAccuracy));
             api.RegisterEntityBehaviorClass("emotionstates", typeof(EntityBehaviorEmotionStates));
             api.RegisterEntityBehaviorClass("repulseagents", typeof(EntityBehaviorRepulseAgents));

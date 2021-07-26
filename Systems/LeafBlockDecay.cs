@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
 
         private CheckDecayThread checkDecayThread;
 
-        public static int leafRemovalInterval = 3000;
+        public static int leafRemovalInterval = 1000;
 
 
         public override bool ShouldLoad(EnumAppSide side)
@@ -75,6 +75,7 @@ namespace Vintagestory.GameContent
                 {
                     Vec3i vec = Vec3i.DirectAndIndirectNeighbours[i];
                     Block block = sapi.World.BlockAccessor.GetBlock(pos.X + vec.X, pos.Y + vec.Y, pos.Z + vec.Z);
+                    if (block.Id == 0) continue;
 
                     if (canDecay(block))
                     {
@@ -200,7 +201,7 @@ namespace Vintagestory.GameContent
 
             private void processCheckDecayQueue()
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 100; i++)
                 {
                     if (checkDecay.Count == 0) return;
 

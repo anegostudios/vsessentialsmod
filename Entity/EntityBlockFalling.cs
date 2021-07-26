@@ -98,7 +98,7 @@ namespace Vintagestory.GameContent
 
                 if (bef.Block.Id != 0)
                 {
-                    dustParticles.Color = bef.Block.GetRandomColor(capi, bef.blockAsStack);
+                    dustParticles.Color = bef.stackForParticleColor.Collectible.GetRandomColor(capi, bef.stackForParticleColor);
                     dustParticles.Color &= 0xffffff;
                     dustParticles.Color |= (150 << 24);
                     dustParticles.MinPos.Set(bef.Pos.X - 0.2 - 0.5, bef.Pos.Y, bef.Pos.Z - 0.2 - 0.5);
@@ -120,6 +120,8 @@ namespace Vintagestory.GameContent
                 bitsParticles.MinQuantity = particlemul;
                 bitsParticles.AddQuantity = 6 * Math.Abs((float)bef.Pos.Motion.Y) * particlemul;
                 bitsParticles.Color = dustParticles.Color;
+
+                dustParticles.Color = bef.Block.GetRandomColor(capi, bef.stackForParticleColor);
 
                 capi.World.SpawnParticles(bitsParticles);
             }
@@ -179,7 +181,7 @@ namespace Vintagestory.GameContent
         ILoadedSound sound;
         float soundStartDelay;
 
-        internal ItemStack blockAsStack;
+        internal ItemStack stackForParticleColor;
         bool canFallSideways;
 
 
@@ -254,8 +256,15 @@ namespace Vintagestory.GameContent
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
 
 			SidedPos.Motion.Y = -0.02;
-            blockAsStack = new ItemStack(Block);
 
+            if (drops != null && drops.Length > 0)
+            {
+                stackForParticleColor = drops[0];
+            }
+            else
+            {
+                stackForParticleColor = new ItemStack(Block);
+            }
             
             if (api.Side == EnumAppSide.Client && fallSound != null && fallingNow.Count < 100)
             {
@@ -550,7 +559,7 @@ namespace Vintagestory.GameContent
                         if (nowhit && !didhit)
                         {
                             didhit = nowhit;
-                            Api.World.PlaySoundAt(this.Block.Sounds.Hit, entity);
+                            Api.World.PlaySoundAt(this.Block.Sounds.Break, entity);
                         }
                     }
                 }

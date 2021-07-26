@@ -87,6 +87,9 @@ namespace Vintagestory.GameContent
         IBulkBlockAccessor ba;
         IBulkBlockAccessor cuba;
 
+        bool shouldPauseThread;
+        bool isThreadPaused;
+
         public WeatherSimulationSnowAccum(ICoreServerAPI sapi, WeatherSystemBase ws)
         {
             this.sapi = sapi;
@@ -106,23 +109,41 @@ namespace Vintagestory.GameContent
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
             sapi.Event.RegisterGameTickListener(OnServerTick3s, 3000);
             sapi.Event.RegisterGameTickListener(OnServerTick100ms, 100);
+            sapi.Event.ServerSuspend += Event_ServerSuspend;
+            sapi.Event.ServerResume += Event_ServerResume;
 
-            snowLayerScannerThread = new Thread(new ThreadStart(onThreadTick));
+            snowLayerScannerThread = new Thread(new ThreadStart(onThreadStart));
             snowLayerScannerThread.IsBackground = true;
         }
 
+        private void Event_ServerResume()
+        {
+            shouldPauseThread = false;
+        }
+
+        private EnumSuspendState Event_ServerSuspend()
+        {
+            shouldPauseThread = true;
+            if (isThreadPaused) return EnumSuspendState.Ready;
+            else return EnumSuspendState.Wait;
+        }
 
         private void Event_SaveGameLoaded()
         {
+            chunksize = sapi.World.BlockAccessor.ChunkSize;
+            regionsize = sapi.WorldManager.RegionSize;
+            if (regionsize == 0)
+            {
+                sapi.Logger.Notification("Warning: region size was 0 for Snow Accum system");
+                regionsize = 16;
+            }
+
             enabled = sapi.World.Config.GetBool("snowAccum", true);
             GlobalConstants.MeltingFreezingEnabled = enabled;
 
             if (!enabled) return;
 
             snowLayerScannerThread.Start();
-
-            chunksize = sapi.World.BlockAccessor.ChunkSize;
-            regionsize = sapi.WorldManager.RegionSize;
         }
 
 
@@ -277,11 +298,19 @@ namespace Vintagestory.GameContent
             return true;
         }
 
-        private void onThreadTick()
+        private void onThreadStart()
         {
             while (!isShuttingDown)
             {
                 Thread.Sleep(5);
+
+                if (shouldPauseThread)
+                {
+                    isThreadPaused = true;
+                    continue;
+                }
+                isThreadPaused = false;
+
                 int i = 0;
 
                 while (chunkColsstoCheckQueue.Count > 0 && i++ < 10)
@@ -556,10 +585,12 @@ namespace Vintagestory.GameContent
             int prevChunkY = -99999;
             IWorldChunk chunk = null;
 
+            int maxY = sapi.World.BlockAccessor.MapSizeY - 1;
+
             for (int i = 0; i < posIndices.Length; i++)
             {
                 int posIndex = posIndices[i];
-                int posY = mc.RainHeightMap[posIndex];
+                int posY = GameMath.Clamp(mc.RainHeightMap[posIndex], 0, maxY);
                 int chunkY = posY / chunksize;
 
                 pos.Set(

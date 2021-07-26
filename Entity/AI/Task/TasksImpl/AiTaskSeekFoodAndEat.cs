@@ -146,7 +146,7 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
             if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
 
-            EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
+            EntityBehaviorMultiplyBase bh = entity.GetBehavior<EntityBehaviorMultiplyBase>();
             if (bh != null && !bh.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
 
             targetPoi = null;
@@ -235,7 +235,7 @@ namespace Vintagestory.GameContent
             nowStuck = false;
             soundPlayed = false;
             eatTimeNow = 0;
-            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000);
+            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000, true);
             eatAnimStarted = false;
         }
 
@@ -255,19 +255,21 @@ namespace Vintagestory.GameContent
             if (distance <= minDist)
             {
                 pathTraverser.Stop();
+                if (animMeta != null)
+                {
+                    entity.AnimManager.StopAnimation(animMeta.Code);
+                }
 
-                EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
-                if (bh != null && !bh.ShouldEat) return false;
+                EntityBehaviorMultiplyBase bh = entity.GetBehavior<EntityBehaviorMultiplyBase>();
+                if (bh != null && !bh.ShouldEat)
+                {
+                    return false;
+                }
 
                 if (targetPoi.IsSuitableFor(entity) != true) return false;
                 
                 if (eatAnimMeta != null && !eatAnimStarted)
                 {
-                    if (animMeta != null)
-                    {
-                        entity.AnimManager.StopAnimation(animMeta.Code);
-                    }
-
                     entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);                        
 
                     eatAnimStarted = true;
@@ -313,7 +315,7 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500))
+                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500, true))
                     {
                         return false;
                     }
