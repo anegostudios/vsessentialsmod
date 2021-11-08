@@ -262,6 +262,20 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public override void OnKeyDown(ICoreClientAPI api, KeyEvent args)
+        {
+            base.OnKeyDown(api, args);
+
+            // Centers the map around the players position  
+            if (args.KeyCode == (int)GlKeys.Space)
+            {
+                BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
+                CurrentBlockViewBounds = new Cuboidd(
+                    start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel,
+                    start.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ZoomLevel
+                );
+            }
+        }
 
 
         public override void Dispose()

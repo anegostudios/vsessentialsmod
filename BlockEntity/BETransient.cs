@@ -90,13 +90,18 @@ namespace Vintagestory.GameContent
             lastCheckAtTotalDays = Math.Min(lastCheckAtTotalDays, Api.World.Calendar.TotalDays);
 
 
-            while (Api.World.Calendar.TotalDays - lastCheckAtTotalDays > 1f / Api.World.Calendar.HoursPerDay)
+            ClimateCondition baseClimate = Api.World.BlockAccessor.GetClimateAt(Pos, EnumGetClimateMode.WorldGenValues);
+            if (baseClimate == null) return;
+            float baseTemperature = baseClimate.Temperature;
+
+            float oneHour = 1f / Api.World.Calendar.HoursPerDay;
+            while (Api.World.Calendar.TotalDays - lastCheckAtTotalDays > oneHour)
             {
-                lastCheckAtTotalDays += 1f / Api.World.Calendar.HoursPerDay;
+                lastCheckAtTotalDays += oneHour;
                 transitionHoursLeft -= 1f;
 
-                ClimateCondition conds = Api.World.BlockAccessor.GetClimateAt(Pos, EnumGetClimateMode.ForSuppliedDateValues, lastCheckAtTotalDays);
-                if (conds == null) return;
+                baseClimate.Temperature = baseTemperature;
+                ClimateCondition conds = Api.World.BlockAccessor.GetClimateAt(Pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, lastCheckAtTotalDays);
 
                 if (props.Condition == EnumTransientCondition.Temperature)
                 {

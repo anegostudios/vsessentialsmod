@@ -537,6 +537,7 @@ namespace Vintagestory.GameContent
                 bool ok = true;
                 foreach (var val in wsysServer.weatherSimByMapRegion)
                 {
+                    val.Value.ReloadPatterns(api.World.Seed);
                     ok &= val.Value.SetWeatherPattern(code, true);
                     if (ok)
                     {

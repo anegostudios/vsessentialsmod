@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
@@ -76,16 +77,16 @@ namespace Vintagestory.GameContent
             SingleComposer = capi.Gui
                 .CreateCompo("worldmap-modwp", dialogBounds)
                 .AddShadedDialogBG(bgBounds, false)
-                .AddDialogTitleBar("Modify waypoint", () => TryClose())
+                .AddDialogTitleBar(Lang.Get("Modify waypoint"), () => TryClose())
                 .BeginChildElements(bgBounds)
-                    .AddStaticText("Name", CairoFont.WhiteSmallText(), leftColumn = leftColumn.FlatCopy())
+                    .AddStaticText(Lang.Get("Name"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.FlatCopy())
                     .AddTextInput(rightColumn = rightColumn.FlatCopy().WithFixedWidth(200), onNameChanged, CairoFont.TextInput(), "nameInput")
 
-                    .AddRichtext("Color (<a href=\"https://www.99colors.net/dot-net-colors\">List</a>)", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
+                    .AddRichtext(Lang.Get("waypoint-color"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
                     .AddTextInput(rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(150), onColorChanged, CairoFont.TextInput(), "colorInput")
                     .AddDynamicCustomDraw(rightColumn.FlatCopy().WithFixedWidth(30).WithFixedOffset(160, 0), onDrawColorRect, "colorRect")
 
-                    .AddStaticText("Icon", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
+                    .AddStaticText(Lang.Get("Icon"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
                     .AddDropDown(
                         names,
                         new string[] { "<icon name=\"wpCircle\">", "<icon name=\"wpBee\">", "<icon name=\"wpCave\">", "<icon name=\"wpHome\">", "<icon name=\"wpLadder\">", "<icon name=\"wpPick\">", "<icon name=\"wpRocks\">", "<icon name=\"wpRuins\">", "<icon name=\"wpSpiral\">", "<icon name=\"wpStar1\">", "<icon name=\"wpStar2\">", "<icon name=\"wpTrader\">", "<icon name=\"wpVessel\">" },
@@ -96,12 +97,12 @@ namespace Vintagestory.GameContent
                         "iconInput"
                     )
 
-                    .AddStaticText("Pinned", CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
+                    .AddStaticText(Lang.Get("Pinned"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 9))
                     .AddSwitch(onPinnedToggled, rightColumn = rightColumn.BelowCopy(0, 5).WithFixedWidth(200), "pinnedSwitch")
 
-                    .AddSmallButton("Cancel", onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)
-                    .AddSmallButton("Delete", onDelete, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.CenterFixed), EnumButtonStyle.Normal)
-                    .AddSmallButton("Save", onSave, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.RightFixed), EnumButtonStyle.Normal, key: "saveButton")
+                    .AddSmallButton(Lang.Get("Cancel"), onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)
+                    .AddSmallButton(Lang.Get("Delete"), onDelete, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.CenterFixed), EnumButtonStyle.Normal)
+                    .AddSmallButton(Lang.Get("Save"), onSave, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100).WithAlignment(EnumDialogArea.RightFixed), EnumButtonStyle.Normal, key: "saveButton")
                 .EndChildElements()
                 .Compose()
             ;

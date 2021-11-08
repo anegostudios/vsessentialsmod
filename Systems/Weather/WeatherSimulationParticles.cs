@@ -225,10 +225,12 @@ namespace Vintagestory.GameContent
 
             float plevel = precIntensity * capi.Settings.Int["particleLevel"] / 100f;
 
+            float dryness = GameMath.Clamp(1 - precIntensity, 0, 1);
+
             tmpPos.Set((int)plrPos.X, (int)plrPos.Y, (int)plrPos.Z);
 
+            precIntensity = Math.Max(0, precIntensity - (float)Math.Max(0, (plrPos.Y - capi.World.SeaLevel - 5000) / 10000f));
 
-            //float plevel = weatherData.PrecIntensity * capi.Settings.Int["particleLevel"] / 100f;
 
             EnumPrecipitationType precType = weatherData.BlendedPrecType;
             if (precType == EnumPrecipitationType.Auto)
@@ -262,6 +264,7 @@ namespace Vintagestory.GameContent
 
             parentVeloSnow.X = -Math.Max(0, weatherData.curWindSpeed.X / 2 - 0.15f);
             parentVeloSnow.Y = 0;
+
             parentVeloSnow.Z = 0;
 
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
@@ -279,7 +282,7 @@ namespace Vintagestory.GameContent
                 dustParticles.DieOnRainHeightmap = true;
                 dustParticles.WindAffectednes = 8f;
                 dustParticles.MinQuantity = 0;
-                dustParticles.AddQuantity = 8 * (weatherData.curWindSpeed.X - 0.5f);
+                dustParticles.AddQuantity = 8 * (weatherData.curWindSpeed.X - 0.5f) * dryness;
 
                 dustParticles.MinSize = 0.1f;
                 dustParticles.MaxSize = 0.4f;
@@ -423,6 +426,7 @@ namespace Vintagestory.GameContent
                 snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
                 snowParticle.MinSize = 0.1f * conds.Rainfall;// weatherData.PrecParticleSize;
                 snowParticle.MaxSize = 0.3f * conds.Rainfall / (1 + wetness);// weatherData.PrecParticleSize / (1 + wetness);
+
 
                 float hrange = 40;
                 float vrange = 20;

@@ -64,7 +64,7 @@ namespace Vintagestory.GameContent
 
         public double TotalDaysLastBirth
         {
-            get { return multiplyTree.GetDouble("totalDaysLastBirth"); }
+            get { return multiplyTree.GetDouble("totalDaysLastBirth", -9999); }
             set { multiplyTree.SetDouble("totalDaysLastBirth", value); }
         }
 
@@ -110,7 +110,10 @@ namespace Vintagestory.GameContent
 
             if (entity.World.Side == EnumAppSide.Server)
             {
-                TotalDaysLastBirth = -9999;
+                if (!multiplyTree.HasAttribute("totalDaysLastBirth"))
+                {
+                    TotalDaysLastBirth = -9999;
+                }
 
                 callbackId = entity.World.RegisterCallback(CheckMultiply, 3000);
             }
@@ -181,7 +184,7 @@ namespace Vintagestory.GameContent
 
         private bool TryGetPregnant()
         {
-            if (entity.World.Rand.NextDouble() > 0.03) return false;
+            if (entity.World.Rand.NextDouble() > 0.06) return false;
             if (TotalDaysCooldownUntil > entity.World.Calendar.TotalDays) return false;
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");

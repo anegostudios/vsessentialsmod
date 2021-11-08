@@ -169,8 +169,14 @@ namespace Vintagestory.GameContent
                         if (e.Code.Path == "player")
                         {
                             float rangeMul = e.Stats.GetBlended("animalSeekingRange");
-
                             IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
+
+                            // Sneaking reduces the detection range
+                            if (player.Entity.Controls.Sneak && player.Entity.OnGround)
+                            {
+                                rangeMul *= 0.6f;
+                            }
+
                             return
                                 (rangeMul == 1 || e.ServerPos.DistanceTo(ownPos) < range * rangeMul) &&
                                 (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -16,6 +17,8 @@ namespace Vintagestory.GameContent
         DlgComposers Composers => dlg.Composers;
         ICoreClientAPI capi;
         GuiDialogCharacterBase dlg;
+
+        public event System.Action<StringBuilder> OnEnvText;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -82,7 +85,11 @@ namespace Vintagestory.GameContent
         {
             ElementBounds leftDlgBounds = Composers["playercharacter"].Bounds;
             CairoFont font = CairoFont.WhiteSmallText().WithLineHeightMultiplier(1.2);
-            double height = font.GetFontExtents().Height * font.LineHeightMultiplier * 3 / RuntimeEnv.GUIScale;
+            
+            string envText = getEnvText();
+            int cntlines = 1 + Regex.Matches(envText, "\n").Count;
+            double height = font.GetFontExtents().Height * font.LineHeightMultiplier * cntlines / RuntimeEnv.GUIScale;
+
             ElementBounds textBounds = ElementBounds.Fixed(0, 25, (int)(leftDlgBounds.InnerWidth / RuntimeEnv.GUIScale - 40), height);
             textBounds.Name = "textbounds";
 
@@ -97,54 +104,66 @@ namespace Vintagestory.GameContent
             Composers["environment"] = capi.Gui
                 .CreateCompo("environment", dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
-                .AddDialogTitleBar("Environment", () => dlg.OnTitleBarClose())
+                .AddDialogTitleBar(Lang.Get("Environment"), () => dlg.OnTitleBarClose())
                 .BeginChildElements(bgBounds)
-                    .AddDynamicText("", font, EnumTextOrientation.Left, textBounds, "dyntext")
+                    .AddDynamicText(envText, font, EnumTextOrientation.Left, textBounds, "dyntext")
                 .EndChildElements()
                 .Compose()
             ;
-
-            updateEnvText();
         }
 
         void updateEnvText()
         {
             if (!IsOpened() || Composers?["environment"] == null) return;
 
+            Composers["environment"].GetDynamicText("dyntext").SetNewTextAsync(getEnvText());
+        }
+
+        string getEnvText()
+        {
             string date = capi.World.Calendar.PrettyDate();
             var conds = capi.World.BlockAccessor.GetClimateAt(capi.World.Player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
-            if (conds == null) return;
+            string temp = "?";
+            string rainfallfreq = "?";
 
-            string temp = (int)conds.Temperature + "°C";
-            string rainfallfreq = Lang.Get("freq-veryrare");
+            if (conds != null)
+            {
+                temp = (int)conds.Temperature + "°C";
+                rainfallfreq = Lang.Get("freq-veryrare");
 
-            if (conds.WorldgenRainfall > 0.9)
-            {
-                rainfallfreq = Lang.Get("freq-allthetime");
+                if (conds.WorldgenRainfall > 0.9)
+                {
+                    rainfallfreq = Lang.Get("freq-allthetime");
+                }
+                else
+                if (conds.WorldgenRainfall > 0.7)
+                {
+                    rainfallfreq = Lang.Get("freq-verycommon");
+                }
+                else
+                if (conds.WorldgenRainfall > 0.45)
+                {
+                    rainfallfreq = Lang.Get("freq-common");
+                }
+                else
+                if (conds.WorldgenRainfall > 0.3)
+                {
+                    rainfallfreq = Lang.Get("freq-uncommon");
+                }
+                else
+                if (conds.WorldgenRainfall > 0.15)
+                {
+                    rainfallfreq = Lang.Get("freq-rarely");
+                }
             }
-            else
-            if (conds.WorldgenRainfall > 0.7)
-            {
-                rainfallfreq = Lang.Get("freq-verycommon");
-            }
-            else
-            if (conds.WorldgenRainfall > 0.45)
-            {
-                rainfallfreq = Lang.Get("freq-common");
-            }
-            else
-            if (conds.WorldgenRainfall > 0.3)
-            {
-                rainfallfreq = Lang.Get("freq-uncommon");
-            }
-            else
-            if (conds.WorldgenRainfall > 0.15)
-            {
-                rainfallfreq = Lang.Get("freq-rarely");
-            }
+            
 
+            StringBuilder sb = new StringBuilder();
+            sb.Append(Lang.Get("character-envtext", date, temp, rainfallfreq));
 
-            Composers["environment"].GetDynamicText("dyntext").SetNewTextAsync(Lang.Get("character-envtext", date, temp, rainfallfreq));
+            OnEnvText?.Invoke(sb);
+
+            return sb.ToString();
         }
 
         public virtual void ComposeStatsGui()
@@ -198,7 +217,7 @@ namespace Vintagestory.GameContent
             Composers["playerstats"] = capi.Gui
                 .CreateCompo("playerstats", dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
-                .AddDialogTitleBar("Stats", () => dlg.OnTitleBarClose())
+                .AddDialogTitleBar(Lang.Get("Stats"), () => dlg.OnTitleBarClose())
                 .BeginChildElements(bgBounds)
 
                     .AddStaticText(Lang.Get("playerinfo-nutrition"), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), leftColumnBounds.WithFixedWidth(200))

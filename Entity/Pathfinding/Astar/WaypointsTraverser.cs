@@ -43,13 +43,18 @@ namespace Vintagestory.Essentials
 
         public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, API.Common.Action OnGoalReached, API.Common.Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 999, bool allowReachAlmost = false)
         {
+            BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
             waypointToReachIndex = 0;
 
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.stepHeight;
             bool canFallDamage = entity.Properties.FallDamage;
 
-            waypoints = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().FindPathAsWaypoints(entity.ServerPos.AsBlockPos, target.AsBlockPos, canFallDamage ? 8 : 4, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
+            if (!entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            {
+                waypoints = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().FindPathAsWaypoints(startBlockPos, target.AsBlockPos, canFallDamage ? 8 : 4, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
+            }
+
             bool nopath = false;
 
             if (waypoints == null)
@@ -163,10 +168,6 @@ namespace Vintagestory.Essentials
 
             bool nearAllDirsNext = sqDistToNextTarget < targetDistance * targetDistance;
 
-            //float speedMul = 1;// entity.Properties.Habitat == API.Common.EnumHabitat.Land && waypointToReachIndex >= waypoints.Count - 1 ? Math.Min(1, GameMath.Sqrt(horsqDistToTarget)) : 1;
-            //Console.WriteLine(speedMul);
-
-
 
             if (nearAllDirs || nearAllDirsNext)
             {
@@ -193,7 +194,7 @@ namespace Vintagestory.Essentials
                 (entity.CollidedVertically && entity.Controls.IsClimbing) ||
                 (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0) ||
                 (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land) ||
-                (waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
+                (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
             ;
 
             // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion

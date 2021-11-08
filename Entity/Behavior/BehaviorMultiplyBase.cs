@@ -45,6 +45,14 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public virtual float PortionsLeftToEat
+        {
+            get
+            {
+                return PortionsEatenForMultiply - GetSaturation();
+            }
+        }
+
         public EntityBehaviorMultiplyBase(Entity entity) : base(entity)
         {
 
@@ -98,27 +106,6 @@ namespace Vintagestory.GameContent
                     infotext.AppendLine(Lang.Get("Portions eaten: {0}", saturation));
                     if (saturation >= PortionsEatenForMultiply) infotext.AppendLine(Lang.Get("Ready to lay"));
                 }
-
-                //multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");
-
-                //double daysLeft = TotalDaysCooldownUntil - entity.World.Calendar.TotalDays;
-
-                //if (daysLeft > 0)
-                //{
-                //    if (daysLeft > 3)
-                //    {
-                //        infotext.AppendLine(Lang.Get("Several days left before ready to lay"));
-                //    }
-                //    else
-                //    {
-                //        infotext.AppendLine(Lang.Get("Less than 3 days before ready to lay"));
-                //    }
-
-                //}
-                //else
-                //{
-                //    infotext.AppendLine(Lang.Get("Ready to lay"));
-                //}
             }
         }
     }

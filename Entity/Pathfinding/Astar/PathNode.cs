@@ -27,6 +27,7 @@ namespace Vintagestory.Essentials
         public int HeapIndex { get; set; }
 
         public PathNode Parent;
+        public int pathLength = 0;
         public EnumTraverseAction Action;
         
 
@@ -84,10 +85,11 @@ namespace Vintagestory.Essentials
             }*/
 
             
-            int dx = node.X - X;
-            int dz = node.Z - Z;
+            int dx = Math.Abs(node.X - X);
+            int dz = Math.Abs(node.Z - Z);
 
-            return GameMath.Sqrt(dx * dx + dz * dz);
+            // Use the diagonal distance, i.e. every step must be straight or a diagonal
+            return dx > dz ? dx - dz + 1.4142136f * dz : dz - dx + 1.4142136f * dx; // GameMath.Sqrt(dx * dx + dz * dz);
         }
 
         public Vec3d ToWaypoint()

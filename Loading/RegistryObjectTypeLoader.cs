@@ -642,7 +642,6 @@ namespace Vintagestory.ServerMods.NoObf
             block.ParticleProperties = typedBlockType.ParticleProperties;
             block.Climbable = typedBlockType.Climbable;
             block.RainPermeable = typedBlockType.RainPermeable;
-            block.SnowCoverage = typedBlockType.SnowCoverage;
             block.FaceCullMode = typedBlockType.FaceCullMode;
             block.Drops = typedBlockType.Drops;
             block.MaxStackSize = typedBlockType.MaxStackSize;
@@ -721,11 +720,12 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (json is JObject)
             {
-                foreach (var entry in (json as JObject))
+                foreach (var entry in json as JObject)
                 {
-                    if (entry.Key.EndsWith("byType", System.StringComparison.OrdinalIgnoreCase))
+                    if (entry.Key.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var byTypeProperty in entry.Value.ToObject<OrderedDictionary<string, JToken>>())
+                        var jobj = entry.Value as JObject;
+                        foreach (var byTypeProperty in jobj)
                         {
                             if (WildcardUtil.Match(byTypeProperty.Key, codePath))
                             {

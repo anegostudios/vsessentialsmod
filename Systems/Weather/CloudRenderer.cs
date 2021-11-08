@@ -331,7 +331,7 @@ namespace Vintagestory.GameContent
             //shv.PointLightColorsArray(cnt, ScreenManager.Platform.PointLightColors3);
 
             prog.Uniform("flatFogDensity", capi.Ambient.BlendedFlatFogDensity);
-            prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader);
+            prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader - (float)capi.World.Player.Entity.CameraPos.Y);
 
 
             mvMat

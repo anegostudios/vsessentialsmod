@@ -51,7 +51,7 @@ namespace Vintagestory.GameContent
                     BlockPos pos = blockSel.Position.AddCopy(blockSel.Face.Opposite);
                     Block attachingBlock = world.BlockAccessor.GetBlock(pos);
                     var mat = attachingBlock.GetBlockMaterial(world.BlockAccessor, pos);
-                    if (!attachingBlock.SideSolid[blockSel.Face.Index] || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
+                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, attachingBlock, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
                     {
                         failureCode = "decorrequiressolid";
                         return false;

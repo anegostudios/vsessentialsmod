@@ -147,22 +147,26 @@ namespace Vintagestory.GameContent
                 double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * entity.World.Calendar.HoursPerDay;
                 double oneweekHours = 7 * entity.World.Calendar.HoursPerDay;
 
-                // Don't simulate longer than a year
-                startHours = Math.Max(startHours, totalHours - entity.World.Calendar.HoursPerDay * entity.World.Calendar.DaysPerYear);
+                // Don't simulate longer than a month per tick
+                totalHours = Math.Min(totalHours, startHours + entity.World.Calendar.HoursPerDay * entity.World.Calendar.DaysPerMonth);
                 BlockPos pos = entity.Pos.AsBlockPos;
 
                 float weight = AnimalWeight;
 
                 float step = 3;
 
+                ClimateCondition baseClimate = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.WorldGenValues);
+                if (baseClimate == null)
+                {
+                    base.OnGameTick(deltaTime);
+                    return;
+                }
+                float baseTemperature = baseClimate.Temperature;
+
                 while (startHours < totalHours - 1)
                 {
-                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDateValues, startHours);
-                    if (conds == null)
-                    {
-                        base.OnGameTick(deltaTime);
-                        return;
-                    }
+                    baseClimate.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
+                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours);
 
                     // no need to simulate every single hour
                     startHours += step;

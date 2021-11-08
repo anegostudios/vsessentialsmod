@@ -58,6 +58,8 @@ namespace Vintagestory.GameContent
 
         public GuiDialogHandbook(ICoreClientAPI capi) : base(capi)
         {
+            currentCatgoryCode = capi.Settings.String["currentHandbookCategoryCode"];
+
             IPlayerInventoryManager invm = capi.World.Player.InventoryManager;
 
             capi.Settings.AddWatcher<float>("guiScale", (float val) => {
@@ -78,10 +80,11 @@ namespace Vintagestory.GameContent
             shownHandbookPages.Clear();
             allHandbookPages.Clear();
 
-            InitStackCacheAndStacks();
             HashSet<string> codes = initCustomPages();
             codes.Add("stack");
             this.categoryCodes = codes.ToList();
+
+            InitStackCacheAndStacks();
             initOverviewGui();
         }
 
@@ -200,6 +203,8 @@ namespace Vintagestory.GameContent
             else currentCatgoryCode = categoryCodes[index - 1];
 
             FilterItems();
+
+            capi.Settings.String["currentHandbookCategoryCode"] = currentCatgoryCode;
         }
 
         void initDetailGui() { 
@@ -522,6 +527,7 @@ namespace Vintagestory.GameContent
             {
                 GuiHandbookPage page = allHandbookPages[i];
                 if (currentCatgoryCode != null && page.CategoryCode != currentCatgoryCode) continue;
+                if (page.IsDuplicate) continue;
 
                 float weight = 1;
                 bool skip = texts.Length > 0;

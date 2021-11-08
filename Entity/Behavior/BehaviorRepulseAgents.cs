@@ -13,17 +13,12 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorRepulseAgents : EntityBehavior
     {
-        Cuboidd entityCuboid = new Cuboidd();
         Vec3d pushVector = new Vec3d();
-        double ownTouchDistance;
-
-        int chunksize;
-
         EntityPartitioning partitionUtil;
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
-            chunksize = entity.World.BlockAccessor.ChunkSize;
+            entity.hasRepulseBehavior = true;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
@@ -33,65 +28,49 @@ namespace Vintagestory.GameContent
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
         }
 
-        Vec3d tmppos = new Vec3d();
-        Vec3d ownPos = new Vec3d();
-        Vec3d hisPos = new Vec3d();
-
         public override void OnGameTick(float deltaTime)
         {
             if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
 
-            ownPos.Set(
-                entity.SidedPos.X + (entity.CollisionBox.X2 - entity.OriginCollisionBox.X2), 
-                entity.SidedPos.Y + (entity.CollisionBox.Y2 - entity.OriginCollisionBox.Y2), 
-                entity.SidedPos.Z + (entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2)
-            );
+            double touchdist = entity.CollisionBox.XSize / 2;
 
-            ownTouchDistance = entity.CollisionBox.XSize/2;
-            
             pushVector.Set(0, 0, 0);
             
-            partitionUtil.WalkEntityPartitions(ownPos, ownTouchDistance + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
+            partitionUtil.WalkEntityPartitions(entity.ownPosRepulse, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
 
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
             pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 3);
             pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
 
             entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
-
-            //entity.World.FrameProfiler.Mark("entity-repulse");
         }
 
 
-        Cuboidd tmpCuboid = new Cuboidd();
-
         private void WalkEntity(Entity e)
         {
-            double hisTouchDistance = e.CollisionBox.XSize / 2;
-            EntityPos epos = e.SidedPos;
+            double dx = entity.ownPosRepulse.X - e.ownPosRepulse.X;
+            double dy = entity.ownPosRepulse.Y - e.ownPosRepulse.Y;
+            double dz = entity.ownPosRepulse.Z - e.ownPosRepulse.Z;
 
-            hisPos.Set(
-                epos.X + (e.CollisionBox.X2 - e.OriginCollisionBox.X2),
-                epos.Y + (e.CollisionBox.Y2 - e.OriginCollisionBox.Y2),
-                epos.Z + (e.CollisionBox.Z2 - e.OriginCollisionBox.Z2)
-            );
+            double distSq = dx * dx + dy * dy + dz * dz;
+            double minDistSq = entity.touchDistanceSq + e.touchDistanceSq;
 
-            double centerToCenterDistance = GameMath.Sqrt(hisPos.SquareDistanceTo(ownPos));
-
-            if (e != entity && centerToCenterDistance < ownTouchDistance + hisTouchDistance && e.HasBehavior("repulseagents") && e.IsInteractable)
+            if (e != entity && distSq < minDistSq && e.hasRepulseBehavior && e.IsInteractable)
             {
-                tmppos.Set(ownPos.X - hisPos.X, ownPos.Y - hisPos.Y, ownPos.Z - hisPos.Z);
-                tmppos.Normalize().Mul(1 - centerToCenterDistance / (ownTouchDistance + hisTouchDistance));
-
+                double pushForce = (1 - distSq / minDistSq) / Math.Max(0.001f, GameMath.Sqrt(distSq));
+                double px = dx * pushForce;
+                double py = dy * pushForce;
+                double pz = dz * pushForce;
+                
                 float hisSize = e.CollisionBox.Length * e.CollisionBox.Height;
                 float mySize = entity.CollisionBox.Length * entity.CollisionBox.Height;
                 float pushDiff = GameMath.Clamp(hisSize / mySize, 0, 1);
 
-                pushVector.Add(tmppos.X * pushDiff, tmppos.Y * pushDiff, tmppos.Z * pushDiff);
+                pushVector.Add(px * pushDiff, py * pushDiff, pz * pushDiff);
             }
         }
-        
+
 
         public override string PropertyName()
         {

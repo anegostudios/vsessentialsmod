@@ -14,9 +14,6 @@ namespace Vintagestory.GameContent
 {
     public class WaypointMapComponent : MapComponent
     {
-        public MeshRef quadModel;
-        
-
         Vec2f viewPos = new Vec2f();
         Vec4f color = new Vec4f();
         Waypoint waypoint;
@@ -35,19 +32,18 @@ namespace Vintagestory.GameContent
             this.wpLayer = wpLayer;
             
             ColorUtil.ToRGBAVec4f(waypoint.Color, ref color);
-
-            quadModel = capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
         }
 
         public override void Render(GuiElementMap map, float dt)
         {
-            if (quadModel == null || quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed meshref");
-
             map.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
             if (waypoint.Pinned)
             {
                 map.Api.Render.PushScissor(null);
                 map.ClampButPreserveAngle(ref viewPos, 2);
+            } else
+            {
+                if (viewPos.X < -10 || viewPos.Y < -10 || viewPos.X > map.Bounds.OuterWidth + 10 || viewPos.Y > map.Bounds.OuterHeight + 10) return;
             }
 
             float x = (float)(map.Bounds.renderX + viewPos.X);
@@ -78,7 +74,7 @@ namespace Vintagestory.GameContent
                 prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
                 prog.UniformMatrix("modelViewMatrix", mvMat.Values);
 
-                api.Render.RenderMesh(quadModel);
+                api.Render.RenderMesh(wpLayer.quadModel);
             }
 
             if (waypoint.Pinned)
@@ -90,9 +86,6 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             base.Dispose();
-
-            quadModel.Dispose();
-
             // Texture is disposed by WaypointMapLayer
         }
 

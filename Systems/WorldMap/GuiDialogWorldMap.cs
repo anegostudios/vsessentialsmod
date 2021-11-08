@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -95,7 +96,7 @@ namespace Vintagestory.GameContent
                 .CreateCompo("worldmap" + dlgType, dialogBounds)
                 .AddShadedDialogBG(bgBounds, false)
                 .AddIf(dlgType == EnumDialogType.Dialog)
-                    .AddDialogTitleBar("World Map", OnTitleBarClose)
+                    .AddDialogTitleBar(Lang.Get("World Map"), OnTitleBarClose)
                     .AddInset(mapBounds, 2)
                 .EndIf()
                 .BeginChildElements(bgBounds)
@@ -318,6 +319,11 @@ namespace Vintagestory.GameContent
             }
 
             base.OnMouseUp(args);
+        }
+
+        public override bool ShouldReceiveKeyboardEvents()
+        {
+            return base.ShouldReceiveKeyboardEvents() && dialogType == EnumDialogType.Dialog;
         }
     }
 }

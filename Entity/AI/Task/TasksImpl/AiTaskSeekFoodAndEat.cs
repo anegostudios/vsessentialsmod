@@ -52,9 +52,12 @@ namespace Vintagestory.GameContent
         float extraTargetDist;
         long lastPOISearchTotalMs;
 
+        ICoreAPI api;
+
         public AiTaskSeekFoodAndEat(EntityAgent entity) : base(entity)
         {
-            porregistry = entity.Api.ModLoader.GetModSystem<POIRegistry>();
+            api = entity.Api;
+            porregistry = api.ModLoader.GetModSystem<POIRegistry>();
 
             entity.WatchedAttributes.SetBool("doesEat", true);
         }
@@ -153,7 +156,7 @@ namespace Vintagestory.GameContent
             extraTargetDist = 0;
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            entity.World.Api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 10, (e) =>
+            api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 10, (e) =>
             {
                 if (e is EntityItem)
                 {
@@ -333,23 +336,31 @@ namespace Vintagestory.GameContent
         }
 
 
-        float GetSaturation()
-        {
-            ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-            if (tree == null) entity.WatchedAttributes["hunger"] = tree = new TreeAttribute();
-
-            return tree.GetFloat("saturation");
-        }
-
 
         public override void FinishExecute(bool cancelled)
         {
-            base.FinishExecute(cancelled);
+            // don't call base method, we set the cool down manually
+            // Instead of resetting the cool down to current time + delta, we add it, so that the animal can eat multiple times, to catch up on lost time 
+            var bh = entity.GetBehavior<EntityBehaviorMultiply>();
+            if (bh != null && bh.PortionsLeftToEat > 0 && !bh.IsPregnant)
+            {
+                cooldownUntilTotalHours += mincooldownHours + entity.World.Rand.NextDouble() * (maxcooldownHours - mincooldownHours);
+            } else
+            {
+                cooldownUntilTotalHours = api.World.Calendar.TotalHours + mincooldownHours + entity.World.Rand.NextDouble() * (maxcooldownHours - mincooldownHours);
+            }
+
             pathTraverser.Stop();
+
 
             if (eatAnimMeta != null)
             {
                 entity.AnimManager.StopAnimation(eatAnimMeta.Code);
+            }
+
+            if (animMeta != null)
+            {
+                entity.AnimManager.StopAnimation(animMeta.Code);
             }
 
             if (cancelled)

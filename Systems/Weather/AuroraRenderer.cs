@@ -69,14 +69,14 @@ namespace Vintagestory.GameContent
 
             if (capi.Render.FrameWidth == 0) return;
 
-            
+            var campos = capi.World.Player.Entity.CameraPos;
 
             quarterSecAccum += deltaTime;
             if (quarterSecAccum > 0.25f)
             {
-                plrPos.X = (int)capi.World.Player.Entity.CameraPos.X;
+                plrPos.X = (int)campos.X;
                 plrPos.Y = capi.World.SeaLevel;
-                plrPos.Z = (int)capi.World.Player.Entity.CameraPos.Z;
+                plrPos.Z = (int)campos.Z;
 
                 clientClimateCond = capi.World.BlockAccessor.GetClimateAt(plrPos);
                 quarterSecAccum = 0;
@@ -98,7 +98,7 @@ namespace Vintagestory.GameContent
             prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
 
             prog.Uniform("flatFogDensity", capi.Ambient.BlendedFlatFogDensity);
-            prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader);
+            prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader - (float)campos.Y);
 
             float speedmul = capi.World.Calendar.SpeedOfTime / 60f;
             prog.Uniform("auroraCounter", (float)(capi.InWorldEllapsedMilliseconds / 4000.0 * speedmul) % 579f);

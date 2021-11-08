@@ -41,6 +41,13 @@ namespace Vintagestory.GameContent
             api.Event.GameWorldSave += onGameGettingSaved;
             api.Event.RegisterEventBusListener(onLeafDecayEventReceived, 0.5, "testForDecay");
             api.Event.RegisterGameTickListener(processReadyToDecayQueue, leafRemovalInterval);
+
+            api.RegisterCommand("leafdecaydebug", "", "", onLeafdecaydebug, Privilege.controlserver);
+        }
+
+        private void onLeafdecaydebug(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            player.SendMessage(groupId, "Queue sizes: pdq: " + performDecayQueue.Count + " / cdq: " + checkDecayQueue.Count, EnumChatType.Notification);
         }
 
         private void processReadyToDecayQueue(float dt)
@@ -214,8 +221,6 @@ namespace Vintagestory.GameContent
 
                     if (shouldDecay(pos))
                     {
-                        shouldDecay(pos);
-
                         lock (performDecayLock)
                         {
                             performDecay.Add(pos);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -24,6 +25,11 @@ namespace Vintagestory.ServerMods
         public override bool ShouldLoad(EnumAppSide side)
         {   
             return true;
+        }
+
+        public override void StartPre(ICoreAPI api)
+        {
+            GameVersion.EnsureEqualVersionOrKillExecutable(api, System.Diagnostics.FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion, GameVersion.OverallVersion, "VSEssentials");
         }
 
 

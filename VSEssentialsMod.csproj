@@ -107,6 +107,7 @@
     <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
     <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
+    <Compile Include="Entity\Pathfinding\Astar\PathNodeSet.cs" />
     <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
     <Compile Include="Entity\Pathfinding\Astar\PathNode.cs" />
     <Compile Include="Entity\Pathfinding\PathFindDebug.cs" />

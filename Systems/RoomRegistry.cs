@@ -8,6 +8,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.Essentials;
 
 namespace Vintagestory.GameContent
 {
@@ -21,7 +22,13 @@ namespace Vintagestory.GameContent
         public int CoolingWallCount;
         public int NonCoolingWallCount;
 
+        /// <summary>
+        /// A bounding box of the found room volume, but that doesn't mean this volumne is 100% room. You can check if a block inside inside is volume is part of the room with the PosInRoom byte array
+        /// </summary>
         public Cuboidi Location;
+
+        public byte[] PosInRoom;
+
 
         /// <summary>
         /// If greater than 0, a chunk is unloaded.  Counts upwards and when it reaches a certain value, this room will be removed from the registry and re-checked: this allows valid fully loaded rooms to be detected quite quickly in the normal world loading process
@@ -38,6 +45,22 @@ namespace Vintagestory.GameContent
                 roomsList.RemoveRoom(this);
             }
             return false;
+        }
+
+        public bool Contains(BlockPos pos)
+        {
+            if (!Location.ContainsOrTouches(pos)) return false;
+
+            int sizez = Location.Z2 - Location.Z1 + 1;
+            int sizex = Location.X2 - Location.X1 + 1;
+
+            int dx = pos.X - Location.X1;
+            int dy = pos.Y - Location.Y1;
+            int dz = pos.Z - Location.Z1;
+
+            int index = (dy * sizez + dz) * sizex + dx;
+
+            return (PosInRoom[index / 8] & (1 << (index % 8))) > 0;
         }
     }
 
@@ -96,7 +119,98 @@ namespace Vintagestory.GameContent
         public override void StartServerSide(ICoreServerAPI api)
         {
             api.Event.SaveGameLoaded += init;
+
+            api.RegisterCommand("roomregdebug", "Room registry debug tool", "", onRoomRegDbgCmd, Privilege.controlserver);
         }
+
+        private void onRoomRegDbgCmd(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            string cmd = args.PopWord();
+
+            BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
+            long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
+            ChunkRooms chunkrooms;
+            lock (roomsByChunkIndexLock)
+            {
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+            }
+
+            if (chunkrooms == null || chunkrooms.Rooms.Count == 0)
+            {
+                player.SendMessage(groupId, "No rooms here", EnumChatType.Notification);
+                return;
+            }
+
+            switch (cmd) {
+                case "list":
+                    player.SendMessage(groupId, chunkrooms.Rooms.Count + " Rooms here ", EnumChatType.Notification);
+
+                    lock (chunkrooms.roomsLock)
+                    {
+                        for (int i = 0; i < chunkrooms.Rooms.Count; i++)
+                        {
+                            Room room = chunkrooms.Rooms[i];
+                            int sizex = room.Location.X2 - room.Location.X1 + 1;
+                            int sizey = room.Location.Y2 - room.Location.Y1 + 1;
+                            int sizez = room.Location.Z2 - room.Location.Z1 + 1;
+                            string str = string.Format("{0} - bbox dim: {1}/{2}/{3}, mid: {4}/{5}/{6}", i, sizex, sizey, sizez, room.Location.X1 + sizex / 2f, room.Location.Y1 + sizey / 2f, room.Location.Z1 + sizez / 2f);
+                            player.SendMessage(groupId, str, EnumChatType.Notification);
+                        }
+                    }
+                    break;
+
+
+                case "hi":
+                    {
+                        int rindex = (int)args.PopInt(0);
+
+                        if (chunkrooms.Rooms.Count < rindex - 1 || rindex < 0)
+                        {
+                            player.SendMessage(groupId, "Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1), EnumChatType.Notification);
+                        }
+                        else
+                        {
+                            Room room = chunkrooms.Rooms[rindex];
+
+                            // Debug visualization
+                            List<BlockPos> poses = new List<BlockPos>();
+                            List<int> colors = new List<int>();
+
+                            int sizex = room.Location.X2 - room.Location.X1 + 1;
+                            int sizey = room.Location.Y2 - room.Location.Y1 + 1;
+                            int sizez = room.Location.Z2 - room.Location.Z1 + 1;
+                            
+                            for (int dx = 0; dx < sizex; dx++)
+                            {
+                                for (int dy = 0; dy < sizey; dy++)
+                                {
+                                    for (int dz = 0; dz < sizez; dz++)
+                                    {
+                                        int pindex = (dy * sizez + dz) * sizex + dx;
+
+                                        if ((room.PosInRoom[pindex / 8] & (1 << (pindex % 8))) > 0)
+                                        {
+                                            poses.Add(new BlockPos(room.Location.X1 + dx, room.Location.Y1 + dy, room.Location.Z1 + dz));
+                                            colors.Add(ColorUtil.ColorFromRgba(room.ExitCount == 0 ? 0 : 100, room.ExitCount == 0 ? 100 : 0, Math.Min(255, rindex * 30), 150));
+                                        }
+                                    }
+                                }
+                            }
+
+                            api.World.HighlightBlocks(player, 50, poses, 
+                                colors, 
+                                EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
+                            );
+                        }
+                        break;
+                    }
+
+                case "unhi":
+                    api.World.HighlightBlocks(player, 50, new List<BlockPos>(), new List<int>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                    break;
+            }
+        }
+
         private void init()
         {
             chunksize = this.api.World.BlockAccessor.ChunkSize;
@@ -117,17 +231,33 @@ namespace Vintagestory.GameContent
                 roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
                 if (chunkrooms != null)
                 {
+                    set.Add(index3d);
                     for (int i = 0; i < chunkrooms.Rooms.Count; i++)
                     {
                         cuboid = chunkrooms.Rooms[i].Location;
-                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.Start.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.Start.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.End.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.Start.X / chunksize, cuboid.End.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.Start.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.Start.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.End.Y / chunksize, cuboid.Start.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
-                        set.Add(MapUtil.Index3dL(cuboid.End.X / chunksize, cuboid.End.Y / chunksize, cuboid.End.Z / chunksize, chunkMapSizeX, chunkMapSizeZ));
+                        int x1 = cuboid.Start.X / chunksize;
+                        int x2 = cuboid.End.X / chunksize;
+                        int y1 = cuboid.Start.Y / chunksize;
+                        int y2 = cuboid.End.Y / chunksize;
+                        int z1 = cuboid.Start.Z / chunksize;
+                        int z2 = cuboid.End.Z / chunksize;
+                        set.Add(MapUtil.Index3dL(x1, y1, z1, chunkMapSizeX, chunkMapSizeZ));
+                        if (z2 != z1) set.Add(MapUtil.Index3dL(x1, y1, z2, chunkMapSizeX, chunkMapSizeZ));
+                        if (y2 != y1)
+                        {
+                            set.Add(MapUtil.Index3dL(x1, y2, z1, chunkMapSizeX, chunkMapSizeZ));
+                            if (z2 != z1) set.Add(MapUtil.Index3dL(x1, y2, z2, chunkMapSizeX, chunkMapSizeZ));
+                        }
+                        if (x2 != x1)
+                        {
+                            set.Add(MapUtil.Index3dL(x2, y1, z1, chunkMapSizeX, chunkMapSizeZ));
+                            if (z2 != z1) set.Add(MapUtil.Index3dL(x2, y1, z2, chunkMapSizeX, chunkMapSizeZ));
+                            if (y2 != y1)
+                            {
+                                set.Add(MapUtil.Index3dL(x2, y2, z1, chunkMapSizeX, chunkMapSizeZ));
+                                if (z2 != z1) set.Add(MapUtil.Index3dL(x2, y2, z2, chunkMapSizeX, chunkMapSizeZ));
+                            }
+                        }
                     }
                 }
                 foreach (long index in set) roomsByChunkIndex.Remove(index);
@@ -154,7 +284,8 @@ namespace Vintagestory.GameContent
                 for (int i = 0; i < chunkrooms.Rooms.Count; i++)
                 {
                     room = chunkrooms.Rooms[i];
-                    if (room.Location.Contains(pos)) {
+                    if (room.Contains(pos))
+                    {
                         if (firstEnclosedRoom == null && room.ExitCount == 0)
                         {
                             firstEnclosedRoom = room;
@@ -190,20 +321,23 @@ namespace Vintagestory.GameContent
         }
 
 
+        const int MAXROOMSIZE = 15;  // Note if changing this constant, the algorithm for compressedPos in the bfsQueue.Enqueue() and .Dequeue() calls may need updating
+        readonly int[] currentVisited = new int[MAXROOMSIZE * MAXROOMSIZE * MAXROOMSIZE];
+        readonly int[] skyLightXZChecked = new int[MAXROOMSIZE * MAXROOMSIZE];
+        int iteration = 0;
+
+
         private Room FindRoomForPosition(BlockPos pos, ChunkRooms otherRooms)
         {
-            HashSet<BlockPos> visitedPositions = new HashSet<BlockPos>();
-            return FindRoomForPosition(pos, otherRooms, visitedPositions);
-        }
+            QueueOfInt bfsQueue = new QueueOfInt();
 
-        private Room FindRoomForPosition(BlockPos pos, ChunkRooms otherRooms, HashSet<BlockPos> visitedPositions)
-        {
-            Queue<BlockPos> bfsQueue = new Queue<BlockPos>();
+            int maxHalfSize = (MAXROOMSIZE - 1) / 2;
+            int maxSize = maxHalfSize + maxHalfSize;
+            bfsQueue.Enqueue(maxHalfSize << 8 | maxHalfSize << 4 | maxHalfSize);
 
-            bfsQueue.Enqueue(pos);
-            visitedPositions.Add(pos);
-
-            int maxHalfSize = 7;
+            int visitedIndex = (maxHalfSize * MAXROOMSIZE + maxHalfSize) * MAXROOMSIZE + maxHalfSize; // Center node
+            int iteration = ++this.iteration;
+            currentVisited[visitedIndex] = iteration;
 
             int coolingWallCount = 0;
             int nonCoolingWallCount = 0;
@@ -214,21 +348,47 @@ namespace Vintagestory.GameContent
 
             blockAccess.Begin();
 
-            HashSet<Vec2i> skyLightXZChecked = new HashSet<Vec2i>();
-
             bool allChunksLoaded = true;
 
-            int minx=pos.X, miny = pos.Y, minz = pos.Z, maxx = pos.X + 1, maxy = pos.Y + 1, maxz = pos.Z + 1;
+            int minx = maxHalfSize, miny = maxHalfSize, minz = maxHalfSize, maxx = maxHalfSize, maxy = maxHalfSize, maxz = maxHalfSize;
+            int posX = pos.X - maxHalfSize;
+            int posY = pos.Y - maxHalfSize;
+            int posZ = pos.Z - maxHalfSize;
+            BlockPos npos = new BlockPos();
+            BlockPos bpos = new BlockPos();
+            int dx, dy, dz;
 
             while (bfsQueue.Count > 0)
             {
-                BlockPos bpos = bfsQueue.Dequeue();
-                
+                int compressedPos = bfsQueue.Dequeue();
+                dx = compressedPos >> 8;
+                dy = (compressedPos >> 4) & 0xf;
+                dz = compressedPos & 0xf;
+                npos.Set(posX + dx, posY + dy, posZ + dz);
+                bpos.Set(npos);
+
+                if (dx < minx) minx = dx;
+                else if (dx > maxx) maxx = dx;
+
+                if (dy < miny) miny = dy;
+                else if (dy > maxy) maxy = dy;
+
+                if (dz < minz) minz = dz;
+                else if (dz > maxz) maxz = dz;
+
+                Block bBlock = blockAccess.GetBlock(bpos);
+
                 foreach (BlockFacing facing in BlockFacing.ALLFACES)
                 {
-                    BlockPos npos = bpos.AddCopy(facing);
+                    facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
 
-                    if (!api.World.BlockAccessor.IsValidPos(npos))
+                    // We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
+                    if (bBlock.Id != 0 && bBlock.GetHeatRetention(bpos, facing) != 0)
+                    {
+                        continue;
+                    }
+
+                    if (!blockAccess.IsValidPos(npos))
                     {
                         nonCoolingWallCount++;
                         continue;
@@ -236,7 +396,7 @@ namespace Vintagestory.GameContent
 
                     Block nBlock = blockAccess.GetBlock(npos);
                     allChunksLoaded &= blockAccess.LastChunkLoaded;
-                    int heatRetention = nBlock.GetHeatRetention(npos, facing);
+                    int heatRetention = nBlock.GetHeatRetention(npos, facing.Opposite);
 
                     // We hit a wall, no need to scan further
                     if (heatRetention != 0)
@@ -247,46 +407,92 @@ namespace Vintagestory.GameContent
                         continue;
                     }
 
-                    // Only traverse within maxHalfSize range
-                    bool inCube = Math.Abs(npos.X - pos.X) <= maxHalfSize && Math.Abs(npos.Y - pos.Y) <= maxHalfSize && Math.Abs(npos.Z - pos.Z) <= maxHalfSize;
+                    // Compute the new dx, dy, dz offsets for npos
+                    dx = npos.X - posX;
+                    dy = npos.Y - posY;
+                    dz = npos.Z - posZ;
 
-                    // Outside maxHalfSize range. Count as exit and don't continue searching in this direction
-                    if (!inCube)
+                    // Only traverse within maxHalfSize range:
+                    //   Outside maxHalfSize range from center position. Count as exit and don't continue searching in this direction
+                    //   Note: for performance, this switch statement ensures only one conditional check in each case, instead of 6 conditionals or 3 conditionals and 3 Math.Abs calls (which involve conditionals)
+                    bool outsideCube = false;
+                    switch (facing.Index)
+                    {
+                        case 0: // North
+                            outsideCube = dz < 0;
+                            break;
+                        case 1: // East
+                            outsideCube = dx > maxSize;
+                            break;
+                        case 2: // South
+                            outsideCube = dz > maxSize;
+                            break;
+                        case 3: // West
+                            outsideCube = dx < 0;
+                            break;
+                        case 4: // Up
+                            outsideCube = dy > maxSize;
+                            break;
+                        case 5: // Down
+                            outsideCube = dy < 0;
+                            break;
+                    }
+                    if (outsideCube)
                     {
                         exitCount++;
                         continue;
                     }
 
-                    minx = Math.Min(minx, bpos.X);
-                    miny = Math.Min(miny, bpos.Y);
-                    minz = Math.Min(minz, bpos.Z);
 
-                    maxx = Math.Max(maxx, bpos.X);
-                    maxy = Math.Max(maxy, bpos.Y);
-                    maxz = Math.Max(maxz, bpos.Z);
+                    visitedIndex = (dx * MAXROOMSIZE + dy) * MAXROOMSIZE + dz;
+                    if (currentVisited[visitedIndex] == iteration) continue;   // continue if block position was already visited
+                    currentVisited[visitedIndex] = iteration;
 
-                    Vec2i vec = new Vec2i(npos.X, npos.Z);
-                    if (skyLightXZChecked.Add(vec))  //HashSet.Add returns true if the element is added to the HashSet<T> object; false if the element is already present.
+                    // We only need to check the skylight if it's a block position not already visited ...
+                    int skyLightIndex = dx * MAXROOMSIZE + dz;
+                    if (skyLightXZChecked[skyLightIndex] < iteration)
                     {
-                        int light = api.World.BlockAccessor.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
+                        skyLightXZChecked[skyLightIndex] = iteration;
+                        int light = blockAccess.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
 
                         if (light >= api.World.SunBrightness - 1)
                         {
                             skyLightCount++;
-                        } else
+                        }
+                        else
                         {
                             nonSkyLightCount++;
                         }
                     }
-                    
 
-                    if (visitedPositions.Add(npos))  //HashSet.Add returns true if the element is added to the HashSet<T> object; false if the element is already present.
-                    {
-                        bfsQueue.Enqueue(npos);
-                    }
+                    bfsQueue.Enqueue(dx << 8 | dy << 4 | dz);
                 }
             }
 
+
+
+            int sizex = maxx - minx + 1;
+            int sizey = maxy - miny + 1;
+            int sizez = maxz - minz + 1;
+
+            byte[] posInRoom = new byte[(sizex * sizey * sizez + 7) / 8];
+
+            for (dx = 0; dx < sizex; dx++)
+            {
+                for (dy = 0; dy < sizey; dy++)
+                {
+                    visitedIndex = ((dx + minx) * MAXROOMSIZE + (dy + miny)) * MAXROOMSIZE + minz;
+                    for (dz = 0; dz < sizez; dz++)
+                    {
+                        if (currentVisited[visitedIndex + dz] == iteration)
+                        {
+                            int index = (dy * sizez + dz) * sizex + dx;
+
+                            posInRoom[index / 8] = (byte)(posInRoom[index / 8] | (1 << (index % 8)));
+                        }
+                    }
+                }
+            }
 
             return new Room()
             {
@@ -296,7 +502,8 @@ namespace Vintagestory.GameContent
                 NonSkylightCount = nonSkyLightCount,
                 ExitCount = exitCount,
                 AnyChunkUnloaded = allChunksLoaded ? 0 : 1,
-                Location = new Cuboidi(minx, miny, minz, maxx, maxy, maxz)
+                Location = new Cuboidi(posX + minx, posY + miny, posZ + minz, posX + maxx, posY + maxy, posZ + maxz),
+                PosInRoom = posInRoom
             };
         }
     }

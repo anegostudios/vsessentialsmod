@@ -424,7 +424,7 @@ namespace Vintagestory.GameContent
             BlockPos pos = entity.ServerPos.XYZ.AsBlockPos.Add(dx, dy, dz);
             Block blockAtPos = blockAccess.GetBlock(pos);
 
-            if (blockAtPos.IsReplacableBy(block) && blockAccess.GetBlock(pos.X, pos.Y - 1, pos.Z).SideSolid[BlockFacing.UP.Index])
+            if (!blockAtPos.IsLiquid() && blockAtPos.IsReplacableBy(block) && blockAccess.GetBlock(pos.X, pos.Y - 1, pos.Z).SideSolid[BlockFacing.UP.Index])
             {
                 blockAccess.SetBlock(block.BlockId, pos);
 

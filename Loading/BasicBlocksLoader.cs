@@ -41,7 +41,7 @@ namespace Vintagestory.ServerMods
                 },
                 DrawType = EnumDrawType.Cube,
                 MatterState = EnumMatterState.Solid,
-                BlockMaterial = EnumBlockMaterial.Stone,
+                BlockMaterial = EnumBlockMaterial.Mantle,
                 Replaceable = 0,
                 Resistance = 31337,
                 RequiredMiningTier = 196,

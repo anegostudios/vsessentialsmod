@@ -71,7 +71,7 @@ namespace Vintagestory.GameContent
                 mapdb = new MapDB(api.World.Logger);
                 string errorMessage = null;
                 string mapdbfilepath = getMapDbFilePath();
-                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, false, false);
+                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, true, false);
                 if (errorMessage != null)
                 {
                     throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
@@ -450,9 +450,6 @@ namespace Vintagestory.GameContent
                         if (mcomp.IsChunkSet(dx, dz)) continue;
                     }
 
-                    //api.Logger.Notification("Now Visible @{0}/{1}", cord.X, cord.Y);
-
-
                     chunksToGen.Enqueue(cord.Copy());
                 }
             }
@@ -480,8 +477,6 @@ namespace Vintagestory.GameContent
         {
             ICoreClientAPI capi = api as ICoreClientAPI;
 
-            //capi.Logger.Notification("GenImg @{0}/{1}", chunkPos.X, chunkPos.Y);
-
             BlockPos tmpPos = new BlockPos();
             Vec2i localpos = new Vec2i();
 
@@ -489,7 +484,7 @@ namespace Vintagestory.GameContent
             for (int cy = 0; cy < chunksTmp.Length; cy++)
             {
                 chunksTmp[cy] = capi.World.BlockAccessor.GetChunk(chunkPos.X, cy, chunkPos.Y);
-                if (chunksTmp[cy] == null) return null;
+                if (chunksTmp[cy] == null || !(chunksTmp[cy] as IClientChunk).LoadedFromServer) return null;
             }
 
             // Prefetch map chunks
@@ -557,11 +552,6 @@ namespace Vintagestory.GameContent
                 int blockId = chunksTmp[cy].Unpack_AndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize));
                 Block block = api.World.Blocks[blockId];
 
-                /*if (i == 0)
-                {
-                    capi.Logger.Notification("GenImg @{0}/{1}, first block is {2}", chunkPos.X, chunkPos.Y, block.Code);
-                }*/
-
                 if (!withSnow && block.BlockMaterial == EnumBlockMaterial.Snow)
                 {
                     y--;
@@ -571,6 +561,7 @@ namespace Vintagestory.GameContent
                 }
 
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
+
 
                 int avgCol = block.GetColor(capi, tmpPos);
                 int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP);

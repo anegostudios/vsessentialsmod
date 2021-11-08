@@ -162,7 +162,6 @@ namespace Vintagestory.API.Common
             // Ugly hack to fix attack animation sometimes not playing - it seems it gets stopped even before it gets sent to the client?
             if (animMeta != null && animMeta.Code != "attack" && animMeta.Code != "idle")
             {
-                //Console.WriteLine("entity id " + entity.EntityId +" ai task stop anim " + animMeta.Code);
                 entity.AnimManager.StopAnimation(animMeta.Code);
             }
         }

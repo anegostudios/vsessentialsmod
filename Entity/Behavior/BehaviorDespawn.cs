@@ -55,6 +55,7 @@ namespace Vintagestory.GameContent
             
             if ((DeathTime += deltaTime) > minSeconds)
             {
+                //entity.World.Logger.Notification("despawn " + entity.Code + " plr in range " + PlayerInRange() + ", min seconds: " + minSeconds);
                 entity.Die(EnumDespawnReason.Expire, null);
                 return;
             }

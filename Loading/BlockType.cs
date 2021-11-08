@@ -131,9 +131,6 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public bool RainPermeable = false;
         [JsonProperty]
-        public bool? SnowCoverage = null;
-
-        [JsonProperty]
         public int LiquidLevel;
         [JsonProperty]
         public string LiquidCode;

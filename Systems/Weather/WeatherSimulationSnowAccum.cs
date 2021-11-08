@@ -669,7 +669,6 @@ namespace Vintagestory.GameContent
                 Block upBlock = chunk.GetLocalBlockAtBlockPos(sapi.World, placePos);
 
 
-
                 // Case 1: We have a block that can become snow covered (or more snow covered)
                 placePos.Set(pos);
                 Block newblock = block.GetSnowCoveredVariant(placePos, hereShouldLevel);
@@ -681,7 +680,7 @@ namespace Vintagestory.GameContent
                     }
                 }
                 // Case 2: We have a solid block that can have snow on top
-                else if ((block.SnowCoverage == null && block.SideSolid[BlockFacing.UP.Index]) || block.SnowCoverage == true)
+                else if (block.AllowSnowCoverage(sapi.World, placePos))
                 {
                     placePos.Set(pos.X, pos.Y + 1, pos.Z);
 

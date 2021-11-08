@@ -47,6 +47,7 @@ namespace Vintagestory.GameContent
         // Client side
         public List<Waypoint> ownWaypoints = new List<Waypoint>();
         List<MapComponent> wayPointComponents = new List<MapComponent>();
+        public MeshRef quadModel;
 
         public Dictionary<string, LoadedTexture> texturesByIcon;
 
@@ -63,6 +64,9 @@ namespace Vintagestory.GameContent
                 sapi.Event.GameWorldSave += OnSaveGameGettingSaved;
                 sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list]", OnCmdWayPoint, Privilege.chat);
                 sapi.RegisterCommand("tpwp", "Teleport yourself to a waypoint starting with the supplied name", "[name]", OnCmdTpTo, Privilege.tp);
+            } else
+            {
+                quadModel = (api as ICoreClientAPI).Render.UploadMesh(QuadMeshUtil.GetQuad());
             }
         }
 
@@ -190,7 +194,7 @@ namespace Vintagestory.GameContent
                         player.SendMessage(groupId, Lang.Get("You have no waypoints"), EnumChatType.CommandSuccess);
                     } else
                     {
-                        player.SendMessage(groupId, Lang.Get("Your waypoints:\n" + wps.ToString()), EnumChatType.CommandSuccess);
+                        player.SendMessage(groupId, Lang.Get("Your waypoints:") + "\n" + wps.ToString(), EnumChatType.CommandSuccess);
                     }
                     
                     break;
@@ -324,7 +328,7 @@ namespace Vintagestory.GameContent
 
         private void OnSaveGameGettingSaved()
         {
-            sapi.WorldManager.SaveGame.StoreData("playerMapMarkers", JsonUtil.ToBytes(Waypoints));
+            sapi.WorldManager.SaveGame.StoreData("playerMapMarkers_v2", SerializerUtil.Serialize(Waypoints));
         }
         
 
@@ -396,6 +400,7 @@ namespace Vintagestory.GameContent
                 }
             }
             texturesByIcon = null;
+            quadModel?.Dispose();
 
             base.Dispose();
         }
@@ -406,8 +411,17 @@ namespace Vintagestory.GameContent
             {
                 try
                 {
-                    byte[] data = sapi.WorldManager.SaveGame.GetData("playerMapMarkers");
-                    if (data != null) Waypoints = JsonUtil.FromBytes<List<Waypoint>>(data);
+                    byte[] data = sapi.WorldManager.SaveGame.GetData("playerMapMarkers_v2");
+                    if (data != null)
+                    {
+                        Waypoints = SerializerUtil.Deserialize<List<Waypoint>>(data);
+                        sapi.World.Logger.Notification("Successfully loaded " + Waypoints.Count + " waypoints");
+                    }
+                    else
+                    {
+                        data = sapi.WorldManager.SaveGame.GetData("playerMapMarkers");
+                        if (data != null) Waypoints = JsonUtil.FromBytes<List<Waypoint>>(data);
+                    }
 
                     for (int i = 0; i < Waypoints.Count; i++)
                     {
@@ -418,7 +432,6 @@ namespace Vintagestory.GameContent
                             i--;
                         }
                     }
-
                 } catch (Exception e)
                 {
                     sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: ", e);

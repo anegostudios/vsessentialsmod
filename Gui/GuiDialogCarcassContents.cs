@@ -49,7 +49,7 @@ namespace Vintagestory.GameContent
                 capi.Gui
                 .CreateCompo("carcasscontents" + owningEntity.EntityId, dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
-                .AddDialogTitleBar("Contents", OnTitleBarClose)
+                .AddDialogTitleBar(Lang.Get("carcass-contents"), OnTitleBarClose)
                 .BeginChildElements(bgBounds)
                     .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
                 .EndChildElements()

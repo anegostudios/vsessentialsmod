@@ -120,11 +120,15 @@ namespace Vintagestory.GameContent
             return Math.Max(0, GetRainCloudness(conds, posX, posZ, totalDays) - 0.5f);
         }
 
+        public float GetPrecipitation(BlockPos pos, double totalDays, ClimateCondition conds)
+        {
+            return Math.Max(0, GetRainCloudness(conds, pos.X + 0.5, pos.Z + 0.5, totalDays) - 0.5f);
+        }
 
 
         protected void Event_OnGetClimate(ref ClimateCondition climate, BlockPos pos, EnumGetClimateMode mode = EnumGetClimateMode.WorldGenValues, double totalDays = 0)
         {
-            if (mode == EnumGetClimateMode.WorldGenValues) return;
+            if (mode == EnumGetClimateMode.WorldGenValues || mode == EnumGetClimateMode.ForSuppliedDate_TemperatureOnly) return;
 
             float rainCloudness = GetRainCloudness(climate, pos.X + 0.5, pos.Z + 0.5, totalDays);
 
