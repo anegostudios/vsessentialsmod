@@ -82,6 +82,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BlockBehavior\BehaviorMultiblock.cs" />
     <Compile Include="BlockBehavior\BehaviorDecor.cs" />
     <Compile Include="BlockBehavior\BehaviorRopeTieable.cs" />
     <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
@@ -89,6 +90,7 @@
     <Compile Include="BlockEntity\BEGeneric.cs" />
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
+    <Compile Include="Block\BlockMultiblock.cs" />
     <Compile Include="Core.cs" />
     <Compile Include="Entity\AI\Goal-Action\Actions\AiActionGoto.cs" />
     <Compile Include="Entity\AI\Goal-Action\AiActionBase.cs" />
@@ -98,6 +100,7 @@
     <Compile Include="Entity\AI\Goap\AIGoapAction.cs" />
     <Compile Include="Entity\AI\Goap\AIGoal.cs" />
     <Compile Include="Entity\AI\Goap\GoapCondition.cs" />
+    <Compile Include="Entity\AI\Task\AiTaskBaseTargetable.cs" />
     <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekBlockAndLay.cs" />
     <Compile Include="Entity\AI\Task\TasksImpl\AiTaskUseInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
