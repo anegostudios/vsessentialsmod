@@ -11,13 +11,14 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskMeleeAttack : AiTaskBase, IWorldIntersectionSupplier
+    public class AiTaskMeleeAttack : AiTaskBaseTargetable, IWorldIntersectionSupplier
     {
         Entity targetEntity;
 
         long lastCheckOrAttackMs;
 
         float damage = 2f;
+        float knockbackStrength = 1f;
         float minDist = 1.5f;
         float minVerDist = 1f;
 
@@ -30,8 +31,6 @@ namespace Vintagestory.GameContent
         BlockSelection blockSel = new BlockSelection();
         EntitySelection entitySel = new EntitySelection();
 
-        string[] seekEntityCodesExact = new string[] { "player" };
-        string[] seekEntityCodesBeginsWith = new string[0];
 
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
@@ -53,6 +52,7 @@ namespace Vintagestory.GameContent
             }
 
             this.damage = taskConfig["damage"].AsFloat(2);
+            this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(2);
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
 
@@ -68,24 +68,6 @@ namespace Vintagestory.GameContent
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("extraInfoText");
             tree.SetString("dmgTier", Lang.Get("Damage tier: {0}", damageTier));
-
-            if (taskConfig["entityCodes"] != null)
-            {
-                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-
-                List<string> exact = new List<string>();
-                List<string> beginswith = new List<string>();
-
-                for (int i = 0; i < codes.Length; i++)
-                {
-                    string code = codes[i];
-                    if (code.EndsWith("*")) beginswith.Add(code.Substring(0, code.Length - 1));
-                    else exact.Add(code);
-                }
-
-                seekEntityCodesExact = exact.ToArray();
-                seekEntityCodesBeginsWith = beginswith.ToArray();
-            }
         }
 
         public override bool ShouldExecute()
@@ -95,8 +77,13 @@ namespace Vintagestory.GameContent
             {
                 return false;
             }
-            if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
-            if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+            if (entity.EntityId==1)
+            {
+                int a =1;
+            }
+
+            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
+            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
 
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
@@ -107,39 +94,7 @@ namespace Vintagestory.GameContent
             if (fearReductionFactor <= 0) return false;
 
             targetEntity = entity.World.GetNearestEntity(pos, 3f * fearReductionFactor, 3f * fearReductionFactor, (e) => {
-                if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
-
-                for (int i = 0; i < seekEntityCodesExact.Length; i++)
-                {
-                    if (e.Code.Path == seekEntityCodesExact[i])
-                    {
-                        if (e.Code.Path == "player")
-                        {
-                            IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            bool okplayer =
-                                player == null ||
-                                (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing);
-
-                            return okplayer && hasDirectContact(e);
-                        }
-
-                        if (hasDirectContact(e))
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-
-                for (int i = 0; i < seekEntityCodesBeginsWith.Length; i++)
-                {
-                    if (e.Code.Path.StartsWithFast(seekEntityCodesBeginsWith[i]) && hasDirectContact(e))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
+                return isTargetableEntity(e, 15) && hasDirectContact(e); 
             });
 
             lastCheckOrAttackMs = entity.World.ElapsedMilliseconds;
@@ -181,14 +136,15 @@ namespace Vintagestory.GameContent
                         Source = EnumDamageSource.Entity, 
                         SourceEntity = entity, 
                         Type = damageType,
-                        DamageTier = damageTier
+                        DamageTier = damageTier,
+                        KnockbackStrength = knockbackStrength
                     },
                     damage * GlobalConstants.CreatureDamageModifier
                 );
 
                 if (alive && !targetEntity.Alive)
                 {
-                    this.entity.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState("saturated");
+                    bhEmo?.TryTriggerState("saturated", targetEntity.EntityId);
                 }
 
                 damageInflicted = true;

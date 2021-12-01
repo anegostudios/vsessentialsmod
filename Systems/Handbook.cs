@@ -15,7 +15,6 @@ namespace Vintagestory.GameContent
 
     public class ModSystemHandbook : ModSystem
     {
-        ICoreAPI api;
         ICoreClientAPI capi;
 
         GuiDialogHandbook dialog;
@@ -24,11 +23,6 @@ namespace Vintagestory.GameContent
         public override bool ShouldLoad(EnumAppSide side)
         {
             return side == EnumAppSide.Client;
-        }
-
-        public override void Start(ICoreAPI api)
-        {
-            this.api = api;
         }
 
         public override void StartClientSide(ICoreClientAPI api)

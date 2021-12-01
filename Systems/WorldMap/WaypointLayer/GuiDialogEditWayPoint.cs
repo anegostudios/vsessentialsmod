@@ -159,7 +159,7 @@ namespace Vintagestory.GameContent
 
         private void onDrawColorRect(Context ctx, ImageSurface surface, ElementBounds currentBounds)
         {
-            ctx.Rectangle(0, 0, 25, 25);
+            ctx.Rectangle(0, 0, GuiElement.scaled(25), GuiElement.scaled(25));
             ctx.SetSourceRGBA(ColorUtil.ToRGBADoubles(color));
 
             ctx.FillPreserve();

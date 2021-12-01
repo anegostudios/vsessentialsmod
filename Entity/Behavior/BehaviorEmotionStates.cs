@@ -7,6 +7,7 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
@@ -37,40 +38,25 @@ namespace Vintagestory.GameContent
         public float BelowTempThreshold = -9999;
     }
 
+    public class ActiveEmoState
+    {
+        public int StateId;
+        public float Duration;
+        public long SourceEntityId;
+    }
+
     public class EntityBehaviorEmotionStates : EntityBehavior
     {
         List<EmotionState> availableStates = new List<EmotionState>();
-        public Dictionary<int, float> ActiveStatesById = new Dictionary<int, float>();
+        public Dictionary<string, ActiveEmoState> ActiveStatesByCode = new Dictionary<string, ActiveEmoState>();
 
-        TreeAttribute entityAttrById;
         TreeAttribute entityAttr;
+        float healthRel;
 
-        int timer = 0;
+        float tickAccum;
 
         public EntityBehaviorEmotionStates(Entity entity) : base(entity)
         {
-            try
-            {
-                if (entity.Attributes.HasAttribute("emotionstatesById"))
-                {
-                    entityAttrById = (TreeAttribute)entity.Attributes["emotionstatesById"];
-                    
-
-                    foreach (var val in entityAttrById)
-                    {
-                        ActiveStatesById[val.Key.ToInt(0)] = (float)val.Value.GetValue();
-                    }
-                }
-                else
-                {
-                    entity.Attributes["emotionstatesById"] = entityAttrById = new TreeAttribute();
-                }
-
-            } catch
-            {
-                entity.Attributes["emotionstatesById"] = entityAttrById = new TreeAttribute();
-            }
-
             if (entity.Attributes.HasAttribute("emotionstates"))
             {
                 entityAttr = entity.Attributes["emotionstates"] as TreeAttribute; 
@@ -94,7 +80,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        float healthRel;
+        
         public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
         {
             if (damageSource.Source == EnumDamageSource.Fall && entity.World.Config.GetString("creatureHostility") == "passive" && entity.World.Config.GetString("creatureHostility") == "off")
@@ -105,7 +91,10 @@ namespace Vintagestory.GameContent
             var beh = entity.GetBehavior<EntityBehaviorHealth>();
             healthRel = beh.Health / beh.MaxHealth;
 
-            if (TryTriggerState("alarmherdondamage") && damageSource.SourceEntity != null && (entity as EntityAgent).HerdId > 0)
+            long sourceEntityId = damageSource.SourceEntity?.EntityId ?? 0;
+
+
+            if (TryTriggerState("alarmherdondamage", sourceEntityId) && damageSource.SourceEntity != null && (entity as EntityAgent).HerdId > 0)
             {
                 EmotionState state = availableStates.First((s) => s.Code == "alarmherdondamage");
                 entity.World.GetNearestEntity(entity.ServerPos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
@@ -113,7 +102,7 @@ namespace Vintagestory.GameContent
                     EntityAgent agent = e as EntityAgent;
                     if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == (entity as EntityAgent).HerdId)
                     {
-                        agent.GetBehavior<EntityBehaviorEmotionStates>().TryTriggerState("aggressiveondamage");
+                        agent.GetBehavior<EntityBehaviorEmotionStates>().TryTriggerState("aggressiveondamage", sourceEntityId);
                     }
 
                     return false;
@@ -121,44 +110,46 @@ namespace Vintagestory.GameContent
             }
 
 
-            if (TryTriggerState("aggressiveondamage"))
+            if (TryTriggerState("aggressiveondamage", sourceEntityId))
             {
-                if (TryTriggerState("aggressivealarmondamage"))
+                if (TryTriggerState("aggressivealarmondamage", sourceEntityId))
                 {
 
                 }
             }
 
-            if (TryTriggerState("fleeondamage"))
+            if (TryTriggerState("fleeondamage", sourceEntityId))
             {
-                if (TryTriggerState("fleealarmondamage"))
+                if (TryTriggerState("fleealarmondamage", sourceEntityId))
                 {
 
                 }
             }
+        }
+
+        public override void OnNoPath(Vec3d target)
+        {
+            TryTriggerState("nopathfrustrated", 0);
         }
 
 
         public bool IsInEmotionState(string statecode)
         {
-            for (int stateid = 0; stateid < availableStates.Count; stateid++)
-            {
-                EmotionState newstate = availableStates[stateid];
-
-                if (newstate.Code != statecode) continue;
-
-                return ActiveStatesById.ContainsKey(stateid);
-            }
-
-            return false;
+            return ActiveStatesByCode.ContainsKey(statecode);
         }
 
-        public bool TryTriggerState(string statecode)
+        public ActiveEmoState GetActiveEmotionState(string statecode)
         {
-            return TryTriggerState(statecode, entity.World.Rand.NextDouble());
+            ActiveStatesByCode.TryGetValue(statecode, out var state);
+            return state;
         }
 
-        public bool TryTriggerState(string statecode, double chance)
+        public bool TryTriggerState(string statecode, long sourceEntityId)
+        {
+            return TryTriggerState(statecode, entity.World.Rand.NextDouble(), sourceEntityId);
+        }
+
+        public bool TryTriggerState(string statecode, double chance, long sourceEntityId)
         {
             bool triggered=false;
 
@@ -173,18 +164,18 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                float activedur = 0;
+                ActiveEmoState activeState = null;
 
-                foreach (int activestateid in ActiveStatesById.Keys)
+                foreach (var val in ActiveStatesByCode)
                 {
-                    if (activestateid == stateid)
+                    if (val.Key == newstate.Code)
                     {
-                        activedur = ActiveStatesById[stateid];
+                        activeState = val.Value;
                         continue;
                     }
 
+                    int activestateid = val.Value.StateId;
                     EmotionState activestate = availableStates[activestateid];
-
                     if (activestate.Slot == newstate.Slot)
                     {
                         // Active state has priority over this one
@@ -192,8 +183,8 @@ namespace Vintagestory.GameContent
                         else
                         {
                             // New state has priority
-                            ActiveStatesById.Remove(activestateid);
-                            entityAttrById.RemoveAttribute(""+ activestateid);
+                            ActiveStatesByCode.Remove(val.Key);
+                            
                             entityAttr.RemoveAttribute(newstate.Code);
                             break;
                         }
@@ -207,12 +198,19 @@ namespace Vintagestory.GameContent
                 }
 
                 float newDuration = 0;
-                if (newstate.AccumType == EnumAccumType.Sum) newDuration = activedur + duration;
-                if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activedur, duration);
-                if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activedur > 0 ? activedur : duration;
+                if (newstate.AccumType == EnumAccumType.Sum) newDuration = activeState?.Duration ?? 0 + duration;
+                if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activeState?.Duration ?? 0, duration);
+                if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activeState?.Duration > 0 ? activeState?.Duration ?? 0 : duration;
 
-                ActiveStatesById[stateid] = newDuration;
-                entityAttrById.SetFloat(""+ stateid, newDuration);
+                if (activeState == null)
+                {
+                    ActiveStatesByCode[newstate.Code] = new ActiveEmoState() { Duration = newDuration, SourceEntityId = sourceEntityId, StateId = stateid };
+                } else
+                {
+                    activeState.SourceEntityId = sourceEntityId;
+                }
+                
+                
                 entityAttr.SetFloat(newstate.Code, newDuration);
                 triggered = true;
             }
@@ -223,29 +221,27 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            timer++;
-            if (timer % 10 != 0) return;
+            tickAccum += deltaTime;
+            if (tickAccum < 0.33) return;
+            tickAccum = 0;
 
-            List<int> active = ActiveStatesById.Keys.ToList();
+            List<string> activecodes = ActiveStatesByCode.Keys.ToList();
 
             float nowStressLevel = 0f;
 
-            foreach (int stateid in active) 
+            foreach (var code in activecodes) 
             {
-                ActiveStatesById[stateid] -= 10*deltaTime;
-                float leftDur = ActiveStatesById[stateid];
+                ActiveStatesByCode[code].Duration -= 10*deltaTime;
+                float leftDur = ActiveStatesByCode[code].Duration;
                 if (leftDur <= 0)
                 {
-                    ActiveStatesById.Remove(stateid);
-                    entityAttrById.RemoveAttribute(""+ stateid);
-                    entityAttr.RemoveAttribute(availableStates[stateid].Code);
+                    ActiveStatesByCode.Remove(code);
+                    
+                    entityAttr.RemoveAttribute(code);
                     continue;
                 }
 
-                nowStressLevel += availableStates[stateid].StressLevel;
-
-                entityAttrById.SetFloat(stateid+"", leftDur);
-                entityAttrById.SetFloat(availableStates[stateid].Code, leftDur);
+                nowStressLevel += availableStates[ActiveStatesByCode[code].StateId].StressLevel;
             }
 
             float curlevel = entity.WatchedAttributes.GetFloat("stressLevel");
@@ -256,13 +252,12 @@ namespace Vintagestory.GameContent
             else
             {
                 curlevel = Math.Max(0, curlevel - 1 / 20f);
-
                 entity.WatchedAttributes.SetFloat("stressLevel", curlevel);
             }
 
 
             if (entity.World.EntityDebugMode) {
-                entity.DebugAttributes.SetString("emotionstates", string.Join(", ", active));
+                entity.DebugAttributes.SetString("emotionstates", string.Join(", ", activecodes));
             }
         }
 

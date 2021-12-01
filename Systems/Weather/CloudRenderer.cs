@@ -290,7 +290,10 @@ namespace Vintagestory.GameContent
             
             if (capi.Render.FrameWidth == 0) return;
 
+            capi.Render.ShaderUniforms.PerceptionEffectIntensity *= 20;
             prog.Use();
+            capi.Render.ShaderUniforms.PerceptionEffectIntensity /= 20;
+
             prog.Uniform("sunPosition", capi.World.Calendar.SunPositionNormalized);
 
 

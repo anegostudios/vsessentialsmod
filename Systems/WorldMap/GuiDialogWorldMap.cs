@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -39,6 +40,7 @@ namespace Vintagestory.GameContent
 
             capi.RegisterCommand("worldmapsize", "Set the size of the world map dialog", "width height", onCmdMapSize);
         }
+
 
         private void onCmdMapSize(int groupId, CmdArgs args)
         {
@@ -101,12 +103,12 @@ namespace Vintagestory.GameContent
                 .EndIf()
                 .BeginChildElements(bgBounds)
                     .AddHoverText("", CairoFont.WhiteDetailText(), 350, mapBounds.FlatCopy(), "hoverText")
-                    .AddInteractiveElement(new GuiElementMap(capi.ModLoader.GetModSystem<WorldMapManager>().MapLayers, capi, mapBounds, dlgType == EnumDialogType.HUD), "mapElem")
+                    .AddInteractiveElement(new GuiElementMap(capi.ModLoader.GetModSystem<WorldMapManager>().MapLayers, capi, this, mapBounds, dlgType == EnumDialogType.HUD), "mapElem")
                 .EndChildElements()
                 .Compose()
             ;
 
-            compo.OnRecomposed += SingleComposer_OnRecomposed;
+            compo.OnRecomposed += OnRecomposed;
 
             GuiElementMap mapElem = compo.GetElement("mapElem") as GuiElementMap;
             if (beforeBounds != null)
@@ -148,7 +150,7 @@ namespace Vintagestory.GameContent
             return compo;
         }
 
-        private void SingleComposer_OnRecomposed()
+        private void OnRecomposed()
         {
             requireRecompose = true;
         }

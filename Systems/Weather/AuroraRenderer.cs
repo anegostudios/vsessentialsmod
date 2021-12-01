@@ -36,8 +36,6 @@ namespace Vintagestory.GameContent
 
             rand = new Random(capi.World.Seed);
 
-            
-
             renderAurora = capi.Settings.Bool["renderAurora"];
             renderAurora = true;
         }

@@ -33,6 +33,8 @@ namespace Vintagestory.GameContent
 
         public string OwningPlayerUid = null;
         public int OwningPlayerGroupId = -1;
+
+        public bool Temporary;
     }
 
 
@@ -48,6 +50,8 @@ namespace Vintagestory.GameContent
         public List<Waypoint> ownWaypoints = new List<Waypoint>();
         List<MapComponent> wayPointComponents = new List<MapComponent>();
         public MeshRef quadModel;
+
+        List<MapComponent> tmpWayPointComponents = new List<MapComponent>();
 
         public Dictionary<string, LoadedTexture> texturesByIcon;
 
@@ -73,6 +77,8 @@ namespace Vintagestory.GameContent
         private void OnCmdTpTo(IServerPlayer player, int groupId, CmdArgs args)
         {
             Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
+
+            if (args.Length == 0) return;
 
             string name = args.PopWord().ToLowerInvariant();
 
@@ -317,7 +323,6 @@ namespace Vintagestory.GameContent
                 Pinned = pinned
             };
 
-
             Waypoints.Add(waypoint);
 
             Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
@@ -358,7 +363,7 @@ namespace Vintagestory.GameContent
                 ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
                 Context ctx = new Context(surface);
 
-                string[] icons = new string[] { "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel" };
+                string[] icons = new string[] { "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel", "cross" };
                 ICoreClientAPI capi = api as ICoreClientAPI;
 
                 foreach (var val in icons)
@@ -369,10 +374,7 @@ namespace Vintagestory.GameContent
                     ctx.Operator = Operator.Over;
 
                     capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 1, 1, size - 2, size - 2, new double[] { 0,0,0,1});
-
                     capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 2, 2, size - 4, size - 4, ColorUtil.WhiteArgbDouble);
-
-                    //surface.WriteToPng("icon-" + val+".png");
 
                     texturesByIcon[val] = new LoadedTexture(api as ICoreClientAPI, (api as ICoreClientAPI).Gui.LoadCairoTexture(surface, false), (int)(20 * scale), (int)(20 * scale));
                 }
@@ -388,6 +390,11 @@ namespace Vintagestory.GameContent
 
         public override void OnMapClosedClient()
         {
+            foreach (var val in tmpWayPointComponents)
+            {
+                wayPointComponents.Remove(val);
+            }
+            tmpWayPointComponents.Clear();
         }
 
         public override void Dispose()
@@ -449,11 +456,22 @@ namespace Vintagestory.GameContent
         }
 
 
+        public void AddTemporaryWaypoint(Waypoint waypoint)
+        {
+            WaypointMapComponent comp = new WaypointMapComponent(ownWaypoints.Count, waypoint, this, api as ICoreClientAPI);
+            wayPointComponents.Add(comp);
+            tmpWayPointComponents.Add(comp);
+        }
 
 
         private void RebuildMapComponents()
         {
             if (!mapSink.IsOpened) return;
+
+            foreach (var val in tmpWayPointComponents)
+            {
+                wayPointComponents.Remove(val);
+            }
 
             foreach (WaypointMapComponent comp in wayPointComponents)
             {
@@ -468,6 +486,8 @@ namespace Vintagestory.GameContent
 
                 wayPointComponents.Add(comp);
             }
+
+            wayPointComponents.AddRange(tmpWayPointComponents);
         }
 
 

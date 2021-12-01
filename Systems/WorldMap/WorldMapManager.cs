@@ -13,6 +13,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -63,7 +64,6 @@ namespace Vintagestory.GameContent
         public bool IsShuttingDown { get; set; }
 
         // Server side stuff
-        ICoreServerAPI sapi;
         IServerNetworkChannel serverChannel;
 
 
@@ -137,6 +137,44 @@ namespace Vintagestory.GameContent
             ;
         }
 
+
+        private void onWorldMapLinkClicked(LinkTextComponent linkcomp)
+        {
+            string[] xyzstr = linkcomp.Href.Substring("worldmap://".Length).Split('=');
+            int x = xyzstr[1].ToInt();
+            int y = xyzstr[2].ToInt();
+            int z = xyzstr[3].ToInt();
+            string text = xyzstr.Length >= 5 ? xyzstr[4] : "";
+
+            if (worldMapDlg == null || !worldMapDlg.IsOpened() || (worldMapDlg.IsOpened() && worldMapDlg.DialogType == EnumDialogType.HUD))
+            {
+                ToggleMap(EnumDialogType.Dialog);
+            }
+
+            bool exists = false;
+            var elem = (worldMapDlg.SingleComposer.GetElement("mapElem") as GuiElementMap);
+            var wml = (elem?.mapLayers.FirstOrDefault(ml => ml is WaypointMapLayer) as WaypointMapLayer);
+            Vec3d pos = new Vec3d(x, y, z);
+            if (wml != null)
+            {
+                foreach (var wp in wml.ownWaypoints)
+                {
+                    if (wp.Position.Equals(pos, 0.01))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!exists)
+            {
+                capi.SendChatMessage(string.Format("/waypoint addati {0} ={1} ={2} ={3} {4} {5} {6}", "circle", x, y, z, false, "steelblue", text));
+            }
+
+            elem?.CenterMapTo(new BlockPos(x, y, z));
+        }
+
         private void OnClientTick(float dt)
         {
             foreach (MapLayer layer in MapLayers)
@@ -171,6 +209,7 @@ namespace Vintagestory.GameContent
                 capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GUIOrOtherControls);
                 capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
                 capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
+                capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
             }
 
             foreach (var val in MapLayerRegistry)
@@ -316,8 +355,6 @@ namespace Vintagestory.GameContent
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            this.sapi = sapi;
-
             sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLoaded);
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => IsShuttingDown = true);
 

@@ -106,7 +106,7 @@ namespace Vintagestory.GameContent
                 .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar(Lang.Get("Environment"), () => dlg.OnTitleBarClose())
                 .BeginChildElements(bgBounds)
-                    .AddDynamicText(envText, font, EnumTextOrientation.Left, textBounds, "dyntext")
+                    .AddDynamicText(envText, font, textBounds, "dyntext")
                 .EndChildElements()
                 .Compose()
             ;
@@ -249,11 +249,11 @@ namespace Vintagestory.GameContent
             Composers["playerstats"]
                 .AddIf(health != null)
                     .AddStaticText(Lang.Get("Health Points"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                    .AddDynamicText(health + " / " + maxhealth, CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY).WithFixedHeight(30), "health")
+                    .AddDynamicText(health + " / " + maxhealth, CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY).WithFixedHeight(30), "health")
                 .EndIf()
                 .AddIf(saturation != null)
                     .AddStaticText(Lang.Get("Satiety"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                    .AddDynamicText((int)saturation + " / " + (int)maxsaturation, CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "satiety")
+                    .AddDynamicText((int)saturation + " / " + (int)maxsaturation, CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "satiety")
                 .EndIf()
                 .AddIf(tempTree != null)
                     .AddStaticText(Lang.Get("Body Temperature"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
@@ -264,19 +264,19 @@ namespace Vintagestory.GameContent
                 .EndIf()
 
                 .AddStaticText(Lang.Get("Walk speed"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * walkspeed) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "walkspeed")
+                .AddDynamicText((int)Math.Round(100 * walkspeed) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "walkspeed")
 
                 .AddStaticText(Lang.Get("Healing effectivness"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * healingEffectivness) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "healeffectiveness")
+                .AddDynamicText((int)Math.Round(100 * healingEffectivness) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "healeffectiveness")
 
                 .AddStaticText(Lang.Get("Hunger rate"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * hungerRate) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "hungerrate")
+                .AddDynamicText((int)Math.Round(100 * hungerRate) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "hungerrate")
 
                 .AddStaticText(Lang.Get("Ranged Accuracy"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * rangedWeaponAcc) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponacc")
+                .AddDynamicText((int)Math.Round(100 * rangedWeaponAcc) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponacc")
 
                 .AddStaticText(Lang.Get("Ranged Charge Speed"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * rangedWeaponSpeed) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponchargespeed")
+                .AddDynamicText((int)Math.Round(100 * rangedWeaponSpeed) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponchargespeed")
 
             .EndChildElements()
             .Compose()

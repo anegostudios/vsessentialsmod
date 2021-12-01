@@ -28,10 +28,14 @@ namespace Vintagestory.GameContent
         /// </summary>
         public Cuboidd CurrentBlockViewBounds = new Cuboidd();
 
-        public GuiElementMap(List<MapLayer> mapLayers, ICoreClientAPI capi, ElementBounds bounds, bool snapToPlayer) : base(capi, bounds)
+        bool dialogHasFocus => worldmapdlg.Focused && worldmapdlg.DialogType == EnumDialogType.Dialog;
+        GuiDialogWorldMap worldmapdlg;
+
+        public GuiElementMap(List<MapLayer> mapLayers, ICoreClientAPI capi, GuiDialogWorldMap worldmapdlg, ElementBounds bounds, bool snapToPlayer) : base(capi, bounds)
         {
             this.mapLayers = mapLayers;
             this.snapToPlayer = snapToPlayer;
+            this.worldmapdlg = worldmapdlg;
 
             prevPlayerPos.X = api.World.Player.Entity.Pos.X;
             prevPlayerPos.Z = api.World.Player.Entity.Pos.Z;
@@ -65,6 +69,9 @@ namespace Vintagestory.GameContent
             api.Render.CheckGlError();
         }
 
+        float tkeyDeltaX, tkeyDeltaY;
+        float skeyDeltaX, skeyDeltaY;
+
         public override void PostRenderInteractiveElements(float deltaTime)
         {
             base.PostRenderInteractiveElements(deltaTime);
@@ -90,6 +97,39 @@ namespace Vintagestory.GameContent
 
             prevPlayerPos.Set(plr.Pos.X, plr.Pos.Y, plr.Pos.Z);
 
+            if (dialogHasFocus)
+            {
+                if (api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode])
+                {
+                    tkeyDeltaY = 15f;
+                }
+                else
+                if (api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode])
+                {
+                    tkeyDeltaY = -15f;
+                }
+                else tkeyDeltaY = 0;
+
+                if (api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode])
+                {
+                    tkeyDeltaX = 15f;
+                }
+                else
+                if (api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkright"].CurrentMapping.KeyCode])
+                {
+                    tkeyDeltaX = -15f;
+                }
+                else tkeyDeltaX = 0;
+
+
+                skeyDeltaX += (tkeyDeltaX - skeyDeltaX) * deltaTime * 15;
+                skeyDeltaY += (tkeyDeltaY - skeyDeltaY) * deltaTime * 15;
+
+                if (Math.Abs(skeyDeltaX) > 0.5f || Math.Abs(skeyDeltaY) > 0.5f)
+                {
+                    CurrentBlockViewBounds.Translate(-skeyDeltaX / ZoomLevel, 0, -skeyDeltaY / ZoomLevel);
+                }
+            }
         }
         
         public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
@@ -269,12 +309,33 @@ namespace Vintagestory.GameContent
             // Centers the map around the players position  
             if (args.KeyCode == (int)GlKeys.Space)
             {
-                BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
-                CurrentBlockViewBounds = new Cuboidd(
-                    start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel,
-                    start.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ZoomLevel
-                );
+                CenterMapTo(api.World.Player.Entity.Pos.AsBlockPos);
             }
+
+
+            if (args.KeyCode == api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode || 
+                args.KeyCode == api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode || 
+                args.KeyCode == api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode || 
+                args.KeyCode == api.Input.HotKeys["walkright"].CurrentMapping.KeyCode
+            )
+            {
+                args.Handled = true;
+            }
+
+        }
+
+        public override void OnKeyUp(ICoreClientAPI api, KeyEvent args)
+        {
+            base.OnKeyUp(api, args);
+        }
+
+
+        public void CenterMapTo(BlockPos pos)
+        {
+            CurrentBlockViewBounds = new Cuboidd(
+                pos.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, pos.Z - Bounds.InnerHeight / 2 / ZoomLevel,
+                pos.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, pos.Z + Bounds.InnerHeight / 2 / ZoomLevel
+            );
         }
 
 

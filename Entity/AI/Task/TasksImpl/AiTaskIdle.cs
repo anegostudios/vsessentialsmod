@@ -59,30 +59,16 @@ namespace Vintagestory.GameContent
             this.chance = taskConfig["chance"].AsFloat(1.1f);
             string code = taskConfig["onBlockBelowCode"].AsString(null);
 
-            if (taskConfig["tamingGenerations"] != null)
-            {
-                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
-            }
+            tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
 
             if (code != null && code.Length > 0)
             {
                 this.onBlockBelowCode = new AssetLocation(code);
             }
 
-            if (taskConfig["stopRange"] != null)
-            {
-                stopRange = taskConfig["stopRange"].AsFloat(0f);
-            }
-
-            if (taskConfig["stopOnHurt"] != null)
-            {
-                stopOnHurt = taskConfig["stopOnHurt"].AsBool(false);
-            }
-
-            if (taskConfig["duringDayTimeFrames"] != null)
-            {
-                duringDayTimeFrames = taskConfig["duringDayTimeFrames"].AsObject<DayTimeFrame[]>(null);
-            }
+            stopRange = taskConfig["stopRange"].AsFloat(0f);
+            stopOnHurt = taskConfig["stopOnHurt"].AsBool(false);
+            duringDayTimeFrames = taskConfig["duringDayTimeFrames"].AsObject<DayTimeFrame[]>(null);
 
             if (taskConfig["stopOnNearbyEntityCodes"] != null)
             {
@@ -122,8 +108,8 @@ namespace Vintagestory.GameContent
             {
                 if (entity.Properties.Habitat == EnumHabitat.Land && entity.FeetInLiquid) return false;
 
-                if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
-                if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+                if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
+                if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
 
                 // The entityInRange test is expensive. So we only test for it every 4 seconds
                 // which should have zero impact on the behavior. It'll merely execute this task 4 seconds later

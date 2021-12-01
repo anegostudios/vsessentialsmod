@@ -233,11 +233,20 @@ namespace Vintagestory.GameContent
                 IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord);
                 if (mc == null)
                 {
-                    //api.Logger.Notification("From DB @{0}/{1}", cord.X, cord.Y);
-                    MapPieceDB piece = mapdb.GetMapPiece(cord);
-                    if (piece?.Pixels != null)
+                    try
                     {
-                        loadFromChunkPixels(cord, piece.Pixels);
+                        MapPieceDB piece = mapdb.GetMapPiece(cord);
+                        if (piece?.Pixels != null)
+                        {
+                            loadFromChunkPixels(cord, piece.Pixels);
+                        }
+                    } catch (ProtoBuf.ProtoException)
+                    {
+                        api.Logger.Warning("Failed loading map db section {0}/{1}, a protobuf exception was thrown. Will ignore.", cord.X, cord.Y);
+                    }
+                    catch (OverflowException)
+                    {
+                        api.Logger.Warning("Failed loading map db section {0}/{1}, a overflow exception was thrown. Will ignore.", cord.X, cord.Y);
                     }
 
                     continue;
@@ -564,7 +573,7 @@ namespace Vintagestory.GameContent
 
 
                 int avgCol = block.GetColor(capi, tmpPos);
-                int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP);
+                int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP, GameMath.MurmurHash3Mod(tmpPos.X, tmpPos.Y, tmpPos.Z, 30));
 
                 // Add a bit of randomness to each pixel
                 int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.2f);

@@ -217,7 +217,9 @@ namespace Vintagestory.GameContent
             {
                 EntityPlayer plr = (EntityPlayer)entity;
                 EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
-                
+
+                detox(deltaTime);
+
                 if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
 
                 if (plr.Controls.TriesToMove || plr.Controls.Jump || plr.Controls.LeftMouseDown || plr.Controls.RightMouseDown)
@@ -245,6 +247,24 @@ namespace Vintagestory.GameContent
 
                 hungerCounter = 0;
                 sprintCounter = 0;
+
+                detox(deltaTime);
+            }
+        }
+
+        float detoxCounter = 0f;
+
+        private void detox(float dt)
+        {
+            detoxCounter += dt;
+            if (detoxCounter > 1)
+            {
+                float intox = entity.WatchedAttributes.GetFloat("intoxication");
+                if (intox > 0)
+                {
+                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f));
+                }
+                detoxCounter = 0;
             }
         }
 

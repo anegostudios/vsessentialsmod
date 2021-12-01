@@ -10,7 +10,7 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskSeekEntity : AiTaskBase
+    public class AiTaskSeekEntity : AiTaskBaseTargetable
     {
         Entity targetEntity;
         Vec3d targetPos;
@@ -22,8 +22,6 @@ namespace Vintagestory.GameContent
         float maxFollowTime = 60;
         
         bool stopNow = false;
-        string[] seekEntityCodesExact = new string[] { "player" };
-        string[] seekEntityCodesBeginsWith = new string[0];
 
         float currentFollowTime = 0;
 
@@ -41,7 +39,7 @@ namespace Vintagestory.GameContent
         long lastSearchTotalMs;
 
         EntityPartitioning partitionUtil;
-
+		float extraTargetDistance = 0f;
         
         bool lowTempMode;
 
@@ -55,86 +53,27 @@ namespace Vintagestory.GameContent
 
             base.LoadConfig(taskConfig, aiConfig);
 
-            
-            if (taskConfig["leapAnimation"].Exists)
-            {
-                leapAnimationCode = taskConfig["leapAnimation"].AsString(null);
-            }
-
-            if (taskConfig["leapChance"].Exists)
-            {
-                leapChance = taskConfig["leapChance"].AsFloat(1);
-            }
-
-            if (taskConfig["leapHeightMul"].Exists)
-            {
-                leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
-            }
-
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-            }
-
-            if (taskConfig["seekingRange"] != null)
-            {
-                seekingRange = taskConfig["seekingRange"].AsFloat(25);
-            }
-
-            if (taskConfig["belowTempSeekingRange"] != null)
-            {
-                belowTempSeekingRange = taskConfig["belowTempSeekingRange"].AsFloat(25);
-            }
-
-            if (taskConfig["belowTempThreshold"] != null)
-            {
-                belowTempThreshold = taskConfig["belowTempThreshold"].AsFloat(-999);
-            }
-            
-
-
-            if (taskConfig["maxFollowTime"] != null)
-            {
-                maxFollowTime = taskConfig["maxFollowTime"].AsFloat(60);
-            }
-
-            if (taskConfig["alarmHerd"] != null)
-            {
-                alarmHerd = taskConfig["alarmHerd"].AsBool(false);
-            }
-
-            if (taskConfig["leapAtTarget"] != null)
-            {
-                leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
-            }
-
-            if (taskConfig["entityCodes"] != null)
-            {
-                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-
-                List<string> exact = new List<string>();
-                List<string> beginswith = new List<string>();
-
-                for (int i = 0; i < codes.Length; i++)
-                {
-                    string code = codes[i];
-                    if (code.EndsWith("*")) beginswith.Add(code.Substring(0, code.Length - 1));
-                    else exact.Add(code);
-                }
-
-                seekEntityCodesExact = exact.ToArray();
-                seekEntityCodesBeginsWith = beginswith.ToArray();
-            }
+            leapAnimationCode = taskConfig["leapAnimation"].AsString("jump");
+            leapChance = taskConfig["leapChance"].AsFloat(1);
+            leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
+            extraTargetDistance = taskConfig["extraTargetDistance"].AsFloat(0f);
+            seekingRange = taskConfig["seekingRange"].AsFloat(25);
+            belowTempSeekingRange = taskConfig["belowTempSeekingRange"].AsFloat(25);
+            belowTempThreshold = taskConfig["belowTempThreshold"].AsFloat(-999);
+            maxFollowTime = taskConfig["maxFollowTime"].AsFloat(60);
+            alarmHerd = taskConfig["alarmHerd"].AsBool(false);
+            leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
         }
 
 
         public override bool ShouldExecute()
         {
             // React immediately on hurt, otherwise only 1/10 chance of execution
-            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || !entity.HasEmotionState(whenInEmotionState))) return false;
+            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || bhEmo?.IsInEmotionState(whenInEmotionState) != true)) return false;
 
-            if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
-            if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+            if (whenInEmotionState != null && !bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
+            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
             if (lastSearchTotalMs + 4000 > entity.World.ElapsedMilliseconds) return false;
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
@@ -159,43 +98,7 @@ namespace Vintagestory.GameContent
 
             Vec3d ownPos = entity.ServerPos.XYZ;
 
-            targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => {
-                if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return false;
-
-                for (int i = 0; i < seekEntityCodesExact.Length; i++)
-                {
-                    if (e.Code.Path == seekEntityCodesExact[i])
-                    {
-                        if (e.Code.Path == "player")
-                        {
-                            float rangeMul = e.Stats.GetBlended("animalSeekingRange");
-                            IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-
-                            // Sneaking reduces the detection range
-                            if (player.Entity.Controls.Sneak && player.Entity.OnGround)
-                            {
-                                rangeMul *= 0.6f;
-                            }
-
-                            return
-                                (rangeMul == 1 || e.ServerPos.DistanceTo(ownPos) < range * rangeMul) &&
-                                (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
-                            ;
-                        }
-                        return true;
-                    }
-                }
-
-
-                for (int i = 0; i < seekEntityCodesBeginsWith.Length; i++)
-                {
-                    if (e.Code.Path.StartsWithFast(seekEntityCodesBeginsWith[i])) return true;
-                }
-
-                return false;
-            });
-
-            
+            targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => isTargetableEntity(e, range));
 
             if (targetEntity != null)
             {
@@ -228,7 +131,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.1f, targetEntity.CollisionBox.XSize / 2 + entity.CollisionBox.XSize / 4);
+            return extraTargetDistance + Math.Max(0.1f, targetEntity.CollisionBox.XSize / 2 + entity.CollisionBox.XSize / 4);
         }
 
         public override void StartExecute()

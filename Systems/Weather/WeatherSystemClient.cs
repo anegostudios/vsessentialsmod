@@ -101,6 +101,9 @@ namespace Vintagestory.GameContent
             }
         }
 
+        Vec3f windSpeedSmoothed = new Vec3f();
+        double windRandCounter;
+
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             simLightning.OnRenderFrame(dt, stage);
@@ -135,7 +138,14 @@ namespace Vintagestory.GameContent
 
                 // Windspeed should be stored inside ClimateConditions and not be a global constant
                 double windspeed = WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
-                GlobalConstants.CurrentWindSpeedClient.X += ((float)windspeed - GlobalConstants.CurrentWindSpeedClient.X) * dt;
+
+
+                windSpeedSmoothed.X += ((float)windspeed - windSpeedSmoothed.X) * dt;
+
+                windRandCounter = (windRandCounter + dt) % (2000 * Math.PI);
+                double rndx = (2 * Math.Sin(windRandCounter / 8) + Math.Sin(windRandCounter / 2) + Math.Sin(0.5 + 2 * windRandCounter)) / 10.0;
+
+                GlobalConstants.CurrentWindSpeedClient.Set(windSpeedSmoothed.X, windSpeedSmoothed.Y, windSpeedSmoothed.Z + (float)rndx * windSpeedSmoothed.X);
 
                 capi.Ambient.CurrentModifiers["weather"] = WeatherDataAtPlayer.BlendedWeatherData.Ambient;
             }

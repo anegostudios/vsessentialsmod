@@ -100,12 +100,12 @@ namespace Vintagestory.GameContent
             }
 
             Vec3d pos = entity.SidedPos.XYZ;
-            pos.Y += entity.Properties.DeadHitBoxSize.Y / 2;
+            pos.Y += entity.Properties.DeadCollisionBoxSize.Y / 2;
 
             entity.World.SpawnParticles(new EntityCubeParticles(
                 entity.World,
                 entity.EntityId,
-                pos, 0.15f, (int)(40 + entity.Properties.DeadHitBoxSize.X * 60), 0.4f, 1f
+                pos, 0.15f, (int)(40 + entity.Properties.DeadCollisionBoxSize.X * 60), 0.4f, 1f
             ));
         }
 

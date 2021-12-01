@@ -151,6 +151,7 @@ namespace Vintagestory.GameContent
         public override void OnEntityLoaded()
         {
             loaded = true;
+            prevY = entity.Pos.Y;
             MarkShapeModified();
         }
 
@@ -207,7 +208,7 @@ namespace Vintagestory.GameContent
             shapeFresh = true;
             CompositeShape compositeShape = OverrideCompositeShape != null ? OverrideCompositeShape : entity.Properties.Client.Shape;
 
-            Shape entityShape = OverrideEntityShape != null ? OverrideEntityShape : entity.Properties.Client.LoadedShape;
+            Shape entityShape = OverrideEntityShape != null ? OverrideEntityShape : entity.Properties.Client.LoadedShapeForEntity;
 
             if (entityShape == null)
             {
@@ -290,8 +291,6 @@ namespace Vintagestory.GameContent
 
                 }, "uploadentitymesh");
             });
-
-            
         }
 
 
@@ -886,10 +885,18 @@ namespace Vintagestory.GameContent
 
 
         double stepPitch;
-        
+        double prevY;
+        double prevYAccum;
 
         public void loadModelMatrix(Entity entity, float dt, bool isShadowPass)
         {
+            prevYAccum += dt;
+            if (prevYAccum > 1f/5f)
+            {
+                prevYAccum = 0;
+                prevY = entity.Pos.Y;
+            }
+
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);            
@@ -900,13 +907,13 @@ namespace Vintagestory.GameContent
             float rotZ = entity.Properties.Client.Shape?.rotateZ ?? 0;
 
             Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
-            
+
             // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
-            if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass && eagent.Alive)
+            if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass && eagent.Alive && entity.Attributes.GetInt("dmgkb", 0) == 0 && entity.Properties.Client.PitchStep)
             {
                 if (entity.Properties.Habitat != EnumHabitat.Air && entity.Alive && !eagent.Controls.IsClimbing)
                 {
-                    if (entity.ServerPos.Y > entity.Pos.Y + 0.04 && !entity.FeetInLiquid && !entity.Swimming)
+                    if (entity.Pos.Y - prevY > 0.02 && !entity.FeetInLiquid && !entity.Swimming)
                     {
                         stepPitch = Math.Max(-0.5, stepPitch - 2 * dt);
                     }
@@ -930,13 +937,15 @@ namespace Vintagestory.GameContent
                     }
                 } else
                 {
-                    stepPitch = GameMath.Clamp(entity.Pos.Y - entity.ServerPos.Y + 0.1, 0, 0.3) - GameMath.Clamp(entity.ServerPos.Y - entity.Pos.Y - 0.1, 0, 0.3);
+                    stepPitch = GameMath.Clamp(entity.Pos.Y - prevY + 0.1, 0, 0.3) - GameMath.Clamp(prevY - entity.Pos.Y - 0.1, 0, 0.3);
                 }
             }
             if (eagent?.Alive == false)
             {
                 stepPitch = Math.Max(0, stepPitch - 2 * dt);
             }
+
+
 
             double[] quat = Quaterniond.Create();
 
@@ -957,10 +966,7 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < quat.Length; i++) qf[i] = (float)quat[i];
             Mat4f.Mul(ModelMat, ModelMat, Mat4f.FromQuat(Mat4f.Create(), qf));
 
-
-
             Mat4f.RotateX(ModelMat, ModelMat, sidewaysSwivelAngle);
-
 
 
             float scale = entity.Properties.Client.Size;
@@ -1004,12 +1010,21 @@ namespace Vintagestory.GameContent
 
             Mat4f.RotateX(ModelMat, ModelMat, sidewaysSwivelAngle);
 
+
+            if (entityPlayer != null)
+            {
+                float targetIntensity = entity.WatchedAttributes.GetFloat("intoxication");
+                intoxIntensity += (targetIntensity - intoxIntensity) * dt / 3;
+                capi.Render.PerceptionEffects.ApplyToTpPlayer(entityPlayer, ModelMat, intoxIntensity);
+            }
+
             float scale = entity.Properties.Client.Size;
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
         }
 
-        
+        float intoxIntensity;
+
 
 
         protected void loadModelMatrixForGui(Entity entity, double posX, double posY, double posZ, double yawDelta, float size)

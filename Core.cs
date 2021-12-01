@@ -93,12 +93,13 @@ namespace Vintagestory.ServerMods
 
         private void RegisterDefaultBlocks()
         {
-            
+            api.RegisterBlockClass("BlockMultiblock", typeof(BlockMultiblock));
         }
         
         private void RegisterDefaultBlockBehaviors()
         {
             api.RegisterBlockBehaviorClass("Decor", typeof(BlockBehaviorDecor));
+            api.RegisterBlockBehaviorClass("Multiblock", typeof(BlockBehaviorMultiblock));
         }
 
 

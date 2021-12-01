@@ -183,8 +183,6 @@ namespace Vintagestory.GameContent
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
-            //int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
-            //int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);
 
             int mincy = (int)((centerPos.Y - radius) / chunkSize);
             int maxcy = (int)((centerPos.Y + radius) / chunkSize);
@@ -199,14 +197,11 @@ namespace Vintagestory.GameContent
             EntityPartitionChunk partitionChunk = null;
 
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            //int gridYMax = api.World.BlockAccessor.MapSizeY / gridSizeInBlocks;
             int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks;
-
             int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize;
 
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
-                //for (int gridY = mingy; gridY <= maxgy; gridY++)
                 for (int cy = mincy; cy <= maxcy; cy++)
                 {
                     for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
@@ -214,7 +209,6 @@ namespace Vintagestory.GameContent
                         if (gridX < 0 || cy < 0 || gridZ < 0 || gridX >= gridXMax || cy >= cyTop || gridZ >= gridZMax) continue;
 
                         int cx = gridX * gridSizeInBlocks / chunkSize;
-                        //int cy = gridY * gridSizeInBlocks / chunkSize;
                         int cz = gridZ * gridSizeInBlocks / chunkSize;
 
                         long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
@@ -236,6 +230,7 @@ namespace Vintagestory.GameContent
                         for (int i = 0; i < entities.Count; i++)
                         {
                             double distSq = entities[i].SidedPos.SquareDistanceTo(centerPos);
+
                             if (distSq <= radiusSq && !callback(entities[i]))
                             {
                                 return;
@@ -248,12 +243,12 @@ namespace Vintagestory.GameContent
 
 
         /// <summary>
-        /// Same as <see cref="WalkEntities(Vec3d, double, API.Common.Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
+        /// Same as <see cref="WalkEntities(Vec3d, double, Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback"></param>
-        public void WalkEntityPartitions(Vec3d centerPos, double radius, API.Common.Action<Entity> callback)
+        public void WalkEntityPartitions(Vec3d centerPos, double radius, Action<Entity> callback)
         {
             int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
             int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);

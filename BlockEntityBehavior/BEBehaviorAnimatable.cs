@@ -34,9 +34,9 @@ namespace Vintagestory.GameContent
             animUtil?.Dispose();
         }
 
-        public override void OnBlockBroken()
+        public override void OnBlockBroken(IPlayer byPlayer = null)
         {
-            base.OnBlockBroken();
+            base.OnBlockBroken(byPlayer);
             animUtil?.Dispose();
         }
 
@@ -111,8 +111,6 @@ namespace Vintagestory.GameContent
 
             capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
 
-            //meshdata.Rgba2 = null;
-
             InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
         }
 
@@ -180,8 +178,26 @@ namespace Vintagestory.GameContent
             renderer = new BEAnimatableRenderer(api as ICoreClientAPI, be.Pos, rotation, animator, activeAnimationsByAnimCode, meshref);
         }
 
+        public void InitializeAnimatorServer(string cacheDictKey, Shape blockShape)
+        {
+            animator = GetAnimator(api, cacheDictKey, blockShape);
+
+            be.RegisterGameTickListener(animTickServer, 20);
+        }
+
+        
 
         bool stopRenderTriggered = false;
+
+        private void animTickServer(float deltaTime)
+        {
+            if (animator == null) return; // not initialized yet
+
+            if (activeAnimationsByAnimCode.Count > 0 || animator.ActiveAnimationCount > 0)
+            {
+                animator.OnFrame(activeAnimationsByAnimCode, deltaTime);
+            }
+        }
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
@@ -201,11 +217,14 @@ namespace Vintagestory.GameContent
 
         public void StartAnimation(AnimationMetaData meta)
         {
-            if (!activeAnimationsByAnimCode.ContainsKey(meta.Code) && renderer != null)
+            if (!activeAnimationsByAnimCode.ContainsKey(meta.Code))
             {
                 stopRenderTriggered = false;
                 activeAnimationsByAnimCode[meta.Code] = meta;
-                api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => renderer.ShouldRender = true);
+                if (renderer != null)
+                {
+                    api.World.BlockAccessor.MarkBlockDirty(be.Pos, () => renderer.ShouldRender = true);
+                }
             }
         }
 

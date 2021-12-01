@@ -21,10 +21,23 @@ namespace Vintagestory.ServerMods.NoObf
     {
         [JsonProperty]
         public EnumHabitat Habitat = EnumHabitat.Land;
+
+        [JsonProperty, Obsolete("Use CollisionBoxSize instead")]
+        public Vec2f HitBoxSize => CollisionBoxSize;
+
+        [JsonProperty, Obsolete("Use DeadCollisionBoxSize instead")]
+        public Vec2f DeadHitBoxSize => DeadCollisionBoxSize;
+
         [JsonProperty]
-        public Vec2f HitBoxSize = new Vec2f(0.5f, 0.5f);
+        public Vec2f CollisionBoxSize = new Vec2f(0.5f, 0.5f);
         [JsonProperty]
-        public Vec2f DeadHitBoxSize = new Vec2f(0.5f, 0.25f);
+        public Vec2f DeadCollisionBoxSize = new Vec2f(0.5f, 0.25f);
+
+
+        [JsonProperty]
+        public Vec2f SelectionBoxSize = null;
+        [JsonProperty]
+        public Vec2f DeadSelectionBoxSize = null;
         [JsonProperty]
         public double EyeHeight = 0.1;
         [JsonProperty]
@@ -82,8 +95,10 @@ namespace Vintagestory.ServerMods.NoObf
                 Variant = new OrderedDictionary<string, string>(Variant),
                 Class = Class,
                 Habitat = Habitat,
-                HitBoxSize = HitBoxSize,
-                DeadHitBoxSize = DeadHitBoxSize,
+                CollisionBoxSize = CollisionBoxSize,
+                DeadCollisionBoxSize = DeadCollisionBoxSize,
+                SelectionBoxSize = SelectionBoxSize,
+                DeadSelectionBoxSize = DeadSelectionBoxSize,
                 Weight = Weight,
                 CanClimb = CanClimb,
                 CanClimbAnywhere = CanClimbAnywhere,
@@ -105,6 +120,7 @@ namespace Vintagestory.ServerMods.NoObf
                     RendererName = Client.Renderer,
                     Textures = new Dictionary<string, CompositeTexture>(Client.Textures),
                     GlowLevel = Client.GlowLevel,
+                    PitchStep = Client.PitchStep,
                     Shape = Client.Shape,
                     Size = Client.Size,
                     SizeGrowthFactor = Client.SizeGrowthFactor,
@@ -149,6 +165,8 @@ namespace Vintagestory.ServerMods.NoObf
         public float SizeGrowthFactor = 0f;
         [JsonProperty]
         public AnimationMetaData[] Animations;
+        [JsonProperty]
+        public bool PitchStep = true;
 
         public Dictionary<string, AnimationMetaData> AnimationsByMetaCode = new Dictionary<string, AnimationMetaData>(StringComparer.OrdinalIgnoreCase);
 

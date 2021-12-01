@@ -12,7 +12,7 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskFleeEntity : AiTaskBase
+    public class AiTaskFleeEntity : AiTaskBaseTargetable
     {
         EntityAgent targetEntity;
         Vec3d targetPos = new Vec3d();
@@ -27,9 +27,6 @@ namespace Vintagestory.GameContent
         long fleeStartMs;
         bool stuck;
 
-        string[] fleeEntityCodesExact = new string[] { "player" };
-        string[] fleeEntityCodesBeginsWith = new string[0];
-
         float stepHeight;
 
         EntityPartitioning partitionUtil;
@@ -38,8 +35,10 @@ namespace Vintagestory.GameContent
         bool ignoreDeepDayLight;
 
         float tamingGenerations = 10f;
-        
+        Vec3d tmpVec = new Vec3d();
+        Vec3d collTmpVec = new Vec3d();
 
+		bool cancelNow;
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
         {
         }
@@ -50,69 +49,15 @@ namespace Vintagestory.GameContent
 
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["tamingGenerations"] != null)
-            {
-                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
-            }
-
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-            }
-
-            if (taskConfig["seekingRange"] != null)
-            {
-                seekingRange = taskConfig["seekingRange"].AsFloat(25);
-            }
-
-            if (taskConfig["executionChance"] != null)
-            {
-                executionChance = taskConfig["executionChance"].AsFloat(0.07f);
-            }
-
-            if (taskConfig["minDayLight"] != null)
-            {
-                minDayLight = taskConfig["minDayLight"].AsFloat(-1f);
-            }
-
-            if (taskConfig["cancelOnHurt"] != null)
-            {
-                cancelOnHurt = taskConfig["cancelOnHurt"].AsBool(false);
-            }
-
-            if (taskConfig["ignoreDeepDayLight"] != null)
-            {
-                ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
-            }
-
-            if (taskConfig["fleeingDistance"] != null)
-            {
-                fleeingDistance = taskConfig["fleeingDistance"].AsFloat(25f);
-            } else fleeingDistance = seekingRange + 6;
-
-            if (taskConfig["fleeDurationMs"] != null)
-            {
-                fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
-            }
-
-            if (taskConfig["entityCodes"] != null)
-            {
-                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-
-                List<string> exact = new List<string>();
-                List<string> beginswith = new List<string>();
-
-                for (int i = 0; i < codes.Length; i++)
-                {
-                    string code = codes[i];
-                    if (code.EndsWith("*")) beginswith.Add(code.Substring(0, code.Length - 1));
-                    else exact.Add(code);
-                }
-
-                fleeEntityCodesExact = exact.ToArray();
-                fleeEntityCodesBeginsWith = beginswith.ToArray();
-            }
-
+            tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
+            seekingRange = taskConfig["seekingRange"].AsFloat(25);
+            executionChance = taskConfig["executionChance"].AsFloat(0.1f);
+            minDayLight = taskConfig["minDayLight"].AsFloat(-1f);
+            cancelOnHurt = taskConfig["cancelOnHurt"].AsBool(false);
+            ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
+            fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 6);
+            fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
         }
 
@@ -126,8 +71,8 @@ namespace Vintagestory.GameContent
             if (rand.NextDouble() > 2 * executionChance) return false;
 
 
-            if (whenInEmotionState != null && !entity.HasEmotionState(whenInEmotionState)) return false;
-            if (whenNotInEmotionState != null && entity.HasEmotionState(whenNotInEmotionState)) return false;
+            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
+            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
 
             // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
@@ -146,55 +91,13 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
             Vec3d ownPos = entity.ServerPos.XYZ;
-            double hereRange = fearReductionFactor * seekingRange;
+            float hereRange = fearReductionFactor * seekingRange;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
-                if (!e.Alive || e.EntityId == this.entity.EntityId || e is EntityItem) return false;
-
-                for (int i = 0; i < fleeEntityCodesExact.Length; i++)
-                {
-                    if (e.Code.Path == fleeEntityCodesExact[i])
-                    {
-                        if (e is EntityAgent eagent)
-                        {
-                            float rangeMul = 1f;
-
-                            // Sneaking reduces the detection range
-                            if (eagent.Controls.Sneak && eagent.OnGround)
-                            {
-                                rangeMul *= 0.6f;
-                            }
-                            // Trait bonus
-                            if (e.Code.Path == "player")
-                            {
-                                rangeMul *= eagent.Stats.GetBlended("animalSeekingRange");
-                            }
-
-                            if (rangeMul != 1 && e.ServerPos.DistanceTo(ownPos) > hereRange * rangeMul) return false;
-                        }
-
-                        if (e.Code.Path == "player")
-                        {
-                            IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
-                            bool ok = player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator);
-
-                            ok &= !lowStabilityAttracted || e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
-
-                            return ok;
-                        }
-                        return true;
-                    }
-                }
-
-                for (int i = 0; i < fleeEntityCodesBeginsWith.Length; i++)
-                {
-                    if (e.Code.Path.StartsWithFast(fleeEntityCodesBeginsWith[i])) return true;
-                }
-
-                return false;
+                if (!isTargetableEntity(e, hereRange)) return false;
+                return e.Code.Path != "player" || !lowStabilityAttracted || e.WatchedAttributes.GetDouble("temporalStability", 1) < 0.25;
             });
 
-            //yawOffset = 0;
 
             if (targetEntity != null)
             {
@@ -211,6 +114,8 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
+            cancelNow = false;
+
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             stepHeight = bh == null ? 0.6f : bh.stepHeight;
 
@@ -218,14 +123,12 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.CollisionBox.XSize;
 
-            //pathTraverser.NavigateTo(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
             pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
             fleeStartMs = entity.World.ElapsedMilliseconds;
             stuck = false;
-            
-
         }
+
 
         public override bool ContinueExecute(float dt)
         {
@@ -255,49 +158,23 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            //if (entity.IsActivityRunning("invulnerable")) return false;
-
-            return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs);
+            return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs) && !cancelNow;
         }
 
 
-        Vec3d tmpVec = new Vec3d();
-        //float yawOffset;
+        
 
         private void updateTargetPos()
         {
             float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
 
-            /*tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(10, 0, yaw - GameMath.PI / 2);
-
-            int tries = 10;
-            double dx, dy, dz;
-            while (tries-- > 0)
-            {
-                dx = rand.NextDouble() * 8 - 4;
-                dy = rand.NextDouble() * 8 - 4;
-                dz = rand.NextDouble() * 8 - 4;
-
-                if (entity.Properties.Habitat == EnumHabitat.Land)
-                {
-                    tmpVec.Y = moveDownToFloor((int)tmpVec.X, tmpVec.Y, (int)tmpVec.Z);
-                }
-
-                tmpVec.Add(dx, dx, dz);
-
-                pathTraverser.NavigateTo(targetPos, moveSpeed, 1, OnGoalReached, OnStuck, tries > 0, 999, true);
-            }*/
-
-
-            // Some simple steering behavior, works really suxy
+            // Simple steering behavior
             tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
             tmpVec.Ahead(0.9, 0, yaw - GameMath.PI / 2);
 
             // Running into wall?
             if (traversable(tmpVec))
             {
-                //yawOffset = 0;
                 targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
                 return;
             }
@@ -323,17 +200,20 @@ namespace Vintagestory.GameContent
             // Run towards target o.O
             tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
             tmpVec.Ahead(0.9, 0, -yaw);
-            //if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
-                return;
-            }
+            targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
         }
 
 
-        
+        public override void OnEntityHurt(DamageSource source, float damage)
+        {
+            base.OnEntityHurt(source, damage);
 
-        Vec3d collTmpVec = new Vec3d();
+            if (cancelOnHurt) cancelNow = true;
+        }
+
+
+
+
         bool traversable(Vec3d pos)
         {
             return
@@ -346,7 +226,6 @@ namespace Vintagestory.GameContent
         public override void FinishExecute(bool cancelled)
         {
             pathTraverser.Stop();
-
             base.FinishExecute(cancelled);
         }
 

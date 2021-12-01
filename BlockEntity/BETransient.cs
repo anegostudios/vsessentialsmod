@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
             if (block.Attributes == null)
             {
-                Api.World.Logger.Error("BETransient exiting at {0} cannot find block attributes. Will stop transient timer", Pos);
+                Api.World.Logger.Error("BETransient exiting at {0} cannot find block attributes for {1}. Will stop transient timer", Pos, this.Block.Code.ToShortString());
                 UnregisterGameTickListener(listenerId);
                 return;
             }

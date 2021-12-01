@@ -262,7 +262,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public void WalkPoints(API.Common.Action<ClothPoint> onPoint)
+        public void WalkPoints(Action<ClothPoint> onPoint)
         {
             foreach (var pl in Points2d)
             {

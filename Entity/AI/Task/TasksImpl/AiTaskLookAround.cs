@@ -15,6 +15,7 @@ namespace Vintagestory.GameContent
 
         public int minduration;
         public int maxduration;
+        public float turnSpeedMul = 1f;
 
         public long idleUntilMs;
 
@@ -22,6 +23,7 @@ namespace Vintagestory.GameContent
         {
             this.minduration = (int)taskConfig["minduration"]?.AsInt(2000);
             this.maxduration = (int)taskConfig["maxduration"]?.AsInt(4000);
+            this.turnSpeedMul = (float)taskConfig["turnSpeedMul"]?.AsFloat(1);
 
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
 
@@ -40,8 +42,8 @@ namespace Vintagestory.GameContent
 
             entity.ServerPos.Yaw = (float)GameMath.Clamp(
                 entity.World.Rand.NextDouble() * GameMath.TWOPI,
-                entity.ServerPos.Yaw - GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier,
-                entity.ServerPos.Yaw + GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier
+                entity.ServerPos.Yaw - GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul,
+                entity.ServerPos.Yaw + GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul
             );
             
         }

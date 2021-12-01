@@ -57,7 +57,7 @@ namespace Vintagestory.GameContent
 
 
     /// <summary>
-    /// Point-of-Interest registry
+    /// Point-of-Interest registry, not synchronized to client
     /// </summary>
     public class POIRegistry : ModSystem
     {
@@ -68,7 +68,7 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
-            return forSide == EnumAppSide.Server;
+            return true;
         }
 
         public override void StartServerSide(ICoreServerAPI api)

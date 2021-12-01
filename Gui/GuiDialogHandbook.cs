@@ -33,10 +33,12 @@ namespace Vintagestory.GameContent
     // but can be explicitly made to be included or excluded using item/block attributes
     public class GuiDialogHandbook : GuiDialog
     {
+        public override double DrawOrder => 0.2; // Needs to be same as chest container guis so it can be on top of those dialogs if necessary
+
         Dictionary<string, int> pageNumberByPageCode = new Dictionary<string, int>();
         
         List<GuiHandbookPage> allHandbookPages = new List<GuiHandbookPage>();
-        List<GuiHandbookPage> shownHandbookPages = new List<GuiHandbookPage>();
+        List<IFlatListItem> shownHandbookPages = new List<IFlatListItem>();
 
         ItemStack[] allstacks;
         List<string> categoryCodes = new List<string>();
@@ -142,7 +144,7 @@ namespace Vintagestory.GameContent
                 .BeginChildElements(bgBounds)
                     .BeginClip(clipBounds)
                         .AddInset(insetBounds, 3)
-                        .AddHandbookStackList(stackListBounds, onLeftClickListElement, shownHandbookPages, "stacklist")
+                        .AddFlatList(stackListBounds, onLeftClickListElement, shownHandbookPages, "stacklist")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalueOverviewPage, scrollbarBounds, "scrollbar")
                     .AddSmallButton(Lang.Get("general-back"), OnButtonBack, backButtonBounds, EnumButtonStyle.Normal, EnumTextOrientation.Center, "backButton")
@@ -153,7 +155,7 @@ namespace Vintagestory.GameContent
 
             overviewGui.GetScrollbar("scrollbar").SetHeights(
                 (float)listHeight, 
-                (float)overviewGui.GetHandbookStackList("stacklist").insideBounds.fixedHeight
+                (float)overviewGui.GetFlatList("stacklist").insideBounds.fixedHeight
             );
 
             overviewGui.GetTextInput("searchField").SetPlaceHolderText("Search...");
@@ -340,7 +342,7 @@ namespace Vintagestory.GameContent
         private void onLeftClickListElement(int index)
         {
             browseHistory.Push(new BrowseHistoryElement() {
-                Page = shownHandbookPages[index]
+                Page = shownHandbookPages[index] as GuiHandbookPage
             });
             initDetailGui();
         }
@@ -349,7 +351,7 @@ namespace Vintagestory.GameContent
 
         private void OnNewScrollbarvalueOverviewPage(float value)
         {
-            GuiElementHandbookList stacklist = overviewGui.GetHandbookStackList("stacklist");
+            GuiElementFlatList stacklist = overviewGui.GetFlatList("stacklist");
 
             stacklist.insideBounds.fixedY = 3 - value;
             stacklist.insideBounds.CalcWorldBounds();
@@ -547,7 +549,7 @@ namespace Vintagestory.GameContent
                 shownHandbookPages.Add(val.Page);
             }
 
-            GuiElementHandbookList stacklist = overviewGui.GetHandbookStackList("stacklist");
+            GuiElementFlatList stacklist = overviewGui.GetFlatList("stacklist");
             stacklist.CalcTotalHeight();
             overviewGui.GetScrollbar("scrollbar").SetHeights(
                 (float)listHeight, (float)stacklist.insideBounds.fixedHeight

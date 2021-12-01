@@ -44,7 +44,7 @@ namespace Vintagestory.GameContent
                 .BeginChildElements(bgBounds)
                     .BeginClip(clippingBounds)
                     .AddInset(insetBounds, 3)
-                    .AddDynamicText("", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, logtextBounds, "text")
+                    .AddDynamicText("", CairoFont.WhiteDetailText(), logtextBounds, "text")
                     .EndClip()
                     .AddVerticalScrollbar(OnNewScrollbarvalue, scrollbarBounds, "scrollbar")
                     .AddSmallButton("Close", OnButtonClose, closeButtonBounds)

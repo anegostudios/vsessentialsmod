@@ -19,6 +19,8 @@ namespace Vintagestory.Essentials
         long lastWaypointIncTotalMs;
 
 
+        PathfindSystem psys;
+
         public override Vec3d CurrentTarget {
             get
             {
@@ -37,11 +39,13 @@ namespace Vintagestory.Essentials
                 minTurnAnglePerSec = 250;
                 maxTurnAnglePerSec = 450;
             }
+
+            psys = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>();
         }
 
 
 
-        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, API.Common.Action OnGoalReached, API.Common.Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 999, bool allowReachAlmost = false)
+        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 999, bool allowReachAlmost = false)
         {
             BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
             waypointToReachIndex = 0;
@@ -52,7 +56,7 @@ namespace Vintagestory.Essentials
 
             if (!entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
             {
-                waypoints = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().FindPathAsWaypoints(startBlockPos, target.AsBlockPos, canFallDamage ? 8 : 4, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
+                waypoints = psys.FindPathAsWaypoints(startBlockPos, target.AsBlockPos, canFallDamage ? 8 : 4, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
             }
 
             bool nopath = false;
@@ -61,6 +65,8 @@ namespace Vintagestory.Essentials
             {
                 waypoints = new List<Vec3d>();
                 nopath = true;
+
+                entity.OnNoPath(target);
 
                 // Debug visualization
                 /*List<BlockPos> poses = new List<BlockPos>();
@@ -109,11 +115,12 @@ namespace Vintagestory.Essentials
                 Active = false;
                 return false;
             }
+
             return ok;
         }
 
 
-        public override bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, API.Common.Action OnGoalReached, API.Common.Action OnStuck)
+        public override bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
         {
             waypoints = new List<Vec3d>();
             waypoints.Add(target);

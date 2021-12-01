@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
 
     public class AiTaskManager
     {
-        public event API.Common.Action<IAiTask> OnTaskStarted;
+        public event Action<IAiTask> OnTaskStarted;
         public ActionBoolReturn<IAiTask> ShouldExecuteTask = (task) => true;
 
         Entity entity;

@@ -41,5 +41,6 @@ using Vintagestory.API.Config;
 [assembly: ModInfo("Essentials", "game",
     Version = GameVersion.ShortGameVersion,
     NetworkVersion = GameVersion.NetworkVersion,
-    Description = "Game Essentials (Json assets loader, World map, weather, player entity, entity ai, entity behaviors, physics simulation, etc.)",
+    IconPath = "game/textures/gui/modicon.png",
+    Description = "Game Essentials (Assets loader, world map, weather, AI, handbook, physics,...)",
     Authors = new[] { "Tyron" })]

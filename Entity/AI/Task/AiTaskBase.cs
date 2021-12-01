@@ -46,7 +46,8 @@ namespace Vintagestory.API.Common
         protected double cooldownUntilTotalHours;
 
         protected PathTraverserBase pathTraverser;
-        
+
+        protected EntityBehaviorEmotionStates bhEmo;
 
         public AiTaskBase(EntityAgent entity)
         {
@@ -54,7 +55,8 @@ namespace Vintagestory.API.Common
             this.world = entity.World;
             randTL = new ThreadLocal<Random>(() => new Random((int)entity.EntityId));
 
-            this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser; 
+            this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser;
+            bhEmo = entity.GetBehavior<EntityBehaviorEmotionStates>();
         }
 
         public virtual void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)

@@ -84,8 +84,6 @@ namespace Vintagestory.GameContent
             }
 
             unconsumedDeltaTime = deltaTime;
-
-            //entity.World.FrameProfiler.Mark("entity-collectentities");
         }
 
 

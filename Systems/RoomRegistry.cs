@@ -15,6 +15,10 @@ namespace Vintagestory.GameContent
     public class Room
     {
         public int ExitCount;
+        /// <summary>
+        /// If true, indicates room dimensions do not exceed recommended cellar dimensions of 7x7x7  (soft limit: slightly longer shapes with low overall volume also permitted)
+        /// </summary>
+        public bool IsSmallRoom;
 
         public int SkylightCount;
         public int NonSkylightCount;
@@ -164,9 +168,10 @@ namespace Vintagestory.GameContent
                     {
                         int rindex = (int)args.PopInt(0);
 
-                        if (chunkrooms.Rooms.Count < rindex - 1 || rindex < 0)
+                        if (chunkrooms.Rooms.Count - 1 < rindex || rindex < 0)
                         {
-                            player.SendMessage(groupId, "Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1), EnumChatType.Notification);
+                            if (rindex == 0) player.SendMessage(groupId, "No room here", EnumChatType.Notification);
+                            else player.SendMessage(groupId, "Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1), EnumChatType.Notification);
                         }
                         else
                         {
@@ -321,9 +326,13 @@ namespace Vintagestory.GameContent
         }
 
 
-        const int MAXROOMSIZE = 15;  // Note if changing this constant, the algorithm for compressedPos in the bfsQueue.Enqueue() and .Dequeue() calls may need updating
-        readonly int[] currentVisited = new int[MAXROOMSIZE * MAXROOMSIZE * MAXROOMSIZE];
-        readonly int[] skyLightXZChecked = new int[MAXROOMSIZE * MAXROOMSIZE];
+        const int ARRAYSIZE = 29;  // Note if this constant is increased beyond 32, the bitshifts for compressedPos in the bfsQueue.Enqueue() and .Dequeue() calls may need updating
+        readonly int[] currentVisited = new int[ARRAYSIZE * ARRAYSIZE * ARRAYSIZE];
+        readonly int[] skyLightXZChecked = new int[ARRAYSIZE * ARRAYSIZE];
+        const int MAXROOMSIZE = 14;
+        const int MAXCELLARSIZE = 7;
+        const int ALTMAXCELLARSIZE = 9;
+        const int ALTMAXCELLARVOLUME = 150;
         int iteration = 0;
 
 
@@ -331,11 +340,11 @@ namespace Vintagestory.GameContent
         {
             QueueOfInt bfsQueue = new QueueOfInt();
 
-            int maxHalfSize = (MAXROOMSIZE - 1) / 2;
-            int maxSize = maxHalfSize + maxHalfSize;
-            bfsQueue.Enqueue(maxHalfSize << 8 | maxHalfSize << 4 | maxHalfSize);
+            int halfSize = (ARRAYSIZE - 1) / 2;
+            int maxSize = halfSize + halfSize;
+            bfsQueue.Enqueue(halfSize << 10 | halfSize << 5 | halfSize);
 
-            int visitedIndex = (maxHalfSize * MAXROOMSIZE + maxHalfSize) * MAXROOMSIZE + maxHalfSize; // Center node
+            int visitedIndex = (halfSize * ARRAYSIZE + halfSize) * ARRAYSIZE + halfSize; // Center node
             int iteration = ++this.iteration;
             currentVisited[visitedIndex] = iteration;
 
@@ -350,10 +359,10 @@ namespace Vintagestory.GameContent
 
             bool allChunksLoaded = true;
 
-            int minx = maxHalfSize, miny = maxHalfSize, minz = maxHalfSize, maxx = maxHalfSize, maxy = maxHalfSize, maxz = maxHalfSize;
-            int posX = pos.X - maxHalfSize;
-            int posY = pos.Y - maxHalfSize;
-            int posZ = pos.Z - maxHalfSize;
+            int minx = halfSize, miny = halfSize, minz = halfSize, maxx = halfSize, maxy = halfSize, maxz = halfSize;
+            int posX = pos.X - halfSize;
+            int posY = pos.Y - halfSize;
+            int posZ = pos.Z - halfSize;
             BlockPos npos = new BlockPos();
             BlockPos bpos = new BlockPos();
             int dx, dy, dz;
@@ -361,9 +370,9 @@ namespace Vintagestory.GameContent
             while (bfsQueue.Count > 0)
             {
                 int compressedPos = bfsQueue.Dequeue();
-                dx = compressedPos >> 8;
-                dy = (compressedPos >> 4) & 0xf;
-                dz = compressedPos & 0xf;
+                dx = compressedPos >> 10;
+                dy = (compressedPos >> 5) & 0x1f;
+                dz = compressedPos & 0x1f;
                 npos.Set(posX + dx, posY + dy, posZ + dz);
                 bpos.Set(npos);
 
@@ -412,29 +421,29 @@ namespace Vintagestory.GameContent
                     dy = npos.Y - posY;
                     dz = npos.Z - posZ;
 
-                    // Only traverse within maxHalfSize range:
-                    //   Outside maxHalfSize range from center position. Count as exit and don't continue searching in this direction
-                    //   Note: for performance, this switch statement ensures only one conditional check in each case, instead of 6 conditionals or 3 conditionals and 3 Math.Abs calls (which involve conditionals)
+                    // Only traverse within maxSize range, and overall room size must not exceed MAXROOMSIZE
+                    //   If outside that, count as an exit and don't continue searching in this direction
+                    //   Note: for performance, this switch statement ensures only one conditional check in each case on the dimension which has actually changed, instead of 6 conditionals or more
                     bool outsideCube = false;
                     switch (facing.Index)
                     {
                         case 0: // North
-                            outsideCube = dz < 0;
+                            if (dz < minz) outsideCube = dz < 0 || maxz - minz >= MAXROOMSIZE;
                             break;
                         case 1: // East
-                            outsideCube = dx > maxSize;
+                            if (dx > maxx) outsideCube = dx > maxSize || maxx - minx >= MAXROOMSIZE;
                             break;
                         case 2: // South
-                            outsideCube = dz > maxSize;
+                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz >= MAXROOMSIZE;
                             break;
                         case 3: // West
-                            outsideCube = dx < 0;
+                            if (dx < minx) outsideCube = dx < 0 || maxx - minx >= MAXROOMSIZE;
                             break;
                         case 4: // Up
-                            outsideCube = dy > maxSize;
+                            if (dy > maxy) outsideCube = dy > maxSize || maxy - miny >= MAXROOMSIZE;
                             break;
                         case 5: // Down
-                            outsideCube = dy < 0;
+                            if (dy < miny) outsideCube = dy < 0 || maxy - miny >= MAXROOMSIZE;
                             break;
                     }
                     if (outsideCube)
@@ -444,12 +453,12 @@ namespace Vintagestory.GameContent
                     }
 
 
-                    visitedIndex = (dx * MAXROOMSIZE + dy) * MAXROOMSIZE + dz;
+                    visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
                     if (currentVisited[visitedIndex] == iteration) continue;   // continue if block position was already visited
                     currentVisited[visitedIndex] = iteration;
 
                     // We only need to check the skylight if it's a block position not already visited ...
-                    int skyLightIndex = dx * MAXROOMSIZE + dz;
+                    int skyLightIndex = dx * ARRAYSIZE + dz;
                     if (skyLightXZChecked[skyLightIndex] < iteration)
                     {
                         skyLightXZChecked[skyLightIndex] = iteration;
@@ -465,7 +474,7 @@ namespace Vintagestory.GameContent
                         }
                     }
 
-                    bfsQueue.Enqueue(dx << 8 | dy << 4 | dz);
+                    bfsQueue.Enqueue(dx << 10 | dy << 5 | dz);
                 }
             }
 
@@ -477,11 +486,12 @@ namespace Vintagestory.GameContent
 
             byte[] posInRoom = new byte[(sizex * sizey * sizez + 7) / 8];
 
+            int volumeCount = 0;
             for (dx = 0; dx < sizex; dx++)
             {
                 for (dy = 0; dy < sizey; dy++)
                 {
-                    visitedIndex = ((dx + minx) * MAXROOMSIZE + (dy + miny)) * MAXROOMSIZE + minz;
+                    visitedIndex = ((dx + minx) * ARRAYSIZE + (dy + miny)) * ARRAYSIZE + minz;
                     for (dz = 0; dz < sizez; dz++)
                     {
                         if (currentVisited[visitedIndex + dz] == iteration)
@@ -489,10 +499,20 @@ namespace Vintagestory.GameContent
                             int index = (dy * sizez + dz) * sizex + dx;
 
                             posInRoom[index / 8] = (byte)(posInRoom[index / 8] | (1 << (index % 8)));
+                            volumeCount++;
                         }
                     }
                 }
             }
+
+            bool isCellar = sizex <= MAXCELLARSIZE && sizey <= MAXCELLARSIZE && sizez <= MAXCELLARSIZE;
+            if (!isCellar && volumeCount <= ALTMAXCELLARVOLUME)
+            {
+                isCellar = sizex <= ALTMAXCELLARSIZE && sizey <= MAXCELLARSIZE && sizez <= MAXCELLARSIZE
+                    || sizex <= MAXCELLARSIZE && sizey <= ALTMAXCELLARSIZE && sizez <= MAXCELLARSIZE
+                    || sizex <= MAXCELLARSIZE && sizey <= MAXCELLARSIZE && sizez <= ALTMAXCELLARSIZE;
+            }
+
 
             return new Room()
             {
@@ -503,7 +523,8 @@ namespace Vintagestory.GameContent
                 ExitCount = exitCount,
                 AnyChunkUnloaded = allChunksLoaded ? 0 : 1,
                 Location = new Cuboidi(posX + minx, posY + miny, posZ + minz, posX + maxx, posY + maxy, posZ + maxz),
-                PosInRoom = posInRoom
+                PosInRoom = posInRoom,
+                IsSmallRoom = isCellar && exitCount == 0
             };
         }
     }

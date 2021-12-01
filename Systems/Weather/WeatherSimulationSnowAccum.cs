@@ -224,7 +224,7 @@ namespace Vintagestory.GameContent
                 hereblock.PerformSnowLevelUpdate(ba, sval.Key, newblock, snowLevel);
             }
 
-            mc.SetData("lastSnowAccumUpdateTotalHours", SerializerUtil.Serialize<double>(lastSnowAccumUpdateTotalHours));
+            mc.SetModdata("lastSnowAccumUpdateTotalHours", SerializerUtil.Serialize<double>(lastSnowAccumUpdateTotalHours));
             mc.MarkDirty();
         }
 
@@ -499,7 +499,7 @@ namespace Vintagestory.GameContent
         private UpdateSnowLayerChunk GetSnowUpdate(WeatherSimulationRegion simregion, IServerMapChunk mc, Vec2i chunkPos, IWorldChunk[] chunksCol)
         {
 
-            byte[] data = mc.GetData("lastSnowAccumUpdateTotalHours");
+            byte[] data = mc.GetModdata("lastSnowAccumUpdateTotalHours");
             double lastSnowAccumUpdateTotalHours = data == null ? 0 : SerializerUtil.Deserialize<double>(data);
             double startTotalHours = lastSnowAccumUpdateTotalHours;
 

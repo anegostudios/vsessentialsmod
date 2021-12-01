@@ -81,6 +81,7 @@ namespace Vintagestory.GameContent
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             if (capi.IsGamePaused) return;
+            
             onPhysicsTick(deltaTime);
         }
 
@@ -99,6 +100,7 @@ namespace Vintagestory.GameContent
             {
                 return;
             }
+
 
             accum1s += deltaTime;
             if (accum1s > 1.5f)
@@ -190,6 +192,29 @@ namespace Vintagestory.GameContent
                     locomotor.Apply(dt, entity, pos, controls);
                 }
             }
+
+            int kb = entity.Attributes.GetInt("dmgkb");
+            if (kb > 0)
+            {
+                entity.Attributes.SetInt("dmgkb", kb + 1);
+                if (kb == 1)
+                {
+                    float str = 1 * 30 * dt;
+                    pos.Motion.X += entity.WatchedAttributes.GetDouble("kbdirX") * str;
+                    pos.Motion.Y += entity.WatchedAttributes.GetDouble("kbdirY") * str;
+                    pos.Motion.Z += entity.WatchedAttributes.GetDouble("kbdirZ") * str;
+                }
+
+                if (kb > 4)
+                {
+                    entity.Attributes.SetInt("dmgkb", 0);
+                    float str = 0.5f * 30 * dt;
+                    pos.Motion.X -= entity.WatchedAttributes.GetDouble("kbdirX") * str;
+                    pos.Motion.Y -= entity.WatchedAttributes.GetDouble("kbdirY") * str;
+                    pos.Motion.Z -= entity.WatchedAttributes.GetDouble("kbdirZ") * str;
+                }
+            }
+
 
             EntityAgent agent = entity as EntityAgent;
             if (agent?.MountedOn != null)

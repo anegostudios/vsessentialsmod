@@ -683,6 +683,7 @@ namespace Vintagestory.GameContent
             //sb.AppendLine(string.Format(string.Format("Blended:\nPrecipitation: {0}, Particle size: {1}, Type: {2}, Wind speed: {3}", wData.PrecIntensity, wData.PrecParticleSize, wData.BlendedPrecType, wsys.GetWindSpeed(plrPos))));
             ClimateCondition climate = api.World.BlockAccessor.GetClimateAt(player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
             sb.AppendLine(string.Format("Current precipitation: {0}%", (int)(climate.Rainfall * 100f)));
+            sb.AppendLine(string.Format("Current wind: {0}", API.Config.GlobalConstants.CurrentWindSpeedClient));
 
             return sb.ToString();
         }

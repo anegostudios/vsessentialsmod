@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Client;
+﻿using System;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
@@ -99,6 +100,8 @@ namespace Vintagestory.GameContent
             TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
             string skinBaseTextureKey = entity.Properties.Attributes?["skinBaseTextureKey"].AsString();
             if (skinBaseTextureKey != null) origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.Textures[skinBaseTextureKey].Baked.TextureSubId];
+
+            
 
             LoadedTexture entityAtlas = new LoadedTexture(null) {
                 TextureId = origTexPos.atlasTextureId,

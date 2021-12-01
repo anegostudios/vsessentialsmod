@@ -71,7 +71,7 @@ namespace Vintagestory.GameContent
                     else if (nwOrientable)
                     {
                         BlockFacing suggested = Block.SuggestedHVOrientation(byPlayer, blockSel)[0];
-                        string code = suggested.IsAxisWE ? "we" : "ns";
+                        string code = suggested.Axis == EnumAxis.X ? "we" : "ns";
                         blockToPlace = world.BlockAccessor.GetBlock(block.CodeWithParts(code));
                         if (blockToPlace == null)
                         {
@@ -84,7 +84,7 @@ namespace Vintagestory.GameContent
                         blockToPlace = this.block;
                     }
                     
-                    if (world.BlockAccessor.AddDecor(blockToPlace, pos, blockSel.Face))
+                    if (world.BlockAccessor.SetDecor(blockToPlace, pos, blockSel.Face))
                     {
                         return true;
                     }

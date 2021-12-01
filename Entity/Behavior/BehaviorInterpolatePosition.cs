@@ -20,6 +20,7 @@ namespace Vintagestory.GameContent
         float accum;
         bool serverposApplied;
         
+        
         public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
         {
             if (entity.World.Side == EnumAppSide.Server) throw new Exception("Not made for server side!");
@@ -47,8 +48,10 @@ namespace Vintagestory.GameContent
                 yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
                 pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
 
+                double posDiffSq = posDiffX * posDiffX + posDiffY * posDiffY + posDiffZ * posDiffZ;
+
                 // "|| accum > 1" mitigates items at the edge of block constantly jumping up and down
-                if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05f) || accum > 1)
+                if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05f) || (accum > 1 && posDiffSq < 0.1 * 0.1))
                 {
                     if (!serverposApplied)
                     {
