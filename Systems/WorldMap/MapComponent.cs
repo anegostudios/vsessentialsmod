@@ -7,7 +7,7 @@ using Vintagestory.API.Client;
 
 namespace Vintagestory.GameContent
 {
-    public abstract class MapComponent
+    public abstract class MapComponent : IDisposable
     {
         public ICoreClientAPI capi;
 

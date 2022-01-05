@@ -33,7 +33,7 @@ namespace Vintagestory.GameContent
             if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
 
-            double touchdist = entity.CollisionBox.XSize / 2;
+            double touchdist = entity.SelectionBox.XSize / 2;
 
             pushVector.Set(0, 0, 0);
             
@@ -63,8 +63,8 @@ namespace Vintagestory.GameContent
                 double py = dy * pushForce;
                 double pz = dz * pushForce;
                 
-                float hisSize = e.CollisionBox.Length * e.CollisionBox.Height;
-                float mySize = entity.CollisionBox.Length * entity.CollisionBox.Height;
+                float hisSize = e.SelectionBox.Length * e.SelectionBox.Height;
+                float mySize = entity.SelectionBox.Length * entity.SelectionBox.Height;
                 float pushDiff = GameMath.Clamp(hisSize / mySize, 0, 1);
 
                 pushVector.Add(px * pushDiff, py * pushDiff, pz * pushDiff);

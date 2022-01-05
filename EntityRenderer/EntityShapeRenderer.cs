@@ -265,12 +265,12 @@ namespace Vintagestory.GameContent
                 {
                     if (meshRefOpaque != null)
                     {
-                        capi.Render.DeleteMesh(meshRefOpaque);
+                        meshRefOpaque.Dispose();
                         meshRefOpaque = null;
                     }
                     if (meshRefOit != null)
                     {
-                        capi.Render.DeleteMesh(meshRefOit);
+                        meshRefOit.Dispose();
                         meshRefOit = null;
                     }
 
@@ -507,7 +507,7 @@ namespace Vintagestory.GameContent
             if (apap == null || stack == null) return;
             
             AttachmentPoint ap = apap.AttachPoint;
-            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTp);
+            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(slot, right ? EnumItemRenderTarget.HandTp : EnumItemRenderTarget.HandTpOff);
             IStandardShaderProgram prog = null;
 
             if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
@@ -556,7 +556,7 @@ namespace Vintagestory.GameContent
                 }
 
                 
-                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.CollisionBox.X1 - entity.OriginCollisionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.CollisionBox.Z1 - entity.OriginCollisionBox.Z1));
+                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
                 int temp = (int)stack.Collectible.GetTemperature(capi.World, stack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
                 lightrgbs[0] += glowColor[0];
@@ -684,7 +684,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.CollisionBox.X1 - entity.OriginCollisionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.CollisionBox.Z1 - entity.OriginCollisionBox.Z1));
+                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
 
                 capi.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
                 capi.Render.CurrentActiveShader.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
@@ -774,11 +774,11 @@ namespace Vintagestory.GameContent
                 aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
             } else
             {
-                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.CollisionBox.Y2 + 0.2, entity.Pos.Z);
+                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
             }
 
-            double offX = entity.CollisionBox.X2 - entity.OriginCollisionBox.X2;
-            double offZ = entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2;
+            double offX = entity.SelectionBox.X2 - entity.OriginSelectionBox.X2;
+            double offZ = entity.SelectionBox.Z2 - entity.OriginSelectionBox.Z2;
             aboveHeadPos.Add(offX, 0, offZ);
 
 
@@ -836,54 +836,6 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void Dispose()
-        {
-            if (meshRefOpaque != null)
-            {
-                meshRefOpaque.Dispose();
-                meshRefOpaque = null;
-            }
-
-            if (meshRefOit != null)
-            {
-                meshRefOit.Dispose();
-                meshRefOit = null;
-            }
-
-            if (nameTagTexture != null)
-            {
-                nameTagTexture.Dispose();
-                nameTagTexture = null;
-            }
-
-            if (debugTagTexture != null)
-            {
-                debugTagTexture.Dispose();
-                debugTagTexture = null;
-            }
-
-            capi.Event.ReloadShapes -= MarkShapeModified;
-
-            if (DisplayChatMessages)
-            {
-                capi.Event.ChatMessage -= OnChatMessage;
-            }
-
-
-            if (eagent?.GearInventory != null)
-            {
-                eagent.GearInventory.SlotModified -= gearSlotModified;
-            }
-
-            if (entity is EntityPlayer eplr)
-            {
-                IInventory inv = eplr.Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-                if (inv != null) inv.SlotModified -= backPackSlotModified;
-            }
-
-            }
-
-
         double stepPitch;
         double prevY;
         double prevYAccum;
@@ -906,7 +858,7 @@ namespace Vintagestory.GameContent
             float rotY = entity.Properties.Client.Shape?.rotateY ?? 0;
             float rotZ = entity.Properties.Client.Shape?.rotateZ ?? 0;
 
-            Mat4f.Translate(ModelMat, ModelMat, 0, entity.CollisionBox.Y2 / 2, 0);
+            Mat4f.Translate(ModelMat, ModelMat, 0, entity.SelectionBox.Y2 / 2, 0);
 
             // Some weird quick random hack to make creatures rotate their bodies up/down when stepping up stuff or falling down
             if (eagent != null && !entity.Properties.CanClimbAnywhere && !isShadowPass && eagent.Alive && entity.Attributes.GetInt("dmgkb", 0) == 0 && entity.Properties.Client.PitchStep)
@@ -952,7 +904,14 @@ namespace Vintagestory.GameContent
             float bodyPitch = entity is EntityPlayer ? 0 : entity.Pos.Pitch;
 
             float yaw = entity.Pos.Yaw + (rotY + 90) * GameMath.DEG2RAD;
+
+            /*if (capi.World.Player.Entity.WatchedAttributes.GetDouble("temporalStability", 1) < 0.1)
+            {
+                yaw = (float)Math.Atan2(entity.Pos.X - capi.World.Player.Entity.Pos.X, entity.Pos.Z - capi.World.Player.Entity.Pos.Z) - (rotY + 90) * GameMath.DEG2RAD;
+                if (entity.Code.Path.Contains("strawdummy")) yaw -= GameMath.PIHALF;
+            }*/
             
+
             BlockFacing climbonfacing = entity.ClimbingOnFace;
 
             // To fix climbing locust rotation weirdnes on east and west faces. Brute forced fix. There's probably a correct solution to this.
@@ -970,7 +929,7 @@ namespace Vintagestory.GameContent
 
 
             float scale = entity.Properties.Client.Size;
-            Mat4f.Translate(ModelMat, ModelMat, 0, -entity.CollisionBox.Y2 / 2, 0f);
+            Mat4f.Translate(ModelMat, ModelMat, 0, -entity.SelectionBox.Y2 / 2, 0f);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
         }
@@ -999,9 +958,6 @@ namespace Vintagestory.GameContent
                 bodyYawLerped += GameMath.Clamp(yawDist, -dt * 8, dt * 8);
                 bodyYaw = bodyYawLerped;
             }
-
-
-
             
             float bodyPitch = eplr == null ? 0 : eplr.WalkPitch;
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
@@ -1093,5 +1049,56 @@ namespace Vintagestory.GameContent
         }
 
         #endregion
+
+
+
+        public override void Dispose()
+        {
+            if (meshRefOpaque != null)
+            {
+                meshRefOpaque.Dispose();
+                meshRefOpaque = null;
+            }
+
+            if (meshRefOit != null)
+            {
+                meshRefOit.Dispose();
+                meshRefOit = null;
+            }
+
+            if (nameTagTexture != null)
+            {
+                nameTagTexture.Dispose();
+                nameTagTexture = null;
+            }
+
+            if (debugTagTexture != null)
+            {
+                debugTagTexture.Dispose();
+                debugTagTexture = null;
+            }
+
+            capi.Event.ReloadShapes -= MarkShapeModified;
+
+            if (DisplayChatMessages)
+            {
+                capi.Event.ChatMessage -= OnChatMessage;
+            }
+
+
+            if (eagent?.GearInventory != null)
+            {
+                eagent.GearInventory.SlotModified -= gearSlotModified;
+            }
+
+            if (entity is EntityPlayer eplr)
+            {
+                IInventory inv = eplr.Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
+                if (inv != null) inv.SlotModified -= backPackSlotModified;
+            }
+
+        }
+
+
     }
 }

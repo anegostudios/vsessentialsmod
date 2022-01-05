@@ -60,14 +60,14 @@ namespace Vintagestory.GameContent
             int textureSubId = block.FirstTextureInventory.Baked.TextureSubId;
             this.atlasTextureId = api.BlockTextureAtlas.Positions[textureSubId].atlasTextureId;
 
-            prevPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
+            prevPos.Set(entity.Pos.X + entity.SelectionBox.X1, entity.Pos.Y + entity.SelectionBox.Y1, entity.Pos.Z + entity.SelectionBox.Z1);
         }
 
 
         public void OnPhysicsTick(float nextAccum, Vec3d prevPos)
         {
             this.accum = nextAccum;
-            this.prevPos.Set(prevPos.X + entity.CollisionBox.X1, prevPos.Y + entity.CollisionBox.Y1, prevPos.Z + entity.CollisionBox.Z1);
+            this.prevPos.Set(prevPos.X + entity.SelectionBox.X1, prevPos.Y + entity.SelectionBox.Y1, prevPos.Z + entity.SelectionBox.Z1);
 
             ellapsedMsPhysics = capi.ElapsedMilliseconds;
         }
@@ -92,7 +92,7 @@ namespace Vintagestory.GameContent
 
             if (!DoRender || (!blockFallingEntity.InitialBlockRemoved && entity.World.BlockAccessor.GetBlock(blockFallingEntity.initialPos).Id != 0)) return;
 
-            curPos.Set(entity.Pos.X + entity.CollisionBox.X1, entity.Pos.Y + entity.CollisionBox.Y1, entity.Pos.Z + entity.CollisionBox.Z1);
+            curPos.Set(entity.Pos.X + entity.SelectionBox.X1, entity.Pos.Y + entity.SelectionBox.Y1, entity.Pos.Z + entity.SelectionBox.Z1);
 
             RenderFallingBlockEntity();
         }

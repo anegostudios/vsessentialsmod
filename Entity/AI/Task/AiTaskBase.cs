@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace Vintagestory.API.Common
@@ -125,7 +126,8 @@ namespace Vintagestory.API.Common
                 animMeta.EaseInSpeed = 1f;
                 animMeta.EaseOutSpeed = 1f;
                 entity.AnimManager.StartAnimation(animMeta);
-                //Console.WriteLine("entity id " + entity.EntityId + " ai task start anim " + animMeta.Code);
+                
+                //Console.WriteLine("entity id " + entity.EntityId + " ai task start anim " + animMeta.Code + ", speed: " + animMeta.AnimationSpeed);
             }
 
             if (sound != null && entity.World.Rand.NextDouble() <= soundChance)
@@ -199,6 +201,11 @@ namespace Vintagestory.API.Common
         }
 
         public virtual void OnEntityHurt(DamageSource source, float damage)
+        {
+            
+        }
+
+        public virtual void OnNoPath(Vec3d target)
         {
             
         }

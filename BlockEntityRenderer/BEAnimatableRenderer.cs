@@ -38,9 +38,9 @@ namespace Vintagestory.GameContent
             this.rotation = rotation;
             if (rotation == null) this.rotation = new Vec3f();
 
-            textureId = capi.BlockTextureAtlas.AtlasTextureIds[0];//.GetPosition(capi.World.BlockAccessor.GetBlock(pos), "rusty").atlasTextureId;
+            textureId = capi.BlockTextureAtlas.AtlasTextureIds[0];
 
-            (capi as ICoreClientAPI).Event.EnqueueMainThreadTask(() =>
+            capi.Event.EnqueueMainThreadTask(() =>
             {
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "beanimatable");
                 capi.Event.RegisterRenderer(this, EnumRenderStage.ShadowFar, "beanimatable");
@@ -50,7 +50,7 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
-            if (!ShouldRender) return;
+            if (!ShouldRender || meshref.Disposed || !meshref.Initialized) return;
 
             bool shadowPass = stage != EnumRenderStage.Opaque;
             

@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
 
                 Health = typeAttributes["currenthealth"].AsFloat(20);
                 BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
-                UpdateMaxHealth();
+                MarkDirty();
                 return;
             }
 
@@ -89,9 +89,8 @@ namespace Vintagestory.GameContent
             BaseMaxHealth = healthTree.GetFloat("basemaxhealth");
 
             if (BaseMaxHealth == 0) BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
-            
 
-            UpdateMaxHealth();
+            MarkDirty();
         }
 
 
@@ -154,7 +153,7 @@ namespace Vintagestory.GameContent
 
 
 
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
             if (onDamaged != null)
             {
@@ -183,7 +182,7 @@ namespace Vintagestory.GameContent
             }
 
             if (!entity.Alive) return;
-
+            if (damage <= 0) return;
             
 
             Health -= damage;
@@ -204,6 +203,12 @@ namespace Vintagestory.GameContent
                 {
                     entity.AnimManager.StartAnimation("hurt");
                 }
+
+                if (damageSource.Type != EnumDamageType.Heal)
+                {
+                    entity.PlayEntitySound("hurt");
+                }
+
             }
         }
 

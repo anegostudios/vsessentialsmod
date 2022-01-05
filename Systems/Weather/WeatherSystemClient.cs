@@ -114,7 +114,7 @@ namespace Vintagestory.GameContent
                 plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
                 plrPosd.Set(eplr.Pos.X, eplr.Pos.Y, eplr.Pos.Z);
 
-                WeatherDataAtPlayer.LoadAdjacentSimsAndLerpValues(plrPosd);
+                WeatherDataAtPlayer.LoadAdjacentSimsAndLerpValues(plrPosd, dt);
                 WeatherDataAtPlayer.UpdateAdjacentAndBlendWeatherData();
 
                 int lightlevel = Math.Max(

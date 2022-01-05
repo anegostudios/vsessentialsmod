@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
 
         public int minduration;
         public int maxduration;
-        public float turnSpeedMul = 1f;
+        public float turnSpeedMul = 0.75f;
 
         public long idleUntilMs;
 
@@ -23,7 +23,7 @@ namespace Vintagestory.GameContent
         {
             this.minduration = (int)taskConfig["minduration"]?.AsInt(2000);
             this.maxduration = (int)taskConfig["maxduration"]?.AsInt(4000);
-            this.turnSpeedMul = (float)taskConfig["turnSpeedMul"]?.AsFloat(1);
+            this.turnSpeedMul = (float)taskConfig["turnSpeedMul"]?.AsFloat(0.75f);
 
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
 

@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
 
             if (player?.WorldData.CurrentGameMode == EnumGameMode.Spectator) return;
 
-            tmp.Set(entity.ServerPos.X, entity.ServerPos.Y + entity.CollisionBox.Y1 + entity.CollisionBox.Y2 / 2, entity.ServerPos.Z);
+            tmp.Set(entity.ServerPos.X, entity.ServerPos.Y + entity.SelectionBox.Y1 + entity.SelectionBox.Y2 / 2, entity.ServerPos.Z);
             Entity[] entities = entity.World.GetEntitiesAround(tmp, 1.5f, 1.5f, entityMatcher);
             if (entities.Length == 0)
             {

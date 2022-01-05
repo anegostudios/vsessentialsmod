@@ -22,11 +22,24 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public EnumHabitat Habitat = EnumHabitat.Land;
 
-        [JsonProperty, Obsolete("Use CollisionBoxSize instead")]
-        public Vec2f HitBoxSize => CollisionBoxSize;
+        /// <summary>
+        /// Sets both the collision and selection box
+        /// </summary>
+        [JsonProperty]
+        public Vec2f HitBoxSize {
+            get { return null; }
+            set { CollisionBoxSize = value; SelectionBoxSize = value; }
+        }
 
-        [JsonProperty, Obsolete("Use DeadCollisionBoxSize instead")]
-        public Vec2f DeadHitBoxSize => DeadCollisionBoxSize;
+        /// <summary>
+        /// Sets both the collision and selection box
+        /// </summary>
+        [JsonProperty]
+        public Vec2f DeadHitBoxSize
+        {
+            get { return null; }
+            set { DeadCollisionBoxSize = value; DeadSelectionBoxSize = value; }
+        }
 
         [JsonProperty]
         public Vec2f CollisionBoxSize = new Vec2f(0.5f, 0.5f);

@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
         }
 
         
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
             if (damageSource.Source == EnumDamageSource.Fall && entity.World.Config.GetString("creatureHostility") == "passive" && entity.World.Config.GetString("creatureHostility") == "off")
             {

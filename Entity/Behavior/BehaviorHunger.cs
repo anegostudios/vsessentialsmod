@@ -228,7 +228,6 @@ namespace Vintagestory.GameContent
                 }
             }
 
-
             sprintCounter += entityAgent != null && entityAgent.Controls.Sprint ? 1 : 0;
             hungerCounter += deltaTime;
 
@@ -236,7 +235,7 @@ namespace Vintagestory.GameContent
             if (hungerCounter > 10)
             {
                 bool isStandingStill = (entity.World.ElapsedMilliseconds - lastMoveMs) > 3000;
-                float satLossMultiplier = isStandingStill ? 1 / 3f : 1f;
+                float satLossMultiplier = isStandingStill ? 1 / 4f : 1f;
                 //if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f; - Now set in InventoryPlayerHotbar
 
                 satLossMultiplier *= 1.2f * (8 + sprintCounter / 15f) / 10f;
@@ -440,7 +439,7 @@ namespace Vintagestory.GameContent
             return "hunger";
         }
 
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
             if (damageSource.Type == EnumDamageType.Heal && damageSource.Source == EnumDamageSource.Revive)
             {

@@ -12,36 +12,38 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskSeekEntity : AiTaskBaseTargetable
     {
-        Entity targetEntity;
-        Vec3d targetPos;
+        protected Vec3d targetPos;
 
-        float moveSpeed = 0.02f;
-        float seekingRange = 25f;
-        float belowTempSeekingRange = 25f;
-        float belowTempThreshold = -999;
-        float maxFollowTime = 60;
-        
-        bool stopNow = false;
+        protected float moveSpeed = 0.02f;
+        protected float seekingRange = 25f;
+        protected float belowTempSeekingRange = 25f;
+        protected float belowTempThreshold = -999;
+        protected float maxFollowTime = 60;
 
-        float currentFollowTime = 0;
+        protected bool stopNow = false;
 
-        bool alarmHerd = false;
-        bool leapAtTarget = false;
-        float leapHeightMul = 1f;
-        string leapAnimationCode="jump";
-        float leapChance = 1f;
+        protected float currentFollowTime = 0;
 
-        bool siegeMode;
+        protected bool alarmHerd = false;
+        protected bool leapAtTarget = false;
+        protected float leapHeightMul = 1f;
+        protected string leapAnimationCode ="jump";
+        protected float leapChance = 1f;
 
-        long finishedMs;
-        bool jumpAnimOn;
+        protected bool siegeMode;
 
-        long lastSearchTotalMs;
+        protected long finishedMs;
+        protected bool jumpAnimOn;
 
-        EntityPartitioning partitionUtil;
-		float extraTargetDistance = 0f;
-        
-        bool lowTempMode;
+        protected long lastSearchTotalMs;
+
+        protected EntityPartitioning partitionUtil;
+        protected float extraTargetDistance = 0f;
+
+        protected bool lowTempMode;
+
+        protected int searchWaitMs = 4000;
+
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
@@ -64,6 +66,7 @@ namespace Vintagestory.GameContent
             maxFollowTime = taskConfig["maxFollowTime"].AsFloat(60);
             alarmHerd = taskConfig["alarmHerd"].AsBool(false);
             leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
+            retaliateAttacks = taskConfig["retaliateAttacks"].AsBool(true);
         }
 
 
@@ -72,9 +75,9 @@ namespace Vintagestory.GameContent
             // React immediately on hurt, otherwise only 1/10 chance of execution
             if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || bhEmo?.IsInEmotionState(whenInEmotionState) != true)) return false;
 
-            if (whenInEmotionState != null && !bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
+            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
             if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
-            if (lastSearchTotalMs + 4000 > entity.World.ElapsedMilliseconds) return false;
+            if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
 
@@ -98,32 +101,44 @@ namespace Vintagestory.GameContent
 
             Vec3d ownPos = entity.ServerPos.XYZ;
 
-            targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => isTargetableEntity(e, range));
-
-            if (targetEntity != null)
+            if (entity.World.ElapsedMilliseconds - attackedByEntityMs > 30000)
             {
-                if (alarmHerd && entity.HerdId > 0)
+                attackedByEntity = null;
+            }
+
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && entity.World.Rand.NextDouble() < 0.5 && IsTargetableEntity(attackedByEntity, range, true))
+            {
+                targetEntity = attackedByEntity;
+            }
+            else
+            {
+                targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, range, (e) => IsTargetableEntity(e, range));
+
+                if (targetEntity != null)
                 {
-                    entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, range, (e) =>
+                    if (alarmHerd && entity.HerdId > 0)
                     {
-                        EntityAgent agent = e as EntityAgent;
-                        if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == entity.HerdId)
+                        entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, range, (e) =>
                         {
-                            agent.Notify("seekEntity", targetEntity);
-                        }
+                            EntityAgent agent = e as EntityAgent;
+                            if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == entity.HerdId)
+                            {
+                                agent.Notify("seekEntity", targetEntity);
+                            }
 
+                            return false;
+                        });
+                    }
+
+                    targetPos = targetEntity.ServerPos.XYZ;
+
+                    if (entity.ServerPos.SquareDistanceTo(targetPos) <= MinDistanceToTarget())
+                    {
                         return false;
-                    });
+                    }
+
+                    return true;
                 }
-
-                targetPos = targetEntity.ServerPos.XYZ;
-
-                if (entity.ServerPos.SquareDistanceTo(targetPos) <= MinDistanceToTarget())
-                {
-                    return false;
-                }
-
-                return true;
             }
 
             return false;
@@ -131,7 +146,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return extraTargetDistance + Math.Max(0.1f, targetEntity.CollisionBox.XSize / 2 + entity.CollisionBox.XSize / 4);
+            return extraTargetDistance + Math.Max(0.1f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 4);
         }
 
         public override void StartExecute()
@@ -170,7 +185,7 @@ namespace Vintagestory.GameContent
                 while (tries < 5)
                 {
                     // Down ok?
-                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y - dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, new Vec3d(tmp.X + 0.5, tmp.Y - dy + 1, tmp.Z + 0.5), false))
+                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y - dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y - dy + 1, tmp.Z + 0.5), false))
                     {
                         ok = true;
                         targetPos.Y -= dy;
@@ -180,7 +195,7 @@ namespace Vintagestory.GameContent
                     }
 
                     // Down ok?
-                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y + dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, new Vec3d(tmp.X + 0.5, tmp.Y + dy + 1, tmp.Z + 0.5), false))
+                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y + dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y + dy + 1, tmp.Z + 0.5), false))
                     {
                         ok = true;
                         targetPos.Y += dy;
@@ -212,11 +227,12 @@ namespace Vintagestory.GameContent
             currentFollowTime += dt;
             lastPathUpdateSeconds += dt;
 
-            if (!siegeMode && lastPathUpdateSeconds >= 1 && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3*3)
+            if (!siegeMode && lastPathUpdateSeconds >= 0.75f && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3*3)
             {
-                pathTraverser.NavigateTo(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 2000, true);
+                targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
+                
+                pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 2000, true);
                 lastPathUpdateSeconds = 0;
-                targetPos.Set(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
             }
 
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
@@ -231,8 +247,8 @@ namespace Vintagestory.GameContent
                 pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
             }
 
-            Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
+            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
             double distance = targetBox.ShortestDistanceFrom(pos);
 
 
@@ -320,7 +336,7 @@ namespace Vintagestory.GameContent
         {
             if (!siegeMode)
             {
-                pathTraverser.Active = true;
+                pathTraverser.Retarget();
             } else
             {
                 stopNow = true;

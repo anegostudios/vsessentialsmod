@@ -90,8 +90,8 @@ namespace Vintagestory.GameContent
         {
             if (capi.Settings.Bool["immersiveMouseMode"])
             {
-                double offX = owningEntity.CollisionBox.X2 - owningEntity.OriginCollisionBox.X2;
-                double offZ = owningEntity.CollisionBox.Z2 - owningEntity.OriginCollisionBox.Z2;
+                double offX = owningEntity.SelectionBox.X2 - owningEntity.OriginSelectionBox.X2;
+                double offZ = owningEntity.SelectionBox.Z2 - owningEntity.OriginSelectionBox.Z2;
 
                 Vec3d aboveHeadPos = new Vec3d(owningEntity.Pos.X + offX, owningEntity.Pos.Y + FloatyDialogPosition, owningEntity.Pos.Z + offZ);
                 Vec3d pos = MatrixToolsd.Project(aboveHeadPos, capi.Render.PerspectiveProjectionMat, capi.Render.PerspectiveViewMat, capi.Render.FrameWidth, capi.Render.FrameHeight);
@@ -118,7 +118,7 @@ namespace Vintagestory.GameContent
             base.OnFinalizeFrame(dt);
 
             entityPos.Set(owningEntity.Pos.X, owningEntity.Pos.Y, owningEntity.Pos.Z);
-            entityPos.Add(owningEntity.CollisionBox.X2 - owningEntity.OriginCollisionBox.X2, 0, owningEntity.CollisionBox.Z2 - owningEntity.OriginCollisionBox.Z2);
+            entityPos.Add(owningEntity.SelectionBox.X2 - owningEntity.OriginSelectionBox.X2, 0, owningEntity.SelectionBox.Z2 - owningEntity.OriginSelectionBox.Z2);
 
             if (!IsInRangeOfBlock())
             {

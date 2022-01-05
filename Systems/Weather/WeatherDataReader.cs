@@ -71,9 +71,9 @@ namespace Vintagestory.GameContent
         {
         }
 
-        public void LoadAdjacentSimsAndLerpValues(Vec3d pos)
+        public void LoadAdjacentSimsAndLerpValues(Vec3d pos, float dt)
         {
-            LoadAdjacentSimsAndLerpValues(pos, false);
+            LoadAdjacentSimsAndLerpValues(pos, false, 0, 0, dt);
         }
 
 
@@ -199,10 +199,10 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public void LoadAdjacentSimsAndLerpValues(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0)
+        public void LoadAdjacentSimsAndLerpValues(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0, float dt = 1)
         {
             LoadAdjacentSims(pos);
-            LoadLerp(pos, useArgValues, lerpRainCloudOverlay, lerpRainOverlay);
+            LoadLerp(pos, useArgValues, lerpRainCloudOverlay, lerpRainOverlay, dt);
         }
 
 
@@ -211,7 +211,7 @@ namespace Vintagestory.GameContent
         BlockPos tmpPos = new BlockPos();
         IMapRegion hereMapRegion;
 
-        public void LoadLerp(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0)
+        public void LoadLerp(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0, float dt = 1)
         {
             int regSize = api.World.BlockAccessor.RegionSize;
 
@@ -252,8 +252,9 @@ namespace Vintagestory.GameContent
                     }
 
                     ClimateCondition conds = ws.GetClimateFast(tmpPos, climate);
-                    this.lerpRainCloudOverlay = conds.RainCloudOverlay;
-                    this.lerpRainOverlay = conds.Rainfall;
+                    float tspeed = Math.Min(1, dt * 10);
+                    this.lerpRainCloudOverlay = this.lerpRainCloudOverlay + (conds.RainCloudOverlay - this.lerpRainCloudOverlay) * tspeed;
+                    this.lerpRainOverlay = this.lerpRainOverlay + (conds.Rainfall - this.lerpRainOverlay) * tspeed;
                 }
             }
         }

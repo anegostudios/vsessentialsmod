@@ -406,6 +406,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.GuiTransform = typedItemType.GuiTransform?.Clone();
             item.FpHandTransform = typedItemType.FpHandTransform?.Clone();
             item.TpHandTransform = typedItemType.TpHandTransform?.Clone();
+            item.TpOffHandTransform = typedItemType.TpOffHandTransform?.Clone();
             item.GroundTransform = typedItemType.GroundTransform?.Clone();
 
             item.DamagedBy = (EnumItemDamageSource[])typedItemType.DamagedBy?.Clone();
@@ -609,6 +610,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.GuiTransform = typedBlockType.GuiTransform;
             block.FpHandTransform = typedBlockType.FpHandTransform;
             block.TpHandTransform = typedBlockType.TpHandTransform;
+            block.TpOffHandTransform = typedBlockType.TpOffHandTransform;
             block.GroundTransform = typedBlockType.GroundTransform;
             block.RenderPass = typedBlockType.RenderPass;
             block.ParticleProperties = typedBlockType.ParticleProperties;

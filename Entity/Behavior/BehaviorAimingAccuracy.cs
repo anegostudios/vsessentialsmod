@@ -77,9 +77,9 @@ namespace Vintagestory.GameContent
             entity.Attributes.SetFloat("aimingAccuracy", accuracy);
         }
 
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            base.OnEntityReceiveDamage(damageSource, damage);
+            base.OnEntityReceiveDamage(damageSource, ref damage);
 
             if (damageSource.Type == EnumDamageType.Heal) return;
 
@@ -144,11 +144,11 @@ namespace Vintagestory.GameContent
             float modacc = 0.93f * rangedAcc;
             if (rangedAcc >= 1)
             {
-                // Asymptomatically reach of 100% accuracy
+                // Asymptomatically reach 100% accuracy
                 modacc = 0.93f + ((1 - 1 / (1 + 3 * rangedAcc)) - 0.5f) * 0.07f;
             }
 
-            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.1, 1.5), 0, modacc);
+            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.7, 1.5), 0, modacc);
             accuracy *= Math.Max(0.1f, modacc);
 
             accuracy -= GameMath.Clamp((SecondsSinceAimStart - 3f) / 3, 0, 0.25f);
@@ -157,8 +157,6 @@ namespace Vintagestory.GameContent
             {
                 accuracy += GameMath.Sin(SecondsSinceAimStart * 8) / 80f;
             }
-
-            
         }
     }
 

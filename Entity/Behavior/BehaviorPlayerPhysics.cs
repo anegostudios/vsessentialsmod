@@ -13,10 +13,11 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics
     {
+        EntityPlayer eplr;
 
         public EntityBehaviorPlayerPhysics(Entity entity) : base(entity)
         {
-            
+            eplr = entity as EntityPlayer;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
@@ -62,17 +63,16 @@ namespace Vintagestory.GameContent
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
                 
-                GameTick(entity, frameTime);
+                TickEntityPhysicsPre(entity, frameTime);
                 accumulator -= frameTime;
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
         }
 
-        public override void GameTick(Entity entity, float dt)
+        public override void TickEntityPhysicsPre(Entity entity, float dt)
         {
-            EntityPlayer entityplayer = entity as EntityPlayer;
-            EntityControls controls = entityplayer.Controls;
+            EntityControls controls = eplr.Controls;
 
             string playerUID = entity.WatchedAttributes.GetString("playerUID");
             IPlayer player = entity.World.PlayerByUid(playerUID);
@@ -120,24 +120,27 @@ namespace Vintagestory.GameContent
 
                 float desiredYaw = (float)Math.Atan2(controls.WalkVector.X, controls.WalkVector.Z) - GameMath.PIHALF;
                 
-                float yawDist = GameMath.AngleRadDistance(entityplayer.WalkYaw, desiredYaw);
-                entityplayer.WalkYaw += GameMath.Clamp(yawDist, -8 * dt * GlobalConstants.OverallSpeedMultiplier, 8 * dt * GlobalConstants.OverallSpeedMultiplier);
-                entityplayer.WalkYaw = GameMath.Mod(entityplayer.WalkYaw, GameMath.TWOPI);
+                float yawDist = GameMath.AngleRadDistance(eplr.WalkYaw, desiredYaw);
+                eplr.WalkYaw += GameMath.Clamp(yawDist, -8 * dt * GlobalConstants.OverallSpeedMultiplier, 8 * dt * GlobalConstants.OverallSpeedMultiplier);
+                eplr.WalkYaw = GameMath.Mod(eplr.WalkYaw, GameMath.TWOPI);
 
                 if (entity.Swimming)
                 {
                     float desiredPitch = -(float)Math.Sin(pos.Pitch); // (float)controls.FlyVector.Y * GameMath.PI;
-                    float pitchDist = GameMath.AngleRadDistance(entityplayer.WalkPitch, desiredPitch);
-                    entityplayer.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt * GlobalConstants.OverallSpeedMultiplier, 2 * dt * GlobalConstants.OverallSpeedMultiplier);
-                    entityplayer.WalkPitch = GameMath.Mod(entityplayer.WalkPitch, GameMath.TWOPI);
+                    float pitchDist = GameMath.AngleRadDistance(eplr.WalkPitch, desiredPitch);
+                    eplr.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt * GlobalConstants.OverallSpeedMultiplier, 2 * dt * GlobalConstants.OverallSpeedMultiplier);
+                    eplr.WalkPitch = GameMath.Mod(eplr.WalkPitch, GameMath.TWOPI);
                 } else
                 {
-                    entityplayer.WalkPitch = 0;
+                    eplr.WalkPitch = 0;
                 }
             } else
             {
-
+                float prevYaw = pos.Yaw;
+                IServerPlayer splr = player as IServerPlayer;
+                if (splr != null) pos.Yaw = splr.CameraYaw;
                 controls.CalcMovementVectors(pos, dt);
+                pos.Yaw = prevYaw;
             }
             
             TickEntityPhysics(pos, controls, dt);

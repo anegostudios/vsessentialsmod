@@ -73,6 +73,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public ModelTransform TpHandTransform;
         [JsonProperty]
+        public ModelTransform TpOffHandTransform;
+        [JsonProperty]
         public ModelTransform GroundTransform;
 
         [JsonProperty]
@@ -133,6 +135,9 @@ namespace Vintagestory.ServerMods.NoObf
             GuiTransform.EnsureDefaultValues();
             FpHandTransform.EnsureDefaultValues();
             TpHandTransform.EnsureDefaultValues();
+
+            if (TpOffHandTransform == null) TpOffHandTransform = TpHandTransform.Clone();
+            TpOffHandTransform.EnsureDefaultValues();
             GroundTransform.EnsureDefaultValues();
 
             if (Texture != null)

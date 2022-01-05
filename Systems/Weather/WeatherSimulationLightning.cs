@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -49,8 +43,6 @@ namespace Vintagestory.GameContent
                     lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
                     lightningIntensity = 0.25f + (float)rnd.NextDouble();
 
-
-
                     float pitch = GameMath.Clamp((float)rnd.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2 - deepnessSub / 2, 0.6f, 1.15f);
                     float volume = GameMath.Clamp(Math.Min(1, 0.25f + lightningTime + lightningIntensity / 2) - 2f * deepnessSub, 0, 1);
                     
@@ -92,7 +84,6 @@ namespace Vintagestory.GameContent
             {
                 AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
                 actualSunGlowAmb.FogColor.Weight = sunGlowAmb.FogColor.Weight;
-                //actualSunGlowAmb.AmbientColor.Weight = sunGlowAmb.AmbientColor.Weight;
 
                 dt = Math.Min(0.5f, dt);
 

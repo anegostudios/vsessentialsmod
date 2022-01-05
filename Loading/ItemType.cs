@@ -21,6 +21,7 @@ namespace Vintagestory.ServerMods.NoObf
             GuiTransform = ModelTransform.ItemDefaultGui();
             FpHandTransform = ModelTransform.ItemDefaultFp();
             TpHandTransform = ModelTransform.ItemDefaultTp();
+            TpOffHandTransform = null;
             GroundTransform = ModelTransform.ItemDefaultGround();
         }
 

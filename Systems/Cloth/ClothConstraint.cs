@@ -27,7 +27,7 @@ namespace Vintagestory.GameContent
 
         float rest_length;
         float inverse_length;
-        Vec3d tensionDirection = new Vec3d();
+        Vec3f tensionDirection = new Vec3f();
         private float StretchStiffness = 200f;
         double springLength;
         public Vec3d renderCenterPos;
@@ -69,7 +69,7 @@ namespace Vintagestory.GameContent
 
         public void satisfy(float pdt)
         {
-            tensionDirection.Set(p1.Pos).Sub(p2.Pos);
+            tensionDirection.Set((float)(p1.Pos.X - p2.Pos.X), (float)(p1.Pos.Y - p2.Pos.Y), (float)(p1.Pos.Z - p2.Pos.Z));
 
             springLength = tensionDirection.Length();
 

@@ -289,92 +289,7 @@ namespace Vintagestory.GameContent
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
             if (weatherData.curWindSpeed.X > 0.5f && particlePos.Y - rainYPos < 10)
             {
-                float dx = (float)(plrPos.Motion.X * 40) - 50 * weatherData.curWindSpeed.X;
-                float dy = (float)(plrPos.Motion.Y * 40);
-                float dz = (float)(plrPos.Motion.Z * 40);
-
-                stormDustParticles.MinPos.Set(particlePos.X - 40 + dx, particlePos.Y + 5 + 5 * Math.Abs(weatherData.curWindSpeed.X) + dy, particlePos.Z - 40 + dz);
-                stormDustParticles.AddPos.Set(80, -20, 80);
-                stormDustParticles.GravityEffect = 0.1f;
-                stormDustParticles.ParticleModel = EnumParticleModel.Quad;
-                stormDustParticles.LifeLength = 1f;
-                stormDustParticles.DieOnRainHeightmap = true;
-                stormDustParticles.WindAffectednes = 8f;
-                stormDustParticles.MinQuantity = 0;
-                stormDustParticles.AddQuantity = 8 * (weatherData.curWindSpeed.X - 0.5f) * dryness;
-
-                stormDustParticles.MinSize = 0.1f;
-                stormDustParticles.MaxSize = 0.4f;
-
-                stormDustParticles.MinVelocity.Set(-0.025f + 10 * weatherData.curWindSpeed.X, 0f, -0.025f);
-                stormDustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, -0.25f, 0.05f);
-
-
-                for (int i = 0; i < 30; i++)
-                {
-                    double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-                    double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-
-                    int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
-                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-                    if (block.IsLiquid()) continue;
-                    if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
-                    {
-                        if (rand.NextDouble() < 0.5f) continue;
-                    }
-                    if (Math.Abs(py - particlePos.Y) > 15) continue;
-
-                    tmpPos.Set((int)px, py, (int)pz);
-                    stormDustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));
-                    stormDustParticles.Color |= 255 << 24;
-
-                    manager.Spawn(stormDustParticles);
-                }
-
-
-                if (weatherData.curWindSpeed.X > 0.85f)
-                {
-                    stormWaterParticles.AddVelocity.Y = 1.5f;
-                    stormWaterParticles.LifeLength = 0.17f;
-                    stormWaterParticles.WindAffected = true;
-                    stormWaterParticles.WindAffectednes = 1f;
-                    stormWaterParticles.GravityEffect = 0.4f;
-                    stormWaterParticles.MinVelocity.Set(-0.025f + 4 * weatherData.curWindSpeed.X, 1.5f, -0.025f);
-                    stormWaterParticles.Color = onwaterSplashParticleColor;
-                    //stormWaterParticles.Color |= 140 << 24;
-                    stormWaterParticles.MinQuantity = 1;
-                    stormWaterParticles.AddQuantity = 5;
-                    stormWaterParticles.ShouldDieInLiquid = false;
-
-                    splashParticles.WindAffected = true;
-                    splashParticles.WindAffectednes = 1f;
-
-                    for (int i = 0; i < 20; i++)
-                    {
-                        double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
-                        double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
-                        int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
-
-                        Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-                        if (!block.IsLiquid()) continue;
-
-                        stormWaterParticles.MinPos.Set(px, py + block.TopMiddlePos.Y, pz);
-                        stormWaterParticles.ParticleModel = EnumParticleModel.Cube;
-                        stormWaterParticles.MinSize = 0.4f;
-
-                        manager.Spawn(stormWaterParticles);
-
-
-
-                        splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
-                        splashParticles.MinVelocity.X = weatherData.curWindSpeed.X * 1;
-                        splashParticles.AddVelocity.Y = 1.5f;
-                        splashParticles.LifeLength = 0.17f;
-
-                        splashParticles.Color = onwaterSplashParticleColor;
-                        manager.Spawn(splashParticles);
-                    }
-                }
+                SpawnDustParticles(manager, weatherData, plrPos, dryness, onwaterSplashParticleColor);
             }
 
 
@@ -382,133 +297,236 @@ namespace Vintagestory.GameContent
 
             if (precType == EnumPrecipitationType.Hail)
             {
-                float dx = (float)(plrPos.Motion.X * 40) - 4 * weatherData.curWindSpeed.X;
-                float dy = (float)(plrPos.Motion.Y * 40);
-                float dz = (float)(plrPos.Motion.Z * 40);
-
-                hailParticle.MinPos.Set(particlePos.X + dx, particlePos.Y + 15 + dy, particlePos.Z + dz);
-
-                hailParticle.MinSize = 0.3f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
-                hailParticle.MaxSize = 1f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
-                //hailParticle.AddPos.Set(80, 5, 80);
-
-                hailParticle.Color = ColorUtil.ToRgba(220, 210, 230, 255);
-
-                hailParticle.MinQuantity = 100 * plevel;
-                hailParticle.AddQuantity = 25 * plevel;
-                hailParticle.MinVelocity.Set(-0.025f + 7.5f * weatherData.curWindSpeed.X, -5f, -0.025f);
-                hailParticle.AddVelocity.Set(0.05f + 7.5f * weatherData.curWindSpeed.X, 0.05f, 0.05f);
-
-                manager.Spawn(hailParticle);
+                SpawnHailParticles(manager, weatherData, conds, plrPos, plevel);
                 return true;
             }
 
 
             if (precType == EnumPrecipitationType.Rain)
             {
-                float dx = (float)(plrPos.Motion.X * 80);
-                float dy = (float)(plrPos.Motion.Y * 80);
-                float dz = (float)(plrPos.Motion.Z * 80);
-
-                rainParticle.MinPos.Set(particlePos.X - 30 + dx, particlePos.Y + 15 + dy, particlePos.Z - 30 + dz);
-                rainParticle.WithTerrainCollision = false;
-                rainParticle.MinQuantity = 1000 * plevel;
-                rainParticle.LifeLength = 1f;
-                rainParticle.AddQuantity = 25 * plevel;
-                rainParticle.MinSize = 0.15f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
-                rainParticle.MaxSize = 0.22f * (0.5f + conds.Rainfall); // weatherData.PrecParticleSize;
-                rainParticle.Color = rainParticleColor;
-
-                rainParticle.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -10f, -0.025f);
-                rainParticle.AddVelocity.Set(0.05f + 8 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
-
-                manager.Spawn(rainParticle);
-
-                
-                splashParticles.MinVelocity = new Vec3f(-1f, 3, -1f);
-                splashParticles.AddVelocity = new Vec3f(2, 0, 2);
-                splashParticles.LifeLength = 0.1f;
-                splashParticles.MinSize = 0.07f * (0.5f + 0.65f * conds.Rainfall);// weatherData.PrecParticleSize;
-                splashParticles.MaxSize = 0.2f * (0.5f + 0.65f * conds.Rainfall); // weatherData.PrecParticleSize;
-                splashParticles.ShouldSwimOnLiquid = true;
-                splashParticles.Color = rainParticleColor;
-
-                float cnt = 100 * plevel;
-                
-                for (int i = 0; i < cnt; i++)
-                {
-                    double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-                    double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-
-                    int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
-
-                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-
-                    if (block.IsLiquid())
-                    {
-                        splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
-                        splashParticles.AddVelocity.Y = 1.5f;
-                        splashParticles.LifeLength = 0.17f;
-                        splashParticles.Color = onwaterSplashParticleColor;
-                    }
-                    else
-                    {
-                        double b = 0.75 + 0.25 * rand.NextDouble();
-                        int ca = 230 - rand.Next(100);
-                        int cr = (int)(((rainParticleColor >> 16) & 0xff) * b);
-                        int cg = (int)(((rainParticleColor >> 8) & 0xff) * b);
-                        int cb = (int)(((rainParticleColor >> 0) & 0xff) * b);
-
-                        splashParticles.Color = (ca << 24) | (cr << 16) | (cg << 8) | cb;
-                        splashParticles.AddVelocity.Y = 0f;
-                        splashParticles.LifeLength = 0.1f;
-                        splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y + 0.05, pz);
-                    }
-
-                    manager.Spawn(splashParticles);
-                }
+                SpawnRainParticles(manager, weatherData, conds, plrPos, plevel, onwaterSplashParticleColor);
             }
 
 
             if (precType == EnumPrecipitationType.Snow)
             {
-                snowParticle.WindAffected = true;
-                snowParticle.WindAffectednes = 1f;
-
-                float wetness = 2.5f * GameMath.Clamp(ws.clientClimateCond.Temperature + 1, 0, 4) / 4f;
-
-                float dx = (float)(plrPos.Motion.X * 40) - (30 - 9 * wetness) * 2 * weatherData.curWindSpeed.X;
-                float dy = (float)(plrPos.Motion.Y * 40);
-                float dz = (float)(plrPos.Motion.Z * 40);
-
-                snowParticle.MinVelocity.Set(-0.5f + 5 * weatherData.curWindSpeed.X, -1f, -0.5f);
-                snowParticle.AddVelocity.Set(1f + 5 * weatherData.curWindSpeed.X, 0.05f, 1f);
-                snowParticle.Color = ColorUtil.ToRgba(255, 255, 255, 255);
-
-                snowParticle.MinQuantity = 90 * plevel * (1 + wetness / 3);
-                snowParticle.AddQuantity = 15 * plevel * (1 + wetness / 3);
-                snowParticle.ParentVelocity = parentVeloSnow;
-                snowParticle.ShouldDieInLiquid = true;
-
-                snowParticle.LifeLength = Math.Max(1f, 4f - wetness);
-                snowParticle.Color = ColorUtil.ColorOverlay(ColorUtil.ToRgba(255, 255, 255, 255), rainParticle.Color, wetness / 4f);
-                snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
-                snowParticle.MinSize = 0.1f * conds.Rainfall;
-                snowParticle.MaxSize = 0.3f * conds.Rainfall / (1 + wetness);
-
-
-                float hrange = 40;
-                float vrange = 23;
-                snowParticle.MinPos.Set(particlePos.X - hrange + dx, particlePos.Y + vrange + dy, particlePos.Z - hrange + dz);
-                snowParticle.AddPos.Set(2 * hrange + dx, -0.66f * vrange + dy, 2 * hrange + dz);
-
-                manager.Spawn(snowParticle);
+                SpawnSnowParticles(manager, weatherData, conds, plrPos, plevel);
             }
 
             return true;
         }
 
 
+        private void SpawnDustParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, EntityPos plrPos, float dryness, int onwaterSplashParticleColor)
+        {
+            float dx = (float)(plrPos.Motion.X * 40) - 50 * weatherData.curWindSpeed.X;
+            float dy = (float)(plrPos.Motion.Y * 40);
+            float dz = (float)(plrPos.Motion.Z * 40);
 
+            stormDustParticles.MinPos.Set(particlePos.X - 40 + dx, particlePos.Y + 5 + 5 * Math.Abs(weatherData.curWindSpeed.X) + dy, particlePos.Z - 40 + dz);
+            stormDustParticles.AddPos.Set(80, -20, 80);
+            stormDustParticles.GravityEffect = 0.1f;
+            stormDustParticles.ParticleModel = EnumParticleModel.Quad;
+            stormDustParticles.LifeLength = 1f;
+            stormDustParticles.DieOnRainHeightmap = true;
+            stormDustParticles.WindAffectednes = 8f;
+            stormDustParticles.MinQuantity = 0;
+            stormDustParticles.AddQuantity = 8 * (weatherData.curWindSpeed.X - 0.5f) * dryness;
+
+            stormDustParticles.MinSize = 0.1f;
+            stormDustParticles.MaxSize = 0.4f;
+
+            stormDustParticles.MinVelocity.Set(-0.025f + 10 * weatherData.curWindSpeed.X, 0f, -0.025f);
+            stormDustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, -0.25f, 0.05f);
+
+
+            for (int i = 0; i < 30; i++)
+            {
+                double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+
+                int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
+                Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
+                if (block.IsLiquid()) continue;
+                if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
+                {
+                    if (rand.NextDouble() < 0.5f) continue;
+                }
+                if (Math.Abs(py - particlePos.Y) > 15) continue;
+
+                tmpPos.Set((int)px, py, (int)pz);
+                stormDustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));
+                stormDustParticles.Color |= 255 << 24;
+
+                manager.Spawn(stormDustParticles);
+            }
+
+
+            if (weatherData.curWindSpeed.X > 0.85f)
+            {
+                stormWaterParticles.AddVelocity.Y = 1.5f;
+                stormWaterParticles.LifeLength = 0.17f;
+                stormWaterParticles.WindAffected = true;
+                stormWaterParticles.WindAffectednes = 1f;
+                stormWaterParticles.GravityEffect = 0.4f;
+                stormWaterParticles.MinVelocity.Set(-0.025f + 4 * weatherData.curWindSpeed.X, 1.5f, -0.025f);
+                stormWaterParticles.Color = onwaterSplashParticleColor;
+                //stormWaterParticles.Color |= 140 << 24;
+                stormWaterParticles.MinQuantity = 1;
+                stormWaterParticles.AddQuantity = 5;
+                stormWaterParticles.ShouldDieInLiquid = false;
+
+                splashParticles.WindAffected = true;
+                splashParticles.WindAffectednes = 1f;
+
+                for (int i = 0; i < 20; i++)
+                {
+                    double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
+                    double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
+                    int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
+
+                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
+                    if (!block.IsLiquid()) continue;
+
+                    stormWaterParticles.MinPos.Set(px, py + block.TopMiddlePos.Y, pz);
+                    stormWaterParticles.ParticleModel = EnumParticleModel.Cube;
+                    stormWaterParticles.MinSize = 0.4f;
+
+                    manager.Spawn(stormWaterParticles);
+
+
+
+                    splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
+                    splashParticles.MinVelocity.X = weatherData.curWindSpeed.X * 1;
+                    splashParticles.AddVelocity.Y = 1.5f;
+                    splashParticles.LifeLength = 0.17f;
+
+                    splashParticles.Color = onwaterSplashParticleColor;
+                    manager.Spawn(splashParticles);
+                }
+            }
+        }
+
+        private void SpawnHailParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, ClimateCondition conds, EntityPos plrPos, float plevel)
+        {
+            float dx = (float)(plrPos.Motion.X * 40) - 4 * weatherData.curWindSpeed.X;
+            float dy = (float)(plrPos.Motion.Y * 40);
+            float dz = (float)(plrPos.Motion.Z * 40);
+
+            hailParticle.MinPos.Set(particlePos.X + dx, particlePos.Y + 15 + dy, particlePos.Z + dz);
+
+            hailParticle.MinSize = 0.3f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
+            hailParticle.MaxSize = 1f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
+                                                                 //hailParticle.AddPos.Set(80, 5, 80);
+
+            hailParticle.Color = ColorUtil.ToRgba(220, 210, 230, 255);
+
+            hailParticle.MinQuantity = 100 * plevel;
+            hailParticle.AddQuantity = 25 * plevel;
+            hailParticle.MinVelocity.Set(-0.025f + 7.5f * weatherData.curWindSpeed.X, -5f, -0.025f);
+            hailParticle.AddVelocity.Set(0.05f + 7.5f * weatherData.curWindSpeed.X, 0.05f, 0.05f);
+
+            manager.Spawn(hailParticle);
+        }
+
+        private void SpawnRainParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, ClimateCondition conds, EntityPos plrPos, float plevel, int onwaterSplashParticleColor)
+        {
+            float dx = (float)(plrPos.Motion.X * 80);
+            float dy = (float)(plrPos.Motion.Y * 80);
+            float dz = (float)(plrPos.Motion.Z * 80);
+
+            rainParticle.MinPos.Set(particlePos.X - 30 + dx, particlePos.Y + 15 + dy, particlePos.Z - 30 + dz);
+            rainParticle.WithTerrainCollision = false;
+            rainParticle.MinQuantity = 1000 * plevel;
+            rainParticle.LifeLength = 1f;
+            rainParticle.AddQuantity = 25 * plevel;
+            rainParticle.MinSize = 0.15f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
+            rainParticle.MaxSize = 0.22f * (0.5f + conds.Rainfall); // weatherData.PrecParticleSize;
+            rainParticle.Color = rainParticleColor;
+
+            rainParticle.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -10f, -0.025f);
+            rainParticle.AddVelocity.Set(0.05f + 8 * weatherData.curWindSpeed.X, 0.05f, 0.05f);
+
+            manager.Spawn(rainParticle);
+
+
+            splashParticles.MinVelocity = new Vec3f(-1f, 3, -1f);
+            splashParticles.AddVelocity = new Vec3f(2, 0, 2);
+            splashParticles.LifeLength = 0.1f;
+            splashParticles.MinSize = 0.07f * (0.5f + 0.65f * conds.Rainfall);// weatherData.PrecParticleSize;
+            splashParticles.MaxSize = 0.2f * (0.5f + 0.65f * conds.Rainfall); // weatherData.PrecParticleSize;
+            splashParticles.ShouldSwimOnLiquid = true;
+            splashParticles.Color = rainParticleColor;
+
+            float cnt = 100 * plevel;
+
+            for (int i = 0; i < cnt; i++)
+            {
+                double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+
+                int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
+
+                Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
+
+                if (block.IsLiquid())
+                {
+                    splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
+                    splashParticles.AddVelocity.Y = 1.5f;
+                    splashParticles.LifeLength = 0.17f;
+                    splashParticles.Color = onwaterSplashParticleColor;
+                }
+                else
+                {
+                    double b = 0.75 + 0.25 * rand.NextDouble();
+                    int ca = 230 - rand.Next(100);
+                    int cr = (int)(((rainParticleColor >> 16) & 0xff) * b);
+                    int cg = (int)(((rainParticleColor >> 8) & 0xff) * b);
+                    int cb = (int)(((rainParticleColor >> 0) & 0xff) * b);
+
+                    splashParticles.Color = (ca << 24) | (cr << 16) | (cg << 8) | cb;
+                    splashParticles.AddVelocity.Y = 0f;
+                    splashParticles.LifeLength = 0.1f;
+                    splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y + 0.05, pz);
+                }
+
+                manager.Spawn(splashParticles);
+            }
+        }
+
+        private void SpawnSnowParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, ClimateCondition conds, EntityPos plrPos, float plevel)
+        {
+            snowParticle.WindAffected = true;
+            snowParticle.WindAffectednes = 1f;
+
+            float wetness = 2.5f * GameMath.Clamp(ws.clientClimateCond.Temperature + 1, 0, 4) / 4f;
+
+            float dx = (float)(plrPos.Motion.X * 40) - (30 - 9 * wetness) * 2 * weatherData.curWindSpeed.X;
+            float dy = (float)(plrPos.Motion.Y * 40);
+            float dz = (float)(plrPos.Motion.Z * 40);
+
+            snowParticle.MinVelocity.Set(-0.5f + 5 * weatherData.curWindSpeed.X, -1f, -0.5f);
+            snowParticle.AddVelocity.Set(1f + 5 * weatherData.curWindSpeed.X, 0.05f, 1f);
+            snowParticle.Color = ColorUtil.ToRgba(255, 255, 255, 255);
+
+            snowParticle.MinQuantity = 90 * plevel * (1 + wetness / 3);
+            snowParticle.AddQuantity = 15 * plevel * (1 + wetness / 3);
+            snowParticle.ParentVelocity = parentVeloSnow;
+            snowParticle.ShouldDieInLiquid = true;
+
+            snowParticle.LifeLength = Math.Max(1f, 4f - wetness);
+            snowParticle.Color = ColorUtil.ColorOverlay(ColorUtil.ToRgba(255, 255, 255, 255), rainParticle.Color, wetness / 4f);
+            snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
+            snowParticle.MinSize = 0.1f * conds.Rainfall;
+            snowParticle.MaxSize = 0.3f * conds.Rainfall / (1 + wetness);
+
+
+            float hrange = 40;
+            float vrange = 23;
+            snowParticle.MinPos.Set(particlePos.X - hrange + dx, particlePos.Y + vrange + dy, particlePos.Z - hrange + dz);
+            snowParticle.AddPos.Set(2 * hrange + dx, -0.66f * vrange + dy, 2 * hrange + dz);
+
+            manager.Spawn(snowParticle);
+        }
     }
 }

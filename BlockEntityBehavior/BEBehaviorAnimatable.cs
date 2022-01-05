@@ -299,7 +299,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        internal void Dispose()
+        public void Dispose()
         {
             renderer?.Dispose();
             (api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Opaque);

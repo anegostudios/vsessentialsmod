@@ -432,7 +432,9 @@ namespace Vintagestory.GameContent
 
                     for (int i = 0; i < Waypoints.Count; i++)
                     {
-                        if (Waypoints[i].Position == null)
+                        var wp = Waypoints[i];
+                        if (wp.Title == null) wp.Title = wp.Text; // Not sure how this happenes. For some reason the title moved into text
+                        if (wp == null)
                         {
                             sapi.World.Logger.Error("Waypoint with no position loaded, will remove");
                             Waypoints.RemoveAt(i);

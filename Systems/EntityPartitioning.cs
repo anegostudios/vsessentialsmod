@@ -121,7 +121,7 @@ namespace Vintagestory.GameContent
 
             foreach (var val in entities)
             {
-                LargestTouchDistance = Math.Max(LargestTouchDistance, val.CollisionBox.XSize / 2);
+                LargestTouchDistance = Math.Max(LargestTouchDistance, val.SelectionBox.XSize / 2);
 
                 PartitionEntity(val);
             }

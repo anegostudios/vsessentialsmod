@@ -228,7 +228,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return Math.Max(extraTargetDist + 0.6f, entity.CollisionBox.XSize / 2 + 0.05f);
+            return Math.Max(extraTargetDist + 0.6f, entity.SelectionBox.XSize / 2 + 0.05f);
         }
 
         public override void StartExecute()
@@ -250,7 +250,7 @@ namespace Vintagestory.GameContent
             pathTraverser.CurrentTarget.Y = pos.Y;
             pathTraverser.CurrentTarget.Z = pos.Z;
 
-            Cuboidd targetBox = entity.CollisionBox.ToDouble().Translate(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            Cuboidd targetBox = entity.SelectionBox.ToDouble().Translate(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
             double distance = targetBox.ShortestDistanceFrom(pos);          
 
             float minDist = MinDistanceToTarget();

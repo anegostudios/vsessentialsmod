@@ -2,6 +2,7 @@
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.API.Common
 {
@@ -78,5 +79,6 @@ namespace Vintagestory.API.Common
         void OnEntitySpawn();
         void OnEntityDespawn(EntityDespawnReason reason);
         void OnEntityHurt(DamageSource source, float damage);
+        void OnNoPath(Vec3d target);
     }
 }

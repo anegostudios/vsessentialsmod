@@ -72,9 +72,9 @@ namespace Vintagestory.GameContent
                 AssetLocation blockcode = new AssetLocation(typeAttributes["decayedBlock"].AsString());
                 Block decblock = entity.World.GetBlock(blockcode);
 
-                double x = entity.ServerPos.X + entity.CollisionBox.X1 - entity.OriginCollisionBox.X1;
-                double y = entity.ServerPos.Y + entity.CollisionBox.Y1 - entity.OriginCollisionBox.Y1;
-                double z = entity.ServerPos.Z + entity.CollisionBox.Z1 - entity.OriginCollisionBox.Z1;
+                double x = entity.ServerPos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1;
+                double y = entity.ServerPos.Y + entity.SelectionBox.Y1 - entity.OriginSelectionBox.Y1;
+                double z = entity.ServerPos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1;
 
                 BlockPos bonepos = new BlockPos((int)x, (int)y, (int)z);
                 var bl = entity.World.BlockAccessor;

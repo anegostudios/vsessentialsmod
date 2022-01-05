@@ -23,13 +23,12 @@ namespace Vintagestory.GameContent
 
         bool clientEnabled;
         int readyFlags;
-        IClientNetworkChannel clientChannel;
         ICoreClientAPI capi;
         GuiDialog dialog;
 
-        ICoreServerAPI sapi;
         IServerNetworkChannel serverChannel;
 
+        object logEntiresLock = new object();
         List<string> logEntries = new List<string>();
 
 
@@ -61,8 +60,7 @@ namespace Vintagestory.GameContent
             api.RegisterCommand("errorreporter", "Reopens the error reporting dialog", "[on|off]", ClientCmdErrorRep);
 
             api.Event.LevelFinalize += OnClientReady;
-            clientChannel =
-                api.Network.RegisterChannel("errorreporter")
+            api.Network.RegisterChannel("errorreporter")
                .RegisterMessageType(typeof(ServerLogEntries))
                .SetMessageHandler<ServerLogEntries>(OnServerLogEntriesReceived)
             ;
@@ -89,35 +87,40 @@ namespace Vintagestory.GameContent
         {
             clientEnabled = true;
             readyFlags++;
-            logEntries.AddRange(msg.LogEntries);
+            lock (logEntiresLock)
+            {
+                logEntries.AddRange(msg.LogEntries);
+            }
 
             if (readyFlags == 2 && logEntries.Count > 0) ShowDialog();
         }
 
         private void ShowDialog()
         {
-            if (!clientEnabled)
+            lock (logEntiresLock)
             {
-                logEntries.Clear();
-                return;
+                if (!clientEnabled)
+                {
+                    logEntries.Clear();
+                    return;
+                }
+
+                List<string> printedEntries = logEntries;
+                if (logEntries.Count > 180)
+                {
+                    printedEntries = logEntries.Take(140).ToList();
+                    printedEntries.Add(string.Format("...{0} more", logEntries.Count - 0));
+                }
+
+                dialog = new GuiDialogLogViewer(string.Join("\n", printedEntries), capi);
             }
 
-            List<string> printedEntries = logEntries;
-            if (logEntries.Count > 180)
-            {
-                printedEntries = logEntries.Take(140).ToList();
-                printedEntries.Add(string.Format("...{0} more", logEntries.Count - 0));
-            }
-
-            dialog = new GuiDialogLogViewer(string.Join("\n", printedEntries), capi);
             dialog.TryOpen();
         }
 
 
         public override void StartServerSide(ICoreServerAPI api)
         {
-            this.sapi = api;
-
             api.RegisterCommand("errorreporter", "Toggles on/off the error reporting dialog on startup", "[on|off]", OnCmdErrRep, Privilege.controlserver);
 
             serverChannel =
@@ -134,7 +137,10 @@ namespace Vintagestory.GameContent
             byPlayer.ServerData.CustomPlayerData.TryGetValue("errorReporting", out val);
             if (val == "1" && logEntries.Count > 0)
             {
-                serverChannel.SendPacket(new ServerLogEntries() { LogEntries = logEntries.ToArray() }, byPlayer);
+                lock (logEntiresLock)
+                {
+                    serverChannel.SendPacket(new ServerLogEntries() { LogEntries = logEntries.ToArray() }, byPlayer);
+                }
             }
         }
 
@@ -150,7 +156,10 @@ namespace Vintagestory.GameContent
         {
             if (logType == EnumLogType.Error || logType == EnumLogType.Fatal || logType == EnumLogType.Warning)
             {
-                logEntries.Add(string.Format("[{0} {1}] {2}", api.Side, logType, string.Format(message, args)));
+                lock (logEntiresLock)
+                {
+                    logEntries.Add(string.Format("[{0} {1}] {2}", api.Side, logType, string.Format(message, args)));
+                }
             }
         }
     }

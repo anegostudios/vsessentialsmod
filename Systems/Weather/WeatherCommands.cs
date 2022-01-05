@@ -147,8 +147,7 @@ namespace Vintagestory.GameContent
                 Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
                 IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
 
-                byte[] data = mc.GetData("lastSnowAccumUpdateTotalHours");
-                double lastSnowAccumUpdateTotalHours = data == null ? 0 : SerializerUtil.Deserialize<double>(data);
+                double lastSnowAccumUpdateTotalHours = mc.GetModdata<double>("lastSnowAccumUpdateTotalHours");
 
                 player.SendMessage(groupId, "lastSnowAccumUpdateTotalHours: " + lastSnowAccumUpdateTotalHours, EnumChatType.CommandSuccess);
 
@@ -621,7 +620,7 @@ namespace Vintagestory.GameContent
 
             var wreader = wsys.getWeatherDataReaderPreLoad();
 
-            wreader.LoadAdjacentSimsAndLerpValues(plrPos);
+            wreader.LoadAdjacentSimsAndLerpValues(plrPos, 1);
 
             int regionX = (int)pos.X / api.World.BlockAccessor.RegionSize;
             int regionZ = (int)pos.Z / api.World.BlockAccessor.RegionSize;

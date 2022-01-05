@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
             base.OnEntityDeath(damageSourceForDeath);
         }
 
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
             if (entity.World.Side == EnumAppSide.Server && entity.World.Rand.NextDouble() < 0.25)
             {
@@ -90,7 +90,7 @@ namespace Vintagestory.GameContent
                 PickupCoolDownUntilMs = entity.World.ElapsedMilliseconds + 10000;
             }
 
-            base.OnEntityReceiveDamage(damageSource, damage);
+            base.OnEntityReceiveDamage(damageSource, ref damage);
         }
 
         public override string PropertyName()

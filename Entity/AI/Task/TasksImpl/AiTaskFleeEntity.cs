@@ -14,7 +14,6 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskFleeEntity : AiTaskBaseTargetable
     {
-        EntityAgent targetEntity;
         Vec3d targetPos = new Vec3d();
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
@@ -39,6 +38,9 @@ namespace Vintagestory.GameContent
         Vec3d collTmpVec = new Vec3d();
 
 		bool cancelNow;
+        public override bool AggressiveTargeting => false;
+
+
         public AiTaskFleeEntity(EntityAgent entity) : base(entity)
         {
         }
@@ -94,7 +96,7 @@ namespace Vintagestory.GameContent
             float hereRange = fearReductionFactor * seekingRange;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
-                if (!isTargetableEntity(e, hereRange)) return false;
+                if (!IsTargetableEntity(e, hereRange)) return false;
                 return e.Code.Path != "player" || !lowStabilityAttracted || e.WatchedAttributes.GetDouble("temporalStability", 1) < 0.25;
             });
 
@@ -121,7 +123,7 @@ namespace Vintagestory.GameContent
 
             soundChance = Math.Max(0.025f, soundChance - 0.2f);
 
-            float size = targetEntity.CollisionBox.XSize;
+            float size = targetEntity.SelectionBox.XSize;
 
             pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
@@ -158,7 +160,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs) && !cancelNow;
+            return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs) && !cancelNow && pathTraverser.Active;
         }
 
 
@@ -217,8 +219,8 @@ namespace Vintagestory.GameContent
         bool traversable(Vec3d pos)
         {
             return
-                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, pos, false) ||
-                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.CollisionBox, collTmpVec.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, pos, false) ||
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, collTmpVec.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
             ;
         }
 
@@ -237,7 +239,7 @@ namespace Vintagestory.GameContent
 
         private void OnGoalReached()
         {
-            pathTraverser.Active = true;
+            pathTraverser.Retarget();
         }
     }
 }

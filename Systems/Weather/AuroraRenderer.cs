@@ -99,17 +99,13 @@ namespace Vintagestory.GameContent
             prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader - (float)campos.Y);
 
             float speedmul = capi.World.Calendar.SpeedOfTime / 60f;
-            prog.Uniform("auroraCounter", (float)(capi.InWorldEllapsedMilliseconds / 4000.0 * speedmul) % 579f);
+            prog.Uniform("auroraCounter", (float)(capi.InWorldEllapsedMilliseconds / 5000.0 * speedmul) % 579f);
 
 
             mvMat
                 .Set(capi.Render.MvMatrix.Top)
                 .FollowPlayer()
-                .Translate(
-                0,//    capi.World.BlockAccessor.MapSizeX/2,
-                    (1.1f * capi.World.BlockAccessor.MapSizeY + 0.5 - capi.World.Player.Entity.CameraPos.Y),
-                 0//   capi.World.BlockAccessor.MapSizeZ/2
-                )
+                .Translate(0, 1.1f * capi.World.BlockAccessor.MapSizeY + 0.5 - capi.World.Player.Entity.CameraPos.Y, 0)
             ;
 
             prog.UniformMatrix("modelViewMatrix", mvMat.Values);
@@ -127,19 +123,32 @@ namespace Vintagestory.GameContent
             float height = 200;
 
             MeshData mesh = new MeshData(4, 6, false, true, true, false);
-            float x=0, y=0, z=0;
+            mesh.CustomFloats = new CustomMeshDataPartFloat(4);
+            mesh.CustomFloats.InterleaveStride = 4;
+            mesh.CustomFloats.InterleaveOffsets = new int[] { 0 };
+            mesh.CustomFloats.InterleaveSizes = new int[] { 1 };
+
+            float x, y, z;
             Random rnd = new Random();
+
+            float resolution = 1.5f;
+            float spread = 1.5f;
+
+            float parts = 20 * resolution;
+            float advance = 1f / resolution;
 
             for (int i = 0; i < 15; i++)
             {
                 Vec3f dir = new Vec3f((float)rnd.NextDouble() * 20 - 10, (float)rnd.NextDouble() * 5 - 3, (float)rnd.NextDouble() * 20 - 10);
                 dir.Normalize();
-                x = (float)rnd.NextDouble() * 800 - 400;
-                y = (float)rnd.NextDouble() * 80 - 40;
-                z = (float)rnd.NextDouble() * 800 - 400;
+                dir.Mul(advance);
+
+                x = spread * ((float)rnd.NextDouble() * 800 - 400);
+                y = spread * ((float)rnd.NextDouble() * 80 - 40);
+                z = spread * ((float)rnd.NextDouble() * 800 - 400);
                 
 
-                for (int j = 0; j < 100; j++)
+                for (int j = 0; j < parts+2; j++)
                 {
                     float lngx = (float)rnd.NextDouble() * 5 + 20;
                     float lngy = (float)rnd.NextDouble() * 4 + 4;
@@ -149,30 +158,27 @@ namespace Vintagestory.GameContent
                     y += dir.Y * lngy;
                     z += dir.Z * lngz;
 
-                    //float width = 20 + (float)rnd.NextDouble() * 5;
-
-                    //MeshData quad = QuadMeshUtil.GetCustomQuad(z, 20, x, x - prevx, height, 255, 255, 255, 255);
-                    //mesh.AddMeshData(quad);
-
                     int lastelement = mesh.VerticesCount;
 
                     mesh.AddVertex(x, y+height, z, j % 2, 1);
                     mesh.AddVertex(x, y, z, j % 2, 0);
 
-                    if (j > 0 && j < 19)
+                    float f = j / (parts-1);
+                    mesh.CustomFloats.Add(f, f);
+
+                    if (j > 0 && j < (parts - 1))
                     {
-                        mesh.AddIndex(lastelement + 0);
-                        mesh.AddIndex(lastelement + 1);
-                        mesh.AddIndex(lastelement + 2);
                         mesh.AddIndex(lastelement + 1);
                         mesh.AddIndex(lastelement + 3);
+                        mesh.AddIndex(lastelement + 2);
+                        mesh.AddIndex(lastelement + 0);
+                        mesh.AddIndex(lastelement + 1);
                         mesh.AddIndex(lastelement + 2);
                     }
                 }
             }
 
             quadTilesRef = capi.Render.UploadMesh(mesh);
-
         }
 
 

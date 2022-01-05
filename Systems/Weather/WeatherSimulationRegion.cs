@@ -58,6 +58,7 @@ namespace Vintagestory.GameContent
         /// Holds a list of daily snow accum snapshot of previous 144 days (= 1 year)
         /// </summary>
         public RingArray<SnowAccumSnapshot> SnowAccumSnapshots;
+        public static object snowAccumSnapshotLock = new object();
 
         public WindPattern CurWindPattern;
         public WeatherEvent CurWeatherEvent;
@@ -215,8 +216,7 @@ namespace Vintagestory.GameContent
         public void TickEveryInGameHourServer(double nowTotalHours)
         {
             SnowAccumSnapshot latestSnap = new SnowAccumSnapshot() {
-                TotalHours = nowTotalHours, 
-               // SumTemperatureByRegionCorner = new API.FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution),
+                TotalHours = nowTotalHours,
                 SnowAccumulationByRegionCorner = new FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
             };
 
@@ -225,6 +225,7 @@ namespace Vintagestory.GameContent
             BlockPos tmpPos = new BlockPos();
             int regsize = ws.api.World.BlockAccessor.RegionSize;
 
+            double nowTotalDays = (nowTotalHours + 0.5) / ws.api.World.Calendar.HoursPerDay;
 
             for (int ix = 0; ix < snowAccumResolution; ix++)
             {
@@ -240,17 +241,15 @@ namespace Vintagestory.GameContent
                             regionZ * regsize + iz * (regsize - 1)
                         );
 
-                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.ForSuppliedDateValues, nowTotalHours + 0.5); // Sample from the middle of the hour
+                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.ForSuppliedDateValues, nowTotalDays);
                         if (nowcond == null)
                         {
                             return;
                         }
 
-                        //latestSnap.SumTemperatureByRegionCorner.AddValue(ix, iy, iz, nowcond.Temperature);
-
-                        if (nowcond.Temperature > 0)
+                        if (nowcond.Temperature > 1.5f || (nowcond.Rainfall < 0.05 && nowcond.Temperature > 0))
                         {
-                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, -nowcond.Temperature / 5f);
+                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, -nowcond.Temperature / 15f);
                         }
                         else
                         {
@@ -261,14 +260,14 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            lock (lockTest)
+            lock (snowAccumSnapshotLock)
             {
                 SnowAccumSnapshots.Add(latestSnap);
             }
             latestSnap.Checks++;
         }
 
-        public static object lockTest = new object();
+        
 
 
 

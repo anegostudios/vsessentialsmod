@@ -86,7 +86,7 @@ namespace Vintagestory.GameContent
                 EntityPlayer eplr = entity as EntityPlayer;
                 if (eplr != null)
                 {
-                    hoverText.AppendLine("Player " + capi.World.PlayerByUid(eplr.PlayerUID).PlayerName);
+                    hoverText.AppendLine("Player " + capi.World.PlayerByUid(eplr.PlayerUID)?.PlayerName);
                 }
             }
         }

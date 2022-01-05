@@ -2,9 +2,25 @@
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
+    public static class ApiTaskAdditions
+    {
+        public static void RegisterAiTask(this ICoreServerAPI sapi, string code, Type type)
+        {
+            AiTaskRegistry.Register(code, type);
+        }
+
+        public static void RegisterAiTask<T>(this ICoreServerAPI sapi, string code) where T : AiTaskBase
+        {
+            AiTaskRegistry.Register<T>(code);
+        }
+    }
+
+
     public static class AiTaskRegistry
     {
         public static Dictionary<string, Type> TaskTypes = new Dictionary<string, Type>();
@@ -35,6 +51,13 @@ namespace Vintagestory.GameContent
             Register("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
             Register("seekblockandlay", typeof(AiTaskSeekBlockAndLay));
             Register("useinventory", typeof(AiTaskUseInventory));
+
+            Register("meleeattacktargetingentity", typeof(AiTaskMeleeAttackTargetingEntity));
+            Register("seektargetingentity", typeof(AiTaskSeekTargetingEntity));
+            Register("stayclosetoguardedentity", typeof(AiTaskStayCloseToGuardedEntity));
+
+            Register("jealousmeleeattack", typeof(AiTaskJealousMeleeAttack));
+            Register("jealousseekentity", typeof(AiTaskJealousSeekEntity));
         }
     }
 
@@ -45,9 +68,11 @@ namespace Vintagestory.GameContent
         public ActionBoolReturn<IAiTask> ShouldExecuteTask = (task) => true;
 
         Entity entity;
-        List<IAiTask> Tasks = new List<IAiTask>();
-        IAiTask[] ActiveTasksBySlot = new IAiTask[8];       
+        List<IAiTask> tasks = new List<IAiTask>();
+        IAiTask[] activeTasksBySlot = new IAiTask[8];
 
+        public IAiTask[] ActiveTasksBySlot => activeTasksBySlot;
+        public List<IAiTask> AllTasks => tasks;
 
         public AiTaskManager(Entity entity)
         {
@@ -56,18 +81,18 @@ namespace Vintagestory.GameContent
 
         public void AddTask(IAiTask task)
         {
-            Tasks.Add(task);
+            tasks.Add(task);
         }
 
         public void RemoveTask(IAiTask task)
         {
-            Tasks.Remove(task);
+            tasks.Remove(task);
         }
 
         public void ExecuteTask(IAiTask task, int slot)
         {
             task.StartExecute();
-            ActiveTasksBySlot[slot] = task;
+            activeTasksBySlot[slot] = task;
 
             if (entity.World.FrameProfiler.Enabled)
             {
@@ -77,7 +102,7 @@ namespace Vintagestory.GameContent
 
         public T GetTask<T>() where T : IAiTask
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 if (task is T)
                 {
@@ -90,18 +115,18 @@ namespace Vintagestory.GameContent
 
         public void ExecuteTask<T>() where T : IAiTask
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 if (task is T)
                 {
                     int slot = task.Slot;
 
-                    if (ActiveTasksBySlot[slot] != null)
+                    if (activeTasksBySlot[slot] != null)
                     {
-                        ActiveTasksBySlot[slot].FinishExecute(true);
+                        activeTasksBySlot[slot].FinishExecute(true);
                     }
 
-                    ActiveTasksBySlot[slot] = task;
+                    activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
                 }
@@ -110,15 +135,16 @@ namespace Vintagestory.GameContent
             entity.World.FrameProfiler.Mark("entity-ai-tasks-start-execg");
         }
 
+        
 
         public void StopTask(Type taskType)
         {
-            foreach (IAiTask task in ActiveTasksBySlot)
+            foreach (IAiTask task in activeTasksBySlot)
             {
                 if (task?.GetType() == taskType)
                 {
                     task.FinishExecute(true);
-                    ActiveTasksBySlot[task.Slot] = null;
+                    activeTasksBySlot[task.Slot] = null;
                 }
             }
 
@@ -129,18 +155,18 @@ namespace Vintagestory.GameContent
         {
             entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin");
 
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 int slot = task.Slot;
 
-                if ((ActiveTasksBySlot[slot] == null || task.Priority > ActiveTasksBySlot[slot].PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
+                if ((activeTasksBySlot[slot] == null || task.Priority > activeTasksBySlot[slot].PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
                 {
-                    if (ActiveTasksBySlot[slot] != null)
+                    if (activeTasksBySlot[slot] != null)
                     {
-                        ActiveTasksBySlot[slot].FinishExecute(true);
+                        activeTasksBySlot[slot].FinishExecute(true);
                     }
 
-                    ActiveTasksBySlot[slot] = task;
+                    activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
                 }
@@ -153,15 +179,15 @@ namespace Vintagestory.GameContent
 
             entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin-cont");
 
-            for (int i = 0; i < ActiveTasksBySlot.Length; i++)
+            for (int i = 0; i < activeTasksBySlot.Length; i++)
             {
-                IAiTask task = ActiveTasksBySlot[i];
+                IAiTask task = activeTasksBySlot[i];
                 if (task == null) continue;
 
                 if (!task.ContinueExecute(dt))
                 {
                     task.FinishExecute(false);
-                    ActiveTasksBySlot[i] = null;
+                    activeTasksBySlot[i] = null;
                 }
 
                 if (entity.World.FrameProfiler.Enabled)
@@ -178,16 +204,16 @@ namespace Vintagestory.GameContent
             {
                 string tasks = "";
                 int j = 0;
-                for (int i = 0; i < ActiveTasksBySlot.Length; i++)
+                for (int i = 0; i < activeTasksBySlot.Length; i++)
                 {
-                    IAiTask task = ActiveTasksBySlot[i];
+                    IAiTask task = activeTasksBySlot[i];
                     if (task == null) continue;
                     if (j++ > 0) tasks += ", ";
 
                     string code;
                     AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out code);
 
-                    tasks += code + "("+task.Priority+")";
+                    tasks += code + "(p"+task.Priority+", pc"+task.PriorityForCancel+")";
 #if DEBUG
                     // temporary for debugging
                     if (entity.Properties.Habitat == EnumHabitat.Underwater && task is AiTaskWander wand)
@@ -203,7 +229,7 @@ namespace Vintagestory.GameContent
 
         public bool IsTaskActive(string id)
         {
-            foreach (var val in ActiveTasksBySlot)
+            foreach (var val in activeTasksBySlot)
             {
                 if (val != null && val.Id == id) return true;
             }
@@ -213,22 +239,22 @@ namespace Vintagestory.GameContent
 
         internal void Notify(string key, object data)
         {
-            for (int i = 0; i < Tasks.Count; i++)
+            for (int i = 0; i < tasks.Count; i++)
             {
-                IAiTask task = Tasks[i];
+                IAiTask task = tasks[i];
 
                 if (task.Notify(key, data))
                 {
-                    int slot = Tasks[i].Slot;
+                    int slot = tasks[i].Slot;
 
-                    if ((ActiveTasksBySlot[slot] == null || task.Priority > ActiveTasksBySlot[slot].PriorityForCancel))
+                    if ((activeTasksBySlot[slot] == null || task.Priority > activeTasksBySlot[slot].PriorityForCancel))
                     {
-                        if (ActiveTasksBySlot[slot] != null)
+                        if (activeTasksBySlot[slot] != null)
                         {
-                            ActiveTasksBySlot[slot].FinishExecute(true);
+                            activeTasksBySlot[slot].FinishExecute(true);
                         }
 
-                        ActiveTasksBySlot[slot] = task;
+                        activeTasksBySlot[slot] = task;
                         task.StartExecute();
                         OnTaskStarted?.Invoke(task);
                     }
@@ -238,7 +264,7 @@ namespace Vintagestory.GameContent
 
         internal void OnStateChanged(EnumEntityState beforeState)
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 task.OnStateChanged(beforeState);
             }
@@ -246,7 +272,7 @@ namespace Vintagestory.GameContent
 
         internal void OnEntitySpawn()
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 task.OnEntitySpawn();
             }
@@ -254,7 +280,7 @@ namespace Vintagestory.GameContent
 
         internal void OnEntityLoaded()
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 task.OnEntityLoaded();
             }
@@ -262,7 +288,7 @@ namespace Vintagestory.GameContent
 
         internal void OnEntityDespawn(EntityDespawnReason reason)
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 task.OnEntityDespawn(reason);
             }
@@ -271,11 +297,18 @@ namespace Vintagestory.GameContent
 
         internal void OnEntityHurt(DamageSource source, float damage)
         {
-            foreach (IAiTask task in Tasks)
+            foreach (IAiTask task in tasks)
             {
                 task.OnEntityHurt(source, damage);
             }
         }
-        
+
+        internal void OnNoPath(Vec3d target)
+        {
+            foreach (IAiTask task in tasks)
+            {
+                task.OnNoPath(target);
+            }
+        }
     }
 }

@@ -20,9 +20,9 @@ namespace Vintagestory.GameContent
         [ProtoMember(4)]
         public Vec3d Pos;
         [ProtoMember(5)]
-        public Vec3d Velocity = new Vec3d();
+        public Vec3f Velocity = new Vec3f();
         [ProtoMember(6)]
-        public Vec3d Tension = new Vec3d();
+        public Vec3f Tension = new Vec3f();
 
         [ProtoMember(7)]
         float GravityStrength = 1;
@@ -194,20 +194,20 @@ namespace Vintagestory.GameContent
             }
 
             // Calculate the force on this ball
-            Vec3d force = Tension.Clone();
+            Vec3f force = Tension.Clone();
             force.Y -= GravityStrength * 10;
 
             // Calculate the acceleration
-            Vec3d acceleration = force * (float)InvMass;
+            Vec3f acceleration = force * (float)InvMass;
 
             if (CollideFlags == 0)
             {
-                acceleration.X += cs.windSpeed.X * InvMass;
+                acceleration.X += (float)cs.windSpeed.X * InvMass;
             }
 
 
             // Update velocity
-            Vec3d nextVelocity = Velocity + (acceleration * dt);
+            Vec3f nextVelocity = Velocity + (acceleration * dt);
             
             // Damp the velocity
             nextVelocity *= dampFactor;

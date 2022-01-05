@@ -13,15 +13,17 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskStayCloseToEntity : AiTaskBase
     {
-        Entity targetEntity;
-        float moveSpeed = 0.03f;
-        float range = 8f;
-        float maxDistance = 3f;
-        string entityCode;
-        bool stuck = false;
-        bool onlyIfLowerId = false;
+        protected Entity targetEntity;
+        protected float moveSpeed = 0.03f;
+        protected float range = 8f;
+        protected float maxDistance = 3f;
+        protected string entityCode;
+        protected bool stuck = false;
+        protected bool onlyIfLowerId = false;
+        protected bool allowTeleport;
+        protected float teleportAfterRange;
 
-        Vec3d targetOffset = new Vec3d();
+        protected Vec3d targetOffset = new Vec3d();
 
         public AiTaskStayCloseToEntity(EntityAgent entity) : base(entity)
         {
@@ -31,27 +33,13 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
-            }
-
-            if (taskConfig["searchRange"] != null)
-            {
-                range = taskConfig["searchRange"].AsFloat(8f);
-            }
-
-            if (taskConfig["maxDistance"] != null)
-            {
-                maxDistance = taskConfig["maxDistance"].AsFloat(3f);
-            }
-
-            if (taskConfig["onlyIfLowerId"] != null)
-            {
-                onlyIfLowerId = taskConfig["onlyIfLowerId"].AsBool();
-            }
-
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
+            range = taskConfig["searchRange"].AsFloat(8f);
+            maxDistance = taskConfig["maxDistance"].AsFloat(3f);
+            onlyIfLowerId = taskConfig["onlyIfLowerId"].AsBool();
             entityCode = taskConfig["entityCode"].AsString();
+            allowTeleport = taskConfig["allowTeleport"].AsBool();
+            teleportAfterRange = taskConfig["teleportAfterRange"].AsFloat(30f);
         }
 
 
@@ -83,7 +71,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
-            float size = targetEntity.CollisionBox.XSize;
+            float size = targetEntity.SelectionBox.XSize;
 
             pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, false, 1000, true);
 
@@ -103,23 +91,85 @@ namespace Vintagestory.GameContent
             pathTraverser.CurrentTarget.Y = y;
             pathTraverser.CurrentTarget.Z = z;
 
-            if (entity.ServerPos.SquareDistanceTo(x, y, z) < maxDistance * maxDistance / 4)
+            float dist = entity.ServerPos.SquareDistanceTo(x, y, z);
+
+            if (dist < 3 * 3)
             {
                 pathTraverser.Stop();
                 return false;
             }
 
-            return targetEntity.Alive && !stuck && pathTraverser.Active;
-        }
-        
-        private void OnStuck()
-        {
-            stuck = true;
+            if (allowTeleport && dist > teleportAfterRange * teleportAfterRange && entity.World.Rand.NextDouble() < 0.05)
+            {
+                tryTeleport();
+            }
+
+            return !stuck && pathTraverser.Active;
         }
 
-        private void OnGoalReached()
+        private Vec3d findDecentTeleportPos()
         {
-        
+            var ba = entity.World.BlockAccessor;
+            var rnd = entity.World.Rand;
+
+            Vec3d pos = new Vec3d();
+            BlockPos bpos = new BlockPos();
+            for (int i = 0; i < 20; i++)
+            {
+                double rndx = rnd.NextDouble() * 10 - 5;
+                double rndz = rnd.NextDouble() * 10 - 5;
+                pos.Set(targetEntity.ServerPos.X + rndx, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + rndz);
+
+                for (int j = 0; j < 8; j++)
+                {
+                    // Produces: 0, -1, 1, -2, 2, -3, 3
+                    int dy = (1 - (j % 2) * 2) * (int)Math.Ceiling(j / 2f);
+
+                    bpos.Set((int)pos.X, (int)(pos.Y + dy + 0.5), (int)pos.Z);
+                    Block aboveBlock = ba.GetBlock(bpos);
+                    var boxes = aboveBlock.GetCollisionBoxes(ba, bpos);
+                    if (boxes != null && boxes.Length > 0) continue;
+
+                    bpos.Set((int)pos.X, (int)(pos.Y + dy - 0.1), (int)pos.Z);
+                    Block belowBlock = ba.GetBlock(bpos);
+                    boxes = belowBlock.GetCollisionBoxes(ba, bpos);
+                    if (boxes == null || boxes.Length == 0) continue;
+
+                    return pos;
+                }
+
+            }
+
+            return null;
+        }
+
+
+        protected void tryTeleport()
+        {
+            if (!allowTeleport) return;
+            Vec3d pos = findDecentTeleportPos();
+            if (pos != null) entity.TeleportTo(pos);
+        }
+
+
+        public override void FinishExecute(bool cancelled)
+        {
+            base.FinishExecute(cancelled);
+        }
+
+        protected void OnStuck()
+        {
+            stuck = true;
+            tryTeleport();
+        }
+
+        public override void OnNoPath(Vec3d target)
+        {
+            tryTeleport();
+        }
+
+        protected void OnGoalReached()
+        {
         }
     }
 }

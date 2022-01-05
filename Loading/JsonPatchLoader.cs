@@ -16,6 +16,7 @@ namespace Vintagestory.ServerMods.NoObf
 {
     public enum EnumJsonPatchOp {
         Add,
+        AddEach,
         Remove,
         Replace,
         Copy,
@@ -192,7 +193,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        private void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
+        public void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
         {
             EnumAppSide targetSide = jsonPatch.Side == null ? jsonPatch.File.Category.SideType : (EnumAppSide)jsonPatch.Side;
 
@@ -261,6 +262,15 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     op = new AddOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
+                case EnumJsonPatchOp.AddEach:
+                    if (jsonPatch.Value == null)
+                    {
+                        api.World.Logger.Error("Patch {0} in {1} failed probably because it is an add each operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
+                        errorCount++;
+                        return;
+                    }
+                    op = new AddEachOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                    break;
                 case EnumJsonPatchOp.Remove:
                     op = new RemoveOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path) };
                     break;
@@ -271,7 +281,6 @@ namespace Vintagestory.ServerMods.NoObf
                         errorCount++;
                         return;
                     }
-
                     op = new ReplaceOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
                 case EnumJsonPatchOp.Copy:
@@ -283,7 +292,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
             PatchDocument patchdoc = new PatchDocument(op);
-            JToken token = null;
+            JToken token;
             try
             {
                 token = JToken.Parse(asset.ToText());
@@ -299,7 +308,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 patchdoc.ApplyTo(token);
             }
-            catch (Tavis.PathNotFoundException p)
+            catch (PathNotFoundException p)
             {
                 api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}", patchIndex, patchSourcefile, jsonPatch.Path, p.Message, loc);
                 errorCount++;
@@ -313,7 +322,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
             string text = token.ToString();
-            asset.Data = System.Text.Encoding.UTF8.GetBytes(text);
+            asset.Data = Encoding.UTF8.GetBytes(text);
 
             applied++;
         }

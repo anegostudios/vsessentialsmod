@@ -29,6 +29,7 @@ namespace Vintagestory.ServerMods.NoObf
             GuiTransform = ModelTransform.BlockDefaultGui();
             FpHandTransform = ModelTransform.BlockDefaultFp();
             TpHandTransform = ModelTransform.BlockDefaultTp();
+            TpOffHandTransform = null;
             GroundTransform = ModelTransform.BlockDefaultGround();
             MaxStackSize = 64;
         }

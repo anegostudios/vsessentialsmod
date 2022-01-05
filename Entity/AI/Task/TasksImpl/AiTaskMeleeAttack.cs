@@ -11,32 +11,27 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskMeleeAttack : AiTaskBaseTargetable, IWorldIntersectionSupplier
+    public class AiTaskMeleeAttack : AiTaskBaseTargetable
     {
-        Entity targetEntity;
+        protected long lastCheckOrAttackMs;
 
-        long lastCheckOrAttackMs;
-
-        float damage = 2f;
-        float knockbackStrength = 1f;
-        float minDist = 1.5f;
-        float minVerDist = 1f;
+        protected float damage = 2f;
+        protected float knockbackStrength = 1f;
+        protected float minDist = 1.5f;
+        protected float minVerDist = 1f;
 
 
-        bool damageInflicted = false;
+        protected bool damageInflicted = false;
 
-        int attackDurationMs = 1500;
-        int damagePlayerAtMs = 500;
+        protected int attackDurationMs = 1500;
+        protected int damagePlayerAtMs = 500;
 
-        BlockSelection blockSel = new BlockSelection();
-        EntitySelection entitySel = new EntitySelection();
 
 
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
         float tamingGenerations = 10f;
 
-        public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
         public AiTaskMeleeAttack(EntityAgent entity) : base(entity)
         {            
@@ -52,7 +47,7 @@ namespace Vintagestory.GameContent
             }
 
             this.damage = taskConfig["damage"].AsFloat(2);
-            this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(2);
+            this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 2f));
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
 
@@ -77,15 +72,11 @@ namespace Vintagestory.GameContent
             {
                 return false;
             }
-            if (entity.EntityId==1)
-            {
-                int a =1;
-            }
 
             if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
             if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
 
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
@@ -93,9 +84,21 @@ namespace Vintagestory.GameContent
 
             if (fearReductionFactor <= 0) return false;
 
-            targetEntity = entity.World.GetNearestEntity(pos, 3f * fearReductionFactor, 3f * fearReductionFactor, (e) => {
-                return isTargetableEntity(e, 15) && hasDirectContact(e); 
-            });
+            if (entity.World.ElapsedMilliseconds - attackedByEntityMs > 30000)
+            {
+                attackedByEntity = null;
+            }
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && IsTargetableEntity(attackedByEntity, 15, true) && hasDirectContact(attackedByEntity, minDist, minVerDist))
+            {
+                targetEntity = attackedByEntity;
+            }
+            else
+            {
+                targetEntity = entity.World.GetNearestEntity(pos, 3f * fearReductionFactor, 3f * fearReductionFactor, (e) =>
+                {
+                    return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
+                });
+            }
 
             lastCheckOrAttackMs = entity.World.ElapsedMilliseconds;
             damageInflicted = false;
@@ -105,10 +108,11 @@ namespace Vintagestory.GameContent
 
 
         float curTurnRadPerSec;
+        bool didStartAnim;
 
         public override void StartExecute()
         {
-            base.StartExecute();
+            didStartAnim = false;
             curTurnRadPerSec = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser.curTurnRadPerSec;
         }
 
@@ -122,12 +126,18 @@ namespace Vintagestory.GameContent
             entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
             entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
 
+            bool correctYaw = Math.Abs(yawDist) < 20 * GameMath.DEG2RAD;
+            if (correctYaw && !didStartAnim)
+            {
+                didStartAnim = true;
+                base.StartExecute();
+            }   
 
             if (lastCheckOrAttackMs + damagePlayerAtMs > entity.World.ElapsedMilliseconds) return true;
 
-            if (!damageInflicted)
+            if (!damageInflicted && correctYaw)
             {
-                if (!hasDirectContact(targetEntity)) return false;
+                if (!hasDirectContact(targetEntity, minDist, minVerDist)) return false;
 
                 bool alive = targetEntity.Alive;
                 
@@ -156,64 +166,7 @@ namespace Vintagestory.GameContent
 
 
 
-        bool hasDirectContact(Entity targetEntity)
-        {
-            Cuboidd targetBox = targetEntity.CollisionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.CollisionBox.Y2 / 2, 0).Ahead(entity.CollisionBox.XSize / 2, 0, entity.ServerPos.Yaw);
-            double dist = targetBox.ShortestDistanceFrom(pos);
-            double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
-            if (dist >= minDist || vertDist >= minVerDist) return false;
+        
 
-            Vec3d rayTraceFrom = entity.ServerPos.XYZ;
-            rayTraceFrom.Y += 1 / 32f;
-            Vec3d rayTraceTo = targetEntity.ServerPos.XYZ;
-            rayTraceTo.Y += 1 / 32f;
-            bool directContact = false;
-
-            entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-            directContact = blockSel == null;
-
-            if (!directContact)
-            {
-                rayTraceFrom.Y += entity.CollisionBox.Y2 * 7 / 16f;
-                rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
-                entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-                directContact = blockSel == null;
-            }
-
-            if (!directContact)
-            {
-                rayTraceFrom.Y += entity.CollisionBox.Y2 * 7 / 16f;
-                rayTraceTo.Y += targetEntity.CollisionBox.Y2 * 7 / 16f;
-                entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
-                directContact = blockSel == null;
-            }
-
-            if (!directContact) return false;
-
-            return true;
-        }
-
-
-        public Block GetBlock(BlockPos pos)
-        {
-            return entity.World.BlockAccessor.GetBlock(pos);
-        }
-
-        public Cuboidf[] GetBlockIntersectionBoxes(BlockPos pos)
-        {
-            return entity.World.BlockAccessor.GetBlock(pos).GetCollisionBoxes(entity.World.BlockAccessor, pos);
-        }
-
-        public bool IsValidPos(BlockPos pos)
-        {
-            return entity.World.BlockAccessor.IsValidPos(pos);
-        }
-
-
-        public Entity[] GetEntitiesAround(Vec3d position, float horRange, float vertRange, ActionConsumable<Entity> matches = null)
-        {
-            return new Entity[0];
-        }
     }
 }

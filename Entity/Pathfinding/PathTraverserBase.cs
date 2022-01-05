@@ -58,5 +58,10 @@ namespace Vintagestory.API.Common
 
         protected abstract bool BeginGo();
         public abstract void Stop();
+
+        public virtual void Retarget()
+        {
+            
+        }
     }
 }

@@ -30,7 +30,7 @@ namespace Vintagestory.GameContent
         GuiComposer fullDialog;
         GuiComposer hudDialog;
 
-        public override double DrawOrder => 0.11;
+        public override double DrawOrder => dialogType == EnumDialogType.HUD ? 0.07 : 0.11;
 
         public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
         {

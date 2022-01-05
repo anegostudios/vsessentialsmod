@@ -52,7 +52,7 @@ namespace Vintagestory.GameContent
 
                 if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
                 {
-                    Cuboidd EntitySuffocationBox = entity.CollisionBox.ToDouble();
+                    Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
 
                     if (tmp.Intersects(EntitySuffocationBox))
                     {

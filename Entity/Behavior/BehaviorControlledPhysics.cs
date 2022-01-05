@@ -120,7 +120,7 @@ namespace Vintagestory.GameContent
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
-                GameTick(entity, GlobalConstants.PhysicsFrameTime);
+                TickEntityPhysicsPre(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
 
@@ -150,7 +150,7 @@ namespace Vintagestory.GameContent
             windForce.Z = Math.Max(0, Math.Abs(windSpeed.Z) - 0.8) / 40f * Math.Sign(windSpeed.Z);
         }
 
-        public virtual void GameTick(Entity entity, float dt)
+        public virtual void TickEntityPhysicsPre(Entity entity, float dt)
         {
             EntityControls controls = ((EntityAgent)entity).Controls;
             TickEntityPhysics(entity.ServerPos, controls, dt);  // this was entity.ServerPos - wtf? - apparently needed so they don't glitch through terrain o.O
@@ -483,50 +483,49 @@ namespace Vintagestory.GameContent
 
         private void HandleSneaking(EntityPos pos, EntityControls controls, float dt)
         {
+            if (!controls.Sneak || !entity.OnGround || pos.Motion.Y > 0) return;
+
             // Sneak to prevent falling off blocks
-            if (controls.Sneak && entity.OnGround && pos.Motion.Y <= 0)
+            Vec3d testPosition = new Vec3d();
+            testPosition.Set(pos.X, pos.Y - GlobalConstants.GravityPerSecond * dt, pos.Z);
+
+            // Only apply this if he was on the ground in the first place
+            if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
             {
-                Vec3d testPosition = new Vec3d();
-                testPosition.Set(pos.X, pos.Y - GlobalConstants.GravityPerSecond * dt, pos.Z);
+                return;
+            }
 
-                // Only apply this if he was on the ground in the first place
-                if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
+
+
+            // Test for X
+            testPosition.Set(outposition.X, outposition.Y - GlobalConstants.GravityPerSecond * dt, pos.Z);
+            if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+            {
+                // Weird hack so you can climb down ladders more easily
+                if (belowBlock.Climbable)
                 {
-                    return;
+                    outposition.X += (pos.X - outposition.X) / 10;
                 }
-
-                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
-
-
-                // Test for X
-                testPosition.Set(outposition.X, outposition.Y - GlobalConstants.GravityPerSecond * dt, pos.Z);
-                if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+                else
                 {
-                    // Weird hack so you can climb down ladders more easily
-                    if (belowBlock.Climbable)
-                    {
-                        outposition.X += (pos.X - outposition.X) / 10;
-                    }
-                    else
-                    {
-                        outposition.X = pos.X;
-                    }
+                    outposition.X = pos.X;
                 }
+            }
 
 
-                // Test for Z
-                testPosition.Set(pos.X, outposition.Y - GlobalConstants.GravityPerSecond * dt, outposition.Z);
-                if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+            // Test for Z
+            testPosition.Set(pos.X, outposition.Y - GlobalConstants.GravityPerSecond * dt, outposition.Z);
+            if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+            {
+                // Weird hack so you can climb down ladders more easily
+                if (belowBlock.Climbable)
                 {
-                    // Weird hack so you can climb down ladders more easily
-                    if (belowBlock.Climbable)
-                    {
-                        outposition.Z += (pos.Z - outposition.Z) / 10;
-                    }
-                    else
-                    {
-                        outposition.Z = pos.Z;
-                    }
+                    outposition.Z += (pos.Z - outposition.Z) / 10;
+                }
+                else
+                {
+                    outposition.Z = pos.Z;
                 }
             }
         }
@@ -768,7 +767,7 @@ namespace Vintagestory.GameContent
 
         private bool HandleSteppingOnBlocks(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
-            if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
+            if ((controls.WalkVector.X == 0 && controls.WalkVector.Z == 0) || (!entity.OnGround && !entity.Swimming)) return false;
 
 
             Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
@@ -920,14 +919,18 @@ namespace Vintagestory.GameContent
 
                 collisionTester.ApplyTerrainCollision(entity, posMoved, dtFac, ref outposition);
 
-                double reflectX = outposition.X - epos.X - motionX;
-                double reflectZ = outposition.Z - epos.Z - motionZ;
+                double reflectX = (outposition.X - epos.X) / dtFac - motionX;
+                double reflectZ = (outposition.Z - epos.Z) / dtFac - motionZ;
 
                 epos.Motion.X = reflectX;
                 epos.Motion.Z = reflectZ;
 
                 entity.CollisionBox.Set(entity.OriginCollisionBox);
                 entity.CollisionBox.Translate(endVec[0], 0, endVec[2]);
+
+
+                entity.SelectionBox.Set(entity.OriginSelectionBox);
+                entity.SelectionBox.Translate(endVec[0], 0, endVec[2]);
             }
         }
 

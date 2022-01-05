@@ -98,6 +98,9 @@ namespace Vintagestory.Essentials
                     i++;
                 }
 
+                poses.Add(target.AsBlockPos);
+                colors.Add(ColorUtil.ColorFromRgba(0, 0, 255, 255));
+
                 IPlayer player = entity.World.AllOnlinePlayers[0];
                 entity.World.HighlightBlocks(player, 2, poses, 
                     colors, 
@@ -137,6 +140,7 @@ namespace Vintagestory.Essentials
             curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
 
             stuckCounter = 0;
+            waypointToReachIndex = 0;
             lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
 
             return true;
@@ -145,63 +149,42 @@ namespace Vintagestory.Essentials
         Vec3d prevPos = new Vec3d(0, -2000, 0);
         Vec3d prevPrevPos = new Vec3d(0, -1000, 0);
         float prevPosAccum;
+        float sqDistToTarget;
+
 
         public override void OnGameTick(float dt)
         {
             if (!Active) return;
 
-            int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex);
-            Vec3d target = waypoints[wayPointIndex];
+            bool nearHorizontally = false;
+            int offset = 0;
+            bool nearAllDirs =
+                IsNearTarget(offset++, ref nearHorizontally)
+                || IsNearTarget(offset++, ref nearHorizontally)
+                || IsNearTarget(offset++, ref nearHorizontally)
+            ;
 
-            // Due to the nature of gravity and going down slope we sometimes end up at the next waypoint. So lets also test for the next waypoint
-            // Doesn't seem to fully fix the issue though
-            int nextwayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + 1);
-            Vec3d nexttarget = waypoints[nextwayPointIndex];
-
-            // For land dwellers only check horizontal distance
-            double sqDistToTarget = Math.Min(
-                Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
-                target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
-            );
-            double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
-
-            double sqDistToNextTarget = Math.Min(
-                Math.Min(nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
-                nexttarget.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
-            );
-
-            bool nearHorizontally = horsqDistToTarget < 1;
-            bool nearAllDirs = sqDistToTarget < targetDistance * targetDistance;
-
-            bool nearAllDirsNext = sqDistToNextTarget < targetDistance * targetDistance;
-
-
-            if (nearAllDirs || nearAllDirsNext)
+            if (nearAllDirs)
             {
-                waypointToReachIndex++;
-                if (nearAllDirsNext && wayPointIndex != nextwayPointIndex)
-                {
-                    waypointToReachIndex++;
-                }
-
+                waypointToReachIndex += offset;
                 lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
+            }
 
-                if (waypointToReachIndex >= waypoints.Count)
-                {
-                    Stop();
-                    OnGoalReached?.Invoke();
-                    return;
-                } else
-                {
-                    target = waypoints[waypointToReachIndex];
-                }
+            target = waypoints[Math.Min(waypoints.Count - 1, waypointToReachIndex)];
+
+            if (waypointToReachIndex >= waypoints.Count)
+            {
+                Stop();
+                OnGoalReached?.Invoke();
+                return;
             }
 
             bool stuck =
                 (entity.CollidedVertically && entity.Controls.IsClimbing) ||
                 (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0) ||
                 (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land) ||
-                (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
+                (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) || // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
+                (entity.Swimming && false)
             ;
 
             // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
@@ -237,6 +220,7 @@ namespace Vintagestory.Essentials
                 (float)(target.Y - entity.ServerPos.Y),
                 (float)(target.Z - entity.ServerPos.Z)
             );
+            targetVec.Normalize();
 
             float desiredYaw = 0;
             
@@ -329,6 +313,25 @@ namespace Vintagestory.Essentials
         }
 
 
+        bool IsNearTarget(int waypointOffset, ref bool nearHorizontally)
+        {
+            if (waypoints.Count - 1 < waypointToReachIndex + waypointOffset) return false;
+
+            int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + waypointOffset);
+            Vec3d target = waypoints[wayPointIndex];
+
+            sqDistToTarget = Math.Min(
+                Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
+                target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
+            );
+            double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
+
+            nearHorizontally |= horsqDistToTarget < 1;
+
+            return sqDistToTarget < targetDistance * targetDistance;
+        }
+
+
         public override void Stop()
         {
             Active = false;
@@ -336,6 +339,12 @@ namespace Vintagestory.Essentials
             entity.ServerControls.Forward = false;
             entity.Controls.WalkVector.Set(0, 0, 0);
             stuckCounter = 0;
+        }
+
+        public override void Retarget()
+        {
+            Active = true;
+            waypointToReachIndex = waypoints.Count - 1;
         }
     }
 }

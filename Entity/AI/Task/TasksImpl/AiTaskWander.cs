@@ -107,7 +107,7 @@ namespace Vintagestory.GameContent
             {
                 wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
             }
-            wanderRangeHorizontal = NatFloat.createStrongerInvexp(wanderRangeMin, wanderRangeMax);
+            wanderRangeHorizontal = NatFloat.createInvexp(wanderRangeMin, wanderRangeMax);
 
 
             if (taskConfig["maxHeight"] != null)

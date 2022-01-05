@@ -498,30 +498,26 @@ namespace Vintagestory.GameContent
 
         private UpdateSnowLayerChunk GetSnowUpdate(WeatherSimulationRegion simregion, IServerMapChunk mc, Vec2i chunkPos, IWorldChunk[] chunksCol)
         {
-
-            byte[] data = mc.GetModdata("lastSnowAccumUpdateTotalHours");
-            double lastSnowAccumUpdateTotalHours = data == null ? 0 : SerializerUtil.Deserialize<double>(data);
+            double lastSnowAccumUpdateTotalHours = mc.GetModdata<double>("lastSnowAccumUpdateTotalHours");
             double startTotalHours = lastSnowAccumUpdateTotalHours;
 
             int reso = WeatherSimulationRegion.snowAccumResolution;
 
             SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
             {
-                //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
                 SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
             };
             float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
 
             // Can't grow bigger than one full snow block
-            float max = ws.GeneralConfig.SnowLayerBlocks.Count + 0.5f;
+            float max = ws.GeneralConfig.SnowLayerBlocks.Count + 0.6f;
 
             int len = simregion.SnowAccumSnapshots.Length;
             int i = simregion.SnowAccumSnapshots.Start;
             int newCount = 0;
 
-            lock (WeatherSimulationRegion.lockTest)
+            lock (WeatherSimulationRegion.snowAccumSnapshotLock)
             {
-
                 while (len-- > 0)
                 {
                     SnowAccumSnapshot hoursnapshot = simregion.SnowAccumSnapshots[i];
@@ -538,7 +534,6 @@ namespace Vintagestory.GameContent
                     lastSnowAccumUpdateTotalHours = Math.Max(lastSnowAccumUpdateTotalHours, hoursnapshot.TotalHours);
                     newCount++;
                 }
-
             }
 
             if (newCount == 0) return null;
@@ -553,8 +548,6 @@ namespace Vintagestory.GameContent
 
             if (ch != null)
             {
-                //Console.WriteLine("{0} snaps used for {1}/{2}", newCount, chunkPos.X, chunkPos.Y);
-
                 ch.LastSnowAccumUpdateTotalHours = lastSnowAccumUpdateTotalHours;
                 ch.Coords = chunkPos.Copy();
             }
@@ -650,10 +643,11 @@ namespace Vintagestory.GameContent
 
                 float nowAccum = hereAccum + sumsnapshot.GetAvgSnowAccumByRegionCorner(relx, rely, relz);
                 
-                mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, ws.GeneralConfig.SnowLayerBlocks.Count + 0.5f);
+                mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, ws.GeneralConfig.SnowLayerBlocks.Count + 0.6f);
 
-                float hereShouldLevel = nowAccum - GameMath.MurmurHash3Mod(pos.X, 0, pos.Z, 100) / 300f;
-                float shouldIndexf = GameMath.Clamp((hereShouldLevel - 1.1f), -1, ws.GeneralConfig.SnowLayerBlocks.Count - 1);
+                float hereShouldLevel = nowAccum - GameMath.MurmurHash3Mod(pos.X, 0, pos.Z, 150) / 300f;
+
+                float shouldIndexf = GameMath.Clamp(hereShouldLevel - 1.1f, -1, ws.GeneralConfig.SnowLayerBlocks.Count - 1);
                 int shouldIndex = shouldIndexf < 0 ? -1 : (int)shouldIndexf;
 
                 placePos.Set(pos.X, Math.Min(pos.Y + 1, sapi.World.BlockAccessor.MapSizeY - 1), pos.Z);

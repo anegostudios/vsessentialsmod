@@ -171,7 +171,7 @@ namespace Vintagestory.GameContent
             ElementBounds leftDlgBounds = Composers["playercharacter"].Bounds;
             ElementBounds botDlgBounds = Composers["environment"].Bounds;
 
-            ElementBounds leftColumnBounds = ElementBounds.Fixed(0, 30, 90, 20);
+            ElementBounds leftColumnBounds = ElementBounds.Fixed(0, 25, 90, 20);
             ElementBounds rightColumnBounds = ElementBounds.Fixed(120, 30, 120, 8);
 
             ElementBounds leftColumnBoundsW = ElementBounds.Fixed(0, 0, 140, 20);
@@ -219,7 +219,11 @@ namespace Vintagestory.GameContent
                 .AddShadedDialogBG(bgBounds, true)
                 .AddDialogTitleBar(Lang.Get("Stats"), () => dlg.OnTitleBarClose())
                 .BeginChildElements(bgBounds)
+            ;
 
+            if (saturation != null)
+            {
+                Composers["playerstats"]
                     .AddStaticText(Lang.Get("playerinfo-nutrition"), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), leftColumnBounds.WithFixedWidth(200))
                     .AddStaticText(Lang.Get("playerinfo-nutrition-Freeza"), CairoFont.WhiteDetailText(), leftColumnBounds = leftColumnBounds.BelowCopy().WithFixedWidth(90))
                     .AddStaticText(Lang.Get("playerinfo-nutrition-Vegita"), CairoFont.WhiteDetailText(), leftColumnBounds = leftColumnBounds.BelowCopy())
@@ -232,55 +236,75 @@ namespace Vintagestory.GameContent
                     .AddStatbar(rightColumnBounds = rightColumnBounds.BelowCopy(0, 12), GuiStyle.FoodBarColor, "grainBar")
                     .AddStatbar(rightColumnBounds = rightColumnBounds.BelowCopy(0, 12), GuiStyle.FoodBarColor, "proteinBar")
                     .AddStatbar(rightColumnBounds = rightColumnBounds.BelowCopy(0, 12), GuiStyle.FoodBarColor, "dairyBar")
+                ;
 
-                    /*.AddDynamicText(Math.Round(fruitLevel / maxSaturation) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBounds = rightColumnBounds.BelowCopy())
-                    .AddDynamicText(Math.Round(vegetableLevel / maxSaturation) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBounds = rightColumnBounds.BelowCopy())
-                    .AddDynamicText(Math.Round(grainLevel / maxSaturation) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBounds = rightColumnBounds.BelowCopy())
-                    .AddDynamicText(Math.Round(proteinLevel / maxSaturation) + "%", CairoFont.WhiteDetailText(), EnumTextOrientation.Left, rightColumnBoundsW = rightColumnBoundsW.BelowCopy())*/
+                leftColumnBoundsW = leftColumnBoundsW.FixedUnder(leftColumnBounds, -5);
+            }
 
-                    .AddStaticText(Lang.Get("Physical"), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), leftColumnBoundsW = leftColumnBoundsW.FixedUnder(leftColumnBounds, 15).WithFixedWidth(200))
+            Composers["playerstats"]
+                    .AddStaticText(Lang.Get("Physical"), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), leftColumnBoundsW.WithFixedWidth(200).WithFixedOffset(0, 23))
                     .Execute(() => {
                         leftColumnBoundsW = leftColumnBoundsW.FlatCopy();
                         leftColumnBoundsW.fixedY += 5;
                     })
                 ;
 
-
-            Composers["playerstats"]
-                .AddIf(health != null)
+            if (health != null)
+            {
+                Composers["playerstats"]
                     .AddStaticText(Lang.Get("Health Points"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                     .AddDynamicText(health + " / " + maxhealth, CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY).WithFixedHeight(30), "health")
-                .EndIf()
-                .AddIf(saturation != null)
+                ;
+            }
+
+            if (saturation != null) {
+                Composers["playerstats"]
                     .AddStaticText(Lang.Get("Satiety"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                     .AddDynamicText((int)saturation + " / " + (int)maxsaturation, CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "satiety")
-                .EndIf()
-                .AddIf(tempTree != null)
+                ;
+            }
+
+            if (tempTree != null)
+            {
+                Composers["playerstats"]
                     .AddStaticText(Lang.Get("Body Temperature"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                     .AddRichtext(tempTree == null ? "-" : getBodyTempText(tempTree), CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "bodytemp")
-                .EndIf()
-                .AddIf(wetnessString.Length > 0)
-                    .AddRichtext(wetnessString, CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .EndIf()
+                ;
+            }
 
+            if (wetnessString.Length > 0)
+            {
+                Composers["playerstats"]
+                    .AddRichtext(wetnessString, CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
+                ;
+            }
+
+            Composers["playerstats"]
                 .AddStaticText(Lang.Get("Walk speed"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                 .AddDynamicText((int)Math.Round(100 * walkspeed) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "walkspeed")
 
                 .AddStaticText(Lang.Get("Healing effectivness"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                 .AddDynamicText((int)Math.Round(100 * healingEffectivness) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "healeffectiveness")
+            ;
 
-                .AddStaticText(Lang.Get("Hunger rate"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
-                .AddDynamicText((int)Math.Round(100 * hungerRate) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "hungerrate")
+            if (saturation != null) 
+            { 
+                Composers["playerstats"]
+                    .AddStaticText(Lang.Get("Hunger rate"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
+                    .AddDynamicText((int)Math.Round(100 * hungerRate) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "hungerrate")
+                ;
+            }
 
+            Composers["playerstats"]
                 .AddStaticText(Lang.Get("Ranged Accuracy"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                 .AddDynamicText((int)Math.Round(100 * rangedWeaponAcc) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponacc")
 
                 .AddStaticText(Lang.Get("Ranged Charge Speed"), CairoFont.WhiteDetailText(), leftColumnBoundsW = leftColumnBoundsW.BelowCopy())
                 .AddDynamicText((int)Math.Round(100 * rangedWeaponSpeed) + "%", CairoFont.WhiteDetailText(), rightColumnBoundsW = rightColumnBoundsW.FlatCopy().WithFixedPosition(rightColumnBoundsW.fixedX, leftColumnBoundsW.fixedY), "rangedweaponchargespeed")
 
-            .EndChildElements()
-            .Compose()
-        ;
+                .EndChildElements()
+                .Compose()
+            ;
 
             UpdateStatBars();
         }
@@ -343,7 +367,7 @@ namespace Vintagestory.GameContent
 
             compo.GetDynamicText("walkspeed").SetNewText((int)Math.Round(100 * walkspeed) + "%");
             compo.GetDynamicText("healeffectiveness").SetNewText((int)Math.Round(100 * healingEffectivness) + "%");
-            compo.GetDynamicText("hungerrate").SetNewText((int)Math.Round(100 * hungerRate) + "%");
+            compo.GetDynamicText("hungerrate")?.SetNewText((int)Math.Round(100 * hungerRate) + "%");
             compo.GetDynamicText("rangedweaponacc").SetNewText((int)Math.Round(100 * rangedWeaponAcc) + "%");
             compo.GetDynamicText("rangedweaponchargespeed").SetNewText((int)Math.Round(100 * rangedWeaponSpeed) + "%");
 
@@ -356,42 +380,35 @@ namespace Vintagestory.GameContent
             GuiComposer compo = Composers["playerstats"];
             if (compo == null || !IsOpened()) return;
 
-            float saturation = 0;
-            float maxSaturation = 0;
-            float fruitLevel = 0;
-            float vegetableLevel = 0;
-            float grainLevel = 0;
-            float proteinLevel = 0;
-            float dairyLevel = 0;
-
             ITreeAttribute hungerTree = capi.World.Player.Entity.WatchedAttributes.GetTreeAttribute("hunger");
 
             if (hungerTree != null)
             {
-                saturation = hungerTree.GetFloat("currentsaturation");
-                maxSaturation = hungerTree.GetFloat("maxsaturation");
-
-                fruitLevel = hungerTree.GetFloat("fruitLevel");
-                vegetableLevel = hungerTree.GetFloat("vegetableLevel");
-                grainLevel = hungerTree.GetFloat("grainLevel");
-                proteinLevel = hungerTree.GetFloat("proteinLevel");
-                dairyLevel = hungerTree.GetFloat("dairyLevel");
+                float saturation = hungerTree.GetFloat("currentsaturation");
+                float maxSaturation = hungerTree.GetFloat("maxsaturation");
+                float fruitLevel = hungerTree.GetFloat("fruitLevel");
+                float vegetableLevel = hungerTree.GetFloat("vegetableLevel");
+                float grainLevel = hungerTree.GetFloat("grainLevel");
+                float proteinLevel = hungerTree.GetFloat("proteinLevel");
+                float dairyLevel = hungerTree.GetFloat("dairyLevel");
 
                 compo.GetDynamicText("satiety").SetNewText((int)saturation + " / " + maxSaturation);
+
+                Composers["playerstats"].GetStatbar("fruitBar").SetLineInterval(maxSaturation / 10);
+                Composers["playerstats"].GetStatbar("vegetableBar").SetLineInterval(maxSaturation / 10);
+                Composers["playerstats"].GetStatbar("grainBar").SetLineInterval(maxSaturation / 10);
+                Composers["playerstats"].GetStatbar("proteinBar").SetLineInterval(maxSaturation / 10);
+                Composers["playerstats"].GetStatbar("dairyBar").SetLineInterval(maxSaturation / 10);
+
+
+                Composers["playerstats"].GetStatbar("fruitBar").SetValues(fruitLevel, 0, maxSaturation);
+                Composers["playerstats"].GetStatbar("vegetableBar").SetValues(vegetableLevel, 0, maxSaturation);
+                Composers["playerstats"].GetStatbar("grainBar").SetValues(grainLevel, 0, maxSaturation);
+                Composers["playerstats"].GetStatbar("proteinBar").SetValues(proteinLevel, 0, maxSaturation);
+                Composers["playerstats"].GetStatbar("dairyBar").SetValues(dairyLevel, 0, maxSaturation);
             }
 
-            Composers["playerstats"].GetStatbar("fruitBar").SetLineInterval(maxSaturation / 10);
-            Composers["playerstats"].GetStatbar("vegetableBar").SetLineInterval(maxSaturation / 10);
-            Composers["playerstats"].GetStatbar("grainBar").SetLineInterval(maxSaturation / 10);
-            Composers["playerstats"].GetStatbar("proteinBar").SetLineInterval(maxSaturation / 10);
-            Composers["playerstats"].GetStatbar("dairyBar").SetLineInterval(maxSaturation / 10);
 
-
-            Composers["playerstats"].GetStatbar("fruitBar").SetValues(fruitLevel, 0, maxSaturation);
-            Composers["playerstats"].GetStatbar("vegetableBar").SetValues(vegetableLevel, 0, maxSaturation);
-            Composers["playerstats"].GetStatbar("grainBar").SetValues(grainLevel, 0, maxSaturation);
-            Composers["playerstats"].GetStatbar("proteinBar").SetValues(proteinLevel, 0, maxSaturation);
-            Composers["playerstats"].GetStatbar("dairyBar").SetValues(dairyLevel, 0, maxSaturation);
         }
     }
 }

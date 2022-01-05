@@ -12,40 +12,40 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorTaskAI : EntityBehavior
     {
-        public AiTaskManager taskManager;
+        public AiTaskManager TaskManager;
         public PathTraverserBase PathTraverser;
 
         public EntityBehaviorTaskAI(Entity entity) : base(entity)
         {
-            taskManager = new AiTaskManager(entity);
+            TaskManager = new AiTaskManager(entity);
         }
 
         public override void OnEntitySpawn()
         {
             base.OnEntitySpawn();
 
-            taskManager.OnEntitySpawn();
+            TaskManager.OnEntitySpawn();
         }
 
         public override void OnEntityLoaded()
         {
             base.OnEntityLoaded();
 
-            taskManager.OnEntityLoaded();
+            TaskManager.OnEntityLoaded();
         }
 
         public override void OnEntityDespawn(EntityDespawnReason reason)
         {
             base.OnEntityDespawn(reason);
 
-            taskManager.OnEntityDespawn(reason);
+            TaskManager.OnEntityDespawn(reason);
         }
 
-        public override void OnEntityReceiveDamage(DamageSource damageSource, float damage)
+        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            base.OnEntityReceiveDamage(damageSource, damage);
+            base.OnEntityReceiveDamage(damageSource, ref damage);
 
-            taskManager.OnEntityHurt(damageSource, damage);
+            TaskManager.OnEntityHurt(damageSource, damage);
         }
 
         public override void Initialize(EntityProperties properties, JsonObject aiconfig)
@@ -83,7 +83,7 @@ namespace Vintagestory.GameContent
                     throw e;
                 }
 
-                taskManager.AddTask(task);
+                TaskManager.AddTask(task);
             }
         }
 
@@ -97,7 +97,7 @@ namespace Vintagestory.GameContent
 
             entity.World.FrameProfiler.Mark("entity-ai-pathing");
 
-            taskManager.OnGameTick(deltaTime);
+            TaskManager.OnGameTick(deltaTime);
 
             entity.World.FrameProfiler.Mark("entity-ai-tasks");
         }
@@ -105,7 +105,7 @@ namespace Vintagestory.GameContent
 
         public override void OnStateChanged(EnumEntityState beforeState, ref EnumHandling handled)
         {
-            taskManager.OnStateChanged(beforeState);
+            TaskManager.OnStateChanged(beforeState);
         }
 
 
@@ -113,12 +113,17 @@ namespace Vintagestory.GameContent
 
         public override void Notify(string key, object data)
         {
-            taskManager.Notify(key, data);
+            TaskManager.Notify(key, data);
         }
 
         public override void GetInfoText(StringBuilder infotext)
         {
             base.GetInfoText(infotext);
+        }
+
+        public override void OnNoPath(Vec3d target)
+        {
+            TaskManager.OnNoPath(target);
         }
 
         public override string PropertyName()

@@ -256,8 +256,12 @@ namespace Vintagestory.GameContent
                 {
                     (entity.World.Api as ICoreClientAPI).Network.SendPacketClient(inv.Open(player));
                 }
-                
-                dlg.OnClosed += () => dlg = null;
+
+                dlg.OnClosed += () =>
+                {
+                    dlg.Dispose();
+                    dlg = null;
+                };
             }
         }
 
