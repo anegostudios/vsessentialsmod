@@ -454,6 +454,7 @@ namespace Vintagestory.GameContent
                 ProteinLevel /= 2;
                 FruitLevel /= 2;
                 DairyLevel /= 2;
+                GrainLevel /= 2;
             }
         }
     }

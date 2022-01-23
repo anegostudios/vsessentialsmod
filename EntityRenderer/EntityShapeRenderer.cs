@@ -774,7 +774,20 @@ namespace Vintagestory.GameContent
                 aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
             } else
             {
-                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+                var thisMount = (entity as EntityAgent)?.MountedOn;
+                var selfMount = entityPlayer.MountedOn;
+
+                if (thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
+                {
+                    var mpos = thisMount.MountSupplier.GetMountOffset(entity);
+
+                    aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
+                    aboveHeadPos.Add(mpos);
+                } else
+                {
+                    aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+                }
+                
             }
 
             double offX = entity.SelectionBox.X2 - entity.OriginSelectionBox.X2;
@@ -851,8 +864,18 @@ namespace Vintagestory.GameContent
 
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
-            Mat4f.Identity(ModelMat);            
-            Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.Y - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
+            Mat4f.Identity(ModelMat);
+
+            if (entity is IMountableSupplier ims && ims.IsMountedBy(entityPlayer))
+            {
+                var mountoffset = ims.GetMountOffset(entityPlayer);
+                Mat4f.Translate(ModelMat, ModelMat, -mountoffset.X, -mountoffset.Y, -mountoffset.Z);
+            }
+            else
+            {
+                var translate = GetRenderTranslateRespectingMounts(entity);
+                Mat4f.Translate(ModelMat, ModelMat, translate.X, translate.Y, translate.Z);
+            }
 
             float rotX = entity.Properties.Client.Shape?.rotateX ?? 0;
             float rotY = entity.Properties.Client.Shape?.rotateY ?? 0;
@@ -945,7 +968,8 @@ namespace Vintagestory.GameContent
 
             if (!isSelf)
             {
-                Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.Y - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
+                var translate = GetRenderTranslateRespectingMounts(entity);
+                Mat4f.Translate(ModelMat, ModelMat, translate.X, translate.Y, translate.Z);
             }
             float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
             float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
@@ -977,6 +1001,31 @@ namespace Vintagestory.GameContent
             float scale = entity.Properties.Client.Size;
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
+        }
+
+
+        public Vec3f GetRenderTranslateRespectingMounts(Entity forEntity)
+        {
+            EntityPlayer entityPlayer = capi.World.Player.Entity;
+            EntityAgent entity = forEntity as EntityAgent;
+
+            if (entity?.MountedOn != null)
+            {
+                if (entityPlayer.MountedOn != null && entity.MountedOn.MountSupplier == entityPlayer.MountedOn.MountSupplier)
+                {
+                    var offs = entity.MountedOn.MountPosition - entityPlayer.MountedOn.MountPosition;
+                    return new Vec3f((float)offs.X, (float)offs.Y, (float)offs.Z);
+                }
+                else
+                {
+                    var offs = entity.MountedOn.MountPosition;
+                    return new Vec3f((float)(offs.X - entityPlayer.CameraPos.X), (float)(offs.Y - entityPlayer.CameraPos.Y), (float)(offs.Z - entityPlayer.CameraPos.Z));
+                }
+            }
+            else
+            {
+                return new Vec3f((float)(forEntity.Pos.X - entityPlayer.CameraPos.X), (float)(forEntity.Pos.Y - entityPlayer.CameraPos.Y), (float)(forEntity.Pos.Z - entityPlayer.CameraPos.Z));
+            }
         }
 
         float intoxIntensity;

@@ -221,6 +221,7 @@ namespace Vintagestory.GameContent
             entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.XYZ.AsBlockPos)?.MarkModified();
         }
 
+
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             base.Initialize(properties, typeAttributes);
@@ -291,8 +292,6 @@ namespace Vintagestory.GameContent
 
         public void SetHarvested(IPlayer byPlayer, float dropQuantityMultiplier = 1f)
         {
-            //entity.World.Logger.Debug("setharvested begin " + entity.World.Side);
-
             if (entity.WatchedAttributes.GetBool("harvested", false)) return;
 
             entity.WatchedAttributes.SetBool("harvested", true);
@@ -330,8 +329,7 @@ namespace Vintagestory.GameContent
                 if (stack.Collectible.NutritionProps != null || stack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.NutritionProps != null)
                 {
                     float weightedStackSize = stack.StackSize * AnimalWeight;
-                    float fraction = weightedStackSize - (int)weightedStackSize;
-                    stack.StackSize = (int)weightedStackSize + (entity.World.Rand.NextDouble() > fraction ? 1 : 0);
+                    stack.StackSize = GameMath.RoundRandom(entity.World.Rand, weightedStackSize);
                 }
 
                 if (stack.StackSize == 0) continue;
@@ -340,16 +338,12 @@ namespace Vintagestory.GameContent
                 if (dstack.LastDrop) break;
             }
 
-            //entity.World.Logger.Debug("setharvested drops resolved");
-
             ItemStack[] resolvedDrops = todrop.ToArray();
 
             TreeAttribute tree = new TreeAttribute();
             for (int i = 0; i < resolvedDrops.Length; i++)
             {
                 inv[i].Itemstack = resolvedDrops[i];
-
-                //entity.World.Logger.Debug("drop {0} is {1}", i, resolvedDrops[i]?.GetName());
             }
 
             inv.ToTreeAttributes(tree);
@@ -361,8 +355,6 @@ namespace Vintagestory.GameContent
             {
                 entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.AsBlockPos).MarkModified();
             }
-
-            //entity.World.Logger.Debug("setharvested done");
         }
 
 
@@ -435,7 +427,6 @@ namespace Vintagestory.GameContent
             {
                 infotext.AppendLine(Lang.Get("creature-weight-starving"));
             }
-
 
             base.GetInfoText(infotext);
         }

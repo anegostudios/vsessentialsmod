@@ -574,9 +574,11 @@ namespace Vintagestory.GameContent
 
                 int avgCol = block.GetColor(capi, tmpPos);
                 int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP, GameMath.MurmurHash3Mod(tmpPos.X, tmpPos.Y, tmpPos.Z, 30));
+                // Why the eff is r and b flipped
+                rndCol = ((rndCol & 0xff) << 16) | (((rndCol >> 8) & 0xff) << 8) | (((rndCol>>16) & 0xff) << 0);
 
                 // Add a bit of randomness to each pixel
-                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.2f);
+                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.6f);
 
                 texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(col, b) | 255 << 24;
             }

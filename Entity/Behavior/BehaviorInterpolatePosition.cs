@@ -34,6 +34,10 @@ namespace Vintagestory.GameContent
         {
             // Don't interpolate for ourselves
             if (entity == ((IClientWorldAccessor)entity.World).Player.Entity) return;
+            if ((entity.World.Api as ICoreClientAPI).IsGamePaused) return;
+
+            // When mounted, the entities position is set by the physics sim
+            bool isMounted = (entity as EntityAgent)?.MountedOn != null;
 
 
             float interval = 0.2f;
@@ -53,7 +57,7 @@ namespace Vintagestory.GameContent
                 // "|| accum > 1" mitigates items at the edge of block constantly jumping up and down
                 if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05f) || (accum > 1 && posDiffSq < 0.1 * 0.1))
                 {
-                    if (!serverposApplied)
+                    if (!serverposApplied && !isMounted)
                     {
                         entity.Pos.SetPos(entity.ServerPos);
                     }
@@ -70,7 +74,7 @@ namespace Vintagestory.GameContent
             double percentPosy = Math.Abs(posDiffY) * deltaTime / interval;
             double percentPosz = Math.Abs(posDiffZ) * deltaTime / interval;
 
-            double percentyawdiff = Math.Abs(yawDiff) * deltaTime / interval;
+            double percentyawdiff = Math.Abs(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw)) * deltaTime / interval;
             double percentrolldiff = Math.Abs(rollDiff) * deltaTime / interval;
             double percentpitchdiff = Math.Abs(pitchDiff) * deltaTime / interval;
 
@@ -79,9 +83,12 @@ namespace Vintagestory.GameContent
             int signPY = Math.Sign(percentPosy);
             int signPZ = Math.Sign(percentPosz);
 
-            entity.Pos.X += GameMath.Clamp(posDiffX, -signPX * percentPosx, signPX * percentPosx);
-            entity.Pos.Y += GameMath.Clamp(posDiffY, -signPY * percentPosy, signPY * percentPosy);
-            entity.Pos.Z += GameMath.Clamp(posDiffZ, -signPZ * percentPosz, signPZ * percentPosz);
+            if (!isMounted)
+            {
+                entity.Pos.X += GameMath.Clamp(posDiffX, -signPX * percentPosx, signPX * percentPosx);
+                entity.Pos.Y += GameMath.Clamp(posDiffY, -signPY * percentPosy, signPY * percentPosy);
+                entity.Pos.Z += GameMath.Clamp(posDiffZ, -signPZ * percentPosz, signPZ * percentPosz);
+            }
 
 
             int signR = Math.Sign(percentrolldiff); 
@@ -111,9 +118,10 @@ namespace Vintagestory.GameContent
             posDiffX = entity.ServerPos.X - entity.Pos.X;
             posDiffY = entity.ServerPos.Y - entity.Pos.Y;
             posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
-            rollDiff = entity.ServerPos.Roll - entity.Pos.Roll;
-            yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
-            pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
+            rollDiff = GameMath.AngleRadDistance(entity.Pos.Roll, entity.ServerPos.Roll);
+            yawDiff = GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw);
+            pitchDiff = GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch);
+
             serverposApplied = false;
 
             accum = 0;

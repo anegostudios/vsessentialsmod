@@ -125,7 +125,7 @@ namespace Vintagestory.GameContent
             AddVelocity = new Vec3f(2, 0, 2),
             MinSize = 0.07f,
             MaxSize = 0.2f,
-            VertexFlags = 32
+            VertexFlags = 0
         };
 
 
@@ -257,8 +257,8 @@ namespace Vintagestory.GameContent
                 precType = conds.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
             }
 
-            
-            particlePos.Set(capi.World.Player.Entity.Pos.X, capi.World.Player.Entity.Pos.Y, capi.World.Player.Entity.Pos.Z);
+            int rainYPos = capi.World.BlockAccessor.GetRainMapHeightAt((int)particlePos.X, (int)particlePos.Z);
+            particlePos.Set(capi.World.Player.Entity.Pos.X, rainYPos, capi.World.Player.Entity.Pos.Z);
 
             
             int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapResolved, lblock.SeasonColorMapResolved, ColorUtil.WhiteArgb, (int)particlePos.X, (int)particlePos.Y, (int)particlePos.Z, false);
@@ -278,7 +278,7 @@ namespace Vintagestory.GameContent
             }
 
 
-            int rainYPos = capi.World.BlockAccessor.GetRainMapHeightAt((int)particlePos.X, (int)particlePos.Z);
+            
             
 
             parentVeloSnow.X = -Math.Max(0, weatherData.curWindSpeed.X / 2 - 0.15f);
@@ -287,11 +287,12 @@ namespace Vintagestory.GameContent
             parentVeloSnow.Z = 0;
 
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
-            if (weatherData.curWindSpeed.X > 0.5f && particlePos.Y - rainYPos < 10)
+            if (weatherData.curWindSpeed.X > 0.5f) // && particlePos.Y - rainYPos < 10
             {
                 SpawnDustParticles(manager, weatherData, plrPos, dryness, onwaterSplashParticleColor);
             }
 
+            particlePos.Y = capi.World.Player.Entity.Pos.Y;
 
             if (precIntensity <= 0.02) return true;
 

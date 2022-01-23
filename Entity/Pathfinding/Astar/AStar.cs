@@ -135,7 +135,7 @@ namespace Vintagestory.Essentials
                     tmpPos.Set(node.X, node.Y - 1, node.Z);
 
                     Block block = blockAccess.GetBlock(tmpPos);
-                    if (block.LiquidCode == "lava" || !block.CanStep) return false; // TODO: Turn into an entityAvoid boolean
+                    if (block.LiquidCode == "lava" || !block.CanStep) return false;
 
                     if (block.LiquidCode == "water")
                     {

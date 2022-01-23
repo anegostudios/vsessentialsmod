@@ -122,6 +122,7 @@ namespace Vintagestory.ServerMods.NoObf
                         {
                             if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
                             {
+                                api.World.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})", asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
                                 unmetConditionCount++;
                                 continue;
                             }
@@ -141,6 +142,7 @@ namespace Vintagestory.ServerMods.NoObf
                         if (!enabled)
                         {
                             unmetConditionCount++;
+                            api.World.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})", asset.Location, j, string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
                             continue;
                         }
                     }

@@ -6,11 +6,15 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public interface IMultiBlockMonolithic
+    public interface IMultiBlockMonolithicSmall
     {
-        void MBDoParticalSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
         Cuboidf[] MBGetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos, Vec3i offset);
         Cuboidf[] MBGetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos, Vec3i offset);
+    }
+
+    public interface IMultiBlockMonolithic : IMultiBlockMonolithicSmall
+    {
+        void MBDoParticalSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
         bool MBOnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
         bool MBOnBlockInteractStep(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
         void MBOnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
@@ -66,7 +70,7 @@ namespace Vintagestory.GameContent
         public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
         {
             var block = blockAccessor.GetBlock(pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z);
-            var blockm = block as IMultiBlockMonolithic;
+            var blockm = block as IMultiBlockMonolithicSmall;
             if (blockm != null) return blockm.MBGetSelectionBoxes(blockAccessor, pos, OffsetInv);
             
             return block.GetSelectionBoxes(blockAccessor, pos);
@@ -75,7 +79,7 @@ namespace Vintagestory.GameContent
         public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
         {
             var block = blockAccessor.GetBlock(pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z);
-            var blockm = block as IMultiBlockMonolithic;
+            var blockm = block as IMultiBlockMonolithicSmall;
             if (blockm != null) return blockm.MBGetCollisionBoxes(blockAccessor, pos, OffsetInv);
 
             return block.GetCollisionBoxes(blockAccessor, pos);

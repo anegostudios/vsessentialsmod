@@ -79,8 +79,6 @@ namespace Vintagestory.GameContent
             if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
             if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
-
-
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
                 entity.AnimManager.StopAnimation("jump");
@@ -235,9 +233,19 @@ namespace Vintagestory.GameContent
                 lastPathUpdateSeconds = 0;
             }
 
+            if (leapAtTarget && !entity.AnimManager.IsAnimationActive(animMeta.Code) && entity.AnimManager.Animator.GetAnimationState(leapAnimationCode)?.Active != true)
+            {
+                animMeta.EaseInSpeed = 1f;
+                animMeta.EaseOutSpeed = 1f;
+                entity.AnimManager.StartAnimation(animMeta);
+            }
+
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
                 entity.AnimManager.StopAnimation(leapAnimationCode);
+                animMeta.EaseInSpeed = 1f;
+                animMeta.EaseOutSpeed = 1f;
+                entity.AnimManager.StartAnimation(animMeta);
             }
 
             if (!siegeMode)
