@@ -64,6 +64,9 @@ namespace Vintagestory.GameContent
             var blockm = block as IMultiBlockMonolithic;
             if (blockm != null) return blockm.GetSounds(blockAccessor, pos, stack);
 
+            // Prevent Stack overflow
+            if (block is BlockMultiblock) return base.GetSounds(blockAccessor, pos, stack);
+
             return block.GetSounds(blockAccessor, pos, stack);
         }
 
@@ -72,7 +75,13 @@ namespace Vintagestory.GameContent
             var block = blockAccessor.GetBlock(pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z);
             var blockm = block as IMultiBlockMonolithicSmall;
             if (blockm != null) return blockm.MBGetSelectionBoxes(blockAccessor, pos, OffsetInv);
-            
+
+            // Prevent Stack overflow
+            if (block is BlockMultiblock || block.Id == 0)
+            {
+                return new Cuboidf[] { Cuboidf.Default() };
+            }
+
             return block.GetSelectionBoxes(blockAccessor, pos);
         }
 
@@ -81,6 +90,12 @@ namespace Vintagestory.GameContent
             var block = blockAccessor.GetBlock(pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z);
             var blockm = block as IMultiBlockMonolithicSmall;
             if (blockm != null) return blockm.MBGetCollisionBoxes(blockAccessor, pos, OffsetInv);
+
+            // Prevent Stack overflow
+            if (block is BlockMultiblock || block.Id == 0)
+            {
+                return new Cuboidf[] { Cuboidf.Default() };
+            }
 
             return block.GetCollisionBoxes(blockAccessor, pos);
         }
@@ -107,6 +122,9 @@ namespace Vintagestory.GameContent
                 mbMono.OnBlockBroken(world, pos, OffsetInv, byPlayer);
                 return;
             }
+
+            // Prevent Stack overflow
+            if (block is BlockMultiblock) return;
 
             block.OnBlockBroken(world, pos.AddCopy(OffsetInv), byPlayer, dropQuantityMultiplier);
         }

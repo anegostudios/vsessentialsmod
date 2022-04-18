@@ -112,10 +112,8 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, ref EnumHandling handling)
+        public override void OnBlockRemoved(IWorldAccessor world, BlockPos pos, ref EnumHandling handling)
         {
-            handling = EnumHandling.PassThrough;
-
             IterateOverEach(pos, (mpos) =>
             {
                 if (mpos == pos) return true;

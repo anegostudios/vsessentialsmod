@@ -149,8 +149,6 @@ namespace Vintagestory.GameContent
 
         public override void StartExecute()
         {
-            base.StartExecute();
-
             stopNow = false;
             siegeMode = false;
 
@@ -215,6 +213,11 @@ namespace Vintagestory.GameContent
             }
 
             currentFollowTime = 0;
+
+            if (!stopNow || world.Rand.NextDouble() < 0.25)
+            {
+                base.StartExecute();
+            }
         }
 
 

@@ -391,13 +391,18 @@ namespace Vintagestory.GameContent
 
             // If we are a climber dude and encountered a wall, let's not try to get behind the wall
             // We do that by removing the coord component that would make the entity want to walk behind the wall
-            if (entity.Controls.IsClimbing && entity.Properties.CanClimbAnywhere && entity.ClimbingOnFace != null)
+            if (entity.Controls.IsClimbing && entity.Properties.CanClimbAnywhere && entity.ClimbingIntoFace != null)
             {
-                BlockFacing facing = entity.ClimbingOnFace;
+                BlockFacing facing = entity.ClimbingIntoFace; // ?? entity.ClimbingOnFace;
 
                 if (Math.Sign(facing.Normali.X) == Math.Sign(pathTraverser.CurrentTarget.X - entity.ServerPos.X))
                 {
                     pathTraverser.CurrentTarget.X = entity.ServerPos.X;
+                }
+
+                if (Math.Sign(facing.Normali.Y) == Math.Sign(pathTraverser.CurrentTarget.Y - entity.ServerPos.Y))
+                {
+                    pathTraverser.CurrentTarget.Y = entity.ServerPos.Y;
                 }
 
                 if (Math.Sign(facing.Normali.Z) == Math.Sign(pathTraverser.CurrentTarget.Z - entity.ServerPos.Z))

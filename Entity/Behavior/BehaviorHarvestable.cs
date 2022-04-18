@@ -144,15 +144,16 @@ namespace Vintagestory.GameContent
                 double startHours = LastWeightUpdateTotalHours;
                 double lastEatenTotalHours = entity.WatchedAttributes.GetDouble("lastMealEatenTotalHours", -9999);
 
-                double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * entity.World.Calendar.HoursPerDay;
+                double hperd = entity.World.Calendar.HoursPerDay;
+
+                double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * hperd;
                 double oneweekHours = 7 * entity.World.Calendar.HoursPerDay;
 
                 // Don't simulate longer than a month per tick
-                totalHours = Math.Min(totalHours, startHours + entity.World.Calendar.HoursPerDay * entity.World.Calendar.DaysPerMonth);
+                totalHours = Math.Min(totalHours, startHours + hperd * entity.World.Calendar.DaysPerMonth);
                 BlockPos pos = entity.Pos.AsBlockPos;
 
                 float weight = AnimalWeight;
-
                 float step = 3;
 
                 ClimateCondition baseClimate = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.WorldGenValues);
@@ -166,7 +167,7 @@ namespace Vintagestory.GameContent
                 while (startHours < totalHours - 1)
                 {
                     baseClimate.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
-                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours);
+                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hperd);
 
                     // no need to simulate every single hour
                     startHours += step;
@@ -248,8 +249,6 @@ namespace Vintagestory.GameContent
             IPlayer player = entity.World.PlayerByUid(entityplr.PlayerUID);
             player.InventoryManager.OpenInventory(inv);
             
-            
-
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
                 dlg = new GuiDialogCarcassContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI);

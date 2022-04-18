@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Server;
-using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -16,7 +13,7 @@ namespace Vintagestory.GameContent
     {
         protected float accumulator = 0;
         protected Vec3d outposition = new Vec3d(); // Temporary field
-        protected CollisionTester collisionTester = new CollisionTester();
+        protected CachingCollisionTester collisionTester = new CachingCollisionTester();
 
         internal List<EntityLocomotion> Locomotors = new List<EntityLocomotion>();
 
@@ -111,12 +108,12 @@ namespace Vintagestory.GameContent
 
             accumulator += deltaTime;
 
-            if (accumulator > 1)
+            if (accumulator > 0.4f)
             {
-                accumulator = 1;
+                accumulator = 0.4f;
             }
 
-
+            collisionTester.NewTick();
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
@@ -196,25 +193,28 @@ namespace Vintagestory.GameContent
             int kb = entity.Attributes.GetInt("dmgkb");
             if (kb > 0)
             {
-                entity.Attributes.SetInt("dmgkb", kb + 1);
+                float acc = entity.Attributes.GetFloat("dmgkbAccum") + dt;
+                entity.Attributes.SetFloat("dmgkbAccum", acc);
+
                 if (kb == 1)
                 {
-                    float str = 1 * 30 * dt;
+                    float str = 1 * 30 * dt * (entity.OnGround ? 1 : 0.5f);
                     pos.Motion.X += entity.WatchedAttributes.GetDouble("kbdirX") * str;
                     pos.Motion.Y += entity.WatchedAttributes.GetDouble("kbdirY") * str;
                     pos.Motion.Z += entity.WatchedAttributes.GetDouble("kbdirZ") * str;
+                    entity.Attributes.SetInt("dmgkb", 2);
                 }
 
-                if (kb > 4)
+                if (acc > 2 / 30f)
                 {
                     entity.Attributes.SetInt("dmgkb", 0);
+                    entity.Attributes.SetFloat("dmgkbAccum", 0);
                     float str = 0.5f * 30 * dt;
                     pos.Motion.X -= entity.WatchedAttributes.GetDouble("kbdirX") * str;
                     pos.Motion.Y -= entity.WatchedAttributes.GetDouble("kbdirY") * str;
                     pos.Motion.Z -= entity.WatchedAttributes.GetDouble("kbdirZ") * str;
                 }
             }
-
 
             EntityAgent agent = entity as EntityAgent;
             if (agent?.MountedOn != null)
@@ -281,8 +281,11 @@ namespace Vintagestory.GameContent
             double prevYMotion = pos.Motion.Y;
 
             controls.IsClimbing = false;
+            entity.ClimbingOnFace = null;
+            entity.ClimbingIntoFace = null;
 
-            if (!onGroundBefore && entity.Properties.CanClimb == true)
+
+            if (/*!onGroundBefore &&*/ entity.Properties.CanClimb == true)
             {
                 int height = (int)Math.Ceiling(entity.CollisionBox.Y2);
 
@@ -307,6 +310,19 @@ namespace Vintagestory.GameContent
                             entity.ClimbingOnFace = null;
                             break;
                         }
+                    }
+                }
+
+                if (controls.WalkVector.LengthSq() > 0.00001 && entity.Properties.CanClimbAnywhere && entity.Alive)
+                {
+                    var walkIntoFace = BlockFacing.FromVector(controls.WalkVector.X, controls.WalkVector.Y, controls.WalkVector.Z);
+                    if (walkIntoFace != null)
+                    {
+                        tmpPos.Set((int)pos.X + walkIntoFace.Normali.X, (int)pos.Y + walkIntoFace.Normali.Y, (int)pos.Z + walkIntoFace.Normali.Z);
+                        Block nblock = blockAccess.GetBlock(tmpPos);
+
+                        Cuboidf[] icollBoxes = nblock.GetCollisionBoxes(blockAccess, tmpPos);
+                        entity.ClimbingIntoFace = (icollBoxes != null && icollBoxes.Length != 0) ? walkIntoFace : null;
                     }
                 }
 
@@ -347,6 +363,7 @@ namespace Vintagestory.GameContent
                     if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
                 }
 
+
                 // what was this for? it causes jitter
                 // moveDelta.Y = pos.Motion.Y * dt * 60f;
                 // nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
@@ -364,8 +381,6 @@ namespace Vintagestory.GameContent
                 {
                     controls.IsStepping = HandleSteppingOnBlocks(pos, moveDelta, dtFac, controls);
                 }
-
-
             }
 
 
@@ -373,7 +388,7 @@ namespace Vintagestory.GameContent
 
             if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping)
             {
-                if (blockAccess.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z).LiquidLevel >= 7 || (blockAccess.GetBlock((int)pos.X, (int)(pos.Y - 0.05), (int)pos.Z).LiquidLevel >= 7))
+                if (blockAccess.GetBlock((int)pos.X, (int)(pos.Y + 0.5), (int)pos.Z).LiquidLevel >= 7 || blockAccess.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z).LiquidLevel >= 7 || (blockAccess.GetBlock((int)pos.X, (int)(pos.Y - 0.05), (int)pos.Z).LiquidLevel >= 7))
                 {
                     pos.Motion.Y += 0.2 * dt;
                     controls.IsStepping = true;

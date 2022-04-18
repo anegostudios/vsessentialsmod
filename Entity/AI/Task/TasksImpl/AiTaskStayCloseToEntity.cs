@@ -114,26 +114,32 @@ namespace Vintagestory.GameContent
 
             Vec3d pos = new Vec3d();
             BlockPos bpos = new BlockPos();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 30; i++)
             {
-                double rndx = rnd.NextDouble() * 10 - 5;
-                double rndz = rnd.NextDouble() * 10 - 5;
-                pos.Set(targetEntity.ServerPos.X + rndx, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + rndz);
+                float range = GameMath.Clamp(i / 4f, 2, 4.5f);
+
+                double rndx = rnd.NextDouble() * 2 * range - range;
+                double rndz = rnd.NextDouble() * 2 * range - range;
 
                 for (int j = 0; j < 8; j++)
                 {
                     // Produces: 0, -1, 1, -2, 2, -3, 3
                     int dy = (1 - (j % 2) * 2) * (int)Math.Ceiling(j / 2f);
 
-                    bpos.Set((int)pos.X, (int)(pos.Y + dy + 0.5), (int)pos.Z);
+                    pos.Set(targetEntity.ServerPos.X + rndx, targetEntity.ServerPos.Y + dy, targetEntity.ServerPos.Z + rndz);
+
+
+                    bpos.Set((int)pos.X, (int)pos.Y, (int)pos.Z);
                     Block aboveBlock = ba.GetBlock(bpos);
                     var boxes = aboveBlock.GetCollisionBoxes(ba, bpos);
                     if (boxes != null && boxes.Length > 0) continue;
 
-                    bpos.Set((int)pos.X, (int)(pos.Y + dy - 0.1), (int)pos.Z);
+                    bpos.Set((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
                     Block belowBlock = ba.GetBlock(bpos);
                     boxes = belowBlock.GetCollisionBoxes(ba, bpos);
                     if (boxes == null || boxes.Length == 0) continue;
+
+                    pos.Y = (int)pos.Y - 1 + boxes.Max(c => c.Y2);
 
                     return pos;
                 }

@@ -52,7 +52,7 @@ namespace Vintagestory.GameContent
             minDayLight = taskConfig["minDayLight"].AsFloat(-1f);
             cancelOnHurt = taskConfig["cancelOnHurt"].AsBool(false);
             ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
-            fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 6);
+            fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 15);
             fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
         }

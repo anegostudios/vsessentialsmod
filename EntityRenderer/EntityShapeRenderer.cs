@@ -643,7 +643,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        void registerSlotModified()
+        protected void registerSlotModified(bool callModified = true)
         {
             eagent.GearInventory.SlotModified += gearSlotModified;
             gearInv = eagent.GearInventory;
@@ -654,7 +654,10 @@ namespace Vintagestory.GameContent
                 if (inv != null) inv.SlotModified += backPackSlotModified;
             }
 
-            MarkShapeModified();
+            if (callModified)
+            {
+                MarkShapeModified();
+            }
         }
 
         protected void backPackSlotModified(int slotId)
@@ -938,9 +941,10 @@ namespace Vintagestory.GameContent
             BlockFacing climbonfacing = entity.ClimbingOnFace;
 
             // To fix climbing locust rotation weirdnes on east and west faces. Brute forced fix. There's probably a correct solution to this.
-            bool fuglyHack = entity.Properties.RotateModelOnClimb && (entity as EntityAgent)?.Controls.IsClimbing == true && entity.ClimbingOnFace?.Axis == EnumAxis.X;
+            bool fuglyHack = entity.Properties.RotateModelOnClimb && /*(entity as EntityAgent)?.Controls.IsClimbing == true &&*/ entity.ClimbingOnFace?.Axis == EnumAxis.X;
+            float sign = -1;
 
-            Quaterniond.RotateX(quat, quat, bodyPitch + rotX * GameMath.DEG2RAD + (fuglyHack ? yaw : 0));
+            Quaterniond.RotateX(quat, quat, bodyPitch + rotX * GameMath.DEG2RAD + (fuglyHack ? yaw * sign : 0));
             Quaterniond.RotateY(quat, quat, fuglyHack ? 0 : yaw);
             Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + stepPitch + rotZ * GameMath.DEG2RAD + (fuglyHack ? GameMath.PIHALF * (climbonfacing == BlockFacing.WEST ? -1 : 1) : 0));
             

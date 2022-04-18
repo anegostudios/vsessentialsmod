@@ -348,7 +348,7 @@ namespace Vintagestory.GameContent
 
                 int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
                 Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-                if (block.IsLiquid()) continue;
+                if (block.Id == 0 || block.IsLiquid()) continue;
                 if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
                 {
                     if (rand.NextDouble() < 0.5f) continue;

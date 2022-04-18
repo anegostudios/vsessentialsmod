@@ -16,25 +16,19 @@ namespace Vintagestory.GameContent
 
         ICoreClientAPI capi;
         IShaderProgram prog;
-        Random rand;
 
         public double RenderOrder => 0.35;
         public int RenderRange => 9999;
 
         MeshRef quadTilesRef;
 
-        WeatherSystemClient wsys;
-
         public AuroraRenderer(ICoreClientAPI capi, WeatherSystemClient wsys)
         {
             this.capi = capi;
-            this.wsys = wsys;
             capi.Event.RegisterRenderer(this, EnumRenderStage.OIT, "aurora");
 
             capi.Event.ReloadShader += LoadShader;
             LoadShader();
-
-            rand = new Random(capi.World.Seed);
 
             renderAurora = capi.Settings.Bool["renderAurora"];
             renderAurora = true;

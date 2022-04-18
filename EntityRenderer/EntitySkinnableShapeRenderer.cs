@@ -143,8 +143,7 @@ namespace Vintagestory.GameContent
 
             if (gearInv == null && eagent?.GearInventory != null)
             {
-                eagent.GearInventory.SlotModified += gearSlotModified;
-                gearInv = eagent.GearInventory;
+                registerSlotModified(false);
             }
 
             for (int i = 0; i < renderOrder.Length; i++)

@@ -293,6 +293,7 @@ namespace Vintagestory.GameContent
         public override void FinishExecute(bool cancelled)
         {
             base.FinishExecute(cancelled);
+            attemptLayEggTotalHours = -1;
             pathTraverser.Stop();
 
             if (sitAnimMeta != null)

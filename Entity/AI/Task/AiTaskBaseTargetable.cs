@@ -176,7 +176,7 @@ namespace Vintagestory.GameContent
             var uid = entity.WatchedAttributes.GetString("guardedPlayerUid");
             if (uid != null)
             {
-                return entity.World.PlayerByUid(uid).Entity;
+                return entity.World.PlayerByUid(uid)?.Entity;
             }
             else
             {

@@ -41,6 +41,8 @@ namespace Vintagestory.GameContent
 
         double? transitionAtTotalDaysOld = null; // old v1.12 data format, here for backwards compatibility
 
+        public string ConvertToOverride;
+
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
@@ -130,7 +132,7 @@ namespace Vintagestory.GameContent
                 }
 
                 if (transitionHoursLeft <= 0) { 
-                    tryTransition(props.ConvertTo);
+                    tryTransition(ConvertToOverride ?? props.ConvertTo);
                     break;
                 }
             }
@@ -182,6 +184,8 @@ namespace Vintagestory.GameContent
             }
 
             lastCheckAtTotalDays = tree.GetDouble("lastCheckAtTotalDays");
+
+            ConvertToOverride = tree.GetString("convertToOverride", null);
         }
 
         public override void ToTreeAttributes(ITreeAttribute tree)
@@ -190,12 +194,16 @@ namespace Vintagestory.GameContent
 
             tree.SetDouble("transitionHoursLeft", transitionHoursLeft);
             tree.SetDouble("lastCheckAtTotalDays", lastCheckAtTotalDays);
+
+            if (ConvertToOverride != null)
+            {
+                tree.SetString("convertToOverride", ConvertToOverride);
+            }
         }
 
 
         public void SetPlaceTime(double totalHours)
         {
-            Block block = Api.World.BlockAccessor.GetBlock(Pos);
             float hours = props.InGameHours;
 
             transitionHoursLeft = hours + totalHours - Api.World.Calendar.TotalHours;

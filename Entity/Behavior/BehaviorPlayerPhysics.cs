@@ -59,6 +59,7 @@ namespace Vintagestory.GameContent
                 frameTime = 1 / 60f;
             }
 
+            collisionTester.NewTick();
             while (accumulator >= frameTime)
             {
                 prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);

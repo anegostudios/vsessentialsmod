@@ -52,11 +52,11 @@ namespace Vintagestory.Essentials
 
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.stepHeight;
-            bool canFallDamage = entity.Properties.FallDamage;
+            bool avoidFall = entity.Properties.FallDamage && entity.Properties.Attributes?["reckless"].AsBool(false) != true;
 
             if (!entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
             {
-                waypoints = psys.FindPathAsWaypoints(startBlockPos, target.AsBlockPos, canFallDamage ? 8 : 4, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
+                waypoints = psys.FindPathAsWaypoints(startBlockPos, target.AsBlockPos, avoidFall ? 4 : 12, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
             }
 
             bool nopath = false;
@@ -142,6 +142,8 @@ namespace Vintagestory.Essentials
             stuckCounter = 0;
             waypointToReachIndex = 0;
             lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
+            distCheckAccum = 0;
+            prevPosAccum = 0;
 
             return true;
         }
@@ -150,6 +152,9 @@ namespace Vintagestory.Essentials
         Vec3d prevPrevPos = new Vec3d(0, -1000, 0);
         float prevPosAccum;
         float sqDistToTarget;
+
+        float distCheckAccum = 0;
+        float lastDistToTarget = 0;
 
 
         public override void OnGameTick(float dt)
@@ -188,6 +193,8 @@ namespace Vintagestory.Essentials
             ;
 
             // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
+            
+
             double distsq = prevPrevPos.SquareDistanceTo(prevPos);
             stuck |= (distsq < 0.01 * 0.01) ? (entity.World.Rand.NextDouble() < GameMath.Clamp(1 - distsq * 1.2, 0.1, 0.9)) : false;
 
@@ -201,6 +208,19 @@ namespace Vintagestory.Essentials
                 prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
             }
 
+            // Long duration tests to make sure we're not just wobbling around in the same spot
+            distCheckAccum += dt;
+            if (distCheckAccum > 2)
+            {
+                distCheckAccum = 0;
+                if (sqDistToTarget - lastDistToTarget < 0.1)
+                {
+                    stuck = true;
+                    stuckCounter += 30;
+                }
+                lastDistToTarget = sqDistToTarget;
+            }
+
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
             
             if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 60 / GlobalConstants.OverallSpeedMultiplier)
@@ -209,8 +229,7 @@ namespace Vintagestory.Essentials
                 Stop();
                 OnStuck?.Invoke();
                 return;
-            }         
-
+            }
 
             EntityControls controls = entity.MountedOn == null ? entity.Controls : entity.MountedOn.Controls;
             if (controls == null) return;
@@ -243,12 +262,17 @@ namespace Vintagestory.Essentials
             controls.WalkVector.Mul(movingSpeed * GlobalConstants.OverallSpeedMultiplier);// * speedMul);
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
-            if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingOnFace != null && entity.Alive)
+            if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingIntoFace != null && entity.Alive)
             {
-                BlockFacing facing = entity.ClimbingOnFace;
+                BlockFacing facing = entity.ClimbingIntoFace;
                 if (Math.Sign(facing.Normali.X) == Math.Sign(controls.WalkVector.X))
                 {
                     controls.WalkVector.X = 0;
+                }
+
+                if (Math.Sign(facing.Normali.Y) == Math.Sign(controls.WalkVector.Y))
+                {
+                    controls.WalkVector.Y = -controls.WalkVector.Y;
                 }
 
                 if (Math.Sign(facing.Normali.Z) == Math.Sign(controls.WalkVector.Z))
@@ -339,11 +363,16 @@ namespace Vintagestory.Essentials
             entity.ServerControls.Forward = false;
             entity.Controls.WalkVector.Set(0, 0, 0);
             stuckCounter = 0;
+            distCheckAccum = 0;
+            prevPosAccum = 0;
         }
 
         public override void Retarget()
         {
             Active = true;
+            distCheckAccum = 0;
+            prevPosAccum = 0;
+
             waypointToReachIndex = waypoints.Count - 1;
         }
     }

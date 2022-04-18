@@ -126,8 +126,6 @@ namespace Vintagestory.API.Common
                 animMeta.EaseInSpeed = 1f;
                 animMeta.EaseOutSpeed = 1f;
                 entity.AnimManager.StartAnimation(animMeta);
-                
-                //Console.WriteLine("entity id " + entity.EntityId + " ai task start anim " + animMeta.Code + ", speed: " + animMeta.AnimationSpeed);
             }
 
             if (sound != null && entity.World.Rand.NextDouble() <= soundChance)

@@ -76,7 +76,7 @@ namespace Vintagestory.Essentials
                         float baseCostToNeighbour = nearestNode.gCost + nearestNode.distanceTo(neighbourNode);
                         if (existingNeighbourNode.gCost > baseCostToNeighbour + 0.0001f)
                         {
-                            if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card.IsDiagnoal, ref extraCost) && existingNeighbourNode.gCost > baseCostToNeighbour + extraCost + 0.0001f)
+                            if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost) && existingNeighbourNode.gCost > baseCostToNeighbour + extraCost + 0.0001f)
                             {
                                 UpdateNode(nearestNode, existingNeighbourNode, extraCost);
                             }
@@ -84,7 +84,7 @@ namespace Vintagestory.Essentials
                     }
                     else if (!closedSet.Contains(neighbourNode))
                     {
-                        if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card.IsDiagnoal, ref extraCost))
+                        if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost))
                         {
                             UpdateNode(nearestNode, neighbourNode, extraCost);
                             neighbourNode.hCost = neighbourNode.distanceTo(targetNode);
@@ -121,9 +121,10 @@ namespace Vintagestory.Essentials
         BlockPos tmpPos = new BlockPos();
         Cuboidd tmpCub = new Cuboidd();
 
-        protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, bool isDiagonal, ref float extraCost)
+        protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
         {
             tmpVec.Set(node.X + centerOffsetX, node.Y, node.Z + centerOffsetZ);
+            Block block;
 
             if (!api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
             {
@@ -134,7 +135,7 @@ namespace Vintagestory.Essentials
                 {
                     tmpPos.Set(node.X, node.Y - 1, node.Z);
 
-                    Block block = blockAccess.GetBlock(tmpPos);
+                    block = blockAccess.GetBlock(tmpPos);
                     if (block.LiquidCode == "lava" || !block.CanStep) return false;
 
                     if (block.LiquidCode == "water")
@@ -190,36 +191,57 @@ namespace Vintagestory.Essentials
                     }
                 }
 
-                return true;
-            }
-            else
-            {
-                tmpPos.Set(node.X, node.Y, node.Z);
-                Block block = blockAccess.GetBlock(tmpPos);
-                if (!block.CanStep) return false;
-
-                tmpVec.Set(node.X + centerOffsetX, node.Y + stepHeight, node.Z + centerOffsetZ);
-                // Test for collision if we step up
-                if (!api.World.CollisionTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false))
+                // If diagonal, make sure we can squeeze through
+                if (fromDir.IsDiagnoal)
                 {
-                    if (isDiagonal)
+                    tmpVec.Add(-fromDir.Normali.X / 2f, 0, -fromDir.Normali.Z / 2f);
+                    if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
                     {
-                        Cuboidf[] collboxes = block.GetCollisionBoxes(blockAccess, tmpPos);
-
-                        if (collboxes != null && collboxes.Length > 0)
-                        {
-                            // Ok, can step on this block
-                            node.Y++;
-                            return true;
-                        }
-                    } else
-                    {
-                        node.Y++;
-                        return true;
+                        return false;
                     }
                 }
-            }
 
+
+                return true;
+            }
+            
+            tmpPos.Set(node.X, node.Y, node.Z);
+            block = blockAccess.GetBlock(tmpPos);
+            if (!block.CanStep) return false;
+
+            // Adjust "step on" height because not all blocks we are stepping onto are a full block high
+            float steponHeightAdjust = -1f;
+            Cuboidf[] collboxes = block.GetCollisionBoxes(blockAccess, tmpPos);
+            if (collboxes != null && collboxes.Length > 0)
+            {
+                steponHeightAdjust += collboxes.Max((cuboid) => cuboid.Y2);
+            }
+            
+            tmpVec.Set(node.X + centerOffsetX, node.Y + stepHeight + steponHeightAdjust, node.Z + centerOffsetZ);
+            // Test for collision if we step up
+            if (!api.World.CollisionTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false))
+            {
+                if (fromDir.IsDiagnoal)
+                {
+                    if (collboxes != null && collboxes.Length > 0)
+                    {
+                        // If diagonal, make sure we can squeeze through
+                        tmpVec.Add(-fromDir.Normali.X / 2f, 0, -fromDir.Normali.Z / 2f);
+                        if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+                        {
+                            return false;
+                        }
+
+                        // Ok, can step on this block
+                        node.Y += (int)(1f + steponHeightAdjust);
+                        return true;
+                    }
+                } else
+                {
+                    node.Y += (int)(1f + steponHeightAdjust);
+                    return true;
+                }
+            }
 
             return false;
         }
