@@ -73,10 +73,11 @@ namespace Vintagestory.GameContent
                 prog = rapi.StandardShader;
                 prog.Use();
                 prog.Tex2D = renderInfo.TextureId;
-                prog.RgbaTint = ColorUtil.WhiteArgbVec;
+                prog.RgbaTint = entity.Swimming ? new Vec4f(0.5f, 0.5f, 0.5f, 1f) : ColorUtil.WhiteArgbVec;
                 prog.DontWarpVertices = 0;
                 prog.NormalShaded = 1;
                 prog.AlphaTest = renderInfo.AlphaTest;
+                prog.DamageEffect = renderInfo.DamageEffect;
 
                 if (entity.Swimming)
                 {
@@ -166,6 +167,7 @@ namespace Vintagestory.GameContent
             
             if (!isShadowPass)
             {
+                prog.DamageEffect = 0;
                 prog.Stop();
             }
             

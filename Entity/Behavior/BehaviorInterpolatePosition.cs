@@ -13,10 +13,11 @@ namespace Vintagestory.GameContent
         
 
         double posDiffX, posDiffY, posDiffZ;
-        double yawDiff, rollDiff, pitchDiff;
-        
+        double rollDiff, pitchDiff;
+        double headpitchDiff;
 
-        
+
+
         float accum;
         bool serverposApplied;
         
@@ -43,13 +44,13 @@ namespace Vintagestory.GameContent
             float interval = 0.2f;
             accum += deltaTime;
 
-            if (accum > interval || !(entity is EntityAgent))
+            if (accum > interval * 2 || !(entity is EntityAgent))
             {
                 posDiffX = entity.ServerPos.X - entity.Pos.X;
                 posDiffY = entity.ServerPos.Y - entity.Pos.Y;
                 posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
                 rollDiff = entity.ServerPos.Roll - entity.Pos.Roll;
-                yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
+                //yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
                 pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
 
                 double posDiffSq = posDiffX * posDiffX + posDiffY * posDiffY + posDiffZ * posDiffZ;
@@ -75,8 +76,11 @@ namespace Vintagestory.GameContent
             double percentPosz = Math.Abs(posDiffZ) * deltaTime / interval;
 
             double percentyawdiff = Math.Abs(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw)) * deltaTime / interval;
+            double percentheadyawdiff = Math.Abs(GameMath.AngleRadDistance(entity.Pos.HeadYaw, entity.ServerPos.HeadYaw)) * deltaTime / interval;
+
             double percentrolldiff = Math.Abs(rollDiff) * deltaTime / interval;
             double percentpitchdiff = Math.Abs(pitchDiff) * deltaTime / interval;
+            double percentheadpitchdiff = Math.Abs(headpitchDiff) * deltaTime / interval;
 
 
             int signPX = Math.Sign(percentPosx);
@@ -95,6 +99,9 @@ namespace Vintagestory.GameContent
             int signY = Math.Sign(percentyawdiff);
             int signP = Math.Sign(percentpitchdiff);
 
+            int signHY = Math.Sign(percentheadyawdiff);
+            int signHP = Math.Sign(percentheadpitchdiff);
+
             // Dunno why the 0.7, but it's too fast otherwise
             entity.Pos.Roll += 0.7f * (float)GameMath.Clamp(rollDiff, -signR * percentrolldiff, signR * percentrolldiff);
             entity.Pos.Yaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw), -signY * percentyawdiff, signY * percentyawdiff);
@@ -103,6 +110,23 @@ namespace Vintagestory.GameContent
 
             entity.Pos.Pitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch), -signP * percentpitchdiff, signP * percentpitchdiff);
             entity.Pos.Pitch = entity.Pos.Pitch % GameMath.TWOPI;
+
+
+
+            entity.Pos.HeadYaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadYaw, entity.ServerPos.HeadYaw), -signHY * percentheadyawdiff, signHY * percentheadyawdiff);
+            entity.Pos.HeadYaw = entity.Pos.HeadYaw % GameMath.TWOPI;
+
+
+            entity.Pos.HeadPitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadPitch, entity.ServerPos.HeadPitch), -signHP * percentheadpitchdiff, signHP * percentheadpitchdiff);
+            entity.Pos.HeadPitch = entity.Pos.HeadPitch % GameMath.TWOPI;
+
+            if (entity is EntityAgent eagent)
+            {
+                double percentbodyyawdiff = Math.Abs(GameMath.AngleRadDistance(eagent.BodyYaw, eagent.BodyYawServer)) * deltaTime / interval;
+                int signBY = Math.Sign(percentbodyyawdiff);
+                eagent.BodyYaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(eagent.BodyYaw, eagent.BodyYawServer), -signBY * percentbodyyawdiff, signBY * percentbodyyawdiff);
+                eagent.BodyYaw = eagent.BodyYaw % GameMath.TWOPI;
+            }
         }
 
 
@@ -119,8 +143,8 @@ namespace Vintagestory.GameContent
             posDiffY = entity.ServerPos.Y - entity.Pos.Y;
             posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
             rollDiff = GameMath.AngleRadDistance(entity.Pos.Roll, entity.ServerPos.Roll);
-            yawDiff = GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw);
             pitchDiff = GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch);
+            headpitchDiff = GameMath.AngleRadDistance(entity.Pos.HeadPitch, entity.ServerPos.HeadPitch);
 
             serverposApplied = false;
 

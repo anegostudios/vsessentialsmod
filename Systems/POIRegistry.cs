@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
 
     public interface IAnimalFoodSource : IPointOfInterest
     {
-        bool IsSuitableFor(Entity entity);
+        bool IsSuitableFor(Entity entity, string[] diet);
 
         /// <summary>
         /// Return amount of saturation given from eating this portion
@@ -124,7 +124,7 @@ namespace Vintagestory.GameContent
             {
                 for (int cz = mincz; cz <= maxcz; cz++)
                 {
-                    List<IPointOfInterest> pois = null;
+                    List<IPointOfInterest> pois;
                     tmp.Set(cx, cz);
                     PoisByChunkColumn.TryGetValue(tmp, out pois);
                     if (pois == null) continue;

@@ -109,7 +109,7 @@ namespace Vintagestory.GameContent
                 if (!placed || MinHourDelay <= 0) break;
             }
 
-            entity.World.FrameProfiler.Mark("entity-createblock");
+            entity.World.FrameProfiler.Mark("createblock");
         }
 
         private bool TryPlace(Block block, int dx, int dy, int dz)
@@ -118,8 +118,10 @@ namespace Vintagestory.GameContent
             BlockPos pos = entity.ServerPos.XYZ.AsBlockPos.Add(dx, dy, dz);
             Block blockAtPos = blockAccess.GetBlock(pos);
 
-            if (blockAtPos.IsReplacableBy(block) && blockAccess.GetBlock(pos.X, pos.Y - 1, pos.Z).SideSolid[BlockFacing.UP.Index])
+            pos.Y--;
+            if (blockAtPos.IsReplacableBy(block) && blockAccess.GetSolidBlock(pos.X, pos.Y, pos.Z).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
             {
+                pos.Y++;
                 blockAccess.SetBlock(block.BlockId, pos);
 
                 // Instantly despawn the block again if it expired already

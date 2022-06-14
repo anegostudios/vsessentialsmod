@@ -308,8 +308,8 @@ namespace Vintagestory.GameContent
             prog.Uniform("dayLight", Math.Max(0, capi.World.Calendar.DayLightStrength - capi.World.Calendar.MoonLightStrength*0.95f));
             prog.Uniform("windOffset", new Vec3f((float)offsetX, 0, (float)offsetZ));
 
-            
 
+            prog.Uniform("alpha", GameMath.Clamp(1 - 1.5f * Math.Max(0, capi.Render.ShaderUniforms.GlitchStrength - 0.1f), 0, 1));
             prog.Uniform("rgbaFogIn", capi.Ambient.BlendedFogColor);
             prog.Uniform("fogMinIn", capi.Ambient.BlendedFogMin);
             prog.Uniform("fogDensityIn", capi.Ambient.BlendedFogDensity);
@@ -321,25 +321,19 @@ namespace Vintagestory.GameContent
 
             prog.Uniform("globalCloudBrightness", blendedGlobalCloudBrightness);
             
-            float yTranslate = (float)(weatherSys.CloudsYPosition * capi.World.BlockAccessor.MapSizeY + 0.5 - capi.World.Player.Entity.CameraPos.Y);
+            float yTranslate = (float)(weatherSys.CloudLevelRel * capi.World.BlockAccessor.MapSizeY + 0.5 - capi.World.Player.Entity.CameraPos.Y);
 
             prog.Uniform("cloudYTranslate", yTranslate);
             prog.Uniform("cloudCounter", (float)((capi.World.Calendar.TotalHours * 20) % 578f));
 
             prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
 
-            //int cnt = capi.Render.PointLightsCount;
-            //prog.Uniform("pointLightQuantity", cnt);
-            //shv.PointLightsArray(cnt, ScreenManager.Platform.PointLights3);
-            //shv.PointLightColorsArray(cnt, ScreenManager.Platform.PointLightColors3);
-
             prog.Uniform("flatFogDensity", capi.Ambient.BlendedFlatFogDensity);
             prog.Uniform("flatFogStart", capi.Ambient.BlendedFlatFogYPosForShader - (float)capi.World.Player.Entity.CameraPos.Y);
 
 
             mvMat
-                .Set(capi.Render.MvMatrix.Top)
-                .FollowPlayer()
+                .Set(capi.Render.CameraMatrixOriginf)
                 .Translate(offsetX, yTranslate, offsetZ)
             ;
 

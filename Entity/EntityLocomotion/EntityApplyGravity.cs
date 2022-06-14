@@ -11,9 +11,8 @@ namespace Vintagestory.GameContent
     {
         double gravityPerSecond = GlobalConstants.GravityPerSecond;
 
-        internal override void Initialize(EntityProperties properties)
+        internal override void Initialize(JsonObject physics)
         {
-            JsonObject physics = properties?.Attributes?["physics"];
             if (physics != null)
             {
                 gravityPerSecond = GlobalConstants.GravityPerSecond * (float)physics["gravityFactor"].AsDouble(1);

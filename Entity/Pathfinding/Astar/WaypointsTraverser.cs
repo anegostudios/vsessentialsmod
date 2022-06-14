@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace Vintagestory.Essentials
@@ -15,11 +16,15 @@ namespace Vintagestory.Essentials
         Vec3f targetVec = new Vec3f();
 
         List<Vec3d> waypoints;
+        List<Vec3d> newWaypoints;
+        private PathfinderTask asyncSearchObject;
+
         int waypointToReachIndex = 0;
         long lastWaypointIncTotalMs;
-
+        Vec3d desiredTarget;
 
         PathfindSystem psys;
+        private PathfindingAsync asyncPathfinder;
 
         public override Vec3d CurrentTarget {
             get
@@ -27,6 +32,21 @@ namespace Vintagestory.Essentials
                 return waypoints[waypoints.Count - 1];
             }
         }
+
+        public override bool Ready
+        {
+            get
+            {
+                return waypoints != null && asyncSearchObject == null;
+            }
+        }
+
+        // These next five fields are used to save parameters, ready for the AfterPathFound() call which might be next tick or even later, after asynchronous pathfinding has finished
+        private Action OnNoPath;
+        private Action OnGoalReached_New;
+        private Action OnStuck_New;
+        private float movingSpeed_New;
+        private float targetDistance_New;
 
         public WaypointsTraverser(EntityAgent entity) : base(entity)
         {
@@ -41,85 +61,156 @@ namespace Vintagestory.Essentials
             }
 
             psys = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>();
+            asyncPathfinder = entity.World.Api.ModLoader.GetModSystem<PathfindingAsync>();
         }
 
 
-
-        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 999, bool allowReachAlmost = false)
+        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath, int searchDepth = 999, int mhdistanceTolerance = 0)
         {
+            this.desiredTarget = target;
+
             BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
+            if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            {
+                HandleNoPath();
+                return false;
+            }
+
+            FindPath(startBlockPos, target.AsBlockPos, searchDepth, mhdistanceTolerance);
+
+            return AfterFoundPath();
+        }
+
+
+        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0)
+        {
+            if (this.asyncSearchObject != null) return false;  //Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
+
+            this.desiredTarget = target;
+
+            // these all have to be saved because they are local parameters, but not used until we call AfterFoundPath()
+            this.OnNoPath = onNoPath;
+            this.OnGoalReached_New = OnGoalReached;
+            this.OnStuck_New = OnStuck;
+            this.movingSpeed_New = movingSpeed;
+            this.targetDistance_New = targetDistance;
+
+            BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
+            if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            {
+                HandleNoPath();
+                return false;
+            }
+
+            FindPath_Async(startBlockPos, target.AsBlockPos, searchDepth, mhdistanceTolerance);
+
+            return true;
+        }
+
+
+        private void FindPath(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth, int mhdistanceTolerance = 0)
+        {
+            waypointToReachIndex = 0;
+
+            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
+            float stepHeight = bh == null ? 0.6f : bh.stepHeight;
+            int maxFallHeight = entity.Properties.FallDamage ? 4 - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
+
+            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance);
+        }
+
+
+        private void FindPath_Async(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth, int mhdistanceTolerance = 0)
+        {
             waypointToReachIndex = 0;
 
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.stepHeight;
             bool avoidFall = entity.Properties.FallDamage && entity.Properties.Attributes?["reckless"].AsBool(false) != true;
+            int maxFallHeight = avoidFall ? 4 - (int)(movingSpeed * 30) : 12;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            if (!entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            asyncSearchObject = new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance);
+            asyncPathfinder.EnqueuePathfinderTask(asyncSearchObject);
+        }
+
+
+        public bool AfterFoundPath()
+        {
+            if (asyncSearchObject != null)
             {
-                waypoints = psys.FindPathAsWaypoints(startBlockPos, target.AsBlockPos, avoidFall ? 4 : 12, stepHeight, entity.CollisionBox, searchDepth, allowReachAlmost);
+                newWaypoints = asyncSearchObject.waypoints;
+                asyncSearchObject = null;
             }
 
-            bool nopath = false;
-
-            if (waypoints == null)
+            if (newWaypoints == null /*|| newWaypoints.Count == 0 - uh no. this is a successful search*/)
             {
-                waypoints = new List<Vec3d>();
-                nopath = true;
-
-                entity.OnNoPath(target);
-
-                // Debug visualization
-                /*List<BlockPos> poses = new List<BlockPos>();
-                List<int> colors = new List<int>();
-                int i = 0;
-                foreach (var node in entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().astar.closedSet)
-                {
-                    poses.Add(node);
-                    colors.Add(ColorUtil.ColorFromRgba(Math.Min(255, i * 2), 0, 0, 150));
-                    i++;
-                }
-
-                IPlayer player = entity.World.AllOnlinePlayers[0];
-                entity.World.HighlightBlocks(player, 2, poses, 
-                    colors, 
-                    API.Client.EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
-                );*/
-            }
-            else
-            {
-                // Debug visualization
-                /*List<BlockPos> poses = new List<BlockPos>();
-                List<int> colors = new List<int>();
-                int i = 0;
-                foreach (var node in waypoints)
-                {
-                    poses.Add(node.AsBlockPos);
-                    colors.Add(ColorUtil.ColorFromRgba(128, 128, Math.Min(255, 128 + i*8), 150));
-                    i++;
-                }
-
-                poses.Add(target.AsBlockPos);
-                colors.Add(ColorUtil.ColorFromRgba(0, 0, 255, 255));
-
-                IPlayer player = entity.World.AllOnlinePlayers[0];
-                entity.World.HighlightBlocks(player, 2, poses, 
-                    colors, 
-                    API.Client.EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
-                );*/
-            }
-
-            waypoints.Add(target);
-
-            
-            bool ok = base.WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
-
-            if (nopath && giveUpWhenNoPath)
-            {
-                Active = false;
+                HandleNoPath();
                 return false;
             }
 
-            return ok;
+            waypoints = newWaypoints;
+
+            // Debug visualization
+            /*List<BlockPos> poses = new List<BlockPos>();
+            List<int> colors = new List<int>();
+            int i = 0;
+            foreach (var node in waypoints)
+            {
+                poses.Add(node.AsBlockPos);
+                colors.Add(ColorUtil.ColorFromRgba(128, 128, Math.Min(255, 128 + i*8), 150));
+                i++;
+            }
+
+            poses.Add(desiredTarget.AsBlockPos);
+            colors.Add(ColorUtil.ColorFromRgba(128, 0, 255, 255));
+
+            IPlayer player = entity.World.AllOnlinePlayers[0];
+            entity.World.HighlightBlocks(player, 2, poses, 
+                colors, 
+                API.Client.EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
+            );*/
+
+            waypoints.Add(desiredTarget);
+
+            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
+
+            return true;
+        }
+
+
+        public void HandleNoPath()
+        {
+            waypoints = new List<Vec3d>();
+
+            entity.OnNoPath(desiredTarget);
+
+            // Debug visualization
+            // Does not work. We meed to copy closedSet into the PathfinderTask to make this work again
+            /*List<BlockPos> poses = new List<BlockPos>();
+            List<int> colors = new List<int>();
+            int i = 0;
+            foreach (var node in entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().astar.closedSet)
+            {
+                poses.Add(node);
+                colors.Add(ColorUtil.ColorFromRgba(Math.Min(255, i * 2), 0, 0, 150));
+                i++;
+            }
+
+            IPlayer player = entity.World.AllOnlinePlayers[0];
+            entity.World.HighlightBlocks(player, 2, poses, 
+                colors, 
+                API.Client.EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
+            );*/
+
+            waypoints.Add(desiredTarget);
+
+            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
+
+            if (OnNoPath != null)
+            {
+                Active = false;
+                OnNoPath.Invoke();
+            }
         }
 
 
@@ -137,7 +228,7 @@ namespace Vintagestory.Essentials
             entity.Controls.Forward = true;
             entity.ServerControls.Forward = true;
             curTurnRadPerSec = minTurnAnglePerSec + (float)entity.World.Rand.NextDouble() * (maxTurnAnglePerSec - minTurnAnglePerSec);
-            curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
+            curTurnRadPerSec *= GameMath.DEG2RAD * 50;
 
             stuckCounter = 0;
             waypointToReachIndex = 0;
@@ -159,6 +250,13 @@ namespace Vintagestory.Essentials
 
         public override void OnGameTick(float dt)
         {
+            if (asyncSearchObject != null)
+            {
+                if (!asyncSearchObject.Finished) return;
+
+                AfterFoundPath();
+            }
+
             if (!Active) return;
 
             bool nearHorizontally = false;
@@ -177,6 +275,8 @@ namespace Vintagestory.Essentials
 
             target = waypoints[Math.Min(waypoints.Count - 1, waypointToReachIndex)];
 
+            bool onlastWaypoint = waypointToReachIndex == waypoints.Count - 1;
+
             if (waypointToReachIndex >= waypoints.Count)
             {
                 Stop();
@@ -185,15 +285,14 @@ namespace Vintagestory.Essentials
             }
 
             bool stuck =
-                (entity.CollidedVertically && entity.Controls.IsClimbing) ||
-                (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0) ||
-                (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land) ||
-                (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000) || // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
-                (entity.Swimming && false)
+                (entity.CollidedVertically && entity.Controls.IsClimbing)
+                || (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0)
+                || (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land)
+                || (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000)    // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
+                //|| (entity.Swimming && false)
             ;
-
             // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
-            
+
 
             double distsq = prevPrevPos.SquareDistanceTo(prevPos);
             stuck |= (distsq < 0.01 * 0.01) ? (entity.World.Rand.NextDouble() < GameMath.Clamp(1 - distsq * 1.2, 0.1, 0.9)) : false;
@@ -218,12 +317,13 @@ namespace Vintagestory.Essentials
                     stuck = true;
                     stuckCounter += 30;
                 }
+                else if (!stuck) stuckCounter = 0;    // Only reset the stuckCounter in same tick as doing this test; otherwise the stuckCounter gets set to 0 every 2 or 3 ticks even if the entity collided horizontally (because motion vecs get set to 0 after the collision, so won't collide in the successive tick)
                 lastDistToTarget = sqDistToTarget;
             }
 
-            stuckCounter = stuck ? (stuckCounter + 1) : 0;
+            if (stuck) stuckCounter++;
             
-            if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 60 / GlobalConstants.OverallSpeedMultiplier)
+            if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 40 / GlobalConstants.OverallSpeedMultiplier)
             {
                 //entity.World.SpawnParticles(10, ColorUtil.WhiteArgb, prevPos, prevPos, new Vec3f(0, 0, 0), new Vec3f(0, -1, 0), 1, 1);
                 Stop();
@@ -248,10 +348,16 @@ namespace Vintagestory.Essentials
                 desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
             }
 
+            float nowMoveSpeed = movingSpeed;
 
+            if (sqDistToTarget < 1)
+            {
+                nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max(sqDistToTarget, 0.2f));
+            }
 
             float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
-            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
+            float turnSpeed = curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier * movingSpeed;
+            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
             entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
 
             
@@ -259,7 +365,7 @@ namespace Vintagestory.Essentials
             double cosYaw = Math.Cos(entity.ServerPos.Yaw);
             double sinYaw = Math.Sin(entity.ServerPos.Yaw);
             controls.WalkVector.Set(sinYaw, GameMath.Clamp(targetVec.Y, -1, 1), cosYaw);
-            controls.WalkVector.Mul(movingSpeed * GlobalConstants.OverallSpeedMultiplier);// * speedMul);
+            controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier);
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
             if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingIntoFace != null && entity.Alive)
@@ -288,8 +394,8 @@ namespace Vintagestory.Essentials
                 controls.FlyVector.Set(controls.WalkVector);
 
                 Vec3d pos = entity.Pos.XYZ;
-                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 
@@ -317,8 +423,8 @@ namespace Vintagestory.Essentials
                 controls.FlyVector.Set(controls.WalkVector);
 
                 Vec3d pos = entity.Pos.XYZ;
-                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 
@@ -344,17 +450,26 @@ namespace Vintagestory.Essentials
             int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + waypointOffset);
             Vec3d target = waypoints[wayPointIndex];
 
-            sqDistToTarget = Math.Min(
-                Math.Min(target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z), target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y - 1, entity.ServerPos.Z)),       // One block above is also ok
-                target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y + 0.5f, entity.ServerPos.Z) // Half a block below is also okay
+            double curPosY = entity.ServerPos.Y;
+            sqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
+            sqDistToTarget += Math.Min(Math.Min(DiffSquared(target.Y, curPosY), DiffSquared(target.Y, curPosY - 1)),       // One block above is also ok
+                DiffSquared(target.Y, curPosY + 0.5f) // Half a block below is also okay
             );
-            double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
 
-            nearHorizontally |= horsqDistToTarget < 1;
+            if (!nearHorizontally)
+            {
+                double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
+                nearHorizontally = horsqDistToTarget < 1;
+            }
 
             return sqDistToTarget < targetDistance * targetDistance;
         }
 
+        private float DiffSquared(double y1, double y2)
+        {
+            double diff = y1 - y2;
+            return (float)(diff * diff);
+        }
 
         public override void Stop()
         {
@@ -365,6 +480,7 @@ namespace Vintagestory.Essentials
             stuckCounter = 0;
             distCheckAccum = 0;
             prevPosAccum = 0;
+            asyncSearchObject = null;
         }
 
         public override void Retarget()

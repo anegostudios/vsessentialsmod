@@ -4,6 +4,7 @@ using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using System.Linq;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
@@ -12,8 +13,9 @@ namespace Vintagestory.API.Common
 {
     public abstract class AiTaskBase : IAiTask
     {
-        public ThreadLocal<Random> randTL;
-        public Random rand => randTL.Value;
+        [ThreadStatic]
+        private static Random randTL;
+        public Random rand => randTL ?? (randTL = new Random());
         public EntityAgent entity;
         public IWorldAccessor world;
         public AnimationMetaData animMeta;
@@ -50,11 +52,14 @@ namespace Vintagestory.API.Common
 
         protected EntityBehaviorEmotionStates bhEmo;
 
+        private string profilerName;
+        public string ProfilerName { get => profilerName; set => profilerName = value; }
+
         public AiTaskBase(EntityAgent entity)
         {
             this.entity = entity;
             this.world = entity.World;
-            randTL = new ThreadLocal<Random>(() => new Random((int)entity.EntityId));
+            if (randTL == null) randTL = new Random((int)entity.EntityId);
 
             this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser;
             bhEmo = entity.GetBehavior<EntityBehaviorEmotionStates>();
@@ -78,12 +83,34 @@ namespace Vintagestory.API.Common
 
             if (taskConfig["animation"].Exists)
             {
-                animMeta = new AnimationMetaData()
+                var code = taskConfig["animation"].AsString()?.ToLowerInvariant();
+                float speed = taskConfig["animationSpeed"].AsFloat(1f);
+
+                var cmeta = this.entity.Properties.Client.Animations.FirstOrDefault(a => a.Code == code);
+                if (cmeta != null)
                 {
-                    Code = taskConfig["animation"].AsString()?.ToLowerInvariant(),
-                    Animation = taskConfig["animation"].AsString()?.ToLowerInvariant(),
-                    AnimationSpeed = taskConfig["animationSpeed"].AsFloat(1f)
-                }.Init();
+                    if (taskConfig["animationSpeed"].Exists)
+                    {
+                        animMeta = cmeta.Clone();
+                        animMeta.AnimationSpeed = speed;
+                    } else
+                    {
+                        animMeta = cmeta;
+                    }
+                } else 
+                {
+                    animMeta = new AnimationMetaData()
+                    {
+                        Code = code,
+                        Animation = code,
+                        AnimationSpeed = speed
+                    }.Init();
+
+                    animMeta.EaseInSpeed = 1f;
+                    animMeta.EaseOutSpeed = 1f;
+                }
+
+
             }
 
             this.whenInEmotionState = taskConfig["whenInEmotionState"].AsString();
@@ -116,15 +143,12 @@ namespace Vintagestory.API.Common
             get { return priorityForCancel; }
         }
 
-
         public abstract bool ShouldExecute();
 
         public virtual void StartExecute()
         {
             if (animMeta != null)
             {
-                animMeta.EaseInSpeed = 1f;
-                animMeta.EaseOutSpeed = 1f;
                 entity.AnimManager.StartAnimation(animMeta);
             }
 
@@ -206,6 +230,11 @@ namespace Vintagestory.API.Common
         public virtual void OnNoPath(Vec3d target)
         {
             
+        }
+
+        public virtual bool CanContinueExecute()
+        {
+            return true;
         }
     }
 }

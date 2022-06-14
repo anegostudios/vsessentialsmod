@@ -23,20 +23,17 @@ namespace Vintagestory.ServerMods
         }
 
 
-        public override void StartServerSide(ICoreServerAPI api)
-        {
-            this.api = api;
-
-            api.Event.SaveGameLoaded += OnSaveGameLoaded;
-        }
-
         bool classExclusiveRecipes = true;
-
-        public void OnSaveGameLoaded()
+        public override void AssetsLoaded(ICoreAPI api)
         {
-            classExclusiveRecipes = api.World.Config.GetBool("classExclusiveRecipes", true);
+            if (api is ICoreServerAPI sapi)
+            {
+                this.api = sapi;
 
-            LoadGridRecipes();
+                classExclusiveRecipes = sapi.World.Config.GetBool("classExclusiveRecipes", true);
+
+                LoadGridRecipes();
+            }
         }
 
 

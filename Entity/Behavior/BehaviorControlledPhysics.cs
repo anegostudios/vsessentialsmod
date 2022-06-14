@@ -55,9 +55,10 @@ namespace Vintagestory.GameContent
         {
             stepHeight = typeAttributes["stepHeight"].AsFloat(0.6f);
 
+            JsonObject physics = properties?.Attributes?["physics"];
             for (int i = 0; i < Locomotors.Count; i++)
             {
-                Locomotors[i].Initialize(properties);
+                Locomotors[i].Initialize(physics);
             }
 
             sneakTestCollisionbox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.1f);
@@ -78,7 +79,7 @@ namespace Vintagestory.GameContent
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             if (capi.IsGamePaused) return;
-            
+
             onPhysicsTick(deltaTime);
         }
 
@@ -98,6 +99,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            entity.World.FrameProfiler.Enter("controlledphysics");
 
             accum1s += deltaTime;
             if (accum1s > 1.5f)
@@ -108,22 +110,22 @@ namespace Vintagestory.GameContent
 
             accumulator += deltaTime;
 
-            if (accumulator > 0.4f)
+            if (accumulator > GlobalConstants.MaxPhysicsIntervalInSlowTicks)
             {
-                accumulator = 0.4f;
+                accumulator = GlobalConstants.MaxPhysicsIntervalInSlowTicks;
             }
+
 
             collisionTester.NewTick();
             while (accumulator >= GlobalConstants.PhysicsFrameTime)
             {
-                prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
                 TickEntityPhysicsPre(entity, GlobalConstants.PhysicsFrameTime);
                 accumulator -= GlobalConstants.PhysicsFrameTime;
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
-            entity.World.FrameProfiler.Mark("entity-controlledphysics-end");
 
+            entity.World.FrameProfiler.Leave();
         }
 
         protected virtual void updateWindForce()
@@ -149,6 +151,7 @@ namespace Vintagestory.GameContent
 
         public virtual void TickEntityPhysicsPre(Entity entity, float dt)
         {
+            prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
             EntityControls controls = ((EntityAgent)entity).Controls;
             TickEntityPhysics(entity.ServerPos, controls, dt);  // this was entity.ServerPos - wtf? - apparently needed so they don't glitch through terrain o.O
 
@@ -163,6 +166,8 @@ namespace Vintagestory.GameContent
 
         public void TickEntityPhysics(EntityPos pos, EntityControls controls, float dt)
         {
+            FrameProfilerUtil profiler = entity.World.FrameProfiler;
+            profiler.Mark("init");
             float dtFac = 60 * dt;
 
             // This seems to make creatures clip into the terrain. Le sigh. 
@@ -190,13 +195,15 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            int kb = entity.Attributes.GetInt("dmgkb");
-            if (kb > 0)
+            profiler.Mark("locomotors");
+
+            int knockbackState = entity.Attributes.GetInt("dmgkb");
+            if (knockbackState > 0)
             {
                 float acc = entity.Attributes.GetFloat("dmgkbAccum") + dt;
                 entity.Attributes.SetFloat("dmgkbAccum", acc);
 
-                if (kb == 1)
+                if (knockbackState == 1)
                 {
                     float str = 1 * 30 * dt * (entity.OnGround ? 1 : 0.5f);
                     pos.Motion.X += entity.WatchedAttributes.GetDouble("kbdirX") * str;
@@ -226,9 +233,15 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            pos.Motion.X = GameMath.Clamp(pos.Motion.X, -10, 10);
-            pos.Motion.Y = GameMath.Clamp(pos.Motion.Y, -10, 10);
-            pos.Motion.Z = GameMath.Clamp(pos.Motion.Z, -10, 10);
+            profiler.Mark("knockback-and-mountedcheck");
+            profiler.Enter("collision");
+
+            if (pos.Motion.LengthSq() > 100D)
+            {
+                pos.Motion.X = GameMath.Clamp(pos.Motion.X, -10, 10);
+                pos.Motion.Y = GameMath.Clamp(pos.Motion.Y, -10, 10);
+                pos.Motion.Z = GameMath.Clamp(pos.Motion.Z, -10, 10);
+            }
 
             if (!controls.NoClip)
             {
@@ -245,6 +258,8 @@ namespace Vintagestory.GameContent
                 entity.OnGround = false;
             }
 
+
+            profiler.Leave();
 
 
             // Shake the player violently when falling at high speeds
@@ -268,17 +283,17 @@ namespace Vintagestory.GameContent
         public void DisplaceWithBlockCollision(EntityPos pos, EntityControls controls, float dt)
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
+            FrameProfilerUtil profiler = entity.World.FrameProfiler;
             float dtFac = 60 * dt;
+            double prevYMotion = pos.Motion.Y;
 
-            moveDelta.Set(pos.Motion.X * dtFac, pos.Motion.Y * dtFac, pos.Motion.Z * dtFac);
+            moveDelta.Set(pos.Motion.X * dtFac, prevYMotion * dtFac, pos.Motion.Z * dtFac);
 
             nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
-            bool falling = pos.Motion.Y < 0;
+            bool falling = prevYMotion < 0;
             bool feetInLiquidBefore = entity.FeetInLiquid;
             bool onGroundBefore = entity.OnGround;
             bool swimmingBefore = entity.Swimming;
-
-            double prevYMotion = pos.Motion.Y;
 
             controls.IsClimbing = false;
             entity.ClimbingOnFace = null;
@@ -289,7 +304,7 @@ namespace Vintagestory.GameContent
             {
                 int height = (int)Math.Ceiling(entity.CollisionBox.Y2);
 
-                entityBox.Set(entity.CollisionBox).Translate(pos.X, pos.Y, pos.Z);
+                entityBox.SetAndTranslate(entity.CollisionBox, pos.X, pos.Y, pos.Z);
 
                 for (int dy = 0; dy < height; dy++)
                 {
@@ -369,7 +384,11 @@ namespace Vintagestory.GameContent
                 // nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
+            profiler.Mark("prep");
+
             collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition, stepHeight);
+
+            profiler.Mark("terraincollision");
 
             if (!entity.Properties.CanClimbAnywhere)
             {
@@ -383,34 +402,49 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            profiler.Mark("stepping-checks");
 
             HandleSneaking(pos, controls, dt);
 
-            if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping)
+            if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping && entity.Properties.Habitat != EnumHabitat.Underwater)
             {
                 if (blockAccess.GetBlock((int)pos.X, (int)(pos.Y + 0.5), (int)pos.Z).LiquidLevel >= 7 || blockAccess.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z).LiquidLevel >= 7 || (blockAccess.GetBlock((int)pos.X, (int)(pos.Y - 0.05), (int)pos.Z).LiquidLevel >= 7))
                 {
                     pos.Motion.Y += 0.2 * dt;
                     controls.IsStepping = true;
                 }
+                else   // attempt to prevent endless collisions
+                {
+                    double absX = Math.Abs(pos.Motion.X);
+                    double absZ = Math.Abs(pos.Motion.Z);
+                    if (absX > absZ)
+                    {
+                        if (absZ < 0.001) pos.Motion.Z += pos.Motion.Z < 0 ? -0.0025 : 0.0025;
+                    }
+                    else
+                    {
+                        if (absX < 0.001) pos.Motion.X += pos.Motion.X < 0 ? -0.0025 : 0.0025;
+                    }
+                }
             }
 
 
-            if (blockAccess.IsNotTraversable((pos.X + pos.Motion.X * dt * 60f), pos.Y, pos.Z))
+            if (outposition.X != pos.X && blockAccess.IsNotTraversable((pos.X + pos.Motion.X * dt * 60f), pos.Y, pos.Z))
             {
                 outposition.X = pos.X;
             }
-            if (blockAccess.IsNotTraversable(pos.X, (pos.Y + pos.Motion.Y * dt * 60f), pos.Z))
+            if (outposition.Y != pos.Y && blockAccess.IsNotTraversable(pos.X, (pos.Y + pos.Motion.Y * dt * 60f), pos.Z))
             {
                 outposition.Y = pos.Y;
             }
-            if (blockAccess.IsNotTraversable(pos.X, pos.Y, (pos.Z + pos.Motion.Z * dt * 60f)))
+            if (outposition.Z != pos.Z && blockAccess.IsNotTraversable(pos.X, pos.Y, (pos.Z + pos.Motion.Z * dt * 60f)))
             {
                 outposition.Z = pos.Z;
             }
 
             pos.SetPos(outposition);
 
+            profiler.Mark("apply-motion");
 
             // Set the motion to zero if he collided.
 
@@ -436,14 +470,18 @@ namespace Vintagestory.GameContent
             int posZ = (int)(pos.Z + offZ);
 
             Block block = blockAccess.GetBlock(posX, (int)(pos.Y), posZ);
-            Block aboveblock = blockAccess.GetBlock(posX, (int)(pos.Y + 1), posZ);
-            Block middleBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ);
-
+            Block waterOrIce = blockAccess.GetLiquidBlock(posX, (int)(pos.Y), posZ);
+            Block middleWOIBlock = blockAccess.GetLiquidBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ);
 
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
-            entity.FeetInLiquid = block.IsLiquid() && ((block.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
+            entity.FeetInLiquid = false;
+            if (waterOrIce.IsLiquid())
+            {
+                Block aboveblock = blockAccess.GetLiquidBlock(posX, (int)(pos.Y + 1), posZ);
+                entity.FeetInLiquid = ((waterOrIce.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
+            }
             entity.InLava = block.LiquidCode == "lava";
-            entity.Swimming = middleBlock.IsLiquid();
+            entity.Swimming = middleWOIBlock.IsLiquid();
 
             if (!onGroundBefore && entity.OnGround)
             {
@@ -465,13 +503,19 @@ namespace Vintagestory.GameContent
                 entity.PositionBeforeFalling.Set(outposition);
             }
 
+            profiler.Mark("apply-collisionandflags");
+
             Cuboidd testedEntityBox = collisionTester.entityBox;
 
-            for (int y = (int)testedEntityBox.Y1; y <= (int)testedEntityBox.Y2; y++)
+            int xMax = (int)testedEntityBox.X2;
+            int yMax = (int)testedEntityBox.Y2;
+            int zMax = (int)testedEntityBox.Z2;
+            int zMin = (int)testedEntityBox.Z1;
+            for (int y = (int)testedEntityBox.Y1; y <= yMax; y++)
             {
-                for (int x = (int)testedEntityBox.X1; x <= (int)testedEntityBox.X2; x++)
+                for (int x = (int)testedEntityBox.X1; x <= xMax; x++)
                 {
-                    for (int z = (int)testedEntityBox.Z1; z <= (int)testedEntityBox.Z2; z++)
+                    for (int z = zMin; z <= zMax; z++)
                     {
                         collisionTester.tmpPos.Set(x, y, z);
                         collisionTester.tempCuboid.Set(x, y, z, x + 1, y + 1, z + 1);
@@ -479,7 +523,7 @@ namespace Vintagestory.GameContent
                         if (collisionTester.tempCuboid.IntersectsOrTouches(testedEntityBox))
                         {
                             // Saves us a few cpu cycles
-                            if (x == (int)pos.X && y == (int)pos.Y && z == (int)pos.Z)
+                            if (x == (int)pos.X && z == (int)pos.Z && y == (int)pos.Y)
                             {
                                 block.OnEntityInside(entity.World, entity, collisionTester.tmpPos);
                                 continue;
@@ -490,11 +534,8 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
+            profiler.Mark("trigger-insideblock");
         }
-
-
-
-
 
         private void HandleSneaking(EntityPos pos, EntityControls controls, float dt)
         {
@@ -548,11 +589,9 @@ namespace Vintagestory.GameContent
 
 
 
-
-
         private bool HandleSteppingOnBlocksSmooth(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
-            if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming)) return false;
+            if (!controls.TriesToMove || (!entity.OnGround && !entity.Swimming) || entity.Properties.Habitat == EnumHabitat.Underwater) return false;
 
             Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
 
@@ -642,6 +681,12 @@ namespace Vintagestory.GameContent
 
             var walkVecOrtho = new Vec2d(walkVec.Y, -walkVec.X).Normalize();
 
+            var maxX = Math.Abs(walkVecOrtho.X * 0.3) + 0.001;
+            var minX = -maxX;
+            var maxZ = Math.Abs(walkVecOrtho.Y * 0.3) + 0.001;
+            var minZ = -maxZ;
+            var col = new Cuboidf((float)minX, entity.CollisionBox.Y1, (float)minZ, (float)maxX, entity.CollisionBox.Y2, (float)maxZ);
+
             double newYPos = pos.Y;
             bool foundStep = false;
             foreach (var stepableBox in stepableBoxes)
@@ -649,13 +694,6 @@ namespace Vintagestory.GameContent
                 double heightDiff = stepableBox.Y2 - entityCollisionBox.Y1 + gravityOffset;
                 Vec3d steppos = new Vec3d(GameMath.Clamp(outposition.X, stepableBox.MinX, stepableBox.MaxX), outposition.Y + heightDiff, GameMath.Clamp(outposition.Z, stepableBox.MinZ, stepableBox.MaxZ));
 
-                var maxX = Math.Abs(walkVecOrtho.X * 0.3) + 0.001;
-                var minX = -maxX;
-
-                var maxZ = Math.Abs(walkVecOrtho.Y * 0.3) + 0.001;
-                var minZ = -maxZ;
-
-                var col = new Cuboidf((float)minX, entity.CollisionBox.Y1, (float)minZ, (float)maxX, entity.CollisionBox.Y2, (float)maxZ);
                 bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, col, steppos, false);
 
                 if (canStep)
@@ -725,7 +763,7 @@ namespace Vintagestory.GameContent
                             bool colliding = alsoCheckTouch ? entityBox.IntersectsOrTouches(collBox, blockPosVec) : entityBox.Intersects(collBox, blockPosVec);
                             if (colliding)
                             {
-                                blocks.Add(collBox, blockPos, block);
+                                blocks.Add(collBox, x, y, z, block);
 
                             }
                         }
@@ -780,29 +818,36 @@ namespace Vintagestory.GameContent
         }
 
 
+        Cuboidd steppingCollisionBox = new Cuboidd();
+        Vec3d steppingTestVec = new Vec3d();
+        Vec3d steppingTestMotion = new Vec3d();
         private bool HandleSteppingOnBlocks(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
         {
-            if ((controls.WalkVector.X == 0 && controls.WalkVector.Z == 0) || (!entity.OnGround && !entity.Swimming)) return false;
+            if (controls.WalkVector.X == 0 && controls.WalkVector.Z == 0) return false;
+            if ((!entity.OnGround && !entity.Swimming) || entity.Properties.Habitat == EnumHabitat.Underwater) return false;
 
 
-            Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
-            entityCollisionBox.Translate(pos.X, pos.Y, pos.Z);
-            entityCollisionBox.Y2 = Math.Max(entityCollisionBox.Y1 + stepHeight, entityCollisionBox.Y2);
+            Cuboidd steppingCollisionBox = this.steppingCollisionBox;
+            steppingCollisionBox.SetAndTranslate(entity.CollisionBox, pos.X, pos.Y, pos.Z);
+            steppingCollisionBox.Y2 = Math.Max(steppingCollisionBox.Y1 + stepHeight, steppingCollisionBox.Y2);
 
             Vec3d walkVec = controls.WalkVector;
-            Vec3d testVec = new Vec3d();
-            Vec3d testMotion = new Vec3d();
-
-            Cuboidd stepableBox = findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, walkVec);
-
+            Cuboidd stepableBox = findSteppableCollisionbox(steppingCollisionBox, moveDelta.Y, walkVec);
 
             if (stepableBox != null)
             {
-                return
-                    tryStep(pos, testMotion.Set(moveDelta.X, moveDelta.Y, moveDelta.Z), dtFac, stepableBox, entityCollisionBox) ||
-                    tryStep(pos, testMotion.Set(moveDelta.X, moveDelta.Y, 0), dtFac, findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox) ||
-                    tryStep(pos, testMotion.Set(0, moveDelta.Y, moveDelta.Z), dtFac, findSteppableCollisionbox(entityCollisionBox, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)
-                ;
+                Vec3d testMotion = this.steppingTestMotion;
+                testMotion.Set(moveDelta.X, moveDelta.Y, moveDelta.Z);
+                if (tryStep(pos, testMotion, dtFac, stepableBox, steppingCollisionBox)) return true;
+
+                Vec3d testVec = this.steppingTestVec;
+                testMotion.Z = 0;
+                if (tryStep(pos, testMotion, dtFac, findSteppableCollisionbox(steppingCollisionBox, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), steppingCollisionBox)) return true;
+
+                testMotion.Set(0, moveDelta.Y, moveDelta.Z);
+                if (tryStep(pos, testMotion, dtFac, findSteppableCollisionbox(steppingCollisionBox, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), steppingCollisionBox)) return true;
+
+                return false;
             }
 
             return false;
@@ -830,9 +875,9 @@ namespace Vintagestory.GameContent
         {
             Cuboidd stepableBox = null;
 
-            for (int i = 0; i < collisionTester.CollisionBoxList.Count; i++)
+            int maxCount = collisionTester.CollisionBoxList.Count;
+            for (int i = 0; i < maxCount; i++)
             {
-                Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
                 Block block = collisionTester.CollisionBoxList.blocks[i];
 
                 if (!block.CanStep)
@@ -841,6 +886,7 @@ namespace Vintagestory.GameContent
                     if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
                 }
 
+                Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 if (intersect == EnumIntersect.NoIntersect) continue;
 

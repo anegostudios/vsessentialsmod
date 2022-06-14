@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -114,6 +115,12 @@ namespace Vintagestory.GameContent
             api.Event.ChunkDirty += Event_ChunkDirty;
 
             blockAccess = api.World.GetCachingBlockAccessor(false, false);
+        }
+
+        public override void Dispose()
+        {
+            blockAccess?.Dispose();
+            blockAccess = null;
         }
 
         public override void StartClientSide(ICoreClientAPI api)

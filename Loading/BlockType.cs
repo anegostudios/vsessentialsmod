@@ -13,6 +13,7 @@ using Vintagestory.API.Config;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 using Vintagestory.API.Util;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -32,6 +33,11 @@ namespace Vintagestory.ServerMods.NoObf
             TpOffHandTransform = null;
             GroundTransform = ModelTransform.BlockDefaultGround();
             MaxStackSize = 64;
+        }
+
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        {
+            return CreateResolvedType<BlockType>(api, fullcode, jobject, deserializer, variant);
         }
 
         [JsonProperty]
@@ -147,6 +153,160 @@ namespace Vintagestory.ServerMods.NoObf
 
         [JsonProperty]
         public string[] AllowSpawnCreatureGroups = new string[] { "*" };
+
+
+        public Block CreateBlock(ICoreServerAPI api)
+        {
+            Block block;
+
+            if (api.ClassRegistry.GetBlockClass(this.Class) == null)
+            {
+                api.Server.Logger.Error("Block with code {0} has defined a block class {1}, no such class registered. Will ignore.", this.Code, this.Class);
+                block = new Block();
+            }
+            else
+            {
+                block = api.ClassRegistry.CreateBlock(this.Class);
+            }
+
+
+            if (this.EntityClass != null)
+            {
+                if (api.ClassRegistry.GetBlockEntity(this.EntityClass) != null)
+                {
+                    block.EntityClass = this.EntityClass;
+                }
+                else
+                {
+                    api.Server.Logger.Error("Block with code {0} has defined a block entity class {1}, no such class registered. Will ignore.", this.Code, this.EntityClass);
+                }
+            }
+
+
+            block.Code = this.Code;
+            block.VariantStrict = this.Variant;
+            block.Variant = new RelaxedReadOnlyDictionary<string, string>(this.Variant);
+            block.Class = this.Class;
+            block.LiquidSelectable = this.LiquidSelectable;
+            block.LiquidCode = this.LiquidCode;
+            block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? new BlockEntityBehaviorType[0];
+            block.WalkSpeedMultiplier = this.WalkspeedMultiplier;
+            block.DragMultiplier = this.DragMultiplier;
+            block.Durability = this.Durability;
+            block.Dimensions = this.Dimensions?.Clone();
+            block.DamagedBy = (EnumItemDamageSource[])this.DamagedBy?.Clone();
+            block.Tool = this.Tool;
+            block.DrawType = this.DrawType;
+            block.Replaceable = this.Replaceable;
+            block.Fertility = this.Fertility;
+            block.LightAbsorption = this.LightAbsorption;
+
+            block.LightTraversable = new bool[] { this.LightAbsorption < 2, this.LightAbsorption < 2, this.LightAbsorption < 2 };
+            if (this.LightTraversable != null)
+            {
+                foreach (var val in this.LightTraversable)
+                {
+                    if (val.Key == "ns") block.LightTraversable[2] = val.Value;
+                    if (val.Key == "ud") block.LightTraversable[1] = val.Value;
+                    if (val.Key == "we") block.LightTraversable[0] = val.Value;
+                }
+            }
+            block.LightHsv = this.LightHsv;
+            block.VertexFlags = this.VertexFlags?.Clone() ?? new VertexFlags(0);
+            block.Frostable = this.Frostable;
+            block.Resistance = this.Resistance;
+            block.BlockMaterial = this.BlockMaterial;
+            block.Shape = this.Shape;
+            block.Lod0Shape = this.Lod0Shape;
+            block.Lod2Shape = this.Lod2Shape;
+            block.ShapeInventory = this.ShapeInventory;
+            block.DoNotRenderAtLod2 = this.DoNotRenderAtLod2;
+            block.TexturesInventory = this.TexturesInventory == null ? null : new FakeDictionary<string, CompositeTexture>(this.TexturesInventory);
+            block.Textures = this.Textures == null ? null : new FakeDictionary<string, CompositeTexture>(this.Textures);
+            block.ClimateColorMap = this.ClimateColorMap;
+            block.SeasonColorMap = this.SeasonColorMap;
+            block.Ambientocclusion = this.Ambientocclusion;
+            block.CollisionBoxes = this.CollisionBoxes;
+            block.SelectionBoxes = this.SelectionBoxes;
+            block.ParticleCollisionBoxes = this.ParticleCollisionBoxes;
+            block.MaterialDensity = this.MaterialDensity;
+            block.GuiTransform = this.GuiTransform;
+            block.FpHandTransform = this.FpHandTransform;
+            block.TpHandTransform = this.TpHandTransform;
+            block.TpOffHandTransform = this.TpOffHandTransform;
+            block.GroundTransform = this.GroundTransform;
+            block.RenderPass = this.RenderPass;
+            block.ParticleProperties = this.ParticleProperties;
+            block.Climbable = this.Climbable;
+            block.RainPermeable = this.RainPermeable;
+            block.FaceCullMode = this.FaceCullMode;
+            block.Drops = this.Drops;
+            block.MaxStackSize = this.MaxStackSize;
+            block.MatterState = this.MatterState;
+            if (this.Attributes != null)
+            {
+                block.Attributes = this.Attributes.Clone();
+            }
+            block.NutritionProps = this.NutritionProps;
+            block.TransitionableProps = this.TransitionableProps;
+            block.GrindingProps = this.GrindingProps;
+            block.CrushingProps = this.CrushingProps;
+            block.LiquidLevel = this.LiquidLevel;
+            block.AttackPower = this.AttackPower;
+            block.MiningSpeed = this.MiningSpeed;
+            block.ToolTier = this.ToolTier;
+            block.RequiredMiningTier = this.RequiredMiningTier;
+            block.HeldSounds = this.HeldSounds?.Clone();
+            block.AttackRange = this.AttackRange;
+
+
+            if (this.Sounds != null)
+            {
+                block.Sounds = this.Sounds.Clone();
+            }
+            block.RandomDrawOffset = this.RandomDrawOffset ? 1 : 0;
+            block.RandomizeRotations = this.RandomizeRotations;
+            block.RandomizeAxes = this.RandomizeAxes;
+            block.RandomSizeAdjust = this.RandomSizeAdjust;
+            block.CombustibleProps = this.CombustibleProps;
+            block.StorageFlags = (EnumItemStorageFlags)this.StorageFlags;
+            block.RenderAlphaTest = this.RenderAlphaTest;
+            block.HeldTpHitAnimation = this.HeldTpHitAnimation;
+            block.HeldRightTpIdleAnimation = this.HeldRightTpIdleAnimation;
+            block.HeldLeftTpIdleAnimation = this.HeldLeftTpIdleAnimation;
+            block.HeldTpUseAnimation = this.HeldTpUseAnimation;
+            block.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
+            block.AllowSpawnCreatureGroups = (string[])this.AllowSpawnCreatureGroups.Clone();
+
+            // BlockType net only sends the collisionboxes at an accuracy of 1/10000 so we have to make sure they are the same server and client side
+            if (block.CollisionBoxes != null)
+            {
+                for (int i = 0; i < block.CollisionBoxes.Length; i++)
+                {
+                    block.CollisionBoxes[i].RoundToFracsOfOne10thousand();
+                }
+            }
+
+            if (block.SelectionBoxes != null)
+            {
+                for (int i = 0; i < block.SelectionBoxes.Length; i++)
+                {
+                    block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
+                }
+            }
+
+            if (block.ParticleCollisionBoxes != null)
+            {
+                for (int i = 0; i < block.ParticleCollisionBoxes.Length; i++)
+                {
+                    block.ParticleCollisionBoxes[i].RoundToFracsOfOne10thousand();
+                }
+            }
+
+            this.InitBlock(api.ClassRegistry, api.World.Logger, block, this.Variant);
+
+            return block;
+        }
 
 
         Cuboidf[] ToCuboidf(params RotatableCube[] cubes)
@@ -325,6 +485,7 @@ namespace Vintagestory.ServerMods.NoObf
                 block.CropProps.NutrientConsumption = CropProps.NutrientConsumption;
                 block.CropProps.RequiredNutrient = CropProps.RequiredNutrient;
                 block.CropProps.TotalGrowthDays = CropProps.TotalGrowthDays;
+                block.CropProps.TotalGrowthMonths = CropProps.TotalGrowthMonths;
 
                 block.CropProps.ColdDamageBelow = CropProps.ColdDamageBelow;
                 block.CropProps.HeatDamageAbove = CropProps.HeatDamageAbove;

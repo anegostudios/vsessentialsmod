@@ -27,13 +27,13 @@ namespace Vintagestory.Essentials
         public PathNodeSet openSet = new PathNodeSet();
         public HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
-        public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, bool allowReachAlmost = false)
+        public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
         {
-            List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, allowReachAlmost);
+            List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance);
             return nodes == null ? null : ToWaypoints(nodes);
         }
 
-        public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, bool allowReachAlmost = false)
+        public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
         {
             blockAccess.Begin();
 
@@ -57,7 +57,7 @@ namespace Vintagestory.Essentials
                 PathNode nearestNode = openSet.RemoveNearest();
                 closedSet.Add(nearestNode);
 
-                if (nearestNode == targetNode || (allowReachAlmost && Math.Abs(nearestNode.X - targetNode.X) <= 1 && Math.Abs(nearestNode.Z - targetNode.Z) <= 1 && (nearestNode.Y == targetNode.Y || nearestNode.Y == targetNode.Y + 1)))
+                if (nearestNode == targetNode || (mhdistanceTolerance>0 && Math.Abs(nearestNode.X - targetNode.X) <= mhdistanceTolerance && Math.Abs(nearestNode.Z - targetNode.Z) <= mhdistanceTolerance && (Math.Abs(nearestNode.Y - targetNode.Y) <= mhdistanceTolerance || (targetNode.Y > nearestNode.Y && targetNode.Y - nearestNode.Y < 4 + mhdistanceTolerance))))
                 {
                     return retracePath(startNode, nearestNode);
                 }
@@ -99,6 +99,7 @@ namespace Vintagestory.Essentials
 
 
 
+
         /// <summary>
         /// Actually now only sets fields in neighbourNode as appropriate.  The calling code must add this to openSet if necessary.
         /// </summary>
@@ -117,8 +118,8 @@ namespace Vintagestory.Essentials
         }
 
 
-        Vec3d tmpVec = new Vec3d();
-        BlockPos tmpPos = new BlockPos();
+        readonly Vec3d tmpVec = new Vec3d();
+        readonly BlockPos tmpPos = new BlockPos();
         Cuboidd tmpCub = new Cuboidd();
 
         protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
@@ -138,7 +139,7 @@ namespace Vintagestory.Essentials
                     block = blockAccess.GetBlock(tmpPos);
                     if (block.LiquidCode == "lava" || !block.CanStep) return false;
 
-                    if (block.LiquidCode == "water")
+                    if (blockAccess.GetLiquidBlock(tmpPos).LiquidCode == "water")
                     {
                         extraCost = 5;
                         //node.Y--; - we swim on top
@@ -157,7 +158,11 @@ namespace Vintagestory.Essentials
                     if (hitboxBelow != null && hitboxBelow.Length > 0)
                     {
                         // Cheap exit from the while() loop in the most common case: there is a block below
+
+                        // Adds a bit of extracost if there is a snowlayer (walkspeedmultiplier will be less than 1)
                         extraCost -= (block.WalkSpeedMultiplier - 1) * 8;
+                        if (extraCost < 0) extraCost = 0;
+                        extraCost -= 0.3f;   //reduce the extraCost if descending one block, because the entity will glide out a bit while descending - similar to a diagonal move downwards and along, I guess?
                         break;
                     }
 
@@ -290,5 +295,10 @@ namespace Vintagestory.Essentials
             return waypoints;
         }
 
+
+        public void Dispose()
+        {
+            blockAccess?.Dispose();
+        }
     }
 }

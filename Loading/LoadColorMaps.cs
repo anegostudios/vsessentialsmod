@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
 namespace Vintagestory.ServerMods
@@ -18,11 +19,15 @@ namespace Vintagestory.ServerMods
         public override void Start(ICoreAPI api)
         {
             this.api = api;
-
-            loadColorMaps();
         }
 
-
+        public override void AssetsLoaded(ICoreAPI api)
+        {
+            if (api is ICoreClientAPI capi)
+            {
+                loadColorMaps();
+            }
+        }
 
         private void loadColorMaps()
         {

@@ -62,8 +62,6 @@ namespace Vintagestory.GameContent
             collisionTester.NewTick();
             while (accumulator >= frameTime)
             {
-                prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
-                
                 TickEntityPhysicsPre(entity, frameTime);
                 accumulator -= frameTime;
             }
@@ -73,6 +71,7 @@ namespace Vintagestory.GameContent
 
         public override void TickEntityPhysicsPre(Entity entity, float dt)
         {
+            prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
             EntityControls controls = eplr.Controls;
 
             string playerUID = entity.WatchedAttributes.GetString("playerUID");
@@ -102,11 +101,11 @@ namespace Vintagestory.GameContent
                 IClientPlayer cplr = player as IClientPlayer;
 
                 float prevYaw = pos.Yaw;
+                pos.Yaw = (entity.Api as ICoreClientAPI).Input.MouseYaw;
 
                 if (entity.Swimming)
                 {
                     float prevPitch = pos.Pitch;
-                    pos.Yaw = cplr.CameraYaw;
                     pos.Pitch = cplr.CameraPitch;
                     controls.CalcMovementVectors(pos, dt);
                     pos.Yaw = prevYaw;
@@ -114,7 +113,6 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    pos.Yaw = cplr.CameraYaw;
                     controls.CalcMovementVectors(pos, dt);
                     pos.Yaw = prevYaw;
                 }
@@ -139,7 +137,8 @@ namespace Vintagestory.GameContent
             {
                 float prevYaw = pos.Yaw;
                 IServerPlayer splr = player as IServerPlayer;
-                if (splr != null) pos.Yaw = splr.CameraYaw;
+                //if (splr != null) pos.Yaw = splr.CameraYaw;
+
                 controls.CalcMovementVectors(pos, dt);
                 pos.Yaw = prevYaw;
             }

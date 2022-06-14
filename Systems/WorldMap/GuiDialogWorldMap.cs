@@ -44,6 +44,12 @@ namespace Vintagestory.GameContent
 
         private void onCmdMapSize(int groupId, CmdArgs args)
         {
+            if (args.Length == 0)
+            {
+                capi.ShowChatMessage(string.Format("Current map size: {0}x{1}", mapWidth, mapHeight));
+                return;
+            }
+
             mapWidth = (int)args.PopInt(1200);
             mapHeight = (int)args.PopInt(800);
             fullDialog = ComposeDialog(EnumDialogType.Dialog);
@@ -108,7 +114,7 @@ namespace Vintagestory.GameContent
                 .Compose()
             ;
 
-            compo.OnRecomposed += OnRecomposed;
+            compo.OnComposed += OnRecomposed;
 
             GuiElementMap mapElem = compo.GetElement("mapElem") as GuiElementMap;
             if (beforeBounds != null)

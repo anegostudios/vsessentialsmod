@@ -1,15 +1,12 @@
-﻿using ProtoBuf;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using Vintagestory.API.Common;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    public delegate void LightningImpactDelegate(ref Vec3d impactPos, ref EnumHandling handling);
+
     public abstract class WeatherSystemBase : ModSystem
     {
         public ICoreAPI api;
@@ -33,12 +30,18 @@ namespace Vintagestory.GameContent
         public WeatherPattern rainOverlayPattern;
         public WeatherDataSnapshot rainOverlaySnap;
 
-
+        public WeatherSimulationLightning simLightning;
 
         public virtual int CloudTileSize { get; set; } = 50;
 
+        public virtual float CloudLevelRel { get; set; } = 1f;
 
-        
+
+        public event LightningImpactDelegate OnLightningImpactBegin;
+        public event LightningImpactDelegate OnLightningImpactEnd;
+
+
+
         public override void Start(ICoreAPI api)
         {
             this.api = api;
@@ -48,6 +51,8 @@ namespace Vintagestory.GameContent
                .RegisterMessageType(typeof(WeatherState))
                .RegisterMessageType(typeof(WeatherConfigPacket))
                .RegisterMessageType(typeof(WeatherPatternAssetsPacket))
+               .RegisterMessageType(typeof(LightningFlashPacket))
+               .RegisterMessageType(typeof(WeatherCloudYposPacket))
             ;
 
             api.Event.OnGetWindSpeed += Event_OnGetWindSpeed;
@@ -62,6 +67,8 @@ namespace Vintagestory.GameContent
         {
             precipitationNoise = SimplexNoise.FromDefaultOctaves(4, 0.02 / 3, 0.95, api.World.Seed - 18971121);
             precipitationNoiseSub = SimplexNoise.FromDefaultOctaves(3, 0.004 / 3, 0.95, api.World.Seed - 1717121);
+
+            simLightning = new WeatherSimulationLightning(api, this);
         }
 
         public void InitDummySim()
@@ -78,15 +85,11 @@ namespace Vintagestory.GameContent
             rainOverlayPattern.OnBeginUse();
 
             rainOverlaySnap = new WeatherDataSnapshot();
-            
         }
 
 
 
-        
-
-
-    public PrecipitationState GetPrecipitationState(Vec3d pos)
+        public PrecipitationState GetPrecipitationState(Vec3d pos)
         {
             return GetPrecipitationState(pos, api.World.Calendar.TotalDays);
         }
@@ -262,8 +265,48 @@ namespace Vintagestory.GameContent
             );
         }
 
+        public virtual void SpawnLightningFlash(Vec3d pos)
+        {
+        }
 
 
+        internal void TriggerOnLightningImpactStart(ref Vec3d impactPos, out EnumHandling handling)
+        {
+            handling = EnumHandling.PassThrough;
+            if (OnLightningImpactBegin == null) return;
+
+            TriggerOnLightningImpactAny(ref impactPos, out handling, OnLightningImpactBegin.GetInvocationList());
+        }
+
+        internal void TriggerOnLightningImpactEnd(Vec3d impactPos, out EnumHandling handling)
+        {
+            handling = EnumHandling.PassThrough;
+            if (OnLightningImpactEnd == null) return;
+
+            TriggerOnLightningImpactAny(ref impactPos, out handling, OnLightningImpactEnd.GetInvocationList());
+        }
+
+        internal void TriggerOnLightningImpactAny(ref Vec3d pos, out EnumHandling handling, Delegate[] delegates)
+        {
+            handling = EnumHandling.PassThrough;
+
+            foreach (LightningImpactDelegate dele in delegates)
+            {
+                EnumHandling delehandling = EnumHandling.PassThrough;
+                dele.Invoke(ref pos, ref delehandling);
+
+                if (delehandling == EnumHandling.PreventSubsequent)
+                {
+                    handling = EnumHandling.PreventSubsequent;
+                    return;
+                }
+
+                if (delehandling == EnumHandling.PreventDefault)
+                {
+                    handling = EnumHandling.PreventDefault;
+                }
+            }
+        }
     }
 }
 

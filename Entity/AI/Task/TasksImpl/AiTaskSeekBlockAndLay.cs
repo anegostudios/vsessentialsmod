@@ -13,7 +13,6 @@ namespace Vintagestory.GameContent
         IAnimalNest targetPoi;
 
         float moveSpeed = 0.02f;
-        long stuckatMs = 0;
         bool nowStuck = false;
         bool laid = false;
 
@@ -140,8 +139,22 @@ namespace Vintagestory.GameContent
 
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            // We want the hen to search for the most full HenBox nearby - so 'proximity' is weighted also according to how full the box is
-            targetPoi = porregistry.GetWeightedNearestPoi(entity.ServerPos.XYZ, 48, (poi) =>
+            targetPoi = FindPOI(42) as IAnimalNest;
+
+            if (targetPoi == null)
+            {
+                // Failed search: may lay an infertile egg on the ground
+                LayEggOnGround();
+            }
+
+            return targetPoi != null;
+        }
+
+
+        private IPointOfInterest FindPOI(int radius)
+        {
+            // We want the hen to search for the most full HenBox nearby - so 'proximity' is weighted also according to how full the box is (see IAnimalNest.DistanceWeighting)
+            return porregistry.GetWeightedNearestPoi(entity.ServerPos.XYZ, radius, (poi) =>
             {
                 if (poi.Type != "nest") return false;
                 IAnimalNest nestPoi;
@@ -157,18 +170,8 @@ namespace Vintagestory.GameContent
                 }
 
                 return false;
-            }) as IAnimalNest;
-
-            if (targetPoi == null)
-            {
-                // Failed search: may lay an infertile egg on the ground
-                LayEggOnGround();
-            }
-
-            return targetPoi != null;
+            });
         }
-
-
 
         public float MinDistanceToTarget()
         {
@@ -185,12 +188,16 @@ namespace Vintagestory.GameContent
                 entity.AnimManager.StartAnimation(animMeta);
             }
 
-            stuckatMs = -9999;
             nowStuck = false;
             sitTimeNow = 0;
             laid = false;
-            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000, true);
+            pathTraverser.NavigateTo_Async(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, null, 1000, 1);
             sitAnimStarted = false;
+        }
+
+        public override bool CanContinueExecute()
+        {
+            return pathTraverser.Ready;
         }
 
         public override bool ContinueExecute(float dt)
@@ -313,7 +320,6 @@ namespace Vintagestory.GameContent
 
         private void OnStuck()
         {
-            stuckatMs = entity.World.ElapsedMilliseconds;
             nowStuck = true;
 
             onBadTarget();
@@ -321,9 +327,18 @@ namespace Vintagestory.GameContent
 
         void onBadTarget()
         {
+            IAnimalNest newTarget = null;
             if (attemptLayEggTotalHours >= 0 && entity.World.Calendar.TotalHours - attemptLayEggTotalHours > 12)
             {
                 LayEggOnGround();
+            }
+            else
+            {
+                if (rand.NextDouble() > 0.4)
+                {
+                    // Look for another nearby henbox
+                    newTarget = FindPOI(18) as IAnimalNest;
+                }
             }
 
             FailedAttempt attempt = null;
@@ -335,6 +350,16 @@ namespace Vintagestory.GameContent
 
             attempt.Count++;
             attempt.LastTryMs = world.ElapsedMilliseconds;
+
+            if (newTarget != null)
+            {
+                targetPoi = newTarget;
+                nowStuck = false;
+                sitTimeNow = 0;
+                laid = false;
+                pathTraverser.NavigateTo_Async(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, null, 1000, 1);
+                sitAnimStarted = false;
+            }
         }
 
         private void OnGoalReached()
@@ -419,10 +444,13 @@ namespace Vintagestory.GameContent
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
             BlockPos pos = entity.ServerPos.XYZ.AsBlockPos.Add(dx, dy, dz);
-            Block blockAtPos = blockAccess.GetBlock(pos);
+            if (blockAccess.GetLiquidBlock(pos).IsLiquid()) return false;
+            if (!blockAccess.GetBlock(pos).IsReplacableBy(block)) return false;
 
-            if (!blockAtPos.IsLiquid() && blockAtPos.IsReplacableBy(block) && blockAccess.GetBlock(pos.X, pos.Y - 1, pos.Z).SideSolid[BlockFacing.UP.Index])
+            pos.Y--;
+            if (blockAccess.GetSolidBlock(pos.X, pos.Y, pos.Z).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
             {
+                pos.Y++;
                 blockAccess.SetBlock(block.BlockId, pos);
 
                 // Instantly despawn the block again if it expired already

@@ -87,10 +87,19 @@ namespace Vintagestory.GameContent
                 adult.ServerPos.SetFrom(entity.ServerPos);
                 adult.Pos.SetFrom(adult.ServerPos);
 
+                // Set adult attribute before we spawn it, so that it initialises correctly (and before the child entity dies!)
+                adult.WatchedAttributes.SetInt("generation", entity.WatchedAttributes.GetInt("generation", 0));
+                // Transfer the textureIndex of the child to the adult, if both have same number of alternates (e.g. used for pullets)
+                if (entity.WatchedAttributes.HasAttribute("textureIndex") && entity.Properties.Client?.FirstTexture?.Alternates != null && adultType.Client?.FirstTexture?.Alternates != null)
+                {
+                    if (entity.Properties.Client.FirstTexture.Alternates.Length == adultType.Client.FirstTexture.Alternates.Length)
+                    {
+                        adult.WatchedAttributes.SetAttribute("textureIndex", entity.WatchedAttributes.GetAttribute("textureIndex"));
+                    }
+                }
+
                 entity.Die(EnumDespawnReason.Expire, null);
                 entity.World.SpawnEntity(adult);
-
-                adult.WatchedAttributes.SetInt("generation", entity.WatchedAttributes.GetInt("generation", 0));
             } else
             {
                 callbackId = entity.World.RegisterCallback(CheckGrowth, 3000);
@@ -106,7 +115,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            entity.World.FrameProfiler.Mark("entity-checkgrowth");
+            entity.World.FrameProfiler.Mark("checkgrowth");
         }
 
 

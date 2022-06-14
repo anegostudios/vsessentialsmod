@@ -19,18 +19,10 @@ namespace Vintagestory.GameContent
 
         long fleeStartMs;
         bool stuck;
-
-        float stepHeight;
-
         EntityPartitioning partitionUtil;
-
         bool lowStabilityAttracted;
         bool ignoreDeepDayLight;
-
         float tamingGenerations = 10f;
-        Vec3d tmpVec = new Vec3d();
-        Vec3d collTmpVec = new Vec3d();
-
 		bool cancelNow;
         public override bool AggressiveTargeting => false;
 
@@ -58,14 +50,14 @@ namespace Vintagestory.GameContent
         }
 
 
-        
 
+        readonly Vec3d ownPos = new Vec3d();
         public override bool ShouldExecute()
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
 
             if (rand.NextDouble() > 2 * executionChance) return false;
-
+            if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
 
             if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
             if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
@@ -73,32 +65,32 @@ namespace Vintagestory.GameContent
             // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
-            float sunlight = entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) / (float)entity.World.SunBrightness;
-            if ((ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) || sunlight < minDayLight)
+            // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
+            // Has to be checked every tick because the drifter attributes change during temporal storms  (grrr, this is a slow way to do it)
+            if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
             {
-                if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
-                {
-                    return false;
-                }
+                if (ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) return false;
+
+                float sunlight = entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) / (float)entity.World.SunBrightness;
+                if (sunlight < minDayLight) return false;
             }
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
-            if (whenInEmotionState != null) fearReductionFactor = 1;
+            float fearReductionFactor = (whenInEmotionState != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
 
-            Vec3d ownPos = entity.ServerPos.XYZ;
+            ownPos.Set(entity.ServerPos);
             float hereRange = fearReductionFactor * seekingRange;
 
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
                 if (!IsTargetableEntity(e, hereRange)) return false;
-                return e.Code.Path != "player" || !lowStabilityAttracted || e.WatchedAttributes.GetDouble("temporalStability", 1) < 0.25;
+                if (!(e is EntityPlayer) || !lowStabilityAttracted) return true;
+                return e.WatchedAttributes.GetDouble("temporalStability", 1) < 0.25;
             });
 
 
             if (targetEntity != null)
             {
-                updateTargetPos();
-                
+                updateTargetPosFleeMode(targetPos);
                 return true;
             }
 
@@ -111,9 +103,6 @@ namespace Vintagestory.GameContent
             base.StartExecute();
 
             cancelNow = false;
-
-            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
-            stepHeight = bh == null ? 0.6f : bh.stepHeight;
 
             soundChance = Math.Max(0.025f, soundChance - 0.2f);
 
@@ -130,14 +119,13 @@ namespace Vintagestory.GameContent
         {
             if (world.Rand.NextDouble() < 0.2)
             {
-                updateTargetPos();
+                updateTargetPosFleeMode(targetPos);
                 pathTraverser.CurrentTarget.X = targetPos.X;
                 pathTraverser.CurrentTarget.Y = targetPos.Y;
                 pathTraverser.CurrentTarget.Z = targetPos.Z;
             }
 
-
-            if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ) > fleeingDistance * fleeingDistance)
+            if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos) > fleeingDistance * fleeingDistance)
             {
                 return false;
             }
@@ -160,44 +148,7 @@ namespace Vintagestory.GameContent
 
         
 
-        private void updateTargetPos()
-        {
-            float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
-
-            // Simple steering behavior
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI / 2);
-
-            // Running into wall?
-            if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
-                return;
-            }
-
-            // Try 90 degrees left
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI);
-            if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI);
-                return;
-            }
-
-            // Try 90 degrees right
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, yaw);
-            if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw);
-                return;
-            }
-
-            // Run towards target o.O
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, -yaw);
-            targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
-        }
+        
 
 
         public override void OnEntityHurt(DamageSource source, float damage)
@@ -205,17 +156,6 @@ namespace Vintagestory.GameContent
             base.OnEntityHurt(source, damage);
 
             if (cancelOnHurt) cancelNow = true;
-        }
-
-
-
-
-        bool traversable(Vec3d pos)
-        {
-            return
-                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, pos, false) ||
-                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, collTmpVec.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
-            ;
         }
 
 

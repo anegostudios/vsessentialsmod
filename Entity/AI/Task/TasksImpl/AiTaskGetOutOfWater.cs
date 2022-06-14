@@ -7,7 +7,9 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskGetOutOfWater : AiTaskBase
     {
-        Vec3d target;
+        Vec3d target = new Vec3d();
+        BlockPos pos = new BlockPos();
+
         bool done;
         float moveSpeed = 0.03f;
 
@@ -30,29 +32,35 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Swimming) return false;
             if (rand.NextDouble() > 0.04f) return false;
-            
 
+
+            target.Y = entity.ServerPos.Y;
             int tries = 6;
+            int px = (int) entity.ServerPos.X;
+            int pz = (int)entity.ServerPos.Z;
+            IBlockAccessor blockAccessor = entity.World.BlockAccessor;
             while (tries-- > 0)
             {
-                target = entity.ServerPos.XYZ.Add(rand.Next(21) - 10, 0, rand.Next(21) - 10);
-                pos.X = (int)target.X;
-                pos.Z = (int)target.Z;
-                pos.Y = entity.World.BlockAccessor.GetTerrainMapheightAt(pos);
+                pos.X = px + rand.Next(21) - 10;
+                pos.Z = pz + rand.Next(21) - 10;
+                pos.Y = blockAccessor.GetTerrainMapheightAt(pos);
 
-                Block block = entity.World.BlockAccessor.GetBlock(pos);
-                Block belowblock = entity.World.BlockAccessor.GetBlock(pos.X, pos.Y - 1, pos.Z);
+                Cuboidf[] blockBoxes = blockAccessor.GetBlock(pos).GetCollisionBoxes(blockAccessor, pos);
+                pos.Y--;
+                Cuboidf[] belowBoxes = blockAccessor.GetBlock(pos).GetCollisionBoxes(blockAccessor, pos);
 
-                bool canStep = block.CollisionBoxes == null || block.CollisionBoxes.Max((cuboid) => cuboid.Y2) <= 1f;
-                bool canStand = belowblock.CollisionBoxes != null && belowblock.CollisionBoxes.Length > 0;
+                bool canStep = blockBoxes == null || blockBoxes.Max((cuboid) => cuboid.Y2) <= 1f;
+                bool canStand = belowBoxes != null && belowBoxes.Length > 0;
 
-                if (canStand && canStep) return true;
+                if (canStand && canStep)
+                {
+                    target.Set(pos.X + 0.5, pos.Y + 1, pos.Z + 0.5);
+                    return true;
+                }
             }
 
             return false;
         }
-
-        BlockPos pos = new BlockPos();
 
         public override void StartExecute()
         {

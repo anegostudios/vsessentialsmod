@@ -30,6 +30,10 @@ namespace Vintagestory.GameContent
         protected long attackedByEntityMs;
         protected bool retaliateAttacks = true;
 
+        public string triggerEmotionState;
+
+        protected bool noEntityCodes => targetEntityCodesExact.Count == 0 && targetEntityCodesBeginsWith.Length == 0;
+
         protected AiTaskBaseTargetable(EntityAgent entity) : base(entity)
         {
         }
@@ -57,6 +61,22 @@ namespace Vintagestory.GameContent
             creatureHostility = entity.World.Config.GetString("creatureHostility");
 
             friendlyTarget = taskConfig["friendlyTarget"].AsBool(false);
+
+            this.triggerEmotionState = taskConfig["triggerEmotionState"].AsString();
+        }
+
+
+        public override void StartExecute()
+        {
+            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
+            stepHeight = bh == null ? 0.6f : bh.stepHeight;
+
+            base.StartExecute();
+
+            if (triggerEmotionState != null)
+            {
+                entity.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState(triggerEmotionState, 1, targetEntity?.EntityId ?? 0);
+            }
         }
 
 
@@ -96,7 +116,7 @@ namespace Vintagestory.GameContent
                 }
 
                 return
-                    (rangeMul == 1 || entity.ServerPos.DistanceTo(e.Pos.XYZ) < range * rangeMul) &&
+                    (rangeMul == 1 || entity.ServerPos.DistanceTo(e.Pos) < range * rangeMul) &&
                     (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
                 ;
             }
@@ -108,17 +128,20 @@ namespace Vintagestory.GameContent
         protected BlockSelection blockSel = new BlockSelection();
         protected EntitySelection entitySel = new EntitySelection();
 
+        readonly Vec3d rayTraceFrom = new Vec3d();
+        readonly Vec3d rayTraceTo = new Vec3d();
+        readonly Vec3d tmpPos = new Vec3d();
         protected bool hasDirectContact(Entity targetEntity, float minDist, float minVerDist)
         {
             Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
-            double dist = targetBox.ShortestDistanceFrom(pos);
-            double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(pos.Y));
+            tmpPos.Set(entity.ServerPos).Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
+            double dist = targetBox.ShortestDistanceFrom(tmpPos);
+            double vertDist = Math.Abs(targetBox.ShortestVerticalDistanceFrom(tmpPos.Y));
             if (dist >= minDist || vertDist >= minVerDist) return false;
 
-            Vec3d rayTraceFrom = entity.ServerPos.XYZ;
+            rayTraceFrom.Set(entity.ServerPos);
             rayTraceFrom.Y += 1 / 32f;
-            Vec3d rayTraceTo = targetEntity.ServerPos.XYZ;
+            rayTraceTo.Set(targetEntity.ServerPos);
             rayTraceTo.Y += 1 / 32f;
             bool directContact = false;
 
@@ -147,6 +170,58 @@ namespace Vintagestory.GameContent
         }
 
 
+        Vec3d tmpVec = new Vec3d();
+        protected void updateTargetPosFleeMode(Vec3d targetPos)
+        {
+            float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
+
+            // Simple steering behavior
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI / 2);
+
+            // Running into wall?
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
+                return;
+            }
+
+            // Try 90 degrees left
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI);
+                return;
+            }
+
+            // Try 90 degrees right
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw);
+                return;
+            }
+
+            // Run towards target o.O
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, -yaw);
+            targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
+        }
+
+
+        Vec3d collTmpVec = new Vec3d();
+        float stepHeight;
+        bool traversable(Vec3d pos)
+        {
+            return
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, pos, false) ||
+                !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, collTmpVec.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
+            ;
+        }
+
+
 
         public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
@@ -159,6 +234,8 @@ namespace Vintagestory.GameContent
         {
             return entity.World.BlockAccessor.GetBlock(pos).GetCollisionBoxes(entity.World.BlockAccessor, pos);
         }
+
+        public IBlockAccessor blockAccessor { get => entity.World.BlockAccessor; }
 
         public bool IsValidPos(BlockPos pos)
         {

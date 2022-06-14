@@ -172,14 +172,14 @@ namespace Vintagestory.GameContent
                     childEntity.ServerPos.Motion.Z += (rand.NextDouble() - 0.5f) / 20f;
 
                     childEntity.Pos.SetFrom(childEntity.ServerPos);
-                    entity.World.SpawnEntity(childEntity);
                     childEntity.Attributes.SetString("origin", "reproduction");
                     childEntity.WatchedAttributes.SetInt("generation", generation + 1);
+                    entity.World.SpawnEntity(childEntity);
                 }
-                
+
             }
 
-            entity.World.FrameProfiler.Mark("entity-multiply");
+            entity.World.FrameProfiler.Mark("multiply");
         }
 
         private bool TryGetPregnant()

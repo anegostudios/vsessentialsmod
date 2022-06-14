@@ -285,6 +285,18 @@ namespace Vintagestory.GameContent
                     TickEveryInGameHourServer(LastUpdateTotalHours);
                     LastUpdateTotalHours++;
                 }
+
+                var rnd = ws.api.World.Rand;
+                float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
+                if (rnd.NextDouble() < CurWeatherEvent.State.LightningRate)
+                {
+                    ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos, EnumGetClimateMode.ForSuppliedDateValues, ws.api.World.Calendar.TotalDays);
+                    if (nowcond.Temperature >= targetLightninMinTemp && nowcond.RainCloudOverlay > 0.15)
+                    {
+                        Vec3d pos = regionCenterPos.ToVec3d().Add(-200 + rnd.NextDouble() * 400, ws.api.World.SeaLevel, -200 + rnd.NextDouble() * 400);
+                        ws.SpawnLightningFlash(pos);
+                    }
+                }
             }
 
             if (Transitioning)
@@ -345,7 +357,6 @@ namespace Vintagestory.GameContent
             }
 
 
-
             NewWePattern.Update(dt);
             OldWePattern.Update(dt);
             
@@ -383,8 +394,8 @@ namespace Vintagestory.GameContent
             
             regionCenterPos.Y = (int)eplr.Pos.Y;
 
-            float targetNearLightningRate = CurWeatherEvent.State.NearLightningRate;
-            float targetDistantLightningRate = CurWeatherEvent.State.DistantLightningRate;
+            float targetNearLightningRate = CurWeatherEvent.State.NearThunderRate;
+            float targetDistantLightningRate = CurWeatherEvent.State.DistantThunderRate;
             float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
 
             weatherData.nearLightningRate += GameMath.Clamp((targetNearLightningRate - weatherData.nearLightningRate) * dt, -0.001f, 0.001f);
@@ -490,7 +501,7 @@ namespace Vintagestory.GameContent
 
         public void TriggerTransition()
         {
-            TriggerTransition(30 + (float)Rand.NextDouble() * 60 * 60 / ws.api.World.Calendar.SpeedOfTime);
+            TriggerTransition(30 + Rand.NextFloat() * 60 * 60 / ws.api.World.Calendar.SpeedOfTime);
         }
 
         public void TriggerTransition(float delay)
@@ -530,7 +541,7 @@ namespace Vintagestory.GameContent
                 totalChance += WeatherEvents[i].hereChance;
             }
 
-            float rndVal = (float)Rand.NextDouble() * totalChance;
+            float rndVal = Rand.NextFloat() * totalChance;
 
             for (int i = 0; i < WeatherEvents.Length; i++)
             {
@@ -553,7 +564,7 @@ namespace Vintagestory.GameContent
                 totalChance += WeatherPatterns[i].hereChance;
             }
 
-            float rndVal = (float)Rand.NextDouble() * totalChance;
+            float rndVal = Rand.NextFloat() * totalChance;
 
             for (int i = 0; i < WeatherPatterns.Length; i++)
             {

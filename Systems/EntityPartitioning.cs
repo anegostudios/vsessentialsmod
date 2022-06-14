@@ -54,8 +54,6 @@ namespace Vintagestory.GameContent
 
         public Dictionary<long, EntityPartitionChunk> Partitions = new Dictionary<long, EntityPartitionChunk>();
 
-//        Dictionary<long, GridAndChunkIndex> GridIndexByEntityId = new Dictionary<long, GridAndChunkIndex>();
-
         int chunkSize;
         int chunkMapSizeX;
         int chunkMapSizeZ;
@@ -83,7 +81,6 @@ namespace Vintagestory.GameContent
             chunkSize = api.World.BlockAccessor.ChunkSize;
 
             gridSizeInBlocks = chunkSize / partitionsLength;
-            //api.Event.OnEntityDespawn += Event_OnEntityDespawn;
         }
 
 
@@ -152,95 +149,90 @@ namespace Vintagestory.GameContent
         public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
             Entity nearestEntity = null;
-            double nearestDistance = 999999;
+            double radiusSq = radius * radius;
+            double nearestDistanceSq = radiusSq;
 
-            WalkEntities(position, radius, (e) =>
+            if (api.Side == EnumAppSide.Client)
             {
-                double dist = e.SidedPos.SquareDistanceTo(position);
-
-                if (dist < nearestDistance && matches(e))
+                WalkEntityPartitions(position, radius, (e) =>
                 {
-                    nearestDistance = dist;
-                    nearestEntity = e;
-                }
+                    double distSq = e.Pos.SquareDistanceTo(position);
 
-                return true;
-            });
+                    if (distSq < nearestDistanceSq && matches(e))
+                    {
+                        nearestDistanceSq = distSq;
+                        nearestEntity = e;
+                    }
+
+                    return true;
+                });
+            } else
+            {
+                WalkEntityPartitions(position, radius, (e) =>
+                {
+                    double distSq = e.ServerPos.SquareDistanceTo(position);
+
+                    if (distSq < nearestDistanceSq && matches(e))
+                    {
+                        nearestDistanceSq = distSq;
+                        nearestEntity = e;
+                    }
+
+                    return true;
+                });
+            }
+
+            
 
             return nearestEntity;
+        }
+
+
+
+        public delegate bool RangeTestDelegate(Entity e, Vec3d pos, double radiuSq);
+
+        private bool onIsInRangeServer(Entity e, Vec3d pos, double radiusSq)
+        {
+            double dx = e.ServerPos.X - pos.X;
+            double dy = e.ServerPos.Y - pos.Y;
+            double dz = e.ServerPos.Z - pos.Z;
+
+            return (dx * dx + dy * dy + dz * dz) < radiusSq;
+        }
+
+        private bool onIsInRangeClient(Entity e, Vec3d pos, double radiusSq)
+        {
+            double dx = e.Pos.X - pos.X;
+            double dy = e.Pos.Y - pos.Y;
+            double dz = e.Pos.Z - pos.Z;
+
+            return (dx * dx + dy * dy + dz * dz) < radiusSq;
+        }
+
+        private bool onIsInRangePartition(Entity e, Vec3d pos, double radiusSq)
+        {
+            return true;
         }
 
 
         /// <summary>
         /// This performs a entity search inside a spacially partioned search grid thats refreshed every 16ms.
         /// This can be a lot faster for when there are thousands of entities on a small space. It is used by EntityBehaviorRepulseAgents to improve performance, because otherwise when spawning 1000 creatures nearby, it has to do 1000x1000 = 1mil search operations every frame
-        /// A small search grid allows us to ignore most of those during the search. 
+        /// A small search grid allows us to ignore most of those during the search.  Return false to stop the walk.
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback">Return false to stop the walk</param>
         public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
-            int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
-
-            int mincy = (int)((centerPos.Y - radius) / chunkSize);
-            int maxcy = (int)((centerPos.Y + radius) / chunkSize);
-
-            int mingz = (int)((centerPos.Z - radius) / gridSizeInBlocks);
-            int maxgz = (int)((centerPos.Z + radius) / gridSizeInBlocks);
-
-            double radiusSq = radius * radius;
-
-            long indexBefore = -1;
-            IWorldChunk chunk = null;
-            EntityPartitionChunk partitionChunk = null;
-
-            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks;
-            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize;
-
-            for (int gridX = mingx; gridX <= maxgx; gridX++)
+            if (api.Side == EnumAppSide.Client)
             {
-                for (int cy = mincy; cy <= maxcy; cy++)
-                {
-                    for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
-                    {
-                        if (gridX < 0 || cy < 0 || gridZ < 0 || gridX >= gridXMax || cy >= cyTop || gridZ >= gridZMax) continue;
-
-                        int cx = gridX * gridSizeInBlocks / chunkSize;
-                        int cz = gridZ * gridSizeInBlocks / chunkSize;
-
-                        long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
-
-                        if (index3d != indexBefore)
-                        {
-                            chunk = api.World.BlockAccessor.GetChunk(cx, cy, cz);
-                            Partitions.TryGetValue(index3d, out partitionChunk);
-                            indexBefore = index3d;
-                        }
-
-                        if (chunk == null || chunk.Entities == null || partitionChunk == null) continue;
-
-                        int lgx = gridX % partitionsLength;
-                        int lgz = gridZ % partitionsLength;
-
-                        List<Entity> entities = partitionChunk.Entities[lgz * partitionsLength + lgx];
-                        
-                        for (int i = 0; i < entities.Count; i++)
-                        {
-                            double distSq = entities[i].SidedPos.SquareDistanceTo(centerPos);
-
-                            if (distSq <= radiusSq && !callback(entities[i]))
-                            {
-                                return;
-                            }
-                        }
-                    }
-                }
+                WalkEntities(centerPos, radius, callback, onIsInRangeClient);
+            } else
+            {
+                WalkEntities(centerPos, radius, callback, onIsInRangeServer);
             }
         }
-
 
         /// <summary>
         /// Same as <see cref="WalkEntities(Vec3d, double, Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
@@ -248,63 +240,67 @@ namespace Vintagestory.GameContent
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback"></param>
-        public void WalkEntityPartitions(Vec3d centerPos, double radius, Action<Entity> callback)
+        public void WalkEntityPartitions(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            int mingx = (int)((centerPos.X - radius) / gridSizeInBlocks);
-            int maxgx = (int)((centerPos.X + radius) / gridSizeInBlocks);
-            /*int mingy = (int)((centerPos.Y - radius) / gridSizeInBlocks);
-            int maxgy = (int)((centerPos.Y + radius) / gridSizeInBlocks);*/
+            WalkEntities(centerPos, radius, callback, onIsInRangePartition);
+        }
 
-            int mincy = (int)((centerPos.Y - radius) / chunkSize);
-            int maxcy = (int)((centerPos.Y + radius) / chunkSize);
 
-            int mingz = (int)((centerPos.Z - radius) / gridSizeInBlocks);
-            int maxgz = (int)((centerPos.Z + radius) / gridSizeInBlocks);
-            
+        private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest)
+        {
+            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks - 1;
+            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize - 1;
+            int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks - 1;
 
-            int cxBefore = -99, cyBefore = -99, czBefore = -99;
+            int mingx = (int)GameMath.Clamp((centerPos.X - radius) / gridSizeInBlocks, 0, gridXMax);
+            int maxgx = (int)GameMath.Clamp((centerPos.X + radius) / gridSizeInBlocks, 0, gridXMax);
+
+            int mincy = (int)GameMath.Clamp((centerPos.Y - radius) / chunkSize, 0, cyTop);
+            int maxcy = (int)GameMath.Clamp((centerPos.Y + radius) / chunkSize, 0, cyTop);
+
+            int mingz = (int)GameMath.Clamp((centerPos.Z - radius) / gridSizeInBlocks, 0, gridZMax);
+            int maxgz = (int)GameMath.Clamp((centerPos.Z + radius) / gridSizeInBlocks, 0, gridZMax);
+
+            double radiusSq = radius * radius;
+
+            long indexBefore = -1;
             IWorldChunk chunk = null;
             EntityPartitionChunk partitionChunk = null;
 
-            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            //int gridYMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-            int gridZMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks;
-
-            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize;
-
             for (int gridX = mingx; gridX <= maxgx; gridX++)
             {
-                for (int cy = mincy; cy <= maxcy; cy++)
-                //for (int gridY = mingy; gridY <= maxgy; gridY++)
+                int cx = gridX * gridSizeInBlocks / chunkSize;
+                int lgx = gridX % partitionsLength;
+
+                for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                 {
-                    for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
+                    int cz = gridZ * gridSizeInBlocks / chunkSize;
+                    int lgz = gridZ % partitionsLength;
+                    lgz = lgz * partitionsLength + lgx;
+
+                    for (int cy = mincy; cy <= maxcy; cy++)
                     {
-                        if (gridX < 0 || cy < 0 || gridZ < 0 || gridX >= gridXMax || cy >= cyTop || gridZ >= gridZMax) continue;
-
-                        int cx = gridX * gridSizeInBlocks / chunkSize;
-                        //int cy = gridY * gridSizeInBlocks / chunkSize;
-                        int cz = gridZ * gridSizeInBlocks / chunkSize;
-
                         long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
 
-                        if (cx != cxBefore || cy != cyBefore || cz != czBefore)
+                        if (index3d != indexBefore)
                         {
+                            indexBefore = index3d;
                             chunk = api.World.BlockAccessor.GetChunk(cx, cy, cz);
+                            if (chunk == null || chunk.Entities == null) continue;
                             Partitions.TryGetValue(index3d, out partitionChunk);
                         }
-                        if (chunk == null || chunk.Entities == null || partitionChunk == null) continue;
+                        else if (chunk == null || chunk.Entities == null) continue;
 
-                        cxBefore = cx;
-                        cyBefore = cy;
-                        czBefore = cz;
+                        if (partitionChunk == null) continue;
 
-                        int lgx = gridX % partitionsLength;
-                        int lgz = gridZ % partitionsLength;
-                        
-                        List<Entity> entities = partitionChunk.Entities[lgz * partitionsLength + lgx];
+                        List<Entity> entities = partitionChunk.Entities[lgz];
+
                         for (int i = 0; i < entities.Count; i++)
                         {
-                            callback(entities[i]);
+                            if (onRangeTest(entities[i], centerPos, radiusSq) && !callback(entities[i]))
+                            {
+                                return;
+                            }
                         }
                     }
                 }

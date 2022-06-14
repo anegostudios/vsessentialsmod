@@ -8,7 +8,7 @@ namespace Vintagestory.GameContent
     {
         internal int appliedMilliseconds;
 
-        internal virtual void Initialize(EntityProperties config)
+        internal virtual void Initialize(API.Datastructures.JsonObject config)
         {
 
         }

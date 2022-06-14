@@ -594,12 +594,19 @@ namespace Vintagestory.GameContent
 
         private void DropItems(BlockPos pos)
         {
+            var dpos = pos.ToVec3d().Add(0.5, 0.5, 0.5);
+
             if (drops != null)
             {
                 for (int i = 0; i < drops.Length; i++)
                 {
-                    World.SpawnItemEntity(drops[i], pos.ToVec3d().Add(0.5, 0.5, 0.5));
+                    World.SpawnItemEntity(drops[i], dpos);
                 }
+            }
+
+            if (removedBlockentity is IBlockEntityContainer bec)
+            {
+                bec.DropContents(dpos);
             }
         }
 

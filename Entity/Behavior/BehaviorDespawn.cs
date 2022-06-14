@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -9,7 +10,7 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorDespawn : EntityBehavior
     {
-        float? minPlayerDistance = null;
+        float? minPlayerDistanceSquared = null;
         float? belowLightLevel = null;
 
         float minSeconds = 30;
@@ -29,33 +30,42 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             JsonObject minDist = typeAttributes["minPlayerDistance"];
-            minPlayerDistance = (minDist.Exists) ? (float?)minDist.AsFloat() : null;
+            minPlayerDistanceSquared = null;
+            if (minDist.Exists)
+            {
+                float minPlayerDist = minDist.AsFloat();
+                minPlayerDistanceSquared = minPlayerDist * minPlayerDist;
+            }
 
             JsonObject belowLight = typeAttributes["belowLightLevel"];
-            belowLightLevel = (belowLight.Exists) ? (float?)belowLight.AsFloat() : null;
+            belowLightLevel = belowLight.Exists ? (float?)belowLight.AsFloat() : null;
             
-
             minSeconds = typeAttributes["minSeconds"].AsFloat(30);
         }
 
+
+        bool shouldStayAlive;
         public override void OnGameTick(float deltaTime)
         {
             if (!entity.Alive || entity.World.Side == EnumAppSide.Client) return;
 
-            accumSeconds += deltaTime;
+            deltaTime = Math.Min(deltaTime, 2);
 
-            if (accumSeconds > 1 && (LightLevelOk() || PlayerInRange()))
+            accumSeconds += deltaTime;
+            if (accumSeconds > 1)
+            {
+                shouldStayAlive = PlayerInRange() || LightLevelOk();
+                accumSeconds = 0;
+            }
+
+            if (shouldStayAlive)
             {
                 DeathTime = 0;
-                accumSeconds = 0;
                 return;
             }
 
-            deltaTime = System.Math.Min(deltaTime, 2);
-            
             if ((DeathTime += deltaTime) > minSeconds)
             {
-                //entity.World.Logger.Notification("despawn " + entity.Code + " plr in range " + PlayerInRange() + ", min seconds: " + minSeconds);
                 entity.Die(EnumDespawnReason.Expire, null);
                 return;
             }
@@ -64,18 +74,20 @@ namespace Vintagestory.GameContent
 
         public bool PlayerInRange()
         {
-            if (minPlayerDistance == null) return false;
+            if (minPlayerDistanceSquared == null) return false;
 
-            IPlayer player = entity.World.NearestPlayer(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            EntityPos pos = entity.ServerPos;
+            EntityPlayer player = entity.World.NearestPlayer(pos.X, pos.Y, pos.Z)?.Entity;
 
-            return player?.Entity != null && player.Entity.ServerPos.SquareDistanceTo(entity.ServerPos.XYZ) < minPlayerDistance * minPlayerDistance;
+            return player != null && player.ServerPos.SquareDistanceTo(pos.X, pos.Y, pos.Z) < minPlayerDistanceSquared;
         }
 
         public bool LightLevelOk()
         {
             if (belowLightLevel == null) return false;
 
-            int level = entity.World.BlockAccessor.GetLightLevel(entity.ServerPos.AsBlockPos, EnumLightLevelType.MaxLight);
+            EntityPos pos = entity.ServerPos;
+            int level = entity.World.BlockAccessor.GetLightLevel((int) pos.X, (int)pos.Y, (int)pos.Z, EnumLightLevelType.MaxLight);
 
             return level >= belowLightLevel;
         }

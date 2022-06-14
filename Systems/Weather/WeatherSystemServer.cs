@@ -135,6 +135,7 @@ namespace Vintagestory.GameContent
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
             serverChannel.SendPacket(packetForClient, byPlayer);
+            serverChannel.SendPacket(new WeatherCloudYposPacket() { CloudYRel = CloudLevelRel }, byPlayer);
             sendConfigUpdate(byPlayer);
         }
 
@@ -173,6 +174,11 @@ namespace Vintagestory.GameContent
             WeatherDataSlowAccess = getWeatherDataReader();
 
             GeneralConfig.Init(api.World);
+
+            if (sapi.WorldManager.SaveGame.WorldConfiguration != null)
+            {
+                CloudLevelRel = sapi.WorldManager.SaveGame.WorldConfiguration.GetString("cloudypos", "1").ToFloat(1);
+            }
         }
 
         public void SendWeatherStateUpdate(WeatherState state)
@@ -194,7 +200,7 @@ namespace Vintagestory.GameContent
             IMapRegion mapregion = sapi.WorldManager.GetMapRegion(state.RegionX, state.RegionZ);
             if (mapregion != null)
             {
-                mapregion.ModData["weather"] = SerializerUtil.Serialize(state);
+                mapregion.SetModdata("weather", SerializerUtil.Serialize(state));
             }
         }
 
@@ -235,7 +241,24 @@ namespace Vintagestory.GameContent
             }   
         }
 
+        public override void SpawnLightningFlash(Vec3d pos)
+        {
+            TriggerOnLightningImpactStart(ref pos, out var handling);
 
+            if (handling == EnumHandling.PassThrough)
+            {
+                var pkt = new LightningFlashPacket()
+                {
+                    Pos = pos,
+                    Seed = api.World.Rand.Next()
+                };
+                serverChannel.BroadcastPacket(pkt);
+
+                var lflash = new LightningFlash(this, api, pkt.Seed, pkt.Pos);
+
+                simLightning.lightningFlashes.Add(lflash);
+            }
+        }
 
 
     }

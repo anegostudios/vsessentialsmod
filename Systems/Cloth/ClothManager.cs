@@ -270,7 +270,7 @@ namespace Vintagestory.GameContent
 
             Item itemRope = capi.World.GetItem(new AssetLocation("rope"));
 
-            Shape shape = capi.Assets.TryGet("shapes/item/ropesection.json")?.ToObject<Shape>();
+            Shape shape = Shape.TryGet(capi, "shapes/item/ropesection.json");
             if (itemRope == null || shape == null) return;
             MeshData meshData;
             capi.Tesselator.TesselateShape(itemRope, shape, out meshData);

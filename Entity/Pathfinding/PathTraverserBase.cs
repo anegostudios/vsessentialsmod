@@ -23,17 +23,28 @@ namespace Vintagestory.API.Common
             get { return target; }
         }
 
+        public virtual bool Ready
+        {
+            get { return true; }
+        }
+
+
         public PathTraverserBase(EntityAgent entity)
         {
             this.entity = entity;
         }
 
-        public bool NavigateTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck, bool allowReachAlmost = false)
+        public bool NavigateTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck, int mhdistanceTolerance = 0)
         {
-            return NavigateTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck, allowReachAlmost);
+            return NavigateTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck, false, 10000, mhdistanceTolerance);
         }
 
-        public virtual bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 10000, bool allowReachAlmost = false)
+        public virtual bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 10000, int mhdistanceTolerance = 0)
+        {
+            return WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
+        }
+
+        public virtual bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action OnNoPath = null, int searchDepth = 10000, int mhdistanceTolerance = 0)
         {
             return WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
         }

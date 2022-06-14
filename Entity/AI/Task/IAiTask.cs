@@ -29,6 +29,7 @@ namespace Vintagestory.API.Common
         /// When the activitiy is active you may wanna give it a higher priority to finish executing
         /// </summary>
         float PriorityForCancel { get; }
+        string ProfilerName { get; set; }
 
         /// <summary>
         /// Return true if this task should execute
@@ -80,5 +81,11 @@ namespace Vintagestory.API.Common
         void OnEntityDespawn(EntityDespawnReason reason);
         void OnEntityHurt(DamageSource source, float damage);
         void OnNoPath(Vec3d target);
+
+        /// <summary>
+        /// Checks whether there is any reason why the AITask cannot move on to the ContinueExecute() method, for example if there is a path traverser and it is waiting for an asynchronous operation to complete
+        /// </summary>
+        /// <returns>True if the AITask can move on to ContinueExecute(); if it's not ready returns false</returns>
+        bool CanContinueExecute();
     }
 }

@@ -17,9 +17,8 @@ namespace Vintagestory.GameContent
 
         float accum;
 
-        internal override void Initialize(EntityProperties properties)
+        internal override void Initialize(JsonObject physics)
         {
-            JsonObject physics = properties.Attributes?["physics"];
             if (physics != null)
             {
                 groundDragFactor = 0.3 * (float)physics["groundDragFactor"].AsDouble(1);

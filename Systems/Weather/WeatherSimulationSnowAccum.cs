@@ -631,7 +631,7 @@ namespace Vintagestory.GameContent
                 //    - A snow variantable block: Call the method with the new level
 
 
-                Block block = chunk.GetLocalBlockAtBlockPos(sapi.World, pos);
+                Block block = chunk.GetLocalLiquidOrBlockAtBlockPos(sapi.World, pos);
 
                 float hereAccum = 0;
 
@@ -660,7 +660,7 @@ namespace Vintagestory.GameContent
                 }
                 if (chunk == null) return null;
 
-                Block upBlock = chunk.GetLocalBlockAtBlockPos(sapi.World, placePos);
+                Block upBlock = chunk.GetLocalLiquidOrBlockAtBlockPos(sapi.World, placePos);
 
 
                 // Case 1: We have a block that can become snow covered (or more snow covered)

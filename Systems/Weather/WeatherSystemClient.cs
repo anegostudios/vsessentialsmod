@@ -29,7 +29,7 @@ namespace Vintagestory.GameContent
 
         public WeatherSimulationSound simSounds;
         public WeatherSimulationParticles simParticles;
-        public WeatherSimulationLightning simLightning;
+        
         public AuroraRenderer auroraRenderer;
 
 
@@ -68,6 +68,8 @@ namespace Vintagestory.GameContent
                 .SetMessageHandler<WeatherState>(OnWeatherUpdatePacket)
                 .SetMessageHandler<WeatherConfigPacket>(OnWeatherConfigUpdatePacket)
                 .SetMessageHandler<WeatherPatternAssetsPacket>(OnAssetsPacket)
+                .SetMessageHandler<LightningFlashPacket>(OnLightningFlashPacket)
+                .SetMessageHandler<WeatherCloudYposPacket>(OnCloudLevelRelPacket)
              ;
 
             capi.Event.RegisterGameTickListener(OnClientGameTick, 50);
@@ -79,15 +81,19 @@ namespace Vintagestory.GameContent
             capi.Event.LeaveWorld += () => cloudRenderer?.Dispose();
             capi.Event.OnGetClimate += Event_OnGetClimate;
 
-            simSounds = new WeatherSimulationSound(capi as ICoreClientAPI, this);
-            simParticles = new WeatherSimulationParticles(capi as ICoreClientAPI, this);
-            simLightning = new WeatherSimulationLightning(capi as ICoreClientAPI, this);
-            auroraRenderer = new AuroraRenderer(capi as ICoreClientAPI, this);
+            simSounds = new WeatherSimulationSound(capi, this);
+            simParticles = new WeatherSimulationParticles(capi, this);
+            auroraRenderer = new AuroraRenderer(capi, this);
         }
 
-        private void OnAssetsPacket(WeatherPatternAssetsPacket networkMessage)
+        private void OnCloudLevelRelPacket(WeatherCloudYposPacket msg)
         {
-            WeatherPatternAssets p = JsonUtil.FromString<WeatherPatternAssets>(networkMessage.Data);
+            this.CloudLevelRel = msg.CloudYRel;
+        }
+
+        private void OnAssetsPacket(WeatherPatternAssetsPacket msg)
+        {
+            WeatherPatternAssets p = JsonUtil.FromString<WeatherPatternAssets>(msg.Data);
             this.GeneralConfig = p.GeneralConfig;
             this.GeneralConfig.Init(api.World);
 
@@ -157,7 +163,7 @@ namespace Vintagestory.GameContent
         private void OnClientGameTick(float dt)
         {
             quarterSecAccum += dt;
-            if (quarterSecAccum > 0.25f)
+            if (quarterSecAccum > 0.25f || clientClimateCond == null)
             {
                 clientClimateCond = capi.World.BlockAccessor.GetClimateAt(plrPos, EnumGetClimateMode.NowValues);
                 quarterSecAccum = 0;
@@ -275,18 +281,18 @@ namespace Vintagestory.GameContent
             cloudRenderer = new CloudRenderer(capi, this);
 
             smoothedLightLevel = capi.World.BlockAccessor.GetLightLevel(capi.World.Player.Entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
-                        
 
             capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", WeatherDataAtPlayer.BlendedWeatherData.Ambient);
             haveLevelFinalize = true;
 
             // Pre init the clouds.             
             capi.Ambient.UpdateAmbient(0.1f);
-            CloudRenderer renderer = this.cloudRenderer as CloudRenderer;
 
-            renderer.blendedCloudDensity = capi.Ambient.BlendedCloudDensity;
-            renderer.blendedGlobalCloudBrightness = capi.Ambient.BlendedCloudBrightness;
-            renderer.CloudTick(0.1f);
+            cloudRenderer.blendedCloudDensity = capi.Ambient.BlendedCloudDensity;
+            cloudRenderer.blendedGlobalCloudBrightness = capi.Ambient.BlendedCloudBrightness;
+            cloudRenderer.CloudTick(0.1f);
+
+            capi.Logger.VerboseDebug("Done init WeatherSystemClient");
         }
 
         public override void Dispose()
@@ -299,11 +305,6 @@ namespace Vintagestory.GameContent
 
         public double RenderOrder => -0.1;
         public int RenderRange => 999;
-
-        public double CloudsYPosition
-        {
-            get { return capi.Ambient.BlendedCloudYPos; }
-        }
 
         /// <summary>
         /// Get the current precipitation as seen by the client at pos
@@ -318,8 +319,6 @@ namespace Vintagestory.GameContent
 
             if (rainOnly)
             {
-                // TODO:  Testing whether it is snowing or not on the client is kinda slow - though the WeatherSimulationParticles must already know!
-
                 WeatherDataSnapshot weatherData = BlendedWeatherData;
                 EnumPrecipitationType precType = weatherData.BlendedPrecType;
                 if (precType == EnumPrecipitationType.Auto)
@@ -330,6 +329,19 @@ namespace Vintagestory.GameContent
             }
 
             return precIntensity;
+        }
+
+
+        private void OnLightningFlashPacket(LightningFlashPacket msg)
+        {
+            if (capi.World.Player == null) return; // not fully connected yet
+
+            simLightning.genLightningFlash(msg.Pos, msg.Seed);
+        }
+
+        public override void SpawnLightningFlash(Vec3d pos)
+        {
+            simLightning.genLightningFlash(pos);
         }
     }
 }

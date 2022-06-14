@@ -14,13 +14,14 @@ namespace Vintagestory.API.Common
         MoreThan
     }
 
-    public enum EnumDataType
-    {
-        Bool,
-        Int,
-        Float,
-        Double
-    }
+    // Overlaps WorldConfiguration EnumDataType
+    //public enum EnumDataType
+    //{
+    //    Bool,
+    //    Int,
+    //    Float,
+    //    Double
+    //}
 
 
     public abstract class GoapCondition

@@ -1,8 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -11,7 +13,6 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
-using Vintagestory.ServerMods.NoObf;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -49,13 +50,15 @@ namespace Vintagestory.ServerMods.NoObf
         public Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
         public Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
 
-        Dictionary<AssetLocation, BlockType> blockTypes;
-        Dictionary<AssetLocation, ItemType> itemTypes;
-        Dictionary<AssetLocation, EntityType> entityTypes;
+        Dictionary<AssetLocation, RegistryObjectType> blockTypes;
+        Dictionary<AssetLocation, RegistryObjectType> itemTypes;
+        Dictionary<AssetLocation, RegistryObjectType> entityTypes;
+        List<RegistryObjectType>[] itemVariants;
+        List<RegistryObjectType>[] blockVariants;
+        List<RegistryObjectType>[] entityVariants;
 
 
         ICoreServerAPI api;
-
 
 
         public override bool ShouldLoad(EnumAppSide side)
@@ -69,110 +72,90 @@ namespace Vintagestory.ServerMods.NoObf
             return 0.2;
         }
 
-        public override void StartServerSide(ICoreServerAPI api)
+        public override void AssetsLoaded(ICoreAPI coreApi)
         {
+            if (!(coreApi is ICoreServerAPI api)) return;
             this.api = api;
 
+            api.Logger.VerboseDebug("Starting to gather blocktypes, itemtypes and entities");
             LoadWorldProperties();
+            int threads = Math.Max(1, Environment.ProcessorCount / 2 - 2);
 
+            itemTypes = new Dictionary<AssetLocation, RegistryObjectType>();
+            blockTypes = new Dictionary<AssetLocation, RegistryObjectType>();
+            entityTypes = new Dictionary<AssetLocation, RegistryObjectType>();
 
-
-            blockTypes = new Dictionary<AssetLocation, BlockType>();
-            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
-            {
-                JToken property;
-                JObject blockTypeObject = entry.Value;
-                AssetLocation location;
-                string entryDomain = entry.Key.Domain;
-                try
-                {
-                    location = blockTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>(entryDomain);
-                }
-                catch (Exception e)
-                {
-                    api.World.Logger.Error("Block type {0} has no valid code property. Will ignore. Exception thrown: {1}", entry.Key, e);
-                    continue;
-                }
-
-                BlockType bt;
-                blockTypes.Add(entry.Key, bt = new BlockType()
-                {
-                    Code = location,
-                    VariantGroups = blockTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                    SkipVariants = blockTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                    AllowedVariants = blockTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                    Enabled = blockTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
-                    jsonObject = blockTypeObject
-                });
-            }
-
-            itemTypes = new Dictionary<AssetLocation, ItemType>();
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "itemtypes/"))
             {
-                JToken property = null;
-                JObject itemTypeObject = entry.Value;
-
-                string entryDomain = entry.Key.Domain;
-                AssetLocation location = itemTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>(entryDomain);
-
-                ItemType et;
-                itemTypes.Add(entry.Key, et = new ItemType()
-                {
-                    Code = location,
-                    VariantGroups = itemTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                    SkipVariants = itemTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                    AllowedVariants = itemTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                    Enabled = itemTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
-                    jsonObject = itemTypeObject
-                });
-            }
-
-            entityTypes = new Dictionary<AssetLocation, EntityType>();
-            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
-            {
-                JToken property = null;
-                JObject entityTypeObject = entry.Value;
-                AssetLocation location = null;
-                string entryDomain = entry.Key.Domain;
                 try
                 {
-                    location = entityTypeObject.GetValue("code", StringComparison.InvariantCultureIgnoreCase).ToObject<AssetLocation>(entryDomain);
+                    ItemType et = new ItemType();
+                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    itemTypes.Add(entry.Key, et);
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Entity type {0} has no valid code property. Will ignore. Exception thrown: {1}", entry.Key, e);
+                    api.World.Logger.Error("Item type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
                     continue;
                 }
+            }
+            itemVariants = new List<RegistryObjectType>[itemTypes.Count];
+            api.Logger.VerboseDebug("Starting parsing ItemTypes in " + threads + " threads");
+            PrepareForLoading(threads);
 
+            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
+            {
                 try
                 {
-                    EntityType et;
-
-                    entityTypes.Add(entry.Key, et = new EntityType()
-                    {
-                        Code = location,
-                        VariantGroups = entityTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<RegistryObjectVariantGroup[]>() : null,
-                        SkipVariants = entityTypeObject.TryGetValue("skipVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                        AllowedVariants = entityTypeObject.TryGetValue("allowedVariants", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<AssetLocation[]>(entryDomain) : null,
-                        Enabled = entityTypeObject.TryGetValue("enabled", StringComparison.InvariantCultureIgnoreCase, out property) ? property.ToObject<bool>() : true,
-                        jsonObject = entityTypeObject
-                    });
-
-                } catch (Exception e)
+                    EntityType et = new EntityType();
+                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    entityTypes.Add(entry.Key, et);
+                }
+                catch (Exception e)
                 {
                     api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
                     continue;
                 }
             }
+            entityVariants = new List<RegistryObjectType>[entityTypes.Count];
 
-            
-            LoadEntities();
-            LoadItems();
-            LoadBlocks();
+            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
+            {
+                try
+                {
+                    BlockType et = new BlockType();
+                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    blockTypes.Add(entry.Key, et);
+                }
+                catch (Exception e)
+                {
+                    api.World.Logger.Error("Block type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
+                    continue;
+                }
+            }
+            blockVariants = new List<RegistryObjectType>[blockTypes.Count];
+
+            TyronThreadPool.QueueTask(GatherAllTypes_Async);   // Now we've loaded everything, let's add one more gathering thread :)
+
+            api.Logger.StoryEvent(Lang.Get("It remembers..."));
+            api.Logger.VerboseDebug("Gathered all types, starting to load items");
+
+            LoadItems(itemVariants);
+            api.Logger.VerboseDebug("Parsed and loaded items");
+
+            api.Logger.StoryEvent(Lang.Get("...all that came before"));
+
+            LoadBlocks(blockVariants);
+            api.Logger.VerboseDebug("Parsed and loaded blocks");
+
+            LoadEntities(entityVariants);
+            api.Logger.VerboseDebug("Parsed and loaded entities");
 
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
 
             FreeRam();
+
+            api.TriggerOnAssetsFirstLoaded();
         }
 
         private void LoadWorldProperties()
@@ -222,537 +205,205 @@ namespace Vintagestory.ServerMods.NoObf
 
 
         #region Entities
-        void LoadEntities()
+        void LoadEntities(List<RegistryObjectType>[] variantLists)
         {
-            foreach (var val in entityTypes)
+            // Step2: create all the entities from their types, and register them: this has to be on the main thread as the registry is not thread-safe
+            LoadFromVariants(variantLists, "entitie", (variants) =>
             {
-                if (!val.Value.Enabled) continue;
-
-                foreach (EntityType type in GatherEntities(val.Key, val.Value))
+                foreach (EntityType type in variants)
                 {
                     api.RegisterEntityClass(type.Class, type.CreateProperties());
                 }
-            }
+            });
         }
 
-
-        List<EntityType> GatherEntities(AssetLocation location, EntityType entityType)
-        {
-            List<EntityType> entities = new List<EntityType>();
-
-            List<ResolvedVariant> variants;
-            try
-            {
-                variants = GatherVariants(entityType.Code, entityType.VariantGroups, entityType.Code, entityType.AllowedVariants, entityType.SkipVariants);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to gather all variants of the item type with code {0}. Will ignore most itemtype completly. Exception: {1}", entityType.Code, e);
-                return new List<EntityType>();
-            }
-
-
-            // Single item type
-            if (variants.Count == 0)
-                entities.Add(baseEntityFromEntityType(entityType, entityType.Code.Clone(), new OrderedDictionary<string, string>()));
-            else
-            {
-                // Multi item type
-                foreach (ResolvedVariant variant in variants)
-                {
-                    EntityType typedEntity = baseEntityFromEntityType(entityType, variant.Code, variant.CodeParts);
-
-                    entities.Add(typedEntity);
-                }
-            }
-
-            entityType.jsonObject = null;
-            return entities;
-        }
-
-
-        EntityType baseEntityFromEntityType(EntityType entityType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
-        {
-            EntityType newEntityType = new EntityType()
-            {
-                Code = fullcode,
-                VariantGroups = entityType.VariantGroups,
-                Enabled = entityType.Enabled,
-                jsonObject = entityType.jsonObject.DeepClone() as JObject,
-                Variant = new OrderedDictionary<string, string>(variant)
-            };
-
-            solveByType(newEntityType.jsonObject, fullcode.Path, variant);
-
-            try
-            {
-                JsonUtil.PopulateObject(newEntityType, newEntityType.jsonObject.ToString(), fullcode.Domain);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to populate/load json data of the typed item with code {0}. Will ignore most of the attributes. Exception: {1}", newEntityType.Code, e);
-            }
-
-            newEntityType.jsonObject = null;
-            return newEntityType;
-        }
         #endregion
 
         #region Items
-        void LoadItems()
+        void LoadItems(List<RegistryObjectType>[] variantLists)
         {
-            List<Item> items = new List<Item>();
-
-            foreach (var val in itemTypes)
+            // Step2: create all the items from the itemtypes, and register them: this has to be on the main thread as the registry is not thread-safe
+            LoadFromVariants(variantLists, "item", (variants) =>
             {
-                if (!val.Value.Enabled) continue;
-                GatherItems(val.Key, val.Value, items);
-            }
-
-            foreach (Item item in items)
-            {
-                try
+                foreach (ItemType type in variants)
                 {
-                    api.RegisterItem(item);
+                    Item item = type.CreateItem(api);
+
+                    try
+                    {
+                        api.RegisterItem(item);
+                    }
+                    catch (Exception e)
+                    {
+                        api.Server.LogError("Failed registering item {0}: {1}", item.Code, e);
+                    }
                 }
-                catch (Exception e)
-                {
-                    api.Server.LogError("Failed registering item {0}: {1}", item.Code, e);
-                }
-
-            }
-
-        }
-
-
-        void GatherItems(AssetLocation location, ItemType itemType, List<Item> items)
-        {
-            List<ResolvedVariant> variants;
-            try
-            {
-                variants = GatherVariants(itemType.Code, itemType.VariantGroups, itemType.Code, itemType.AllowedVariants, itemType.SkipVariants);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to gather all variants of the item type with code {0}. Will ignore most itemtype completly. Exception: {1}", itemType.Code, e);
-                return;
-            }
-
-
-            // Single item type
-            if (variants.Count == 0)
-            {
-                Item item = baseItemFromItemType(itemType, itemType.Code.Clone(), new OrderedDictionary<string, string>());
-                items.Add(item);
-            }
-            else
-            {
-                // Multi item type
-                foreach (ResolvedVariant variant in variants)
-                {
-                    Item typedItem = baseItemFromItemType(itemType, variant.Code, variant.CodeParts);
-
-                    items.Add(typedItem);
-                }
-            }
-
-            itemType.jsonObject = null;
-        }
-
-
-        Item baseItemFromItemType(ItemType itemType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
-        {
-            ItemType typedItemType = new ItemType()
-            {
-                Code = itemType.Code,
-                VariantGroups = itemType.VariantGroups,
-                Variant = new OrderedDictionary<string, string>(variant),
-                Enabled = itemType.Enabled,
-                jsonObject = itemType.jsonObject.DeepClone() as JObject
-            };
-
-            solveByType(typedItemType.jsonObject, fullcode.Path, variant);
-
-            try
-            {
-                JsonUtil.PopulateObject(typedItemType, typedItemType.jsonObject.ToString(), fullcode.Domain);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to populate/load json data of the typed item with code {0}. Will ignore most of the attributes. Exception: {1}", typedItemType.Code, e);
-            }
-
-            Item item;
-
-            if (api.ClassRegistry.GetItemClass(typedItemType.Class) == null)
-            {
-                api.Server.Logger.Error("Item with code {0} has defined an item class {1}, but no such class registered. Will ignore.", typedItemType.Code, typedItemType.Class);
-                item = new Item();
-            }
-            else
-            {
-                item = api.ClassRegistry.CreateItem(typedItemType.Class);
-            }
-
-
-            item.Code = fullcode;
-            item.VariantStrict = typedItemType.Variant;
-            item.Variant= new RelaxedReadOnlyDictionary<string, string>(typedItemType.Variant);
-            item.Class = typedItemType.Class;
-            item.Textures = typedItemType.Textures;
-            item.MaterialDensity = typedItemType.MaterialDensity;
-            
-            
-            item.GuiTransform = typedItemType.GuiTransform?.Clone();
-            item.FpHandTransform = typedItemType.FpHandTransform?.Clone();
-            item.TpHandTransform = typedItemType.TpHandTransform?.Clone();
-            item.TpOffHandTransform = typedItemType.TpOffHandTransform?.Clone();
-            item.GroundTransform = typedItemType.GroundTransform?.Clone();
-
-            item.DamagedBy = (EnumItemDamageSource[])typedItemType.DamagedBy?.Clone();
-            item.MaxStackSize = typedItemType.MaxStackSize;
-            if (typedItemType.Attributes != null) item.Attributes = typedItemType.Attributes;
-            item.CombustibleProps = typedItemType.CombustibleProps;
-            item.NutritionProps = typedItemType.NutritionProps;
-            item.TransitionableProps = typedItemType.TransitionableProps;
-            item.GrindingProps = typedItemType.GrindingProps;
-            item.CrushingProps = typedItemType.CrushingProps;
-            item.Shape = typedItemType.Shape;
-            item.Tool = typedItemType.Tool;
-            item.AttackPower = typedItemType.AttackPower;
-            item.LiquidSelectable = typedItemType.LiquidSelectable;
-            item.ToolTier = typedItemType.ToolTier;
-            item.HeldSounds = typedItemType.HeldSounds?.Clone();
-            item.Durability = typedItemType.Durability;
-            item.Dimensions = typedItemType.Dimensions?.Clone();
-            item.MiningSpeed = typedItemType.MiningSpeed;
-            item.AttackRange = typedItemType.AttackRange;
-            item.StorageFlags = (EnumItemStorageFlags)typedItemType.StorageFlags;
-            item.RenderAlphaTest = typedItemType.RenderAlphaTest;
-            item.HeldTpHitAnimation = typedItemType.HeldTpHitAnimation;
-            item.HeldRightTpIdleAnimation = typedItemType.HeldRightTpIdleAnimation;
-            item.HeldLeftTpIdleAnimation = typedItemType.HeldLeftTpIdleAnimation;
-            item.HeldTpUseAnimation = typedItemType.HeldTpUseAnimation;
-            item.CreativeInventoryStacks = typedItemType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedItemType.CreativeInventoryStacks.Clone();
-            item.MatterState = typedItemType.MatterState;
-            item.ParticleProperties = typedItemType.ParticleProperties;
-
-            typedItemType.InitItem(api.ClassRegistry, api.World.Logger, item, variant);
-
-            typedItemType.jsonObject = null;
-
-
-            return item;
+            });
         }
         #endregion
 
         #region Blocks
-        void LoadBlocks()
+
+        void LoadBlocks(List<RegistryObjectType>[] variantLists)
         {
-            List<Block> blocks = new List<Block>();
-
-            foreach (var val in blockTypes)
+            // Step2: create all the blocks from the blocktypes, and register them: this has to be on the main thread as the registry is not thread-safe
+            LoadFromVariants(variantLists, "block", (variants) =>
             {
-                if (!val.Value.Enabled) continue;
-                GatherBlocks(val.Value.Code, val.Value, blocks);
-            }
+                foreach (BlockType type in variants)
+                {
+                    Block block = type.CreateBlock(api);
 
-            foreach (Block block in blocks)
+                    try
+                    {
+                        api.RegisterBlock(block);
+                    }
+                    catch (Exception e)
+                    {
+                        api.Server.LogError("Failed registering block {0}: {1}", block.Code, e);
+                    }
+                }
+            });
+        }
+        #endregion
+
+        #region generic
+        void PrepareForLoading(int threadsCount)
+        {
+            // JSON parsing is slooowww, so let's multithread the **** out of it :)
+            for (int i = 0; i < threadsCount; i++) TyronThreadPool.QueueTask(GatherAllTypes_Async);
+        }
+
+
+        private void GatherAllTypes_Async()
+        {
+            GatherTypes_Async(itemVariants, itemTypes);
+
+            int timeOut = 1000;
+            bool logged = false;
+            while (blockVariants == null)
+            {
+                if (--timeOut == 0) return;
+                if (!logged)
+                {
+                    api.Logger.VerboseDebug("Waiting for entityTypes to be gathered");
+                    logged = true;
+                }
+                Thread.Sleep(10);
+            }
+            if (logged) api.Logger.VerboseDebug("EntityTypes now all gathered");
+
+            GatherTypes_Async(blockVariants, blockTypes);
+
+            timeOut = 1000;
+            logged = false;
+            while (entityVariants == null)
+            {
+                if (--timeOut == 0) return;
+                if (!logged)
+                {
+                    api.Logger.VerboseDebug("Waiting for blockTypes to be gathered");
+                    logged = true;
+                }
+                Thread.Sleep(10);
+            }
+            if (logged) api.Logger.VerboseDebug("BlockTypes now all gathered");
+
+            GatherTypes_Async(entityVariants, entityTypes);
+        }
+
+
+        /// <summary>
+        /// Each thread attempts to resolve and parse the whole list of types, using the parseStarted field for load-sharing
+        /// </summary>
+        private void GatherTypes_Async(List<RegistryObjectType>[] resolvedTypeLists, Dictionary<AssetLocation, RegistryObjectType> baseTypes)
+        {
+            int i = 0;
+            foreach (RegistryObjectType val in baseTypes.Values)
+            {
+                if (Interlocked.CompareExchange(ref val.parseStarted, 1, 0) == 0)  // In each thread, only do work on RegistryObjectTypes which no other thread has yet worked on
+                {
+                    List<RegistryObjectType> resolvedTypes = new List<RegistryObjectType>();
+                    try
+                    {
+                        if (val.Enabled) GatherVariantsAndPopulate(val, resolvedTypes);
+                    }
+                    finally
+                    {
+                        resolvedTypeLists[i] = resolvedTypes;
+                    }
+                }
+                i++;
+            }
+        }
+
+
+        /// <summary>
+        /// This does the actual gathering and population, through GatherVariants calls - numerous calls if a base type has many variants
+        /// </summary>
+        /// <param name="baseType"></param>
+        /// <param name="typesResolved"></param>
+        void GatherVariantsAndPopulate(RegistryObjectType baseType, List<RegistryObjectType> typesResolved)
+        {
+            List<ResolvedVariant> variants = null;
+            if (baseType.VariantGroups != null && baseType.VariantGroups.Length != 0)
             {
                 try
                 {
-                    api.RegisterBlock(block);
+                    variants = GatherVariants(baseType.Code, baseType.VariantGroups, baseType.Code, baseType.AllowedVariants, baseType.SkipVariants);
                 }
                 catch (Exception e)
                 {
-                    api.Server.LogError("Failed registering block {0}: {1}", block.Code, e);
+                    api.Server.Logger.Error("Exception thrown while trying to gather all variants of the block/item/entity type with code {0}. May lead to the whole type being ignored. Exception: {1}", baseType.Code, e);
+                    return;
                 }
             }
-        }
 
-        void GatherBlocks(AssetLocation location, BlockType blockType, List<Block> blocks)
-        {
-            List<ResolvedVariant> variants;
-            try
-            {
-                variants = GatherVariants(blockType.Code, blockType.VariantGroups, location, blockType.AllowedVariants, blockType.SkipVariants);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to gather all variants of the block type with code {0}. Will ignore most itemtype completly. Exception: {1}", blockType.Code, e);
-                return;
-            }
+            var deserializer = JsonUtil.CreateSerializerForDomain(baseType.Code.Domain);
 
-
-            // Single block type
-            if (variants.Count == 0)
+            // Single variant
+            if (variants == null || variants.Count == 0)
             {
-                Block block = baseBlockFromBlockType(blockType, blockType.Code.Clone(), new OrderedDictionary<string, string>());
-                blocks.Add(block);
+                RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, baseType.Code.Clone(), baseType.jsonObject, deserializer, new OrderedDictionary<string, string>());
+                typesResolved.Add(resolvedType);
             }
             else
             {
+                // Multiple variants
+                int count = 1;
                 foreach (ResolvedVariant variant in variants)
                 {
-                    Block block = baseBlockFromBlockType(blockType, variant.Code, variant.CodeParts);
+                    JObject jobject = count++ == variants.Count ? baseType.jsonObject : baseType.jsonObject.DeepClone() as JObject;
+                    // This DeepClone() is expensive, can we find a better way one day?
 
-                    blocks.Add(block);
+                    RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, variant.Code, jobject, deserializer, variant.CodeParts);
+
+                    typesResolved.Add(resolvedType);
                 }
             }
 
-            blockType.jsonObject = null;
+            baseType.jsonObject = null;
         }
 
 
-        Block baseBlockFromBlockType(BlockType blockType, AssetLocation fullcode, OrderedDictionary<string, string> variant)
+        void LoadFromVariants(List<RegistryObjectType>[] variantLists, string typeForLog, Action<List<RegistryObjectType>> register)
         {
-            BlockType typedBlockType = new BlockType()
+            int count = 0;
+            for (int i = 0; i < variantLists.Length; i++)
             {
-                Code = blockType.Code,
-                VariantGroups = blockType.VariantGroups,
-                Variant = new OrderedDictionary<string, string>(variant),
-                Enabled = blockType.Enabled,
-                jsonObject = blockType.jsonObject.DeepClone() as JObject
-            };
-
-            try
-            {
-                solveByType(typedBlockType.jsonObject, fullcode.Path, variant);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to resolve *byType properties of typed block {0}. Will ignore most of the attributes. Exception thrown: {1}", typedBlockType.Code, e);
-            }
-
-            try
-            {
-                JsonUtil.PopulateObject(typedBlockType, typedBlockType.jsonObject.ToString(), fullcode.Domain);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to populate/load json data of the typed block {0}. Will ignore most of the attributes. Exception thrown: {1}", typedBlockType.Code, e);
-            }
-
-            typedBlockType.jsonObject = null;
-            Block block;
-
-            if (api.ClassRegistry.GetBlockClass(typedBlockType.Class) == null)
-            {
-                api.Server.Logger.Error("Block with code {0} has defined a block class {1}, no such class registered. Will ignore.", typedBlockType.Code, typedBlockType.Class);
-                block = new Block();
-            }
-            else
-            {
-                block = api.ClassRegistry.CreateBlock(typedBlockType.Class);
-            }
-
-
-            if (typedBlockType.EntityClass != null)
-            {
-                if (api.ClassRegistry.GetBlockEntity(typedBlockType.EntityClass) != null)
+                List<RegistryObjectType> variants = variantLists[i];
+                while (variants == null)
                 {
-                    block.EntityClass = typedBlockType.EntityClass;
-                }
-                else
-                {
-                    api.Server.Logger.Error("Block with code {0} has defined a block entity class {1}, no such class registered. Will ignore.", typedBlockType.Code, typedBlockType.EntityClass);
-                }
-            }
-
-
-            block.Code = fullcode;
-            block.VariantStrict = typedBlockType.Variant;
-            block.Variant = new RelaxedReadOnlyDictionary<string, string>(typedBlockType.Variant);
-            block.Class = typedBlockType.Class;
-            block.LiquidSelectable = typedBlockType.LiquidSelectable;
-            block.LiquidCode = typedBlockType.LiquidCode;
-            block.BlockEntityBehaviors = (BlockEntityBehaviorType[])typedBlockType.EntityBehaviors?.Clone() ?? new BlockEntityBehaviorType[0];
-            block.WalkSpeedMultiplier = typedBlockType.WalkspeedMultiplier;
-            block.DragMultiplier = typedBlockType.DragMultiplier;
-            block.Durability = typedBlockType.Durability;
-            block.Dimensions = typedBlockType.Dimensions?.Clone();
-            block.DamagedBy = (EnumItemDamageSource[])typedBlockType.DamagedBy?.Clone();
-            block.Tool = typedBlockType.Tool;
-            block.DrawType = typedBlockType.DrawType;
-            block.Replaceable = typedBlockType.Replaceable;
-            block.Fertility = typedBlockType.Fertility;
-            block.LightAbsorption = typedBlockType.LightAbsorption;
-            
-            block.LightTraversable = new bool[] { typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2, typedBlockType.LightAbsorption < 2 };
-            if (typedBlockType.LightTraversable != null)
-            {
-                foreach (var val in typedBlockType.LightTraversable)
-                {
-                    if (val.Key == "ns") block.LightTraversable[2] = val.Value;
-                    if (val.Key == "ud") block.LightTraversable[1] = val.Value;
-                    if (val.Key == "we") block.LightTraversable[0] = val.Value;
-                }
-            }
-            block.LightHsv = typedBlockType.LightHsv;
-            block.VertexFlags = typedBlockType.VertexFlags?.Clone() ?? new VertexFlags(0);
-            block.Frostable = typedBlockType.Frostable;
-            block.Resistance = typedBlockType.Resistance;
-            block.BlockMaterial = typedBlockType.BlockMaterial;
-            block.Shape = typedBlockType.Shape;
-            block.Lod0Shape = typedBlockType.Lod0Shape;
-            block.Lod2Shape = typedBlockType.Lod2Shape;
-            block.ShapeInventory = typedBlockType.ShapeInventory;
-            block.DoNotRenderAtLod2 = typedBlockType.DoNotRenderAtLod2;
-            block.TexturesInventory = typedBlockType.TexturesInventory;
-            block.Textures = typedBlockType.Textures;
-            block.ClimateColorMap = typedBlockType.ClimateColorMap;
-            block.SeasonColorMap = typedBlockType.SeasonColorMap;
-            block.Ambientocclusion = typedBlockType.Ambientocclusion;
-            block.CollisionBoxes = typedBlockType.CollisionBoxes;
-            block.SelectionBoxes = typedBlockType.SelectionBoxes;
-            block.ParticleCollisionBoxes = typedBlockType.ParticleCollisionBoxes;
-            block.MaterialDensity = typedBlockType.MaterialDensity;
-            block.GuiTransform = typedBlockType.GuiTransform;
-            block.FpHandTransform = typedBlockType.FpHandTransform;
-            block.TpHandTransform = typedBlockType.TpHandTransform;
-            block.TpOffHandTransform = typedBlockType.TpOffHandTransform;
-            block.GroundTransform = typedBlockType.GroundTransform;
-            block.RenderPass = typedBlockType.RenderPass;
-            block.ParticleProperties = typedBlockType.ParticleProperties;
-            block.Climbable = typedBlockType.Climbable;
-            block.RainPermeable = typedBlockType.RainPermeable;
-            block.FaceCullMode = typedBlockType.FaceCullMode;
-            block.Drops = typedBlockType.Drops;
-            block.MaxStackSize = typedBlockType.MaxStackSize;
-            block.MatterState = typedBlockType.MatterState;
-            if (typedBlockType.Attributes != null)
-            {
-                block.Attributes = typedBlockType.Attributes.Clone();
-            }
-            block.NutritionProps = typedBlockType.NutritionProps;
-            block.TransitionableProps = typedBlockType.TransitionableProps;
-            block.GrindingProps = typedBlockType.GrindingProps;
-            block.CrushingProps = typedBlockType.CrushingProps;
-            block.LiquidLevel = typedBlockType.LiquidLevel;
-            block.AttackPower = typedBlockType.AttackPower;
-            block.MiningSpeed = typedBlockType.MiningSpeed;
-            block.ToolTier = typedBlockType.ToolTier;
-            block.RequiredMiningTier = typedBlockType.RequiredMiningTier;
-            block.HeldSounds = typedBlockType.HeldSounds?.Clone();
-            block.AttackRange = typedBlockType.AttackRange;
-
-
-            if (typedBlockType.Sounds != null)
-            {
-                block.Sounds = typedBlockType.Sounds.Clone();
-            }
-            block.RandomDrawOffset = typedBlockType.RandomDrawOffset ? 1 : 0;
-            block.RandomizeRotations = typedBlockType.RandomizeRotations;
-            block.RandomizeAxes = typedBlockType.RandomizeAxes;
-            block.RandomSizeAdjust = typedBlockType.RandomSizeAdjust;
-            block.CombustibleProps = typedBlockType.CombustibleProps;
-            block.StorageFlags = (EnumItemStorageFlags)typedBlockType.StorageFlags;
-            block.RenderAlphaTest = typedBlockType.RenderAlphaTest;
-            block.HeldTpHitAnimation = typedBlockType.HeldTpHitAnimation;
-            block.HeldRightTpIdleAnimation = typedBlockType.HeldRightTpIdleAnimation;
-            block.HeldLeftTpIdleAnimation = typedBlockType.HeldLeftTpIdleAnimation;
-            block.HeldTpUseAnimation = typedBlockType.HeldTpUseAnimation;
-            block.CreativeInventoryStacks = typedBlockType.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])typedBlockType.CreativeInventoryStacks.Clone();
-            block.AllowSpawnCreatureGroups = (string[])typedBlockType.AllowSpawnCreatureGroups.Clone();
-
-            // BlockType net only sends the collisionboxes at an accuracy of 1/10000 so we have to make sure they are the same server and client side
-            if (block.CollisionBoxes != null)
-            {
-                for (int i = 0; i < block.CollisionBoxes.Length; i++)
-                {
-                    block.CollisionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            if (block.SelectionBoxes != null)
-            {
-                for (int i = 0; i < block.SelectionBoxes.Length; i++)
-                {
-                    block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            if (block.ParticleCollisionBoxes != null)
-            {
-                for (int i = 0; i < block.ParticleCollisionBoxes.Length; i++)
-                {
-                    block.ParticleCollisionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            typedBlockType.InitBlock(api.ClassRegistry, api.World.Logger, block, variant);
-
-            return block;
-        }
-
-
-
-        void solveByType(JToken json, string codePath, OrderedDictionary<string, string> searchReplace)
-        {
-            List<string> propertiesToRemove = new List<string>();
-            Dictionary<string, JToken> propertiesToAdd = new Dictionary<string, JToken>();
-
-            if (json is JObject)
-            {
-                var jsonObj = json as JObject;
-
-                foreach (var entry in jsonObj)
-                {
-                    if (entry.Key.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var jobj = entry.Value as JObject;
-                        foreach (var byTypeProperty in jobj)
-                        {
-                            if (WildcardUtil.Match(byTypeProperty.Key, codePath))
-                            {
-                                JToken typedToken = byTypeProperty.Value;
-                                solveByType(typedToken, codePath, searchReplace);
-                                propertiesToAdd.Add(entry.Key.Substring(0, entry.Key.Length - "byType".Length), typedToken);
-                                break;
-                            }
-                        }
-                        propertiesToRemove.Add(entry.Key);
-                    }
+                    Thread.Sleep(10);   // If necessary, wait for all threads to finish
+                    variants = variantLists[i];
+                    if (variants != null && variants.Count > 0) api.Logger.VerboseDebug("Took time to parse " + variants.Count + " variants of " + variants[0].Code.FirstCodePart());
                 }
 
-                
+                count += variants.Count;
 
-                foreach (var property in propertiesToRemove)
-                {
-                    jsonObj.Remove(property);
-                }
+                register.Invoke(variants);
+            }
 
-                foreach (var property in propertiesToAdd)
-                {
-                    if (jsonObj[property.Key] is JObject)
-                    {
-                        (jsonObj[property.Key] as JObject).Merge(property.Value);
-                    } else
-                    {
-                        jsonObj[property.Key] = property.Value;
-                    }
-                }
-
-                foreach (var entry in jsonObj)
-                {
-                    solveByType(entry.Value, codePath, searchReplace);
-                }
-            }
-            else if (json.Type == JTokenType.String)
-            {
-                string value = (string) (json as JValue).Value;
-                if (value.Contains("{"))
-                {
-                    (json as JValue).Value = RegistryObject.FillPlaceHolder(value, searchReplace);
-                }
-            }
-            else if (json is JArray)
-            {
-                foreach (var child in (json as JArray))
-                {
-                    solveByType(child, codePath, searchReplace);
-                }
-            }
+            api.Server.LogNotification("Loaded " + count + " unique " + typeForLog + "s");
         }
         #endregion
 
@@ -770,8 +421,6 @@ namespace Vintagestory.ServerMods.NoObf
         List<ResolvedVariant> GatherVariants(AssetLocation baseCode, RegistryObjectVariantGroup[] variantgroups, AssetLocation location, AssetLocation[] allowedVariants, AssetLocation[] skipVariants)
         {
             List<ResolvedVariant> variantsFinal = new List<ResolvedVariant>();
-
-            if (variantgroups == null || variantgroups.Length == 0) return variantsFinal;
 
             OrderedDictionary<string, VariantEntry[]> variantsMul = new OrderedDictionary<string, VariantEntry[]>();
 
@@ -933,23 +582,24 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         for (int k = 0; k < stateList.Count; k++)
                         {
-                            if (cvg.Code != stateList[k].Code) continue;
-                            
                             VariantEntry old = stateList[k];
 
+                            if (cvg.Code != old.Code) continue;
+                            
                             stateList.RemoveAt(k);
 
                             for (int j = 0; j < cvg.States.Length; j++)
                             {
-                                List<string> codes = old.Codes == null ? new List<string>() { old.Code } : old.Codes;
-                                List<string> types = old.Types == null ? new List<string>() { variantGroup.Code } : old.Types;
+                                List<string> codes = old.Codes ?? new List<string>() { old.Code };
+                                List<string> types = old.Types ?? new List<string>() { variantGroup.Code };
 
-                                codes.Add(cvg.States[j]);
+                                string state = cvg.States[j];
+                                codes.Add(state);
                                 types.Add(cvg.Code);
 
                                 stateList.Insert(k, new VariantEntry()
                                 {
-                                    Code = cvg.States[j].Length > 0 ? old.Code + "-" + cvg.States[j] : old.Code,
+                                    Code = state.Length == 0 ? old.Code : old.Code + "-" + state,
                                     Codes = codes,
                                     Types = types
                                 });
@@ -1046,15 +696,16 @@ namespace Vintagestory.ServerMods.NoObf
 
             for (int i = 0; i < resultingQuantiy; i++)
             {
-                int div = 1;
+                int index = i;
 
                 for (int j = 0; j < variants.Length; j++)
                 {
-                    VariantEntry variant = variants[j][(i / div) % variants[j].Length];
+                    int variantLength = variants[j].Length;
+                    VariantEntry variant = variants[j][index % variantLength];
 
                     multipliedProperties[i, j] = new VariantEntry() { Code = variant.Code, Codes = variant.Codes, Types = variant.Types };
 
-                    div *= variants[j].Length;
+                    index /= variantLength;
                 }
             }
 

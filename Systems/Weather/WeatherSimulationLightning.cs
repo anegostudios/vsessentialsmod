@@ -1,66 +1,121 @@
 ﻿using System;
+using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
 
-    public class WeatherSimulationLightning
+    public class WeatherSimulationLightning : IRenderer
     {
-        WeatherSystemClient weatherSys;
+        WeatherSystemBase weatherSys;
+        WeatherSystemClient weatherSysc;
         ICoreClientAPI capi;
 
-        float lightningTime;
-        float lightningIntensity;
+        IShaderProgram prog;
+
+        public float lightningTime;
+        public float lightningIntensity;
         public AmbientModifier LightningAmbient;
         public AmbientModifier actualSunGlowAmb = new AmbientModifier().EnsurePopulated();
         float nearLightningCoolDown = 0f;
 
+        public double RenderOrder => 0.35;
+        public int RenderRange => 9999;
 
-        public WeatherSimulationLightning(ICoreClientAPI capi, WeatherSystemClient weatherSys)
+        public List<LightningFlash> lightningFlashes = new List<LightningFlash>();
+
+
+
+        public WeatherSimulationLightning(ICoreAPI api, WeatherSystemBase weatherSys)
         {
             this.weatherSys = weatherSys;
-            this.capi = capi;
-            LightningAmbient = new AmbientModifier().EnsurePopulated();
+            weatherSysc = weatherSys as WeatherSystemClient;
+            this.capi = api as ICoreClientAPI;
 
-            capi.Ambient.CurrentModifiers["lightningambient"] = LightningAmbient;
+            if (api.Side == EnumAppSide.Client)
+            {
+                LightningAmbient = new AmbientModifier().EnsurePopulated();
+
+                capi.Ambient.CurrentModifiers["lightningambient"] = LightningAmbient;
+
+                capi.Event.ReloadShader += LoadShader;
+                LoadShader();
+
+                capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "lightning");
+
+                capi.RegisterCommand("lntest", "", "", onCmdLineTest);
+            } else
+            {
+                api.Event.RegisterGameTickListener(OnServerTick, 40, 3);
+
+                (api as ICoreServerAPI).RegisterCommand("lntest", "", "", onCmdLineTestServer);
+            }
         }
 
-        public void ClientTick(float dt) {
+        private void onCmdLineTestServer(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            if (args.PeekWord() == "clear")
+            {
+                foreach (var val in lightningFlashes) val.Dispose();
+                lightningFlashes.Clear();
+                return;
+            }
 
-            Random rnd = capi.World.Rand;
-            WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
+            var pos = player.Entity.Pos.AheadCopy((int)args.PopInt(10)).XYZ;
+            weatherSys.SpawnLightningFlash(pos);
+        }
 
-            if (weatherSys.clientClimateCond.Temperature >= weatherData.lightningMinTemp)
+        private void onCmdLineTest(int groupId, CmdArgs args)
+        {
+            if (args.PeekWord() == "clear")
+            {
+                foreach (var val in lightningFlashes) val.Dispose();
+                lightningFlashes.Clear();
+                return;
+            }
+
+            var pos = capi.World.Player.Entity.Pos.AheadCopy((int)args.PopInt(10)).XYZ;
+            genLightningFlash(pos);
+        }
+
+        public void ClientTick(float dt)
+        {
+            WeatherDataSnapshot weatherData = weatherSysc.BlendedWeatherData;
+
+            if (weatherSysc.clientClimateCond.Temperature >= weatherData.lightningMinTemp)
             {
                 float deepnessSub = GameMath.Clamp(1 - (float)capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel, 0, 1);
 
-                double rndval = capi.World.Rand.NextDouble();
-                rndval -= weatherData.distantLightningRate * weatherSys.clientClimateCond.RainCloudOverlay;
+                var rand = capi.World.Rand;
+
+                double rndval = rand.NextDouble();
+                rndval -= weatherData.distantLightningRate * weatherSysc.clientClimateCond.RainCloudOverlay;
                 if (rndval <= 0)
                 {
-                    lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
-                    lightningIntensity = 0.25f + (float)rnd.NextDouble();
+                    lightningTime = 0.07f + (float)rand.NextDouble() * 0.17f;
+                    lightningIntensity = 0.25f + (float)rand.NextDouble();
 
-                    float pitch = GameMath.Clamp((float)rnd.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2 - deepnessSub / 2, 0.6f, 1.15f);
+                    float pitch = GameMath.Clamp((float)rand.NextDouble() * 0.3f + lightningTime / 2 + lightningIntensity / 2 - deepnessSub / 2, 0.6f, 1.15f);
                     float volume = GameMath.Clamp(Math.Min(1, 0.25f + lightningTime + lightningIntensity / 2) - 2f * deepnessSub, 0, 1);
-                    
+
                     capi.World.PlaySoundAt(new AssetLocation("sounds/weather/lightning-distant.ogg"), 0, 0, 0, null, EnumSoundType.Weather, pitch, 32, volume);
                 }
                 else if (nearLightningCoolDown <= 0)
                 {
-                    rndval -= weatherData.nearLightningRate * weatherSys.clientClimateCond.RainCloudOverlay;
+                    rndval -= weatherData.nearLightningRate * weatherSysc.clientClimateCond.RainCloudOverlay;
                     if (rndval <= 0)
                     {
-                        lightningTime = 0.07f + (float)rnd.NextDouble() * 0.17f;
-                        lightningIntensity = 1 + (float)rnd.NextDouble() * 0.9f;
-                        
-                        float pitch = GameMath.Clamp(0.75f + (float)rnd.NextDouble() * 0.3f - deepnessSub/2, 0.5f, 1.2f);
-                        float volume = GameMath.Clamp(0.5f + (float)rnd.NextDouble() * 0.5f - 2f * deepnessSub, 0, 1);
+                        lightningTime = 0.07f + (float)rand.NextDouble() * 0.17f;
+                        lightningIntensity = 1 + (float)rand.NextDouble() * 0.9f;
+
+                        float pitch = GameMath.Clamp(0.75f + (float)rand.NextDouble() * 0.3f - deepnessSub / 2, 0.5f, 1.2f);
+                        float volume = GameMath.Clamp(0.5f + (float)rand.NextDouble() * 0.5f - 2f * deepnessSub, 0, 1);
                         AssetLocation loc;
 
-                        if (rnd.NextDouble() > 0.25)
+                        if (rand.NextDouble() > 0.25)
                         {
                             loc = new AssetLocation("sounds/weather/lightning-near.ogg");
                             nearLightningCoolDown = 5;
@@ -71,7 +126,7 @@ namespace Vintagestory.GameContent
                             nearLightningCoolDown = 10;
                         }
 
-                        
+
                         capi.World.PlaySoundAt(loc, 0, 0, 0, null, EnumSoundType.Weather, pitch, 32, volume);
                     }
                 }
@@ -80,6 +135,29 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
+            if (stage == EnumRenderStage.Opaque)
+            {
+                prog.Use();
+                prog.UniformMatrix("projection", capi.Render.CurrentProjectionMatrix);
+                prog.UniformMatrix("view", capi.Render.CameraMatrixOriginf);
+
+                for (int i = 0; i < lightningFlashes.Count; i++)
+                {
+                    var lflash = lightningFlashes[i];
+                    lflash.Render(dt);
+
+                    if (!lflash.Alive)
+                    {
+                        lflash.Dispose();
+                        lightningFlashes.RemoveAt(i);
+                        i--;
+                    }
+                }
+
+                prog.Stop();
+                return;
+            }
+
             if (stage == EnumRenderStage.Done)
             {
                 AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
@@ -99,7 +177,7 @@ namespace Vintagestory.GameContent
             {
                 float mul = Math.Min(10 * lightningIntensity * lightningTime, 1.5f);
 
-                WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
+                WeatherDataSnapshot weatherData = weatherSysc.BlendedWeatherData;
 
                 LightningAmbient.CloudBrightness.Value = Math.Max(weatherData.Ambient.SceneBrightness.Value, mul);
                 LightningAmbient.FogBrightness.Value = Math.Max(weatherData.Ambient.FogBrightness.Value, mul);
@@ -137,9 +215,54 @@ namespace Vintagestory.GameContent
                     LightningAmbient.SceneBrightness.Weight = 0;
                 }
             }
+
+
+
+        }
+
+        public void OnServerTick(float dt)
+        {
+            for (int i = 0; i < lightningFlashes.Count; i++)
+            {
+                var lflash = lightningFlashes[i];
+                lflash.GameTick(dt);
+
+                if (!lflash.Alive)
+                {
+                    lightningFlashes.RemoveAt(i);
+                    i--;
+                }
+            }
+        }
+
+        public bool LoadShader()
+        {
+            prog = capi.Shader.NewShaderProgram();
+
+            prog.VertexShader = capi.Shader.NewShader(EnumShaderType.VertexShader);
+            prog.FragmentShader = capi.Shader.NewShader(EnumShaderType.FragmentShader);
+
+            capi.Shader.RegisterFileShaderProgram("lines", prog);
+
+            return prog.Compile();
         }
 
 
+
+        
+
+        public void genLightningFlash(Vec3d pos, int? seed = null)
+        {
+            var lflash = new LightningFlash(weatherSys, capi, seed, pos);
+            lflash.ClientInit();
+            lightningFlashes.Add(lflash);
+        }
+
+
+        public void Dispose() {
+            foreach (var lflash in lightningFlashes) lflash.Dispose();
+        }
     }
+
 
 }

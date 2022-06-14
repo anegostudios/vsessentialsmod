@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -205,8 +206,8 @@ namespace Vintagestory.GameContent
         {
             if (capi != null && capi.World.Config.GetBool("allowMap", true))
             {
-                capi.Input.RegisterHotKey("worldmaphud", "World Map HUD (Small overlay)", GlKeys.F6, HotkeyType.GUIOrOtherControls);
-                capi.Input.RegisterHotKey("worldmapdialog", "World Map Dialog", GlKeys.M, HotkeyType.GUIOrOtherControls);
+                capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
+                capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
                 capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
                 capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
                 capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);

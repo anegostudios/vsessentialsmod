@@ -9,7 +9,6 @@ namespace Vintagestory.Essentials
     {
         float minTurnAnglePerSec;
         float maxTurnAnglePerSec;
-        //float curTurnRadPerSec;
         Vec3f targetVec = new Vec3f();
 
         public StraightLineTraverser(EntityAgent entity) : base(entity)
@@ -30,7 +29,7 @@ namespace Vintagestory.Essentials
             entity.Controls.Forward = true;
             entity.ServerControls.Forward = true;
             curTurnRadPerSec = minTurnAnglePerSec + (float)entity.World.Rand.NextDouble() * (maxTurnAnglePerSec - minTurnAnglePerSec);
-            curTurnRadPerSec *= GameMath.DEG2RAD * 50 * movingSpeed;
+            curTurnRadPerSec *= GameMath.DEG2RAD * 50;
 
             stuckCounter = 0;
 
@@ -94,10 +93,17 @@ namespace Vintagestory.Essentials
                 desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
             }
 
+            float nowMoveSpeed = movingSpeed;
+
+            if (sqDistToTarget < 1)
+            {
+                nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max((float)sqDistToTarget, 0.2f));
+            }
 
 
             float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
-            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
+            float turnSpeed = curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier * movingSpeed;
+            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
             entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
 
             
@@ -105,7 +111,7 @@ namespace Vintagestory.Essentials
             double cosYaw = Math.Cos(entity.ServerPos.Yaw);
             double sinYaw = Math.Sin(entity.ServerPos.Yaw);
             controls.WalkVector.Set(sinYaw, GameMath.Clamp(targetVec.Y, -1, 1), cosYaw);
-            controls.WalkVector.Mul(movingSpeed * GlobalConstants.OverallSpeedMultiplier);
+            controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier);
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
             if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingOnFace != null && entity.Alive)
@@ -130,8 +136,8 @@ namespace Vintagestory.Essentials
                 controls.FlyVector.Set(controls.WalkVector);
 
                 Vec3d pos = entity.Pos.XYZ;
-                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 

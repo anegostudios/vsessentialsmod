@@ -101,8 +101,13 @@ namespace Vintagestory.GameContent
 
             if (shape == null)
             {
-                IAsset asset = api.Assets.TryGet(block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json"));
-                shape = asset.ToObject<Shape>();
+                AssetLocation shapePath = block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json");
+                shape = Shape.TryGet(api, shapePath);
+                if (shape == null)
+                {
+                    api.World.Logger.Error("Shape for block {0} not found or errored, was supposed to be at {1}. Block animations not loaded!", this.be.Block.Code, shapePath);
+                    return;
+                }
             }
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);
@@ -127,8 +132,13 @@ namespace Vintagestory.GameContent
 
             if (shape == null)
             {
-                IAsset asset = api.Assets.TryGet(block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json"));
-                shape = asset.ToObject<Shape>();
+                AssetLocation shapePath = block.Shape.Base.Clone().WithPathPrefixOnce("shapes/").WithPathAppendixOnce(".json");
+                shape = Shape.TryGet(api, shapePath);
+                if (shape == null)
+                {
+                    api.World.Logger.Error("Shape for block {0} not found or errored, was supposed to be at {1}. Block animations not loaded!", this.be.Block.Code, shapePath);
+                    return new MeshData();
+                }
             }
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);

@@ -35,7 +35,7 @@ namespace Vintagestory.GameContent
 
         public DayTimeFrame[] duringDayTimeFrames;
 
-        string[] stopOnNearbyEntityCodesExact = new string[] { "player" };
+        string[] stopOnNearbyEntityCodesExact = null;
         string[] stopOnNearbyEntityCodesBeginsWith = new string[0];
         float stopRange=0;
         bool stopOnHurt = false;
@@ -129,7 +129,7 @@ namespace Vintagestory.GameContent
                 }
 
                 Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z);
-                // Only with a solid block below
+                // Only with a solid block below (and here not lake ice: entities should not idle on lake ice!)
                 if (!belowBlock.SideSolid[API.MathTools.BlockFacing.UP.Index]) return false;
 
                 if (onBlockBelowCode == null) return true;
@@ -157,7 +157,7 @@ namespace Vintagestory.GameContent
 
                 // The entityInRange test is expensive. So we only test for it every 1 second
                 // which should have zero impact on the behavior. It'll merely execute this task 1 second later
-                if (ellapsedMs - lastEntityInRangeTestTotalMs > 1500)
+                if (ellapsedMs - lastEntityInRangeTestTotalMs > 1500 && stopOnNearbyEntityCodesExact != null)
                 {
                     entityWasInRange = entityInRange();
                     lastEntityInRangeTestTotalMs = ellapsedMs;

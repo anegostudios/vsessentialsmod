@@ -12,9 +12,8 @@ namespace Vintagestory.GameContent
         double waterDragValue = GlobalConstants.WaterDrag;
         double airDragValue = GlobalConstants.AirDragAlways;
 
-        internal override void Initialize(EntityProperties properties)
+        internal override void Initialize(JsonObject physics)
         {
-            JsonObject physics = properties?.Attributes?["physics"];
             if (physics != null)
             {
                 waterDragValue = 1 - (1 - GlobalConstants.WaterDrag) * (float)physics["waterDragFactor"].AsDouble(1);

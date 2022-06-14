@@ -91,6 +91,7 @@
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Block\BlockMultiblock.cs" />
+    <Compile Include="Block\BlockForLiquidsLayer.cs" />
     <Compile Include="Core.cs" />
     <Compile Include="Entity\AI\Goal-Action\Actions\AiActionGoto.cs" />
     <Compile Include="Entity\AI\Goal-Action\AiActionBase.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
     <Compile Include="Entity\Pathfinding\Astar\PathNode.cs" />
     <Compile Include="Entity\Pathfinding\PathFindDebug.cs" />
+    <Compile Include="Entity\Pathfinding\PathfindingAsync.cs" />
     <Compile Include="Entity\Pathfinding\PathTraverserBase.cs" />
     <Compile Include="Entity\Pathfinding\Astar\WaypointsTraverser.cs" />
     <Compile Include="Entity\Pathfinding\StraightLineTraverser.cs" />
@@ -174,6 +176,7 @@
     <Compile Include="Systems\Cloth\ClothPoint.cs" />
     <Compile Include="Systems\Cloth\ClothSystem.cs" />
     <Compile Include="Systems\Cloth\ClothManager.cs" />
+    <Compile Include="Systems\Weather\LightningFlash.cs" />
     <Compile Include="Systems\Weather\Map\MapLayerWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Map\NoiseWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Model\Impl\WeatherEvent.cs" />

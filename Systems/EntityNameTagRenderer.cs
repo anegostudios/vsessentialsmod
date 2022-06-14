@@ -25,10 +25,10 @@ namespace Vintagestory.GameContent
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
                     name,
                     CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble),
-                    new TextBackground() { 
-                        FillColor = GuiStyle.DialogLightBgColor, 
-                        Padding = 3, 
-                        Radius = GuiStyle.ElementBGRadius, 
+                    new TextBackground() {
+                        FillColor = GuiStyle.DialogLightBgColor,
+                        Padding = 3,
+                        Radius = GuiStyle.ElementBGRadius,
                         Shade = true,
                         BorderColor = GuiStyle.DialogBorderColor,
                         BorderWidth = 3,
@@ -55,11 +55,16 @@ namespace Vintagestory.GameContent
         {
             EntityPlayer eplr = entity as EntityPlayer;
 
-            if (eplr?.Player != null && eplr.Player.Entitlements.Count > 0)
-            {
-                Entitlement ent = eplr.Player.Entitlements[0];
-                double[] color = null;
+            var entitlements = eplr?.Player.Entitlements;
 
+            //entitlements = new List<Entitlement>();
+            //entitlements.Add(new Entitlement() { Code = "vsteam", Name = "vsteam" });
+
+            if (entitlements?.Count > 0)
+            {
+                Entitlement ent = entitlements[0];
+                double[] color = null;
+                
                 if (GlobalConstants.playerColorByEntitlement.TryGetValue(ent.Code, out color))
                 {
                     TextBackground bg;

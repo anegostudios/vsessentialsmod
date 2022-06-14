@@ -52,6 +52,8 @@ namespace Vintagestory.GameContent
         float extraTargetDist;
         long lastPOISearchTotalMs;
 
+        public string[] entityDiet;
+
         ICoreAPI api;
 
         public AiTaskSeekFoodAndEat(EntityAgent entity) : base(entity)
@@ -137,6 +139,9 @@ namespace Vintagestory.GameContent
                     AnimationSpeed = taskConfig["eatAnimationSpeedLooseItems"].AsFloat(1f)
                 }.Init();
             }
+
+            // Fetch the entity's diet from its JSON durin initialize as this is a potentially slow operation (for most entities diet will be null)
+            entityDiet = entity.Properties.Attributes?["blockDiet"]?.AsArray<string>();
         }
 
         public override bool ShouldExecute()
@@ -188,13 +193,13 @@ namespace Vintagestory.GameContent
             });
 
             if (targetPoi == null)
-            {   
+            {
                 targetPoi = porregistry.GetNearestPoi(entity.ServerPos.XYZ, 48, (poi) =>
                 {
                     if (poi.Type != "food") return false;
                     IAnimalFoodSource foodPoi;
 
-                    if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity) == true)
+                    if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity, entityDiet) == true)
                     {
                         FailedAttempt attempt;
                         failedSeekTargets.TryGetValue(foodPoi, out attempt);
@@ -225,11 +230,11 @@ namespace Vintagestory.GameContent
         }
 
 
-
         public float MinDistanceToTarget()
         {
             return Math.Max(extraTargetDist + 0.6f, entity.SelectionBox.XSize / 2 + 0.05f);
         }
+
 
         public override void StartExecute()
         {
@@ -238,8 +243,13 @@ namespace Vintagestory.GameContent
             nowStuck = false;
             soundPlayed = false;
             eatTimeNow = 0;
-            pathTraverser.NavigateTo(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, false, 1000, true);
+            pathTraverser.NavigateTo_Async(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, null, 1000, 1);
             eatAnimStarted = false;
+        }
+
+        public override bool CanContinueExecute()
+        {
+            return pathTraverser.Ready;
         }
 
         public override bool ContinueExecute(float dt)
@@ -269,7 +279,7 @@ namespace Vintagestory.GameContent
                     return false;
                 }
 
-                if (targetPoi.IsSuitableFor(entity) != true) return false;
+                if (targetPoi.IsSuitableFor(entity, entityDiet) != true) return false;
                 
                 if (eatAnimMeta != null && !eatAnimStarted)
                 {
@@ -318,7 +328,7 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500, true))
+                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500, 1))
                     {
                         return false;
                     }
@@ -431,7 +441,7 @@ namespace Vintagestory.GameContent
             return 0;
         }
 
-        public bool IsSuitableFor(Entity entity)
+        public bool IsSuitableFor(Entity entity, string[] diet)
         {
             return false;
         }
@@ -460,7 +470,7 @@ namespace Vintagestory.GameContent
             return 1f;
         }
 
-        public bool IsSuitableFor(Entity entity)
+        public bool IsSuitableFor(Entity entity, string[] diet)
         {
             return true;
         }

@@ -142,7 +142,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (Texture != null)
             {
-                if (Textures == null) Textures = new TextureDictionary();
+                if (Textures == null) Textures = new Dictionary<string, CompositeTexture>(1);
                 Textures["all"] = Texture;
             }
 

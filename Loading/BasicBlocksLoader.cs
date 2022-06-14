@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 
 namespace Vintagestory.ServerMods
@@ -10,10 +11,6 @@ namespace Vintagestory.ServerMods
     public class ModBasicBlocksLoader : ModSystem
     {
         ICoreServerAPI api;
-
-        //SoundSet solidSounds;
-        //SoundSet snowSounds;
-        BlockSounds noSound;
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -26,19 +23,16 @@ namespace Vintagestory.ServerMods
         }
 
 
-        public override void StartServerSide(ICoreServerAPI manager)
+        public override void Start(ICoreAPI manager)
         {
-            api = manager;
-
-            noSound = new BlockSounds();
+            if (!(manager is ICoreServerAPI sapi)) return;
+            api = sapi;
 
             #region Block types
             Block block = new Block()
             {
                 Code = new AssetLocation("mantle"),
-                Textures = new Dictionary<string, CompositeTexture> {
-                    { "all", new CompositeTexture(new AssetLocation("block/mantle")) },
-                },
+                Textures = new FakeDictionary<string, CompositeTexture>("all", new CompositeTexture(new AssetLocation("block/mantle"))),
                 DrawType = EnumDrawType.Cube,
                 MatterState = EnumMatterState.Solid,
                 BlockMaterial = EnumBlockMaterial.Mantle,

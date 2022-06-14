@@ -67,9 +67,9 @@ namespace Vintagestory.GameContent
                     return 0.5f;
                 }
 
-                string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
+                string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");
 
-                if (deathByEntityLangCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer"))
+                if (deathByEntityCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer"))
                 {
                     return 0.4f;
                 }
@@ -108,17 +108,6 @@ namespace Vintagestory.GameContent
                 entity.WatchedAttributes.RegisterModifiedListener("harvestableInv", onDropsModified);
             }
 
-            inv = new InventoryGeneric(4, "harvestableContents-" + entity.EntityId, entity.Api);
-            TreeAttribute tree = entity.WatchedAttributes["harvestableInv"] as TreeAttribute;
-            if (tree != null) inv.FromTreeAttributes(tree);
-            inv.PutLocked = true;
-            
-            if (entity.World.Side == EnumAppSide.Server)
-            {
-                inv.SlotModified += Inv_SlotModified;
-                inv.OnInventoryClosed += Inv_OnInventoryClosed;
-            }
-
             harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
         }
 
@@ -133,61 +122,64 @@ namespace Vintagestory.GameContent
 
             if (accum > 1.5f)
             {
+                accum = 0;
                 if (!harshWinters)
                 {
                     AnimalWeight = 1;
                     return;
                 }
 
-                accum = 0;
                 double totalHours = entity.World.Calendar.TotalHours;
                 double startHours = LastWeightUpdateTotalHours;
-                double lastEatenTotalHours = entity.WatchedAttributes.GetDouble("lastMealEatenTotalHours", -9999);
-
-                double hperd = entity.World.Calendar.HoursPerDay;
-
-                double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * hperd;
-                double oneweekHours = 7 * entity.World.Calendar.HoursPerDay;
+                double hoursPerDay = entity.World.Calendar.HoursPerDay;
 
                 // Don't simulate longer than a month per tick
-                totalHours = Math.Min(totalHours, startHours + hperd * entity.World.Calendar.DaysPerMonth);
-                BlockPos pos = entity.Pos.AsBlockPos;
+                totalHours = Math.Min(totalHours, startHours + hoursPerDay * entity.World.Calendar.DaysPerMonth);
 
-                float weight = AnimalWeight;
-                float step = 3;
-
-                ClimateCondition baseClimate = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.WorldGenValues);
-                if (baseClimate == null)
+                if (startHours < totalHours - 1)
                 {
-                    base.OnGameTick(deltaTime);
-                    return;
-                }
-                float baseTemperature = baseClimate.Temperature;
+                    double lastEatenTotalHours = entity.WatchedAttributes.GetDouble("lastMealEatenTotalHours", -9999);
+                    double fourmonthsHours = 4 * entity.World.Calendar.DaysPerMonth * hoursPerDay;
+                    double oneweekHours = 7 * hoursPerDay;
+                    BlockPos pos = entity.Pos.AsBlockPos;
+                    float weight = AnimalWeight;
 
-                while (startHours < totalHours - 1)
-                {
-                    baseClimate.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
-                    ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hperd);
+                    float step = 3;
 
-                    // no need to simulate every single hour
-                    startHours += step;
-
-                    double mealHourDiff = startHours - lastEatenTotalHours;
-
-                    bool ateSomeTimeAgo = mealHourDiff < fourmonthsHours;
-                    bool ateRecently = mealHourDiff < oneweekHours;
-
-                    if (conds.Temperature <= 0 && !ateSomeTimeAgo)
+                    ClimateCondition baseClimate = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.WorldGenValues);
+                    if (baseClimate == null)
                     {
-                        // Loose 0.1% of weight each hour = 2.4% per day
-                        weight = Math.Max(0.5f, weight - step * 0.001f);
-                    } else
-                    {
-                        weight = Math.Min(1f, weight + step * (0.001f + (ateRecently ? 0.05f : 0)));
+                        base.OnGameTick(deltaTime);
+                        return;
                     }
+                    float baseTemperature = baseClimate.Temperature;
+
+                    do
+                    {
+                        baseClimate.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
+                        ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hoursPerDay);
+
+                        // no need to simulate every single hour
+                        startHours += step;
+
+                        double mealHourDiff = startHours - lastEatenTotalHours;
+
+                        bool ateSomeTimeAgo = mealHourDiff < fourmonthsHours;
+                        bool ateRecently = mealHourDiff < oneweekHours;
+
+                        if (conds.Temperature <= 0 && !ateSomeTimeAgo)
+                        {
+                            // Loose 0.1% of weight each hour = 2.4% per day
+                            weight = Math.Max(0.5f, weight - step * 0.001f);
+                        }
+                        else
+                        {
+                            weight = Math.Min(1f, weight + step * (0.001f + (ateRecently ? 0.05f : 0)));
+                        }
+                    } while (startHours < totalHours - 1);
+                    AnimalWeight = weight;
                 }
 
-                AnimalWeight = weight;
                 LastWeightUpdateTotalHours = startHours;
             }
 
@@ -225,6 +217,17 @@ namespace Vintagestory.GameContent
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
+            inv = new InventoryGeneric(typeAttributes["quantitySlots"].AsInt(4), "harvestableContents-" + entity.EntityId, entity.Api);
+            TreeAttribute tree = entity.WatchedAttributes["harvestableInv"] as TreeAttribute;
+            if (tree != null) inv.FromTreeAttributes(tree);
+            inv.PutLocked = true;
+
+            if (entity.World.Side == EnumAppSide.Server)
+            {
+                inv.SlotModified += Inv_SlotModified;
+                inv.OnInventoryClosed += Inv_OnInventoryClosed;
+            }
+
             base.Initialize(properties, typeAttributes);
 
             if (entity.World.Side == EnumAppSide.Server)
@@ -312,7 +315,7 @@ namespace Vintagestory.GameContent
                 BlockDropItemStack dstack = jsonDrops[i];
                 if (dstack.Tool != null && (byPlayer == null || dstack.Tool != byPlayer.InventoryManager.ActiveTool)) continue;
 
-                dstack.Resolve(entity.World, "BehaviorHarvestable");
+                dstack.Resolve(entity.World, "BehaviorHarvestable ", entity.Code);
 
                 float extraMul = 1f;
                 if (dstack.DropModbyStat != null)
@@ -380,7 +383,7 @@ namespace Vintagestory.GameContent
                     {
                         ActionLangCode = "blockhelp-creature-harvest",
                         MouseButton = EnumMouseButton.Right,
-                        HotKeyCode = "sneak",
+                        HotKeyCode = "shift",
                         Itemstacks = knifeStacklist.ToArray()
                     }
                 };
@@ -399,16 +402,19 @@ namespace Vintagestory.GameContent
                     infotext.AppendLine(Lang.Get("Looks crushed. Won't be able to harvest as much from this carcass."));
                 }
                 
-                string deathByEntityLangCode = entity.WatchedAttributes.GetString("deathByEntity");
+                string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");
 
-                if (deathByEntityLangCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer")) {
-                    if (deathByEntityLangCode.Contains("wolf"))
+                if (deathByEntityCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer")) {
+
+                    string code = "deadcreature-killed";
+
+                    var props = entity.World.GetEntityType(new AssetLocation(deathByEntityCode));
+                    if (props != null && props.Attributes?["killedByInfoText"].Exists == true)
                     {
-                        infotext.AppendLine(Lang.Get("deadcreature-eaten-wolf"));
-                    } else
-                    {
-                        infotext.AppendLine(Lang.Get("deadcreature-eaten"));
+                        code = props.Attributes["killedByInfoText"].AsString();
                     }
+
+                    infotext.AppendLine(Lang.Get(code));
                 }
             }
 

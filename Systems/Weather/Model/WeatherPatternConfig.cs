@@ -26,8 +26,9 @@ namespace Vintagestory.GameContent
     public class LightningConfig
     {
         public float MinTemperature;
-        public float NearRate;
-        public float DistantRate;
+        public float NearThunderRate;
+        public float DistantThunderRate;
+        public float LightningRate;
         public bool MulWithRainCloudness;
     }
 

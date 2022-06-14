@@ -11,8 +11,21 @@ using Vintagestory.API.Util;
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class LightningFlashPacket
+    {
+        public Vec3d Pos;
+        public int Seed;
+    }
+
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class WeatherPatternAssetsPacket {
         public string Data;
+    }
+
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class WeatherCloudYposPacket
+    {
+        public float CloudYRel;
     }
 
     public class WeatherPatternAssets

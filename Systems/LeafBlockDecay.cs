@@ -130,10 +130,12 @@ namespace Vintagestory.GameContent
 
         private void onSaveGameLoaded()
         {
+            sapi.Logger.Debug("Loading leaf block decay system");
             checkDecayQueue = deserializeQueue("checkDecayQueue");
             performDecayQueue = deserializeQueue("performDecayQueue");
             checkDecayThread = new CheckDecayThread(sapi);
             checkDecayThread.Start(checkDecayQueue, performDecayQueue);
+            sapi.Logger.Debug("Finished loading leaf block decay system");
         }
 
         private HashSet<BlockPos> deserializeQueue(string name)

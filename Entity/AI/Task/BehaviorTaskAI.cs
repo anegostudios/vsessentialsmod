@@ -56,7 +56,6 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            //PathTraverser = new StraightLineTraverser(entity as EntityAgent);
             PathTraverser = new WaypointsTraverser(entity as EntityAgent);
 
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
@@ -65,6 +64,12 @@ namespace Vintagestory.GameContent
             foreach(JsonObject taskConfig in tasks) 
             {
                 string taskCode = taskConfig["code"]?.AsString();
+                bool enabled = taskConfig["enabled"].AsBool(true);
+                if (!enabled)
+                {
+                    continue;
+                }
+
                 Type taskType = null;
                 if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out taskType))
                 {
@@ -92,14 +97,18 @@ namespace Vintagestory.GameContent
         {
             // AI is only running for active entities
             if (entity.State != EnumEntityState.Active || !entity.Alive) return;
+            entity.World.FrameProfiler.Mark("ai-init");
 
             PathTraverser.OnGameTick(deltaTime);
 
-            entity.World.FrameProfiler.Mark("entity-ai-pathing");
+            entity.World.FrameProfiler.Mark("ai-pathfinding");
+
+
+            entity.World.FrameProfiler.Enter("ai-tasks");
 
             TaskManager.OnGameTick(deltaTime);
 
-            entity.World.FrameProfiler.Mark("entity-ai-tasks");
+            entity.World.FrameProfiler.Leave();
         }
 
 

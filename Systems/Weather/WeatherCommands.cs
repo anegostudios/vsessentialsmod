@@ -409,6 +409,22 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            if (arg == "cloudypos" || arg == "cyp")
+            {
+                if (args.Length==0)
+                {
+                    player.SendMessage(groupId, "Cloud level rel = " + wsysServer.CloudLevelRel, EnumChatType.CommandSuccess);
+                    return;
+                }
+
+                wsysServer.CloudLevelRel = (float)args.PopDouble(0.95f);
+
+                wsysServer.serverChannel.BroadcastPacket(new WeatherCloudYposPacket() { CloudYRel = wsysServer.CloudLevelRel });
+
+                player.SendMessage(groupId, string.Format("Cloud level rel {0:0.##} set. (y={1})", wsysServer.CloudLevelRel, (int)(wsysServer.CloudLevelRel*wsysServer.api.World.BlockAccessor.MapSizeY)), EnumChatType.CommandSuccess);
+                return;
+            }
+
             if (arg == "stoprain")
             {
                 rainStopFunc(player, groupId, true);
@@ -478,7 +494,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            if (arg == "setev" || arg == "setevr")
+            if (arg == "setev" || arg == "setevr" || arg == "setevf")
             {
                 wsysServer.ReloadConfigs();
                 string code = args.PopWord();
@@ -487,7 +503,6 @@ namespace Vintagestory.GameContent
 
                 if (arg == "setevr")
                 {
-
                     long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
                     wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
                     if (weatherSim == null)
@@ -498,6 +513,9 @@ namespace Vintagestory.GameContent
 
                     if (weatherSim.SetWeatherEvent(code, true))
                     {
+                        weatherSim.CurWeatherEvent.AllowStop = arg != "setevf";
+
+                        weatherSim.CurWeatherEvent.OnBeginUse();
                         weatherSim.TickEvery25ms(0.025f);
                         player.SendMessage(groupId, "Ok weather event for this region set", EnumChatType.CommandSuccess);
                     }
@@ -511,8 +529,12 @@ namespace Vintagestory.GameContent
                     foreach (var val in wsysServer.weatherSimByMapRegion)
                     {
                         ok &= val.Value.SetWeatherEvent(code, true);
+
+                        val.Value.CurWeatherEvent.AllowStop = arg != "setevf";
+
                         if (ok)
                         {
+                            val.Value.CurWeatherEvent.OnBeginUse();
                             val.Value.TickEvery25ms(0.025f);
                         }
                     }

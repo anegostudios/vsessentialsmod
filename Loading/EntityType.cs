@@ -10,6 +10,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -26,7 +27,8 @@ namespace Vintagestory.ServerMods.NoObf
         /// Sets both the collision and selection box
         /// </summary>
         [JsonProperty]
-        public Vec2f HitBoxSize {
+        public Vec2f HitBoxSize
+        {
             get { return null; }
             set { CollisionBoxSize = value; SelectionBoxSize = value; }
         }
@@ -131,7 +133,7 @@ namespace Vintagestory.ServerMods.NoObf
                 properties.Client = new EntityClientProperties(Client.Behaviors)
                 {
                     RendererName = Client.Renderer,
-                    Textures = new Dictionary<string, CompositeTexture>(Client.Textures),
+                    Textures = new FakeDictionary<string, CompositeTexture>(Client.Textures),
                     GlowLevel = Client.GlowLevel,
                     PitchStep = Client.PitchStep,
                     Shape = Client.Shape,
@@ -154,6 +156,12 @@ namespace Vintagestory.ServerMods.NoObf
             properties.SetEyeHeight(EyeHeight);
 
             return properties;
+        }
+
+
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        {
+            return CreateResolvedType<EntityType>(api, fullcode, jobject, deserializer, variant);
         }
     }
 

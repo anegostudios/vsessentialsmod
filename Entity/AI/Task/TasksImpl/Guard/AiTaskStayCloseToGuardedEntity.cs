@@ -47,17 +47,17 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.SelectionBox.XSize;
 
-            if (!pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, false, 1000, true))
-            {
-                tryTeleport();
-            }
+            pathTraverser.NavigateTo_Async(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, tryTeleport, 1000, 1);
 
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
 
             stuck = false;
         }
 
-
+        public override bool CanContinueExecute()
+        {
+            return pathTraverser.Ready;
+        }
 
         public Entity GetGuardedEntity()
         {

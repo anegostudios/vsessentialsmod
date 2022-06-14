@@ -73,13 +73,17 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.SelectionBox.XSize;
 
-            pathTraverser.NavigateTo(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, false, 1000, true);
+            pathTraverser.NavigateTo_Async(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, null, 1000, 1);
 
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
 
             stuck = false;
         }
 
+        public override bool CanContinueExecute()
+        {
+            return pathTraverser.Ready;
+        }
 
         public override bool ContinueExecute(float dt)
         {
@@ -152,7 +156,7 @@ namespace Vintagestory.GameContent
 
         protected void tryTeleport()
         {
-            if (!allowTeleport) return;
+            if (!allowTeleport || targetEntity == null) return;
             Vec3d pos = findDecentTeleportPos();
             if (pos != null) entity.TeleportTo(pos);
         }

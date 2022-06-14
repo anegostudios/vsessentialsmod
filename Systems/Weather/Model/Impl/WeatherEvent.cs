@@ -17,8 +17,9 @@ namespace Vintagestory.GameContent
         public float BaseStrength;
         public double ActiveUntilTotalHours;
 
-        public float NearLightningRate;
-        public float DistantLightningRate;
+        public float LightningRate;
+        public float NearThunderRate;
+        public float DistantThunderRate;
         public float LightningMinTemp;
         public EnumPrecipitationType PrecType = EnumPrecipitationType.Auto;
 
@@ -38,9 +39,11 @@ namespace Vintagestory.GameContent
         public float Strength;
         internal float hereChance;
 
+        public bool AllowStop { get; set; } = true;
+
         public bool ShouldStop(float rainfall, float temperature)
         {
-            return config.getWeight(rainfall, temperature) <= 0;
+            return config.getWeight(rainfall, temperature) <= 0 && AllowStop;
         }
 
         public WeatherEvent(ICoreAPI api, WeatherEventConfig config, int index, LCGRandom rand, int seed)
@@ -63,8 +66,9 @@ namespace Vintagestory.GameContent
             State.ActiveUntilTotalHours = api.World.Calendar.TotalHours + config.DurationHours.nextFloat(1, rand);
 
             State.PrecType = config.PrecType;
-            State.NearLightningRate = config.Lightning?.NearRate / 100f ?? 0;
-            State.DistantLightningRate = config.Lightning?.DistantRate / 100f ?? 0;
+            State.NearThunderRate = config.Lightning?.NearThunderRate / 100f ?? 0;
+            State.LightningRate = config.Lightning?.LightningRate / 100f ?? 0;
+            State.DistantThunderRate = config.Lightning?.DistantThunderRate / 100f ?? 0;
             State.LightningMinTemp = config.Lightning?.MinTemperature ?? 0;
         }
 

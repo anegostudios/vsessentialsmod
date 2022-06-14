@@ -65,7 +65,10 @@ namespace Vintagestory.GameContent
     public class AiTaskManager
     {
         public event Action<IAiTask> OnTaskStarted;
-        public ActionBoolReturn<IAiTask> ShouldExecuteTask = (task) => true;
+        /// <summary>
+        /// All delegates must return true to execute the task
+        /// </summary>
+        public event ActionBoolReturn<IAiTask> OnShouldExecuteTask;
 
         Entity entity;
         List<IAiTask> tasks = new List<IAiTask>();
@@ -82,6 +85,7 @@ namespace Vintagestory.GameContent
         public void AddTask(IAiTask task)
         {
             tasks.Add(task);
+            task.ProfilerName = "task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()];
         }
 
         public void RemoveTask(IAiTask task)
@@ -96,7 +100,7 @@ namespace Vintagestory.GameContent
 
             if (entity.World.FrameProfiler.Enabled)
             {
-                entity.World.FrameProfiler.Mark("entity-ai-tasks-start-exec" + task.GetType());
+                entity.World.FrameProfiler.Mark("task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()]);
             }
         }
 
@@ -121,18 +125,15 @@ namespace Vintagestory.GameContent
                 {
                     int slot = task.Slot;
 
-                    if (activeTasksBySlot[slot] != null)
-                    {
-                        activeTasksBySlot[slot].FinishExecute(true);
-                    }
+                    activeTasksBySlot[slot]?.FinishExecute(true);
 
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
+
+                    entity.World.FrameProfiler.Mark(task.ProfilerName);
                 }
             }
-
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-start-execg");
         }
 
         
@@ -145,59 +146,54 @@ namespace Vintagestory.GameContent
                 {
                     task.FinishExecute(true);
                     activeTasksBySlot[task.Slot] = null;
+                    //Console.WriteLine("stop " + task.ProfilerName);
                 }
             }
 
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-fin-exec");
+            entity.World.FrameProfiler.Mark("finishexecute");
         }
 
         public void OnGameTick(float dt)
         {
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin");
-
             foreach (IAiTask task in tasks)
             {
                 int slot = task.Slot;
-
-                if ((activeTasksBySlot[slot] == null || task.Priority > activeTasksBySlot[slot].PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
+                IAiTask oldTask = activeTasksBySlot[slot];
+                if ((oldTask == null || task.Priority > oldTask.PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
                 {
-                    if (activeTasksBySlot[slot] != null)
-                    {
-                        activeTasksBySlot[slot].FinishExecute(true);
-                    }
-
+                    //if (oldTask!=null) Console.WriteLine("stop " + oldTask.ProfilerName);
+                    oldTask?.FinishExecute(true);
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
+                    //Console.WriteLine("start " + task.ProfilerName);
                 }
 
                 if (entity.World.FrameProfiler.Enabled)
                 {
-                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-start-exec" + task.GetType());
+                    entity.World.FrameProfiler.Mark(task.ProfilerName);
                 }
             }
 
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-begin-cont");
 
             for (int i = 0; i < activeTasksBySlot.Length; i++)
             {
                 IAiTask task = activeTasksBySlot[i];
                 if (task == null) continue;
+                if (!task.CanContinueExecute()) continue;
 
                 if (!task.ContinueExecute(dt))
                 {
                     task.FinishExecute(false);
+                    //Console.WriteLine("stop " + task.ProfilerName);
                     activeTasksBySlot[i] = null;
                 }
 
                 if (entity.World.FrameProfiler.Enabled)
                 {
-                    entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-" + task.GetType());
+                    entity.World.FrameProfiler.Mark("task-continueexec-" + AiTaskRegistry.TaskCodes[task.GetType()]);
                 }
             }
-
-
-            entity.World.FrameProfiler.Mark("entity-ai-tasks-tick-cont-exec");
 
 
             if (entity.World.EntityDebugMode)
@@ -225,6 +221,18 @@ namespace Vintagestory.GameContent
                 }
                 entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
             }
+        }
+
+        private bool ShouldExecuteTask(IAiTask task)
+        {
+            if (OnShouldExecuteTask == null) return true;
+            bool exec = true;
+            foreach (ActionBoolReturn<IAiTask> dele in OnShouldExecuteTask.GetInvocationList())
+            {
+                exec &= dele(task);
+            }
+
+            return exec;
         }
 
         public bool IsTaskActive(string id)
@@ -256,6 +264,7 @@ namespace Vintagestory.GameContent
 
                         activeTasksBySlot[slot] = task;
                         task.StartExecute();
+                        Console.WriteLine("start " + task.ProfilerName);
                         OnTaskStarted?.Invoke(task);
                     }
                 }

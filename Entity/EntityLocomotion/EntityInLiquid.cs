@@ -37,9 +37,9 @@ namespace Vintagestory.GameContent
                     push = Math.Max(1f, push - 0.1f * dt * 60f);
                 }
 
-                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
-                Block twoaboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 2), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block twoaboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 2), (int)pos.Z);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0) + (twoaboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 
@@ -58,6 +58,15 @@ namespace Vintagestory.GameContent
                     yMot = controls.FlyVector.Y * (1 + push) * 0.03f * swimlineSubmergedness;
                 }
 
+                if (entity.Properties.Habitat == EnumHabitat.Underwater && inblock.IsLiquid() && !aboveblock.IsLiquid())
+                {
+                    float maxY = (int)pos.Y + inblock.LiquidLevel / 8f - entity.CollisionBox.Y2;
+                    if (pos.Y > maxY)
+                    {
+                        yMot = -GameMath.Clamp(pos.Y - maxY, 0, 0.05);
+                    }
+                }
+
                 pos.Motion.Add(
                     controls.FlyVector.X * (1 + push) * 0.03f, 
                     yMot,
@@ -66,11 +75,11 @@ namespace Vintagestory.GameContent
             }
 
 
-            Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+            Block block = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
             if (block.PushVector != null)
             {
                 // Fix for those unfair cases where there is downward flowing water in a 1 deep hole and you cant get out
-                if (block.PushVector.Y >= 0 || !entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y - 1, (int)pos.Z).SideSolid[BlockFacing.UP.Index])
+                if (block.PushVector.Y >= 0 || !entity.World.BlockAccessor.IsSideSolid((int)pos.X, (int)pos.Y - 1, (int)pos.Z, BlockFacing.UP))
                 {
                     pos.Motion.Add(block.PushVector);
                 }

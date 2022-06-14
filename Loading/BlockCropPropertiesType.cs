@@ -26,6 +26,11 @@ namespace Vintagestory.ServerMods.NoObf
         public float TotalGrowthDays;
 
         /// <summary>
+        /// Total time in ingame months required for the crop to reach full maturity assuming full nutrient levels
+        /// </summary>
+        public float TotalGrowthMonths;
+
+        /// <summary>
         /// If true, the player may harvests from the crop multiple times
         /// </summary>
         public bool MultipleHarvests;

@@ -21,7 +21,7 @@ namespace Vintagestory.GameContent
     }
 
     public delegate void OnEntityShapeTesselationDelegate(ref Shape entityShape, string shapePathForLogging);
-
+    public delegate float OnGetFrostAlpha();
     
     public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
@@ -50,6 +50,13 @@ namespace Vintagestory.GameContent
 
         public int AddRenderFlags;
         public double WindWaveIntensity = 1f;
+        public bool glitchFlicker;
+
+        public bool frostable;
+        public float frostAlpha;
+        public float targetFrostAlpha;
+        public OnGetFrostAlpha getFrostAlpha;
+        public float frostAlphaAccum;
 
         protected List<MessageTexture> messageTextures = null;
         protected NameTagRendererDelegate nameTagRenderHandler;
@@ -66,6 +73,7 @@ namespace Vintagestory.GameContent
         ITexPositionSource defaultTexSource;
 
         protected bool shapeFresh;
+        Vec4f lightrgbs;
 
         /// <summary>
         /// This is called before entity.OnTesselation()
@@ -121,6 +129,8 @@ namespace Vintagestory.GameContent
             }
 
             glitchAffected = true;// entity.Properties.Attributes?["glitchAffected"].AsBool(false) ?? false;
+            glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
+            frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
@@ -134,6 +144,12 @@ namespace Vintagestory.GameContent
             }
 
             api.Event.ReloadShapes += MarkShapeModified;
+
+            getFrostAlpha = () =>
+            {
+                float temp = api.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, api.World.Calendar.TotalDays).Temperature;
+                return GameMath.Clamp((Math.Max(0, -temp) - 5) / 5f, 0, 1);
+            };
         }
 
         public virtual void MarkShapeModified()
@@ -244,7 +260,17 @@ namespace Vintagestory.GameContent
                 {
                     try
                     {
-                        capi.Tesselator.TesselateShapeWithJointIds("entity", entityShape, out meshdata, this, new Vec3f(compositeShape.rotateX, compositeShape.rotateY, compositeShape.rotateZ), compositeShape.QuantityElements, compositeShape.SelectiveElements);
+                        TesselationMetaData meta = new TesselationMetaData()
+                        {
+                            quantityElements = compositeShape.QuantityElements,
+                            selectiveElements = compositeShape.SelectiveElements,
+                            texSource = this,
+                            withJointIds = true,
+                            withDamageEffect = true,
+                            typeForLogging = "entity"
+                        };
+
+                        capi.Tesselator.TesselateShape(meta, entityShape, out meshdata, new Vec3f(compositeShape.rotateX, compositeShape.rotateY, compositeShape.rotateZ));
 
                         meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
                         
@@ -290,6 +316,8 @@ namespace Vintagestory.GameContent
                     }
 
                 }, "uploadentitymesh");
+
+                capi.TesselatorManager.ThreadDispose();
             });
         }
 
@@ -383,6 +411,14 @@ namespace Vintagestory.GameContent
                 TesselateShape();
             }
 
+            lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
+
+            if (entity.SelectionBox.Y2 > 1)
+            {
+                Vec4f lightrgbs2 = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y + 1, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
+                if (lightrgbs2.W > lightrgbs.W) lightrgbs = lightrgbs2;
+            }
+
             if (meshRefOpaque == null && meshRefOit == null) return;
 
             if (gearInv == null && eagent?.GearInventory != null)
@@ -429,6 +465,13 @@ namespace Vintagestory.GameContent
             } else
             {
                 calcSidewaysSwivelForEntity(dt);
+            }
+
+            frostAlphaAccum += dt;
+            if (frostAlphaAccum > 5)
+            {
+                frostAlphaAccum = 0;
+                targetFrostAlpha = getFrostAlpha();
             }
         }
 
@@ -544,6 +587,7 @@ namespace Vintagestory.GameContent
                 prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = ColorUtil.WhiteArgbVec;
                 prog.AlphaTest = renderInfo.AlphaTest;
+                prog.DamageEffect = renderInfo.DamageEffect;
 
                 prog.OverlayOpacity = renderInfo.OverlayOpacity;
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
@@ -556,16 +600,17 @@ namespace Vintagestory.GameContent
                 }
 
                 
-                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
                 int temp = (int)stack.Collectible.GetTemperature(capi.World, stack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
-                lightrgbs[0] += glowColor[0];
+                /*lightrgbs[0] += glowColor[0];
                 lightrgbs[1] += glowColor[1];
-                lightrgbs[2] += glowColor[2];
-
-                prog.ExtraGlow = GameMath.Clamp((temp - 500) / 3, 0, 255);
+                lightrgbs[2] += glowColor[2];*/
+                
+                var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
+                prog.ExtraGlow = gi;
                 prog.RgbaAmbientIn = rapi.AmbientColor;
                 prog.RgbaLightIn = lightrgbs;
+                prog.RgbaGlowIn = new Vec4f(glowColor[0], glowColor[1], glowColor[2], gi / 255f);
                 prog.RgbaFogIn = rapi.FogColor;
                 prog.FogMinIn = rapi.FogMin;
                 prog.FogDensityIn = rapi.FogDensity;
@@ -589,6 +634,10 @@ namespace Vintagestory.GameContent
                 rapi.GlEnableCullFace();
             }
 
+            if (!isShadowPass)
+            {
+                prog.DamageEffect = 0;
+            }
 
             if (!isShadowPass)
             {
@@ -687,7 +736,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
+                frostAlpha += (targetFrostAlpha - frostAlpha) * dt / 10f;
 
                 capi.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
                 capi.Render.CurrentActiveShader.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
@@ -698,6 +747,8 @@ namespace Vintagestory.GameContent
                 capi.Render.CurrentActiveShader.Uniform("skipRenderJointId", skipRenderJointId);
                 capi.Render.CurrentActiveShader.Uniform("skipRenderJointId2", skipRenderJointId2);
                 capi.Render.CurrentActiveShader.Uniform("entityId", (int)entity.EntityId);
+                capi.Render.CurrentActiveShader.Uniform("glitchFlicker", glitchFlicker ? 1 : 0);
+                capi.Render.CurrentActiveShader.Uniform("frostAlpha", GameMath.Clamp(frostAlpha, 0, 1));
                 capi.Render.CurrentActiveShader.Uniform("waterWaveCounter", capi.Render.ShaderUniforms.WaterWaveCounter);
 
                 color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
@@ -788,7 +839,13 @@ namespace Vintagestory.GameContent
                     aboveHeadPos.Add(mpos);
                 } else
                 {
-                    aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+                    float f = 1;
+                    /*if (entity.Code.Path.Contains("bot") && entity.AnimManager.ActiveAnimationsByAnimCode.ContainsKey("sitflooridle"))
+                    {
+                        f = 0.55f;
+                    }*/
+
+                    aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 * f + 0.2, entity.Pos.Z);
                 }
                 
             }
@@ -1059,7 +1116,7 @@ namespace Vintagestory.GameContent
 
 
         #region Sideways swivel when changing the movement direction
-        float sidewaysSwivelAngle = 0;
+        public float sidewaysSwivelAngle = 0;
         double prevAngleSwing;
         double prevPosXSwing;
         double prevPosZSwing;
@@ -1078,6 +1135,8 @@ namespace Vintagestory.GameContent
 
             sidewaysSwivelAngle *= Math.Min(0.99f, 1 - 0.1f * dt * 60f);
             prevAngleSwing = nowAngle;
+
+            (entity as EntityPlayer).sidewaysSwivelAngle = sidewaysSwivelAngle;
         }
 
         void calcSidewaysSwivelForEntity(float dt)

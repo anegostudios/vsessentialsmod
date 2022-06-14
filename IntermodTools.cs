@@ -11,7 +11,7 @@ namespace Vintagestory.ServerMods
     // This was under under MIT License: https://github.com/DArkHekRoMaNT/CompatibilityLib/blob/40ab78c40d6fb69e9b5c702534be5b5fcb74627e/LICENSE
     public class ModCompatiblityUtil : ModSystem
     {
-        public static AssetCategory compatibility = new AssetCategory("compatibility", true, EnumAppSide.Universal);
+        public static AssetCategory compatibility;
 
         public static string[] partiallyWorkingCategories = { "shapes", "textures" };
 
@@ -19,6 +19,11 @@ namespace Vintagestory.ServerMods
 
 
         public override double ExecuteOrder() => 0.04; //load before json patching
+
+        public override void StartPre(ICoreAPI api)
+        {
+            compatibility = new AssetCategory("compatibility", true, EnumAppSide.Universal);
+        }
 
         public override void Start(ICoreAPI api)
         {
@@ -33,11 +38,11 @@ namespace Vintagestory.ServerMods
         {
             foreach (var mod in api.ModLoader.Mods)
             {
-                string prefix = "compatibility/" + mod.Info.ModID;
+                string prefix = "compatibility/" + mod.Info.ModID + "/";   // Ensures correct prefix even if a modID begins with all the characters in another modID
                 foreach (var asset in api.Assets.GetMany(prefix))
                 {
                     AssetLocation newLoc = asset.Location;
-                    newLoc.Path = asset.Location.Path.Remove(0, prefix.Length + 1); //remove "<prefix>/"
+                    newLoc.Path = asset.Location.Path.Remove(0, prefix.Length); //remove "<prefix>"
 
                     //Remove existing assets (if exists)
                     if (api.Assets.AllAssets.ContainsKey(newLoc)) api.Assets.AllAssets.Remove(newLoc);

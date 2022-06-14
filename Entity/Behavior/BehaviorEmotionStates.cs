@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
 
     public class EntityBehaviorEmotionStates : EntityBehavior
     {
-        List<EmotionState> availableStates = new List<EmotionState>();
+        EmotionState[] availableStates;
         public Dictionary<string, ActiveEmoState> ActiveStatesByCode = new Dictionary<string, ActiveEmoState>();
 
         TreeAttribute entityAttr;
@@ -72,12 +72,16 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, typeAttributes);
 
             JsonObject[] availStates = typeAttributes["states"].AsArray();
-            
+
+            availableStates = new EmotionState[availStates.Length];
+            int i = 0;
             foreach (JsonObject obj in availStates)
             {
                 EmotionState state = obj.AsObject<EmotionState>();
-                availableStates.Add(state);
+                availableStates[i++] = state;
             }
+
+            tickAccum = (float)(entity.World.Rand.NextDouble() * 0.33);  //spread out the ticking if a lot of entities load at the same time, such as at server start
         }
 
         
@@ -153,7 +157,7 @@ namespace Vintagestory.GameContent
         {
             bool triggered=false;
 
-            for (int stateid = 0; stateid < availableStates.Count; stateid++)
+            for (int stateid = 0; stateid < availableStates.Length; stateid++)
             {
                 EmotionState newstate = availableStates[stateid];
             
@@ -221,28 +225,29 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            tickAccum += deltaTime;
-            if (tickAccum < 0.33) return;
+            if ((tickAccum += deltaTime) < 0.33f) return;
             tickAccum = 0;
-
-            List<string> activecodes = ActiveStatesByCode.Keys.ToList();
 
             float nowStressLevel = 0f;
 
-            foreach (var code in activecodes) 
+            List<string> codesToRemove = null;
+            foreach (var stateAndcode in ActiveStatesByCode) 
             {
-                ActiveStatesByCode[code].Duration -= 10*deltaTime;
-                float leftDur = ActiveStatesByCode[code].Duration;
+                string code = stateAndcode.Key;
+                ActiveEmoState state = stateAndcode.Value;
+                float leftDur = state.Duration -= 10 * deltaTime;
                 if (leftDur <= 0)
                 {
-                    ActiveStatesByCode.Remove(code);
+                    if (codesToRemove == null) codesToRemove = new List<string>();
+                    codesToRemove.Add(code);
                     
                     entityAttr.RemoveAttribute(code);
                     continue;
                 }
 
-                nowStressLevel += availableStates[ActiveStatesByCode[code].StateId].StressLevel;
+                nowStressLevel += availableStates[state.StateId].StressLevel;
             }
+            if (codesToRemove != null) foreach (string s in codesToRemove) ActiveStatesByCode.Remove(s);
 
             float curlevel = entity.WatchedAttributes.GetFloat("stressLevel");
             if (nowStressLevel > 0)
@@ -251,13 +256,18 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                curlevel = Math.Max(0, curlevel - 1 / 20f);
-                entity.WatchedAttributes.SetFloat("stressLevel", curlevel);
+                if (curlevel > 0) // no need to keep recalculating and setting it once it reaches 0
+                {
+                    curlevel = Math.Max(0, curlevel - deltaTime * 1.25f);
+                    entity.WatchedAttributes.SetFloat("stressLevel", curlevel);
+                }
             }
 
 
-            if (entity.World.EntityDebugMode) {
-                entity.DebugAttributes.SetString("emotionstates", string.Join(", ", activecodes));
+            if (entity.World.EntityDebugMode)
+            {
+                // expensive string operations
+                entity.DebugAttributes.SetString("emotionstates", string.Join(", ", ActiveStatesByCode.Keys.ToList()));
             }
         }
 

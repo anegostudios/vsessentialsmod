@@ -15,7 +15,8 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorHealth : EntityBehavior
     {
         ITreeAttribute healthTree;
-        
+        float secondsSinceLastUpdate;
+
         public event OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
 
         public float Health
@@ -79,8 +80,8 @@ namespace Vintagestory.GameContent
             {
                 entity.WatchedAttributes.SetAttribute("health", healthTree = new TreeAttribute());
 
-                Health = typeAttributes["currenthealth"].AsFloat(20);
                 BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
+                Health = typeAttributes["currenthealth"].AsFloat(BaseMaxHealth);
                 MarkDirty();
                 return;
             }
@@ -91,13 +92,13 @@ namespace Vintagestory.GameContent
             if (BaseMaxHealth == 0) BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
 
             MarkDirty();
+            secondsSinceLastUpdate = (float) entity.World.Rand.NextDouble();   // Randomise which game tick these update, a starting server would otherwise start all loaded entities with the same zero timer
         }
 
 
-        float secondsSinceLastUpdate;
-
         public override void OnGameTick(float deltaTime)
         {
+            entity.World.FrameProfiler.Mark("not-bhhealth");
             if (entity.Pos.Y < -30)
             {
                 entity.ReceiveDamage(new DamageSource()
@@ -113,39 +114,52 @@ namespace Vintagestory.GameContent
             {
                 secondsSinceLastUpdate = 0;
 
-                if (entity.Alive && Health < MaxHealth)
+                if (entity.Alive)
                 {
-                    float recoverySpeed = 0.01f;
-
-                    EntityBehaviorHunger ebh = entity.GetBehavior<EntityBehaviorHunger>();
-
-                    if (ebh != null)
+                    float health = Health;  // higher performance to read this TreeAttribute only once
+                    float maxHealth = MaxHealth;
+                    if (health < maxHealth)
                     {
-                        EntityPlayer plr = (EntityPlayer)entity;
-                        if (plr != null && entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
+                        float recoverySpeed = 0.01f;
 
-                        // When below 75% satiety, autoheal starts dropping
-                        recoverySpeed = GameMath.Clamp(0.01f * ebh.Saturation / ebh.MaxSaturation * 1/0.75f, 0, 0.01f);
+                        // Only players have the hunger behavior, and the different nutrient saturations
+                        if (entity is EntityPlayer plr)
+                        {
+                            EntityBehaviorHunger ebh = entity.GetBehavior<EntityBehaviorHunger>();
 
-                        ebh.ConsumeSaturation(150f * recoverySpeed);
+                            if (ebh != null)
+                            {
+                                if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
+
+                                // When below 75% satiety, autoheal starts dropping
+                                recoverySpeed = GameMath.Clamp(0.01f * ebh.Saturation / ebh.MaxSaturation * 1 / 0.75f, 0, 0.01f);
+
+                                ebh.ConsumeSaturation(150f * recoverySpeed);
+                            }
+                        }
+
+                        Health = Math.Min(health + recoverySpeed, maxHealth);
                     }
-
-                    Health = Math.Min(Health + recoverySpeed, MaxHealth);
                 }
 
-                int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.ServerPos.X, (int)entity.ServerPos.Z);
-                if (entity.World.Side == EnumAppSide.Server && entity is EntityPlayer && rainy <= entity.ServerPos.Y)
+                if (entity is EntityPlayer && entity.World.Side == EnumAppSide.Server)
                 {
-                    WeatherSystemBase wsys = entity.Api.ModLoader.GetModSystem<WeatherSystemBase>();
-                    var state = wsys.GetPrecipitationState(entity.ServerPos.XYZ);
+                    // A costly check every 1s for hail damage, but it applies only to players who are in the open
 
-                    if (state != null && state.ParticleSize >= 0.5 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level/2)
+                    int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.ServerPos.X, (int)entity.ServerPos.Z);
+                    if (entity.ServerPos.Y >= rainy)
                     {
-                        entity.ReceiveDamage(new DamageSource()
+                        WeatherSystemBase wsys = entity.Api.ModLoader.GetModSystem<WeatherSystemBase>();
+                        var state = wsys.GetPrecipitationState(entity.ServerPos.XYZ);
+
+                        if (state != null && state.ParticleSize >= 0.5 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level / 2)
                         {
-                            Source = EnumDamageSource.Weather,
-                            Type = EnumDamageType.BluntAttack
-                        }, (float)state.ParticleSize/15f);
+                            entity.ReceiveDamage(new DamageSource()
+                            {
+                                Source = EnumDamageSource.Weather,
+                                Type = EnumDamageType.BluntAttack
+                            }, (float)state.ParticleSize / 15f);
+                        }
                     }
                 }
             }

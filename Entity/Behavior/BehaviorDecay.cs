@@ -80,7 +80,7 @@ namespace Vintagestory.GameContent
                 var bl = entity.World.BlockAccessor;
                 Block exblock = bl.GetBlock(bonepos);
 
-                if (exblock.IsReplacableBy(decblock) && !exblock.IsLiquid())
+                if (exblock.IsReplacableBy(decblock))
                 {
                     bl.SetBlock(decblock.BlockId, bonepos);
                     bl.MarkBlockDirty(bonepos);
@@ -88,10 +88,11 @@ namespace Vintagestory.GameContent
                 {
                     foreach (BlockFacing facing in BlockFacing.HORIZONTALS)
                     {
-                        exblock = entity.World.BlockAccessor.GetBlock(bonepos.AddCopy(facing));
-                        if (exblock.IsReplacableBy(decblock) && !exblock.IsLiquid())
+                        facing.IterateThruFacingOffsets(bonepos);
+                        exblock = entity.World.BlockAccessor.GetBlock(bonepos);
+                        if (exblock.IsReplacableBy(decblock))
                         {
-                            entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos.AddCopy(facing));
+                            entity.World.BlockAccessor.SetBlock(decblock.BlockId, bonepos);
                             break;
                         }
                     }

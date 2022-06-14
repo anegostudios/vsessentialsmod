@@ -75,7 +75,7 @@ namespace Vintagestory.ServerMods.NoObf
             return 0.05;
         }
 
-        public override void Start(ICoreAPI api)
+        public override void AssetsLoaded(ICoreAPI api)    // This is done before assets and items are registerd etc, and before remapping, because of the ExecuteOrder, and (server-side) because of the position of ModHandler early in the ServerSystems list
         {
             this.api = api;
             
@@ -103,7 +103,7 @@ namespace Vintagestory.ServerMods.NoObf
                     patches = asset.ToObject<JsonPatch[]>();
                 } catch (Exception e)
                 {
-                    api.World.Logger.Error("Failed loading patches file {0}: {1}", asset.Location, e);
+                    api.Logger.Error("Failed loading patches file {0}: {1}", asset.Location, e);
                 }
 
                 for (int j = 0; patches != null && j < patches.Length; j++)
@@ -122,7 +122,7 @@ namespace Vintagestory.ServerMods.NoObf
                         {
                             if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                api.World.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})", asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
+                                api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})", asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
                                 unmetConditionCount++;
                                 continue;
                             }
@@ -142,7 +142,7 @@ namespace Vintagestory.ServerMods.NoObf
                         if (!enabled)
                         {
                             unmetConditionCount++;
-                            api.World.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})", asset.Location, j, string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
+                            api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})", asset.Location, j, string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
                             continue;
                         }
                     }
@@ -189,9 +189,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
             }
 
-            
-            api.World.Logger.Notification(sb.ToString());
-            base.Start(api);
+            api.Logger.Notification(sb.ToString());
+            api.Logger.VerboseDebug("Patchloader finished");
         }
 
 
@@ -203,7 +202,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (jsonPatch.File == null)
             {
-                api.World.Logger.Error("Patch {0} in {1} failed because it mising the target file property", patchIndex, patchSourcefile);
+                api.World.Logger.Error("Patch {0} in {1} failed because it is missing the target file property", patchIndex, patchSourcefile);
                 return;
             }
 

@@ -45,7 +45,6 @@ namespace Vintagestory.GameContent
                 entity.ServerPos.Yaw - GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul,
                 entity.ServerPos.Yaw + GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul
             );
-            
         }
 
         public override bool ContinueExecute(float dt)

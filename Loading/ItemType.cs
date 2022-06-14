@@ -9,6 +9,8 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -25,13 +27,20 @@ namespace Vintagestory.ServerMods.NoObf
             GroundTransform = ModelTransform.ItemDefaultGround();
         }
 
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        {
+            ItemType resolvedType = CreateResolvedType<ItemType>(api, fullcode, jobject, deserializer, variant);
+
+            // Special code to rotate our 3D items in inventory by default, unless they expressly set GuiTransform.Rotate to false
+            if (resolvedType.Shape != null && !resolvedType.Shape.VoxelizeTexture)
+            {
+                if (jobject["guiTransform"]?["rotate"] == null) GuiTransform.Rotate = true;
+            }
+            return resolvedType;
+        }
 
         public void InitItem(IClassRegistryAPI instancer, ILogger logger, Item item, OrderedDictionary<string, string> searchReplace)
         {
-            if (Shape != null && !Shape.VoxelizeTexture && jsonObject["guiTransform"]?["rotate"] == null)
-            {
-                GuiTransform.Rotate = true;
-            }
 
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);
 
@@ -50,8 +59,8 @@ namespace Vintagestory.ServerMods.NoObf
                     if (instancer.GetCollectibleBehaviorClass(behaviorType.name) != null)
                     {
                         behavior = instancer.CreateCollectibleBehavior(item, behaviorType.name);
-                    } else 
-                    { 
+                    } else
+                    {
                         logger.Warning(Lang.Get("Collectible behavior {0} for item {1} not found", behaviorType.name, item.Code));
                         continue;
                     }
@@ -72,6 +81,68 @@ namespace Vintagestory.ServerMods.NoObf
 
                 item.CollectibleBehaviors = collbehaviors.ToArray();
             }
+        }
+
+        public Item CreateItem(ICoreServerAPI api)
+        {
+            Item item;
+
+            if (api.ClassRegistry.GetItemClass(this.Class) == null)
+            {
+                api.Server.Logger.Error("Item with code {0} has defined an item class {1}, but no such class registered. Will ignore.", this.Code, this.Class);
+                item = new Item();
+            }
+            else
+            {
+                item = api.ClassRegistry.CreateItem(this.Class);
+            }
+
+
+            item.Code = this.Code;
+            item.VariantStrict = this.Variant;
+            item.Variant = new RelaxedReadOnlyDictionary<string, string>(this.Variant);
+            item.Class = this.Class;
+            item.Textures = this.Textures;
+            item.MaterialDensity = this.MaterialDensity;
+
+
+            item.GuiTransform = this.GuiTransform?.Clone();
+            item.FpHandTransform = this.FpHandTransform?.Clone();
+            item.TpHandTransform = this.TpHandTransform?.Clone();
+            item.TpOffHandTransform = this.TpOffHandTransform?.Clone();
+            item.GroundTransform = this.GroundTransform?.Clone();
+
+            item.DamagedBy = (EnumItemDamageSource[])this.DamagedBy?.Clone();
+            item.MaxStackSize = this.MaxStackSize;
+            if (this.Attributes != null) item.Attributes = this.Attributes;
+            item.CombustibleProps = this.CombustibleProps;
+            item.NutritionProps = this.NutritionProps;
+            item.TransitionableProps = this.TransitionableProps;
+            item.GrindingProps = this.GrindingProps;
+            item.CrushingProps = this.CrushingProps;
+            item.Shape = this.Shape;
+            item.Tool = this.Tool;
+            item.AttackPower = this.AttackPower;
+            item.LiquidSelectable = this.LiquidSelectable;
+            item.ToolTier = this.ToolTier;
+            item.HeldSounds = this.HeldSounds?.Clone();
+            item.Durability = this.Durability;
+            item.Dimensions = this.Dimensions?.Clone();
+            item.MiningSpeed = this.MiningSpeed;
+            item.AttackRange = this.AttackRange;
+            item.StorageFlags = (EnumItemStorageFlags)this.StorageFlags;
+            item.RenderAlphaTest = this.RenderAlphaTest;
+            item.HeldTpHitAnimation = this.HeldTpHitAnimation;
+            item.HeldRightTpIdleAnimation = this.HeldRightTpIdleAnimation;
+            item.HeldLeftTpIdleAnimation = this.HeldLeftTpIdleAnimation;
+            item.HeldTpUseAnimation = this.HeldTpUseAnimation;
+            item.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
+            item.MatterState = this.MatterState;
+            item.ParticleProperties = this.ParticleProperties;
+
+            this.InitItem(api.ClassRegistry, api.World.Logger, item, this.Variant);
+
+            return item;
         }
     }
 }

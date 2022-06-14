@@ -22,12 +22,8 @@ namespace Vintagestory.GameContent
         float? preferredLightLevel;
         float targetDistance = 0.12f;
 
-        bool awaitReached = true;
-
         NatFloat wanderRangeHorizontal = NatFloat.createStrongerInvexp(3, 40);
         NatFloat wanderRangeVertical = NatFloat.createStrongerInvexp(3, 10);
-
-        BlockPos tmpPos = new BlockPos();
 
         public bool StayCloseToSpawn;
         public Vec3d SpawnPosition;
@@ -36,6 +32,7 @@ namespace Vintagestory.GameContent
         public double TeleportInGameHours = 1;
 
         long lastTimeInRangeMs;
+        int failedWanders;
 
         public float WanderRangeMul
         {
@@ -119,13 +116,7 @@ namespace Vintagestory.GameContent
             {
                 preferredLightLevel = taskConfig["preferredLightLevel"].AsFloat(-99);
                 if (preferredLightLevel < 0) preferredLightLevel = null;
-            }
-
-            if (taskConfig["awaitReached"] != null)
-            {
-                awaitReached = taskConfig["awaitReached"].AsBool(true);
-            }
-            
+            }            
         }
 
 
@@ -182,7 +173,7 @@ namespace Vintagestory.GameContent
                     curTarget.W = 1 - distToEdge;
                 }
 
-                Block block;
+                Block waterorIceBlock;
 
 
                 switch (habitat)
@@ -193,8 +184,8 @@ namespace Vintagestory.GameContent
                         curTarget.Y = Math.Min(curTarget.Y, rainMapY + maxHeight);
 
                         // Cannot be in water
-                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                        if (block.IsLiquid()) curTarget.W = 0;
+                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
                     case EnumHabitat.Land:
@@ -204,8 +195,8 @@ namespace Vintagestory.GameContent
                         else
                         {
                             // Does not like water
-                            block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                            if (block.IsLiquid()) curTarget.W /= 2;
+                            waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                            if (waterorIceBlock.IsLiquid()) curTarget.W /= 2;
 
                             // Lets make a straight line plot to see if we would fall off a cliff
                             bool stop = false;
@@ -245,13 +236,13 @@ namespace Vintagestory.GameContent
                         break;
 
                     case EnumHabitat.Sea:
-                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                        if (!block.IsLiquid()) curTarget.W = 0;
+                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
                     case EnumHabitat.Underwater:
-                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
-                        if (!block.IsLiquid()) curTarget.W = 0;
+                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         else curTarget.W = 1 / (Math.Abs(dy) + 1);  //prefer not too much vertical change when underwater
 
                         //TODO: reject (or de-weight) targets not in direct line of sight (avoiding terrain)
@@ -265,8 +256,7 @@ namespace Vintagestory.GameContent
                     for (int i = 0; i < BlockFacing.HORIZONTALS.Length; i++)
                     {
                         BlockFacing face = BlockFacing.HORIZONTALS[i];
-                        block = entity.World.BlockAccessor.GetBlock((int)curTarget.X + face.Normali.X, (int)curTarget.Y, (int)curTarget.Z + face.Normali.Z);
-                        if (block.SideSolid[face.Opposite.Index])
+                        if (entity.World.BlockAccessor.IsSideSolid((int)curTarget.X + face.Normali.X, (int)curTarget.Y, (int)curTarget.Z + face.Normali.Z, face.Opposite))
                         {
                             curTarget.W *= 0.5;
                         }
@@ -319,8 +309,7 @@ namespace Vintagestory.GameContent
             int tries = 5;
             while (tries-- > 0)
             {
-                Block block = world.BlockAccessor.GetBlock(x, (int)y, z);
-                if (block.SideSolid[BlockFacing.UP.Index]) return y + 1;
+                if (world.BlockAccessor.IsSideSolid(x, (int)y, z, BlockFacing.UP)) return y + 1;
                 y--;
             }
 
@@ -330,7 +319,11 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
-            if (rand.NextDouble() > wanderChance) return false;            
+            if (rand.NextDouble() > (failedWanders > 0 ? (1 - wanderChance * 4 * failedWanders) : wanderChance))    // if a wander failed (got stuck) initially greatly increase the chance of trying again, but eventually give up
+            {
+                failedWanders = 0;
+                return false;
+            }
 
             double dist = entity.ServerPos.XYZ.SquareDistanceTo(SpawnPosition);
             if (StayCloseToSpawn)
@@ -433,11 +426,13 @@ namespace Vintagestory.GameContent
         private void OnStuck()
         {
             done = true;
+            failedWanders++;
         }
 
         private void OnGoalReached()
         {
             done = true;
+            failedWanders = 0;
         }
 
         

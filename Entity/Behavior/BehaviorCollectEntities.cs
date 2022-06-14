@@ -42,7 +42,6 @@ namespace Vintagestory.GameContent
             if (entities.Length == 0)
             {
                 unconsumedDeltaTime = 0;
-                //entity.World.FrameProfiler.Mark("entity-collectentities");
                 return;
             }
 
