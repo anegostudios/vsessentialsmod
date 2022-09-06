@@ -23,6 +23,9 @@ namespace Vintagestory.ServerMods.NoObf
         public CollectibleBehaviorType[] Behaviors = new CollectibleBehaviorType[0];
 
         [JsonProperty]
+        public byte[] LightHsv = new byte[] { 0, 0, 0 };
+
+        [JsonProperty]
         public float RenderAlphaTest = 0.05f;
         [JsonProperty]
         public int StorageFlags = 1;

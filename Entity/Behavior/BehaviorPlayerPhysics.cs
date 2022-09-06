@@ -120,12 +120,12 @@ namespace Vintagestory.GameContent
                 float desiredYaw = (float)Math.Atan2(controls.WalkVector.X, controls.WalkVector.Z) - GameMath.PIHALF;
                 
                 float yawDist = GameMath.AngleRadDistance(eplr.WalkYaw, desiredYaw);
-                eplr.WalkYaw += GameMath.Clamp(yawDist, -8 * dt * GlobalConstants.OverallSpeedMultiplier, 8 * dt * GlobalConstants.OverallSpeedMultiplier);
+                eplr.WalkYaw += GameMath.Clamp(yawDist, -6 * dt * GlobalConstants.OverallSpeedMultiplier, 6 * dt * GlobalConstants.OverallSpeedMultiplier);
                 eplr.WalkYaw = GameMath.Mod(eplr.WalkYaw, GameMath.TWOPI);
 
                 if (entity.Swimming)
                 {
-                    float desiredPitch = -(float)Math.Sin(pos.Pitch); // (float)controls.FlyVector.Y * GameMath.PI;
+                    float desiredPitch = -(float)Math.Sin(pos.Pitch);
                     float pitchDist = GameMath.AngleRadDistance(eplr.WalkPitch, desiredPitch);
                     eplr.WalkPitch += GameMath.Clamp(pitchDist, -2 * dt * GlobalConstants.OverallSpeedMultiplier, 2 * dt * GlobalConstants.OverallSpeedMultiplier);
                     eplr.WalkPitch = GameMath.Mod(eplr.WalkPitch, GameMath.TWOPI);
@@ -136,9 +136,6 @@ namespace Vintagestory.GameContent
             } else
             {
                 float prevYaw = pos.Yaw;
-                IServerPlayer splr = player as IServerPlayer;
-                //if (splr != null) pos.Yaw = splr.CameraYaw;
-
                 controls.CalcMovementVectors(pos, dt);
                 pos.Yaw = prevYaw;
             }

@@ -264,7 +264,7 @@ namespace Vintagestory.GameContent
 
                         activeTasksBySlot[slot] = task;
                         task.StartExecute();
-                        Console.WriteLine("start " + task.ProfilerName);
+                        //Console.WriteLine("start " + task.ProfilerName);
                         OnTaskStarted?.Invoke(task);
                     }
                 }

@@ -75,7 +75,7 @@ namespace Vintagestory.GameContent
 
         public int rainParticleColor;
 
-        static SimpleParticleProperties splashParticles = new SimpleParticleProperties()
+        public static SimpleParticleProperties splashParticles = new SimpleParticleProperties()
         {
             MinPos = new Vec3d(),
             AddPos = new Vec3d(1, 0.25, 0),
@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
             VertexFlags = 32
         };
 
-        static WeatherParticleProps stormDustParticles = new WeatherParticleProps()
+        public static WeatherParticleProps stormDustParticles = new WeatherParticleProps()
         {
             MinPos = new Vec3d(),
             AddPos = new Vec3d(),
@@ -110,7 +110,7 @@ namespace Vintagestory.GameContent
             MaxSize = 0.1f
         };
 
-        static SimpleParticleProperties stormWaterParticles = new SimpleParticleProperties()
+        public static SimpleParticleProperties stormWaterParticles = new SimpleParticleProperties()
         {
             MinPos = new Vec3d(),
             AddPos = new Vec3d(),
@@ -129,7 +129,7 @@ namespace Vintagestory.GameContent
         };
 
 
-        static WeatherParticleProps rainParticle = new WeatherParticleProps()
+        public static WeatherParticleProps rainParticle = new WeatherParticleProps()
         {
             MinPos = new Vec3d(),
             AddPos = new Vec3d(60, 9, 60),
@@ -150,7 +150,7 @@ namespace Vintagestory.GameContent
         };
 
 
-        static WeatherParticleProps hailParticle = new HailParticleProps()
+        public static WeatherParticleProps hailParticle = new HailParticleProps()
         {
             MinPos = new Vec3d(),
             AddPos = new Vec3d(60, 0, 60),
@@ -281,7 +281,9 @@ namespace Vintagestory.GameContent
                     sandFinds = 0;
 
                     WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
-                    var climate = capi.World.BlockAccessor.GetClimateAt(capi.World.Player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
+                    var bpos = capi.World.Player.Entity.Pos.AsBlockPos;
+                    var climate = capi.World.BlockAccessor.GetClimateAt(bpos, EnumGetClimateMode.NowValues);
+                    var sunlightrel = capi.World.BlockAccessor.GetLightLevel(bpos, EnumLightLevelType.OnlySunLight) / 22f;
 
                     float climateWeight = 2f * Math.Max(0, weatherData.curWindSpeed.X - 0.5f) * (1 - climate.WorldgenRainfall) * (1 - climate.Rainfall);
 
@@ -300,7 +302,7 @@ namespace Vintagestory.GameContent
                         targetFogColor[2] += (float)colparts[0] * weight;
                     }
                 
-                    float sandRatio = (float)(sum / 30.0 / cnt) * climateWeight;
+                    float sandRatio = (float)(sum / 30.0 / cnt) * climateWeight * sunlightrel;
                     targetFogDensity = sandRatio;
 
                 }
@@ -441,7 +443,7 @@ namespace Vintagestory.GameContent
                 int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
                 Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
                 if (block.Id == 0) continue;
-                if (capi.World.BlockAccessor.GetLiquidBlock((int)px, py, (int)pz).Id != 0) continue;    // Liquid surface or ice produces no particles
+                if (capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid).Id != 0) continue;    // Liquid surface or ice produces no particles
                 if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
                 {
                     if (rand.NextDouble() < 0.5f) continue;
@@ -486,7 +488,7 @@ namespace Vintagestory.GameContent
                     double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
-                    Block block = capi.World.BlockAccessor.GetLiquidBlock((int)px, py, (int)pz);
+                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid);
                     if (!block.IsLiquid()) continue;
 
                     stormWaterParticles.MinPos.Set(px, py + block.TopMiddlePos.Y, pz);
@@ -568,7 +570,7 @@ namespace Vintagestory.GameContent
 
                 int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
-                Block block = capi.World.BlockAccessor.GetLiquidBlock((int)px, py, (int)pz);
+                Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid);
 
                 if (block.IsLiquid())
                 {

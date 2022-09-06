@@ -124,7 +124,7 @@ namespace Vintagestory.GameContent
             IWorldChunk chunk = api.World.BlockAccessor.GetChunkAtBlockPos(blockSel.Position.X, y, blockSel.Position.Z);
             if (chunk == null) return;
 
-            int blockId = chunk.Unpack_AndReadBlock((ly * chunksize + lz) * chunksize + lx);
+            int blockId = chunk.UnpackAndReadBlock((ly * chunksize + lz) * chunksize + lx, BlockLayersAccess.FluidOrSolid);
 
             if (blockId == 0)
             {
@@ -559,14 +559,14 @@ namespace Vintagestory.GameContent
                 if (slopeness > 0) b = 1.18f;
                 if (slopeness < 0) b = 0.82f;
 
-                int blockId = chunksTmp[cy].Unpack_AndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize));
+                int blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
                 Block block = api.World.Blocks[blockId];
 
                 if (!withSnow && block.BlockMaterial == EnumBlockMaterial.Snow)
                 {
                     y--;
                     cy = y / chunksize;
-                    blockId = chunksTmp[cy].Unpack_AndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize));
+                    blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
                     block = api.World.Blocks[blockId];
                 }
 
@@ -624,7 +624,7 @@ namespace Vintagestory.GameContent
                         if (chunk == null) continue;
 
                         int index = ((dy % chunksize) * chunksize + dz) * chunksize + dx;
-                        Block block = sapi.World.Blocks[chunk.Blocks[index]];
+                        Block block = sapi.World.Blocks[chunk.Data.GetBlockId(index, BlockLayersAccess.FluidOrSolid)];
 
                         if (!block.RainPermeable || dy == 0)
                         {

@@ -470,14 +470,14 @@ namespace Vintagestory.GameContent
             int posZ = (int)(pos.Z + offZ);
 
             Block block = blockAccess.GetBlock(posX, (int)(pos.Y), posZ);
-            Block waterOrIce = blockAccess.GetLiquidBlock(posX, (int)(pos.Y), posZ);
-            Block middleWOIBlock = blockAccess.GetLiquidBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ);
+            Block waterOrIce = blockAccess.GetBlock(posX, (int)(pos.Y), posZ, BlockLayersAccess.Fluid);
+            Block middleWOIBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ, BlockLayersAccess.Fluid);
 
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
             entity.FeetInLiquid = false;
             if (waterOrIce.IsLiquid())
             {
-                Block aboveblock = blockAccess.GetLiquidBlock(posX, (int)(pos.Y + 1), posZ);
+                Block aboveblock = blockAccess.GetBlock(posX, (int)(pos.Y + 1), posZ, BlockLayersAccess.Fluid);
                 entity.FeetInLiquid = ((waterOrIce.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
             }
             entity.InLava = block.LiquidCode == "lava";

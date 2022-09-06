@@ -111,10 +111,20 @@ namespace Vintagestory.GameContent
             }
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);
-            BlockEntityAnimationUtil.CacheInvTransforms(shape.Elements);
+            CacheInvTransforms(shape.Elements);
             shape.ResolveAndLoadJoints();
 
-            capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
+            TesselationMetaData meta = new TesselationMetaData()
+            {
+                QuantityElements = block.Shape.QuantityElements,
+                SelectiveElements = block.Shape.SelectiveElements,
+                TexSource = texSource,
+                WithJointIds = true,
+                WithDamageEffect = true,
+                TypeForLogging = "be-typedcontainer"
+            };
+
+            capi.Tesselator.TesselateShape(meta, shape, out meshdata);
 
             InitializeAnimator(cacheDictKey, rotation, shape, capi.Render.UploadMesh(meshdata));
         }
@@ -145,7 +155,18 @@ namespace Vintagestory.GameContent
             CacheInvTransforms(shape.Elements);
             shape.ResolveAndLoadJoints();
 
-            capi.Tesselator.TesselateShapeWithJointIds("entity", shape, out meshdata, texSource, null, block.Shape.QuantityElements, block.Shape.SelectiveElements);
+            TesselationMetaData meta = new TesselationMetaData()
+            {
+                QuantityElements = block.Shape.QuantityElements,
+                SelectiveElements = block.Shape.SelectiveElements,
+                TexSource = texSource,
+                WithJointIds = true,
+                WithDamageEffect = true,
+                TypeForLogging = "be-typedcontainer",
+            };
+
+
+            capi.Tesselator.TesselateShape(meta, shape, out meshdata);
 
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 

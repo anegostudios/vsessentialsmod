@@ -46,12 +46,12 @@ namespace Vintagestory.GameContent
 
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "lightning");
 
-                capi.RegisterCommand("lntest", "", "", onCmdLineTest);
+                //capi.RegisterCommand("lntest", "", "", onCmdLineTest);
             } else
             {
                 api.Event.RegisterGameTickListener(OnServerTick, 40, 3);
 
-                (api as ICoreServerAPI).RegisterCommand("lntest", "", "", onCmdLineTestServer);
+                (api as ICoreServerAPI).RegisterCommand("lntest", "", "", onCmdLineTestServer, Privilege.controlserver);
             }
         }
 

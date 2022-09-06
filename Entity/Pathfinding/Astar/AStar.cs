@@ -18,9 +18,12 @@ namespace Vintagestory.Essentials
         public double centerOffsetX = 0.5;
         public double centerOffsetZ = 0.5;
 
+        CollisionTester collTester;
+
         public AStar(ICoreServerAPI api)
         {
             this.api = api;
+            collTester = new CollisionTester();
             blockAccess = api.World.GetCachingBlockAccessor(true, true);
         }
 
@@ -35,6 +38,12 @@ namespace Vintagestory.Essentials
 
         public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
         {
+            if (entityCollBox.XSize > 100 || entityCollBox.YSize > 100 || entityCollBox.ZSize > 100)
+            {
+                api.Logger.Warning("AStar:FindPath() was called with a entity box larger than 100 ({0}). Algo not designed for such sizes, likely coding error. Will ignore.", entityCollBox);
+                return null;
+            }
+
             blockAccess.Begin();
 
             centerOffsetX = 0.3 + api.World.Rand.NextDouble() * 0.4;
@@ -127,7 +136,7 @@ namespace Vintagestory.Essentials
             tmpVec.Set(node.X + centerOffsetX, node.Y, node.Z + centerOffsetZ);
             Block block;
 
-            if (!api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+            if (!collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
             {
                 int descended = 0;
 
@@ -139,7 +148,7 @@ namespace Vintagestory.Essentials
                     block = blockAccess.GetBlock(tmpPos);
                     if (block.LiquidCode == "lava" || !block.CanStep) return false;
 
-                    if (blockAccess.GetLiquidBlock(tmpPos).LiquidCode == "water")
+                    if (blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid).LiquidCode == "water")
                     {
                         extraCost = 5;
                         //node.Y--; - we swim on top
@@ -168,7 +177,7 @@ namespace Vintagestory.Essentials
 
                     // Only reduce the tmpVec if we are actually falling down 1 block
                     tmpVec.Y--;
-                    if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+                    if (collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
                     {
                         // Can't wall walk
                         return false;
@@ -190,7 +199,7 @@ namespace Vintagestory.Essentials
                 while (--height > 0)
                 {
                     tmpVec.Y++;
-                    if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+                    if (collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
                     {
                         return false;
                     }
@@ -200,7 +209,7 @@ namespace Vintagestory.Essentials
                 if (fromDir.IsDiagnoal)
                 {
                     tmpVec.Add(-fromDir.Normali.X / 2f, 0, -fromDir.Normali.Z / 2f);
-                    if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+                    if (collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
                     {
                         return false;
                     }
@@ -224,7 +233,7 @@ namespace Vintagestory.Essentials
             
             tmpVec.Set(node.X + centerOffsetX, node.Y + stepHeight + steponHeightAdjust, node.Z + centerOffsetZ);
             // Test for collision if we step up
-            if (!api.World.CollisionTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false))
+            if (!collTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false))
             {
                 if (fromDir.IsDiagnoal)
                 {
@@ -232,7 +241,7 @@ namespace Vintagestory.Essentials
                     {
                         // If diagonal, make sure we can squeeze through
                         tmpVec.Add(-fromDir.Normali.X / 2f, 0, -fromDir.Normali.Z / 2f);
-                        if (api.World.CollisionTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
+                        if (collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
                         {
                             return false;
                         }

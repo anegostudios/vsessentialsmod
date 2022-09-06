@@ -1,5 +1,6 @@
 ﻿using System;
 using Vintagestory.API;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -20,6 +21,7 @@ namespace Vintagestory.GameContent
 
         long listenerId;
         long lastMoveMs;
+        ICoreAPI api;
 
 
         /*internal float FatReserves
@@ -116,6 +118,7 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             hungerTree = entity.WatchedAttributes.GetTreeAttribute("hunger");
+            api = entity.World.Api;
 
             if (hungerTree == null)
             {
@@ -145,9 +148,69 @@ namespace Vintagestory.GameContent
             listenerId = entity.World.RegisterGameTickListener(SlowTick, 6000);
 
             UpdateNutrientHealthBoost();
+
+            var capi = entity.Api as ICoreClientAPI;
+            if (capi != null)
+            {
+                bool isSelf = capi.World.Player.Entity.EntityId == entity.EntityId;
+                if (isSelf)
+                {
+                    capi.Event.RegisterEventBusListener(onChatKeyDown, 1, "chatkeydownpost");
+                }
+            }
         }
 
+        private void onChatKeyDown(string eventName, ref EnumHandling handling, IAttribute data)
+        {
+            var treeAttr = data as TreeAttribute;
+            int keyCode = (treeAttr["key"] as IntAttribute).value;
+            string text = (treeAttr["text"] as StringAttribute).value;
 
+            if (keyCode != (int)GlKeys.BackSpace && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
+            {
+                var rnd = api.World.Rand;
+                float intox = entity.WatchedAttributes.GetFloat("intoxication");
+                if (rnd.NextDouble() < intox)
+                {
+                    switch (rnd.Next(9))
+                    {
+                        // Flip last 2 chars
+                        case 0:
+                        case 1:
+                            if (text.Length > 1)
+                            {
+                                text = text.Substring(0, text.Length - 2) + text[text.Length - 1] + text[text.Length - 2];
+                            }
+                            break;
+                        // Repeat last char
+                        case 2:
+                        case 3:
+                        case 4:
+                            text = text + text[text.Length - 1];
+                            break;
+                        // Add random letter left/right from the last pressed key
+                        case 5:
+                            string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
+                            var lastchar = text[text.Length - 1];
+
+                            for (int i = 0; i < 3; i++)
+                            {
+                                int index = keybLayout[i].IndexOf(lastchar);
+                                if (index >= 0)
+                                {
+                                    int rndoffset = rnd.Next(2) * 2 - 1;
+                                    text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                                }
+                            }
+                            break;
+
+                    }
+
+                    (treeAttr["text"] as StringAttribute).value = text;
+                }
+            }
+
+        }
 
         public override void OnEntityDespawn(EntityDespawnReason despawn)
         {

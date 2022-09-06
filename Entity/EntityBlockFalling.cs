@@ -92,7 +92,12 @@ namespace Vintagestory.GameContent
                 float smokeAdd = 0f;
                 if (bef.nowImpacted)
                 {
-                    smokeAdd = 20f;
+                    var lblock = capi.World.BlockAccessor.GetBlock(bef.Pos.AsBlockPos, BlockLayersAccess.Fluid);
+                    // No smoke under water
+                    if (lblock.Id == 0)
+                    {
+                        smokeAdd = 20f;
+                    }
                     bef.nowImpacted = false;
                 }
 
@@ -423,8 +428,12 @@ namespace Vintagestory.GameContent
                 }
             } else
             {
-                World.BlockAccessor.SetBlock(Block.BlockId, pos);
-                World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(false));
+                var lbock = World.BlockAccessor.GetBlock(pos, BlockLayersAccess.Fluid);
+                if (lbock.Id == 0 || Block.BlockMaterial != EnumBlockMaterial.Snow)
+                {
+                    World.BlockAccessor.SetBlock(Block.BlockId, pos);
+                    World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(false));
+                }
 
                 if (blockEntityAttributes != null)
                 {
@@ -440,8 +449,8 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-            
-            NotifyNeighborsOfBlockChange(pos);
+
+            World.BlockAccessor.TriggerNeighbourBlockUpdate(pos);
         }
 
 
@@ -454,15 +463,6 @@ namespace Vintagestory.GameContent
             if (renderer != null) renderer.DoRender = on;
         }
 
-        private void NotifyNeighborsOfBlockChange(BlockPos pos)
-        {
-            foreach (BlockFacing facing in BlockFacing.ALLFACES)
-            {
-                BlockPos npos = pos.AddCopy(facing);
-                Block neib = World.BlockAccessor.GetBlock(npos);
-                neib.OnNeighbourBlockChange(World, npos, pos);
-            }
-        }
 
         public override void OnFallToGround(double motionY)
         {
@@ -474,7 +474,7 @@ namespace Vintagestory.GameContent
 
             if (Api.Side == EnumAppSide.Server)
             {
-                block = World.BlockAccessor.GetBlock(finalPos);
+                block = World.BlockAccessor.GetBlock(finalPos, BlockLayersAccess.SolidBlocks);
 
                 if (block.OnFallOnto(World, finalPos, Block, blockEntityAttributes))
                 {
@@ -486,12 +486,15 @@ namespace Vintagestory.GameContent
 
             if (canFallSideways)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 6; i++)
                 {
-                    BlockFacing facing = BlockFacing.HORIZONTALS[i];
-                    if (
-                        World.BlockAccessor.GetBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y, pos.Z + facing.Normali.Z).Replaceable >= 6000 &&
-                        World.BlockAccessor.GetBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z).Replaceable >= 6000)
+                    if (i == 4) continue;
+                    BlockFacing facing = BlockFacing.ALLFACES[i];
+
+                    var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y, pos.Z + facing.Normali.Z);
+                    var ndownblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z);
+
+                    if (nblock.Replaceable >= 6000 && ndownblock.Replaceable >= 6000)
                     {
                         if (Api.Side == EnumAppSide.Server)
                         {
@@ -501,37 +504,20 @@ namespace Vintagestory.GameContent
                         }
 
                         fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
-                        //spawnParticles(0);
                         return;
                     }
                 }
+
             }
 
             //spawnParticles(20f);
             nowImpacted = true;
             
             
-            Block blockAtFinalPos = World.BlockAccessor.GetBlock(finalPos);
+            Block blockAtFinalPos = World.BlockAccessor.GetMostSolidBlock(finalPos);
 
             if (Api.Side == EnumAppSide.Server)
             {
-                if (!block.IsReplacableBy(Block))
-                {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        BlockFacing facing = BlockFacing.HORIZONTALS[i];
-                        block = World.BlockAccessor.GetBlock(finalPos.X + facing.Normali.X, finalPos.Y + facing.Normali.Y, finalPos.Z + facing.Normali.Z);
-
-                        if (block.Replaceable >= 6000)
-                        {
-                            finalPos.X += facing.Normali.X;
-                            finalPos.Y += facing.Normali.Y;
-                            finalPos.Z += facing.Normali.Z;
-                            break;
-                        }
-                    }
-                }
-
                 if (block.IsReplacableBy(Block))
                 {
                     if (!block.IsLiquid() || Block.BlockMaterial != EnumBlockMaterial.Snow)
@@ -543,9 +529,15 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    // Space is occupied by maybe a torch or some other block we shouldn't replace
-                    DropItems(finalPos);
-
+                    if (block.Replaceable >= 6000)
+                    {
+                        DropItems(finalPos);
+                    }
+                    else
+                    {
+                        SidedPos.Y += 1;
+                        return;
+                    }
                 }
 
                 

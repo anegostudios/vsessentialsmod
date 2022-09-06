@@ -144,6 +144,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("collectitems", typeof(EntityBehaviorCollectEntities));
             api.RegisterEntityBehaviorClass("health", typeof(EntityBehaviorHealth));
             api.RegisterEntityBehaviorClass("hunger", typeof(EntityBehaviorHunger));
+            api.RegisterEntityBehaviorClass("drunktyping", typeof(EntityBehaviorDrunkTyping));
             api.RegisterEntityBehaviorClass("breathe", typeof(EntityBehaviorBreathe));
             
             api.RegisterEntityBehaviorClass("playerphysics", typeof(EntityBehaviorPlayerPhysics));

@@ -444,11 +444,11 @@ namespace Vintagestory.GameContent
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
             BlockPos pos = entity.ServerPos.XYZ.AsBlockPos.Add(dx, dy, dz);
-            if (blockAccess.GetLiquidBlock(pos).IsLiquid()) return false;
+            if (blockAccess.GetBlock(pos, BlockLayersAccess.Fluid).IsLiquid()) return false;
             if (!blockAccess.GetBlock(pos).IsReplacableBy(block)) return false;
 
             pos.Y--;
-            if (blockAccess.GetSolidBlock(pos.X, pos.Y, pos.Z).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
+            if (blockAccess.GetMostSolidBlock(pos.X, pos.Y, pos.Z).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
             {
                 pos.Y++;
                 blockAccess.SetBlock(block.BlockId, pos);

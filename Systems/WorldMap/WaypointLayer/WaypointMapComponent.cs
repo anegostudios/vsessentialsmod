@@ -61,10 +61,14 @@ namespace Vintagestory.GameContent
 
             float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ZoomLevel);
             
-
-            if (wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out tex))
+            if (!wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out tex))
             {
-                prog.BindTexture2D("tex2d", wpLayer.texturesByIcon[waypoint.Icon].TextureId, 0);
+                wpLayer.texturesByIcon.TryGetValue("circle", out tex);
+            }
+
+            if (tex != null)
+            {
+                prog.BindTexture2D("tex2d", tex.TextureId, 0);
                 mvMat
                     .Set(api.Render.CurrentModelviewMatrix)
                     .Translate(x, y, 60)
@@ -152,9 +156,12 @@ namespace Vintagestory.GameContent
                         editWpDlg.TryClose();
                         editWpDlg.Dispose();
                     }
-                    editWpDlg = new GuiDialogEditWayPoint(capi, waypoint, waypointIndex);
+
+                    var mapdlg = capi.ModLoader.GetModSystem<WorldMapManager>().worldMapDlg;
+
+                    editWpDlg = new GuiDialogEditWayPoint(capi, mapdlg.MapLayers.FirstOrDefault(l => l is WaypointMapLayer) as WaypointMapLayer, waypoint, waypointIndex);
                     editWpDlg.TryOpen();
-                    editWpDlg.OnClosed += () => capi.Gui.RequestFocus(capi.ModLoader.GetModSystem<WorldMapManager>().worldMapDlg);
+                    editWpDlg.OnClosed += () => capi.Gui.RequestFocus(mapdlg);
 
                     args.Handled = true;
                 }

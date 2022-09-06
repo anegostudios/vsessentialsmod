@@ -7,10 +7,10 @@ using Vintagestory.API.Common;
 
 namespace Vintagestory.GameContent
 {
-    public class BlockForLiquidsLayer : Block
+    public class BlockForFluidsLayer : Block
     {
 
-        public override bool ForLiquidsLayer { get { return true; } }
+        public override bool ForFluidsLayer { get { return true; } }
 
 
         public override bool DoPlaceBlock(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ItemStack byItemStack)
@@ -31,7 +31,7 @@ namespace Vintagestory.GameContent
             }
             if (preventDefault) return result;
 
-            world.BlockAccessor.SetLiquidBlock(BlockId, blockSel.Position);
+            world.BlockAccessor.SetBlock(BlockId, blockSel.Position, BlockLayersAccess.Fluid);
             // We do not call the base.DoPlaceBlock() method because we want to place this to the liquids layer, not the solid blocks layer
 
             return true;

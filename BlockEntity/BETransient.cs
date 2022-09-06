@@ -48,9 +48,20 @@ namespace Vintagestory.GameContent
             base.Initialize(api);
             if (Block.Attributes?["transientProps"].Exists != true) return;
 
+            // Sanity check
+            if (api.Side == EnumAppSide.Server) {
+                var block = Api.World.BlockAccessor.GetBlock(Pos);
+                if (block.Id != Block.Id)
+                {
+                    Api.World.Logger.Error("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
+                    // Cant delete during init
+                    api.Event.EnqueueMainThreadTask(() => api.World.BlockAccessor.RemoveBlockEntity(Pos), "delete betransient");
+                    return;
+                }
+            }
+
             props = Block.Attributes["transientProps"].AsObject<TransientProperties>();
             if (props == null) return;
-
 
             if (transitionHoursLeft <= 0)
             {
@@ -83,7 +94,7 @@ namespace Vintagestory.GameContent
             Block block = Api.World.BlockAccessor.GetBlock(Pos);
             if (block.Attributes == null)
             {
-                Api.World.Logger.Error("BETransient exiting at {0} cannot find block attributes for {1}. Will stop transient timer", Pos, this.Block.Code.ToShortString());
+                Api.World.Logger.Error("BETransient @{0}: cannot find block attributes for {1}. Will stop transient timer", Pos, this.Block.Code.ToShortString());
                 UnregisterGameTickListener(listenerId);
                 return;
             }

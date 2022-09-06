@@ -99,8 +99,6 @@ namespace Vintagestory.ServerMods.NoObf
         public bool Frostable;
 
         [JsonProperty]
-        public byte[] LightHsv = new byte[] { 0, 0, 0 };
-        [JsonProperty]
         public ushort LightAbsorption = 99;
         [JsonProperty]
         public Dictionary<string, bool> LightTraversable;

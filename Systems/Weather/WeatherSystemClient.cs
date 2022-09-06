@@ -9,6 +9,12 @@ namespace Vintagestory.GameContent
 {
     public class WeatherSystemClient : WeatherSystemBase, IRenderer
     {
+        /// <summary>
+        /// Set by the WeatherSimulation System in the survival mod. Value is client side at the players position. Has values in the 0..1 range. 1 being it just rained. Used by leaf blocks to spawn rain drop particles. 0 meaning it hasn't rained in 4+ hours.
+        /// </summary>
+        public static float CurrentEnvironmentWetness;
+
+
         public ICoreClientAPI capi;
         public IClientNetworkChannel clientChannel;
         public CloudRenderer cloudRenderer;
@@ -110,6 +116,8 @@ namespace Vintagestory.GameContent
         Vec3f windSpeedSmoothed = new Vec3f();
         double windRandCounter;
 
+        float wetnessScanAccum = 0;
+
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             simLightning.OnRenderFrame(dt, stage);
@@ -154,6 +162,23 @@ namespace Vintagestory.GameContent
                 GlobalConstants.CurrentWindSpeedClient.Set(windSpeedSmoothed.X, windSpeedSmoothed.Y, windSpeedSmoothed.Z + (float)rndx * windSpeedSmoothed.X);
 
                 capi.Ambient.CurrentModifiers["weather"] = WeatherDataAtPlayer.BlendedWeatherData.Ambient;
+
+                wetnessScanAccum += dt;
+                if (wetnessScanAccum > 2)
+                {
+                    wetnessScanAccum = 0;
+                    double totalDays = capi.World.Calendar.TotalDays;
+                    float rainSum = 0;
+
+                    // Iterate over the last 3 hours, every 15 minutes
+                    for (int i = 0; i < 12; i++)
+                    {
+                        float weight = 1 - i / 20f; // Weight old values less
+                        rainSum += weight * capi.World.BlockAccessor.GetClimateAt(plrPos, EnumGetClimateMode.ForSuppliedDateValues, totalDays - i / 24.0 / 4).Rainfall;
+                    }
+
+                    CurrentEnvironmentWetness = GameMath.Clamp(rainSum, 0, 1);
+                }
             }
         }
 
@@ -288,8 +313,6 @@ namespace Vintagestory.GameContent
             // Pre init the clouds.             
             capi.Ambient.UpdateAmbient(0.1f);
 
-            cloudRenderer.blendedCloudDensity = capi.Ambient.BlendedCloudDensity;
-            cloudRenderer.blendedGlobalCloudBrightness = capi.Ambient.BlendedCloudBrightness;
             cloudRenderer.CloudTick(0.1f);
 
             capi.Logger.VerboseDebug("Done init WeatherSystemClient");

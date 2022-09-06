@@ -84,7 +84,8 @@ namespace Vintagestory.GameContent
             targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
                 if (!IsTargetableEntity(e, hereRange)) return false;
                 if (!(e is EntityPlayer) || !lowStabilityAttracted) return true;
-                return e.WatchedAttributes.GetDouble("temporalStability", 1) < 0.25;
+
+                return e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
             });
 
 
@@ -123,6 +124,7 @@ namespace Vintagestory.GameContent
                 pathTraverser.CurrentTarget.X = targetPos.X;
                 pathTraverser.CurrentTarget.Y = targetPos.Y;
                 pathTraverser.CurrentTarget.Z = targetPos.Z;
+                pathTraverser.Retarget();
             }
 
             if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos) > fleeingDistance * fleeingDistance)

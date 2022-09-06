@@ -394,8 +394,8 @@ namespace Vintagestory.Essentials
                 controls.FlyVector.Set(controls.WalkVector);
 
                 Vec3d pos = entity.Pos.XYZ;
-                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z, BlockLayersAccess.Fluid);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z, BlockLayersAccess.Fluid);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 
@@ -423,8 +423,8 @@ namespace Vintagestory.Essentials
                 controls.FlyVector.Set(controls.WalkVector);
 
                 Vec3d pos = entity.Pos.XYZ;
-                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y), (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y), (int)pos.Z, BlockLayersAccess.Fluid);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z, BlockLayersAccess.Fluid);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 

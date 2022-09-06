@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
             }
 
             var beh = entity.GetBehavior<EntityBehaviorHealth>();
-            healthRel = beh.Health / beh.MaxHealth;
+            healthRel = beh == null ? 1 : beh.Health / beh.MaxHealth;
 
             long sourceEntityId = damageSource.SourceEntity?.EntityId ?? 0;
 

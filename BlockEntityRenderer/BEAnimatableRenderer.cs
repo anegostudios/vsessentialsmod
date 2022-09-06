@@ -90,6 +90,7 @@ namespace Vintagestory.GameContent
                 prog.Uniform("skipRenderJointId", -2);
                 prog.Uniform("skipRenderJointId2", -2);
                 prog.Uniform("glitchEffectStrength", 0f);
+                prog.Uniform("frostAlpha", 0f);
             } else
             {
                 prog.UniformMatrix("modelViewMatrix", Mat4f.Mul(new float[16], capi.Render.CurrentModelviewMatrix, ModelMat));

@@ -112,6 +112,25 @@ namespace Vintagestory.GameContent
                 (int)(Texture.Height * map.ZoomLevel),
                 renderZ
             );
+
+            /*var width = Texture.Width * map.ZoomLevel;
+            var height = Texture.Height * map.ZoomLevel;
+            var col = ColorUtil.ColorFromRgba(255, 255, 255, 128);
+
+            for (int x = 0; x < ChunkLen; x++)
+            {
+                for (int z = 0; z < ChunkLen; z++)
+                {
+                    capi.Render.RenderRectangle(
+                        (int)(map.Bounds.renderX + viewPos.X + width/3 * x),
+                        (int)(map.Bounds.renderY + viewPos.Y + width / 3 * z),
+                        renderZ,
+                        (int)(width/3),
+                        (int)(height/3),
+                        col
+                    );
+                }
+            }*/
         }
 
         public override void Dispose()

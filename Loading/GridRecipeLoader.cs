@@ -103,6 +103,7 @@ namespace Vintagestory.ServerMods
                         {
                             if (ingred.Name == variantCode)
                             {
+                                ingred.FillPlaceHolder(variantCode, variants[i % variants.Length]);
                                 ingred.Code.Path = ingred.Code.Path.Replace("*", variants[i % variants.Length]);
                             }
 

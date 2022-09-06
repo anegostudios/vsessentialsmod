@@ -124,7 +124,7 @@ namespace Vintagestory.GameContent
         private EnumSuspendState Event_ServerSuspend()
         {
             shouldPauseThread = true;
-            if (isThreadPaused) return EnumSuspendState.Ready;
+            if (isThreadPaused || !enabled) return EnumSuspendState.Ready;
             else return EnumSuspendState.Wait;
         }
 
@@ -631,7 +631,17 @@ namespace Vintagestory.GameContent
                 //    - A snow variantable block: Call the method with the new level
 
 
-                Block block = chunk.GetLocalLiquidOrBlockAtBlockPos(sapi.World, pos);
+                Block block = chunk.GetLocalBlockAtBlockPos(sapi.World, pos);
+                Block blockf = chunk.GetLocalBlockAtBlockPos(sapi.World, pos.X, pos.Y, pos.Z, BlockLayersAccess.Fluid);
+                if (blockf.Id != 0)
+                {
+                    // Prioitize ice
+                    if (!blockf.IsLiquid())
+                    {
+                        block = blockf;
+                    }
+                    else if (block.GetSnowLevel(pos) == 0) continue;  // No snow layer should form on blocks which are in liquids
+                }
 
                 float hereAccum = 0;
 
@@ -642,7 +652,7 @@ namespace Vintagestory.GameContent
                 }
 
                 float nowAccum = hereAccum + sumsnapshot.GetAvgSnowAccumByRegionCorner(relx, rely, relz);
-                
+
                 mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, ws.GeneralConfig.SnowLayerBlocks.Count + 0.6f);
 
                 float hereShouldLevel = nowAccum - GameMath.MurmurHash3Mod(pos.X, 0, pos.Z, 150) / 300f;
@@ -660,8 +670,14 @@ namespace Vintagestory.GameContent
                 }
                 if (chunk == null) return null;
 
-                Block upBlock = chunk.GetLocalLiquidOrBlockAtBlockPos(sapi.World, placePos);
-
+                Block upBlock = chunk.GetLocalBlockAtBlockPos(sapi.World, placePos);
+                Block upblockf = chunk.GetLocalBlockAtBlockPos(sapi.World, placePos.X, placePos.Y, placePos.Z, BlockLayersAccess.Fluid);
+                // Prioitize ice
+                if (upblockf.Id != 0)
+                {
+                    if (!upblockf.IsLiquid()) upBlock = upblockf;
+                    else if(upBlock.GetSnowLevel(pos) == 0)  continue;  // No snow layer should form on blocks which are in liquids
+                }
 
                 // Case 1: We have a block that can become snow covered (or more snow covered)
                 placePos.Set(pos);

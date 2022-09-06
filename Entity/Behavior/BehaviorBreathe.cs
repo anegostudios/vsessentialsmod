@@ -5,35 +5,103 @@ using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorBreathe : EntityBehavior
     {
+        ITreeAttribute oxygenTree => entity.WatchedAttributes.GetTreeAttribute("oxygen");
+
+        public float Oxygen
+        {
+            get { return oxygenTree.GetFloat("currentoxygen"); }
+            set {
+                float prevvalue = oxygenTree.GetFloat("currentoxygen");
+                oxygenTree.SetFloat("currentoxygen", value); 
+                if (value != prevvalue)
+                {
+                    entity.WatchedAttributes.MarkPathDirty("oxygen");
+                }
+                
+            }
+        }
+
+        public float MaxOxygen
+        {
+            get { return oxygenTree.GetFloat("maxoxygen"); }
+            set { oxygenTree.SetFloat("maxoxygen", value); entity.WatchedAttributes.MarkPathDirty("oxygen"); }
+        }
+
+        public bool HasAir
+        {
+            get { return oxygenTree.GetBool("hasair"); }
+            set {
+                bool prevValue = oxygenTree.GetBool("hasair");
+                oxygenTree.SetBool("hasair", value);
+                if (prevValue != value)
+                {
+                    entity.WatchedAttributes.MarkPathDirty("oxygen");
+                }
+            }
+        }
+
+        // The padding that the collisionbox is adjusted by for suffocation damage.  Can be adjusted as necessary - don't set to exactly 0.
         Cuboidd tmp = new Cuboidd();
         float breathAccum = 0;
-        //the padding that the collisionbox is adjusted by for suffocation damage.  Can be adjusted as necessary - don't set to exactly 0.
-        float padding = 0.1f; 
+        float padding = 0.1f;
+        Block suffocationSourceBlock;
+        float damageAccum;
 
         
         public EntityBehaviorBreathe(Entity entity) : base(entity)
         {
         }
 
+        public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
+        {
+            base.Initialize(properties, typeAttributes);
+
+            if (oxygenTree == null)
+            {
+                entity.WatchedAttributes.SetAttribute("oxygen", new TreeAttribute());
+
+                float maxoxy = 40000;
+                if (entity is EntityPlayer) maxoxy = entity.World.Config.GetAsInt("lungCapacity", 40000);
+
+                MaxOxygen = typeAttributes["maxoxygen"].AsFloat(maxoxy);
+                Oxygen = typeAttributes["currentoxygen"].AsFloat(MaxOxygen);
+                HasAir = true;
+            }
+        }
+
+        public override void OnEntityRevive()
+        {
+            Oxygen = MaxOxygen;
+        }
+
         public void Check()
         {
+            if (entity.World.Side == EnumAppSide.Client) return;
+
+            bool nowHasAir = true;
+
             if (entity is EntityPlayer)
             {
                 EntityPlayer plr = (EntityPlayer)entity;
                 EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
-                if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
+                if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator)
+                {
+                    HasAir = true;
+                    return;
+                }
             }
             
             BlockPos pos = new BlockPos(
-                (int)(entity.ServerPos.X + entity.LocalEyePos.X),
-                (int)(entity.ServerPos.Y + entity.LocalEyePos.Y),
-                (int)(entity.ServerPos.Z + entity.LocalEyePos.Z)
+                (int)(entity.SidedPos.X + entity.LocalEyePos.X),
+                (int)(entity.SidedPos.Y + entity.LocalEyePos.Y),
+                (int)(entity.SidedPos.Z + entity.LocalEyePos.Z)
             );
 
             Block block = entity.World.BlockAccessor.GetBlock(pos);
@@ -41,31 +109,35 @@ namespace Vintagestory.GameContent
 
             Cuboidf box = new Cuboidf();
 
-            if (collisionboxes == null) return;
-
-            for (int i = 0; i < collisionboxes.Length; i++)
+            if (collisionboxes != null && block.Attributes?["asphyxiating"].AsBool(true) != false)
             {
-                box.Set(collisionboxes[i]);
-                box.OmniGrowBy(-padding);
-                tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
-                box.OmniGrowBy(padding);
-
-                if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
+                for (int i = 0; i < collisionboxes.Length; i++)
                 {
-                    Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
+                    box.Set(collisionboxes[i]);
+                    box.OmniGrowBy(-padding);
+                    tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
+                    box.OmniGrowBy(padding);
 
-                    if (tmp.Intersects(EntitySuffocationBox))
+                    if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
                     {
-                        DamageSource dmgsrc = new DamageSource() { Source = EnumDamageSource.Block, SourceBlock = block, Type = EnumDamageType.Suffocation };
-                        entity.ReceiveDamage(dmgsrc, 1f);
-                        break;
+                        Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
+
+                        if (tmp.Intersects(EntitySuffocationBox))
+                        {
+                            nowHasAir = false;
+                            suffocationSourceBlock = block;
+                            break;
+                        }
                     }
-
-
                 }
-
             }
 
+            if (nowHasAir)
+            {
+                if (block.IsLiquid() && block.LiquidLevel / 7f > entity.LocalEyePos.Y - (int)entity.LocalEyePos.Y) nowHasAir = false;
+            }
+
+            HasAir = nowHasAir;
         }
 
 
@@ -76,6 +148,24 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            if (!HasAir)
+            {
+                Oxygen = Math.Max(0, Oxygen - deltaTime * 1000);
+                
+                if (Oxygen <=0)
+                {
+                    damageAccum += deltaTime;
+                    if (damageAccum > 0.75)
+                    {
+                        damageAccum = 0;
+                        DamageSource dmgsrc = new DamageSource() { Source = EnumDamageSource.Block, SourceBlock = suffocationSourceBlock, Type = EnumDamageType.Suffocation };
+                        entity.ReceiveDamage(dmgsrc, 0.5f);
+                    }
+                }
+            } else
+            {
+                Oxygen = Math.Min(MaxOxygen, Oxygen + deltaTime * 10000);
+            }
 
             base.OnGameTick(deltaTime);
 

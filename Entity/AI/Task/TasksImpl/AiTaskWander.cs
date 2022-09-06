@@ -184,7 +184,7 @@ namespace Vintagestory.GameContent
                         curTarget.Y = Math.Min(curTarget.Y, rainMapY + maxHeight);
 
                         // Cannot be in water
-                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
@@ -195,7 +195,7 @@ namespace Vintagestory.GameContent
                         else
                         {
                             // Does not like water
-                            waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                            waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                             if (waterorIceBlock.IsLiquid()) curTarget.W /= 2;
 
                             // Lets make a straight line plot to see if we would fall off a cliff
@@ -236,12 +236,12 @@ namespace Vintagestory.GameContent
                         break;
 
                     case EnumHabitat.Sea:
-                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
                     case EnumHabitat.Underwater:
-                        waterorIceBlock = entity.World.BlockAccessor.GetLiquidBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         else curTarget.W = 1 / (Math.Abs(dy) + 1);  //prefer not too much vertical change when underwater
 

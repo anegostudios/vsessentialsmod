@@ -202,6 +202,9 @@ namespace Vintagestory.GameContent
 
         public void CloudTick(float deltaTime)
         {
+            blendedCloudDensity = capi.Ambient.BlendedCloudDensity;
+            blendedGlobalCloudBrightness = capi.Ambient.BlendedCloudBrightness;
+
             if (isFirstTick)
             {
                 weatherSys.ProcessWeatherUpdates();

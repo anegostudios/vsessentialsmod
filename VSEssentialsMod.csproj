@@ -48,8 +48,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.0.8, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.0.0.8\lib\net45\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.2.2.0\lib\net45\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="AnimatedGif">
@@ -91,7 +91,7 @@
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
     <Compile Include="Block\BlockMultiblock.cs" />
-    <Compile Include="Block\BlockForLiquidsLayer.cs" />
+    <Compile Include="Block\BlockForFluidsLayer.cs" />
     <Compile Include="Core.cs" />
     <Compile Include="Entity\AI\Goal-Action\Actions\AiActionGoto.cs" />
     <Compile Include="Entity\AI\Goal-Action\AiActionBase.cs" />
@@ -112,6 +112,7 @@
     <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
     <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
     <Compile Include="Entity\Behavior\BehaviorHarvestable.cs" />
+    <Compile Include="Entity\Behavior\BehaviorDrunkTyping.cs" />
     <Compile Include="Entity\Behavior\BehaviorMouthInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
@@ -188,8 +189,8 @@
     <Compile Include="Systems\WorldMap\ChunkLayer\MapDB.cs" />
     <Compile Include="Systems\WorldMap\GuiElementMap.cs" />
     <Compile Include="Gui\GuiDialogLogViewer.cs" />
-    <Compile Include="Systems\WorldMap\WaypointLayer\GuiDialogEditWayPoint.cs" />
     <Compile Include="Systems\WorldMap\WaypointLayer\GuiDialogAddWayPoint.cs" />
+    <Compile Include="Systems\WorldMap\WaypointLayer\GuiDialogEditWayPoint.cs" />
     <Compile Include="Systems\WorldMap\GuiDialogWorldMap.cs" />
     <Compile Include="InerhitableRotatableCube.cs" />
     <Compile Include="Loading\BasicBlocksLoader.cs" />

@@ -147,8 +147,10 @@ namespace Vintagestory.GameContent
 
             getFrostAlpha = () =>
             {
-                float temp = api.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, api.World.Calendar.TotalDays).Temperature;
-                return GameMath.Clamp((Math.Max(0, -temp) - 5) / 5f, 0, 1);
+                var pos = entity.Pos.AsBlockPos;
+                float temp = api.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, api.World.Calendar.TotalDays).Temperature;
+                float dist = 1 - GameMath.Clamp((api.World.BlockAccessor.GetDistanceToRainFall(pos) - 2) / 2f, 0, 1f);
+                return GameMath.Clamp((Math.Max(0, -temp) - 5) / 5f, 0, 1) * dist;
             };
         }
 
@@ -262,15 +264,16 @@ namespace Vintagestory.GameContent
                     {
                         TesselationMetaData meta = new TesselationMetaData()
                         {
-                            quantityElements = compositeShape.QuantityElements,
-                            selectiveElements = compositeShape.SelectiveElements,
-                            texSource = this,
-                            withJointIds = true,
-                            withDamageEffect = true,
-                            typeForLogging = "entity"
+                            QuantityElements = compositeShape.QuantityElements,
+                            SelectiveElements = compositeShape.SelectiveElements,
+                            TexSource = this,
+                            WithJointIds = true,
+                            WithDamageEffect = true,
+                            TypeForLogging = "entity",
+                            Rotation = new Vec3f(compositeShape.rotateX, compositeShape.rotateY, compositeShape.rotateZ)
                         };
 
-                        capi.Tesselator.TesselateShape(meta, entityShape, out meshdata, new Vec3f(compositeShape.rotateX, compositeShape.rotateY, compositeShape.rotateZ));
+                        capi.Tesselator.TesselateShape(meta, entityShape, out meshdata);
 
                         meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
                         
@@ -736,7 +739,8 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                frostAlpha += (targetFrostAlpha - frostAlpha) * dt / 10f;
+                frostAlpha += (targetFrostAlpha - frostAlpha) * dt / 2f;
+                float fa = (float)Math.Round(GameMath.Clamp(frostAlpha, 0, 1), 4);
 
                 capi.Render.CurrentActiveShader.Uniform("rgbaLightIn", lightrgbs);
                 capi.Render.CurrentActiveShader.Uniform("extraGlow", entity.Properties.Client.GlowLevel);
@@ -748,7 +752,7 @@ namespace Vintagestory.GameContent
                 capi.Render.CurrentActiveShader.Uniform("skipRenderJointId2", skipRenderJointId2);
                 capi.Render.CurrentActiveShader.Uniform("entityId", (int)entity.EntityId);
                 capi.Render.CurrentActiveShader.Uniform("glitchFlicker", glitchFlicker ? 1 : 0);
-                capi.Render.CurrentActiveShader.Uniform("frostAlpha", GameMath.Clamp(frostAlpha, 0, 1));
+                capi.Render.CurrentActiveShader.Uniform("frostAlpha", fa);
                 capi.Render.CurrentActiveShader.Uniform("waterWaveCounter", capi.Render.ShaderUniforms.WaterWaveCounter);
 
                 color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
@@ -1043,7 +1047,9 @@ namespace Vintagestory.GameContent
                 bodyYawLerped += GameMath.Clamp(yawDist, -dt * 8, dt * 8);
                 bodyYaw = bodyYawLerped;
             }
-            
+
+            Mat4f.Translate(ModelMat, ModelMat, 0, entity.SelectionBox.Y2 / 2, 0);
+
             float bodyPitch = eplr == null ? 0 : eplr.WalkPitch;
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
             Mat4f.RotateY(ModelMat, ModelMat, bodyYaw + (180 + rotY) * GameMath.DEG2RAD);
@@ -1060,6 +1066,7 @@ namespace Vintagestory.GameContent
             }
 
             float scale = entity.Properties.Client.Size;
+            Mat4f.Translate(ModelMat, ModelMat, 0, -entity.SelectionBox.Y2 / 2, 0);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
         }

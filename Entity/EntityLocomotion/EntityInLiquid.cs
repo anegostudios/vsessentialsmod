@@ -37,9 +37,9 @@ namespace Vintagestory.GameContent
                     push = Math.Max(1f, push - 0.1f * dt * 60f);
                 }
 
-                Block inblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
-                Block aboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z);
-                Block twoaboveblock = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)(pos.Y + 2), (int)pos.Z);
+                Block inblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z, BlockLayersAccess.Fluid);
+                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 1), (int)pos.Z, BlockLayersAccess.Fluid);
+                Block twoaboveblock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y + 2), (int)pos.Z, BlockLayersAccess.Fluid);
                 float waterY = (int)pos.Y + inblock.LiquidLevel / 8f + (aboveblock.IsLiquid() ? 9 / 8f : 0) + (twoaboveblock.IsLiquid() ? 9 / 8f : 0);
                 float bottomSubmergedness = waterY - (float)pos.Y;
 
@@ -75,7 +75,7 @@ namespace Vintagestory.GameContent
             }
 
 
-            Block block = entity.World.BlockAccessor.GetLiquidBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+            Block block = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z, BlockLayersAccess.Fluid);
             if (block.PushVector != null)
             {
                 // Fix for those unfair cases where there is downward flowing water in a 1 deep hole and you cant get out

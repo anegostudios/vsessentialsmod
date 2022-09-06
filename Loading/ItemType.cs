@@ -112,6 +112,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.TpOffHandTransform = this.TpOffHandTransform?.Clone();
             item.GroundTransform = this.GroundTransform?.Clone();
 
+            item.LightHsv = this.LightHsv;
             item.DamagedBy = (EnumItemDamageSource[])this.DamagedBy?.Clone();
             item.MaxStackSize = this.MaxStackSize;
             if (this.Attributes != null) item.Attributes = this.Attributes;

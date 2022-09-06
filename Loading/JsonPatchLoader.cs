@@ -75,7 +75,8 @@ namespace Vintagestory.ServerMods.NoObf
             return 0.05;
         }
 
-        public override void AssetsLoaded(ICoreAPI api)    // This is done before assets and items are registerd etc, and before remapping, because of the ExecuteOrder, and (server-side) because of the position of ModHandler early in the ServerSystems list
+        // This is done before assets and items are registered etc, and before remapping, because of the ExecuteOrder, and (server-side) because of the position of ModHandler early in the ServerSystems list
+        public override void AssetsLoaded(ICoreAPI api)
         {
             this.api = api;
             

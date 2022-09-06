@@ -35,10 +35,11 @@ namespace Vintagestory.GameContent
         public int OwningPlayerGroupId = -1;
 
         public bool Temporary;
+        //public string Guid { get; set; }
     }
 
 
-    
+
 
     public class WaypointMapLayer : MarkerMapLayer
     {
@@ -56,10 +57,30 @@ namespace Vintagestory.GameContent
         public Dictionary<string, LoadedTexture> texturesByIcon;
 
         public override bool RequireChunkLoaded => false;
-        
-        
+
+        /// <summary>
+        /// If you add your own custom icon here, make sure to also add an icon renderer to capi.Gui.Icons.CustomIcons with the key prefixed with "wp" and the first letter of your key uppercased
+        /// </summary>
+        public List<string> WaypointIcons { get; set; } = new List<string>()
+        {
+            "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel"
+        };
+
+        static string[] hexcolors = new string[] { "#F9D0DC", "#F179AF", "#F15A4A", "#ED272A", "#A30A35", "#   FFDE98", "#EFFD5F", "#F6EA5E", "#FDBB3A", "#C8772E", "#F47832", "C3D941", "#9FAB3A", "#94C948", "#47B749", "#366E4F", "#516D66", "93D7E3", "#7698CF", "#20909E", "#14A4DD", "#204EA2", "#28417A", "#C395C4", "#92479B", "#8E007E", "#5E3896", "D9D4CE", "#AFAAA8", "#706D64", "#4F4C2B", "#BF9C86", "#9885530", "#5D3D21", "#FFFFFF", "#080504" };
+
+        public List<int> WaypointColors { get; set; } = new List<int>()
+        {
+
+        };
+
         public WaypointMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
+            WaypointColors = new List<int>();
+            for (int i = 0; i < hexcolors.Length; i++)
+            {
+                WaypointColors.Add(ColorUtil.Hex2Int(hexcolors[i]));
+            }
+
             if (api.Side == EnumAppSide.Server)
             {
                 ICoreServerAPI sapi = api as ICoreServerAPI;
@@ -290,7 +311,7 @@ namespace Vintagestory.GameContent
             {
                 try
                 {
-                    int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
+                    int argb = int.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
                     parsedColor = System.Drawing.Color.FromArgb(argb);
                 }
                 catch (FormatException)
@@ -310,9 +331,6 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            
-            
-
             Waypoint waypoint = new Waypoint()
             {
                 Color = parsedColor.ToArgb() | (255 << 24),
@@ -320,7 +338,8 @@ namespace Vintagestory.GameContent
                 Position = pos,
                 Title = title,
                 Icon = icon,
-                Pinned = pinned
+                Pinned = pinned,
+                //Guid = Guid.NewGuid().ToString()
             };
 
             Waypoints.Add(waypoint);
@@ -363,10 +382,9 @@ namespace Vintagestory.GameContent
                 ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
                 Context ctx = new Context(surface);
 
-                string[] icons = new string[] { "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel", "cross" };
                 ICoreClientAPI capi = api as ICoreClientAPI;
 
-                foreach (var val in icons)
+                foreach (var val in WaypointIcons)
                 {
                     ctx.Operator = Operator.Clear;
                     ctx.SetSourceRGBA(0, 0, 0, 0);
@@ -433,7 +451,7 @@ namespace Vintagestory.GameContent
                     for (int i = 0; i < Waypoints.Count; i++)
                     {
                         var wp = Waypoints[i];
-                        if (wp.Title == null) wp.Title = wp.Text; // Not sure how this happenes. For some reason the title moved into text
+                        if (wp.Title == null) wp.Title = wp.Text; // Not sure how this happens. For some reason the title moved into text
                         if (wp == null)
                         {
                             sapi.World.Logger.Error("Waypoint with no position loaded, will remove");
@@ -443,9 +461,13 @@ namespace Vintagestory.GameContent
                     }
                 } catch (Exception e)
                 {
-                    sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: ", e);
+                    sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: {0}", e);
                 }
-                
+
+                /*foreach (var wp in Waypoints)
+                {
+                    if (wp.Guid == null) wp.Guid = Guid.NewGuid().ToString();
+                }*/
             }
             
         }
