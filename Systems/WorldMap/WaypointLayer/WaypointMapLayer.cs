@@ -121,6 +121,7 @@ namespace Vintagestory.GameContent
             if (!api.World.Config.GetBool("allowMap", true))
             {
                 player.SendMessage(groupId, Lang.Get("Maps are disabled on this server"), EnumChatType.CommandError);
+                return;
             }
 
             switch (cmd)

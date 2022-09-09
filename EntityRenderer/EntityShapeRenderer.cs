@@ -131,6 +131,7 @@ namespace Vintagestory.GameContent
             glitchAffected = true;// entity.Properties.Attributes?["glitchAffected"].AsBool(false) ?? false;
             glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
             frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
+            frostAlphaAccum = (float)api.World.Rand.NextDouble();
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
@@ -149,7 +150,7 @@ namespace Vintagestory.GameContent
             {
                 var pos = entity.Pos.AsBlockPos;
                 float temp = api.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, api.World.Calendar.TotalDays).Temperature;
-                float dist = 1 - GameMath.Clamp((api.World.BlockAccessor.GetDistanceToRainFall(pos) - 2) / 2f, 0, 1f);
+                float dist = 1 - GameMath.Clamp((api.World.BlockAccessor.GetDistanceToRainFall(pos, 5) - 2) / 3f, 0, 1f);
                 return GameMath.Clamp((Math.Max(0, -temp) - 5) / 5f, 0, 1) * dist;
             };
         }
@@ -441,6 +442,14 @@ namespace Vintagestory.GameContent
                 OnNameChanged();
             }
 
+            frostAlphaAccum += dt;
+            if (frostAlphaAccum > 5)
+            {
+                frostAlphaAccum = 0;
+                targetFrostAlpha = getFrostAlpha();
+            }
+
+
             isSpectator = player != null && player.WorldData.CurrentGameMode == EnumGameMode.Spectator;
             if (isSpectator) return;
             
@@ -468,13 +477,6 @@ namespace Vintagestory.GameContent
             } else
             {
                 calcSidewaysSwivelForEntity(dt);
-            }
-
-            frostAlphaAccum += dt;
-            if (frostAlphaAccum > 5)
-            {
-                frostAlphaAccum = 0;
-                targetFrostAlpha = getFrostAlpha();
             }
         }
 
