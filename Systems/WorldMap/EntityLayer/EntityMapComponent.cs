@@ -30,7 +30,9 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap map, float dt)
         {
-            if ((entity as EntityPlayer)?.Player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true) return;
+            var player = (entity as EntityPlayer)?.Player;
+            if (player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true) return;
+            if ((entity as EntityPlayer)?.Controls.Sneak == true && player != capi.World.Player) return;
 
             map.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
