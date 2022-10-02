@@ -186,7 +186,7 @@ namespace Vintagestory.GameContent
                 (float)(lerpedPos.X - entityPlayer.CameraPos.X), 
                 (float)(lerpedPos.Y - entityPlayer.CameraPos.Y), 
                 (float)(lerpedPos.Z - entityPlayer.CameraPos.Z)
-            );            
+            );
 
             float sizeX = 0.2f * renderInfo.Transform.ScaleXYZ.X;
             float sizeY = 0.2f * renderInfo.Transform.ScaleXYZ.Y;
