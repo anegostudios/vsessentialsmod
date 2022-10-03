@@ -900,7 +900,7 @@ namespace Vintagestory.GameContent
                 double heightDiff = collisionbox.Y2 - entityCollisionBox.Y1;
 
                 if (heightDiff <= 0) continue;
-                if (heightDiff <= stepHeight)
+                if (heightDiff <= stepHeight && (stepableBox == null || stepableBox.Y2 < collisionbox.Y2))
                 {
                     stepableBox = collisionbox;
                 }
