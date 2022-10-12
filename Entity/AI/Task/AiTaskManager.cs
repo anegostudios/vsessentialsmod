@@ -58,6 +58,9 @@ namespace Vintagestory.GameContent
 
             Register("jealousmeleeattack", typeof(AiTaskJealousMeleeAttack));
             Register("jealousseekentity", typeof(AiTaskJealousSeekEntity));
+
+            Register("gotoentity", typeof(AiTaskGotoEntity));
+            Register("lookatentity", typeof(AiTaskLookAtEntity));
         }
     }
 
