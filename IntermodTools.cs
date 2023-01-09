@@ -25,40 +25,40 @@ namespace Vintagestory.ServerMods
             compatibility = new AssetCategory("compatibility", true, EnumAppSide.Universal);
         }
 
-        public override void Start(ICoreAPI api)
+        public override void AssetsLoaded(ICoreAPI api)
         {
-            base.Start(api);
-
             LoadedModIds = api.ModLoader.Mods.Select((m) => m.Info.ModID).ToList();
-
-            RemovePrefixes(api);
+            RemapFromCompatbilityFolder(api);
         }
 
-        private void RemovePrefixes(ICoreAPI api)
+        private void RemapFromCompatbilityFolder(ICoreAPI api)
         {
+            int quantityAdded = 0;
+            int quantityReplaced = 0;
+
             foreach (var mod in api.ModLoader.Mods)
             {
-                string prefix = "compatibility/" + mod.Info.ModID + "/";   // Ensures correct prefix even if a modID begins with all the characters in another modID
-                foreach (var asset in api.Assets.GetMany(prefix))
+                string prefix = "compatibility/" + mod.Info.ModID + "/";
+                var assets = api.Assets.GetManyInCategory("compatibility", mod.Info.ModID + "/");
+                foreach (var asset in assets)
                 {
-                    AssetLocation newLoc = asset.Location;
-                    newLoc.Path = asset.Location.Path.Remove(0, prefix.Length); //remove "<prefix>"
+                    // Remap the original asset path to the new path
+                    var origPath = new AssetLocation(mod.Info.ModID, asset.Location.Path.Remove(0, prefix.Length));
 
-                    //Remove existing assets (if exists)
-                    if (api.Assets.AllAssets.ContainsKey(newLoc)) api.Assets.AllAssets.Remove(newLoc);
-
-                    asset.Location.Path = newLoc.Path;
-
-                    // Warning about partially worked categories
-                    if (partiallyWorkingCategories.Contains(asset.Location.Category.Code))
+                    if (api.Assets.AllAssets.ContainsKey(origPath))
                     {
-                        api.World.Logger.Warning("[" + Mod.Info.ModID + "] Asset categories: {0} - may work strange. " +
-                            "It is best to leave such assets out of the compatibility category!",
-                            string.Join(", ", partiallyWorkingCategories)
-                        );
+                        quantityReplaced++;
                     }
+                    else
+                    {
+                        quantityAdded++;
+                    }
+
+                    api.Assets.AllAssets[origPath] = asset;
                 }
             }
+
+            api.World.Logger.Notification("Compatibility lib: {0} assets added, {1} assets replaced.", quantityAdded, quantityReplaced);
         }
 
     }

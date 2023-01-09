@@ -454,6 +454,23 @@ namespace Vintagestory.GameContent
                 nextClothId = 1;
                 return;
             }
+
+            if (arg == "deleteloaded")
+            {
+                int cnt = 0;
+                foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
+                {
+                    val.Value.RemoveModdata("clothSystems");
+                    cnt++;
+                }
+                clothSystems.Clear();
+                nextClothId = 1;
+
+                player.SendMessage(groupId, string.Format("Ok, deleted in {0} regions", cnt), EnumChatType.CommandSuccess);
+
+
+                return;
+            }
         }
 
         public void RegisterCloth(ClothSystem sys)
@@ -488,6 +505,7 @@ namespace Vintagestory.GameContent
                 nextClothId = 1;
                 return;
             }
+
 
             float xsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
             float zsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
