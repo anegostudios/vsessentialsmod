@@ -21,7 +21,6 @@ namespace Vintagestory.GameContent
         double accum;
         Vec3d prevPos = new Vec3d();
         Vec3d curPos = new Vec3d();
-        long ellapsedMsPhysics;
         internal bool DoRender;
 
         MeshData mesh = new MeshData(4, 3, false, true, true, true);
@@ -68,8 +67,6 @@ namespace Vintagestory.GameContent
         {
             this.accum = nextAccum;
             this.prevPos.Set(prevPos.X + entity.SelectionBox.X1, prevPos.Y + entity.SelectionBox.Y1, prevPos.Z + entity.SelectionBox.Z1);
-
-            ellapsedMsPhysics = capi.ElapsedMilliseconds;
         }
 
         public void AddMeshData(MeshData data, int lodlevel = 1)
@@ -83,7 +80,11 @@ namespace Vintagestory.GameContent
             if (data == null) return;
             mesh.AddMeshData(data);
         }
-
+        public void AddMeshData(MeshData data, float[] tfMatrix, int lodLevel = 1)
+        {
+            if (data == null) return;
+            mesh.AddMeshData(data);
+        }
 
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
@@ -133,6 +134,5 @@ namespace Vintagestory.GameContent
         {
             capi.Render.DeleteMesh(meshRef);
         }
-
     }
 }

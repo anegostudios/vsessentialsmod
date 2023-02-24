@@ -1,4 +1,5 @@
-﻿using Vintagestory.API;
+﻿using System;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -24,6 +25,8 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorReviveOnDeath(Entity entity) : base(entity)
         {
+            if (!(entity is EntityAgent)) throw new InvalidOperationException("Reive on death behavior is only possible on entities deriving from EntityAgent");
+            (entity as EntityAgent).AllowDespawn = false;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)

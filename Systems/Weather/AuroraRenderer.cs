@@ -57,7 +57,7 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
-            if (!renderAurora) return;
+            if (!renderAurora || prog.LoadError) return;
 
             if (capi.Render.FrameWidth == 0) return;
 

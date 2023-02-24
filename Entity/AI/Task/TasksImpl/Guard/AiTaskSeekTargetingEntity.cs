@@ -29,7 +29,7 @@ namespace Vintagestory.GameContent
                 var uid = entity.WatchedAttributes.GetString("guardedPlayerUid");
                 if (uid != null)
                 {
-                    guardedEntity = entity.World.PlayerByUid(uid).Entity;
+                    guardedEntity = entity.World.PlayerByUid(uid)?.Entity;
                 }
                 else
                 {

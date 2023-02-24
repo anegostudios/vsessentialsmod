@@ -217,7 +217,7 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     if (entry.Key.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
                     {
-                        string trueKey = entry.Key.Substring(0, entry.Key.Length - 6);  // 6 is the length of "byType"
+                        string trueKey = entry.Key.Substring(0, entry.Key.Length - "byType".Length);
                         var jobj = entry.Value as JObject;
                         foreach (var byTypeProperty in jobj)
                         {

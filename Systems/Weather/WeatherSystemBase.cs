@@ -1,6 +1,8 @@
-﻿using System;
+﻿using ProtoBuf.Meta;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -190,6 +192,8 @@ namespace Vintagestory.GameContent
             long index2d = MapRegionIndex2D(regionX, regionZ);
             IMapRegion mapregion = api.World.BlockAccessor.GetMapRegion(regionX, regionZ);
 
+            
+
             if (mapregion == null)
             {
                 return null;
@@ -216,8 +220,10 @@ namespace Vintagestory.GameContent
             weatherSim = new WeatherSimulationRegion(this, regioncoord.X, regioncoord.Z);
             weatherSim.Initialize();
 
-            byte[] data;
-            if (mapregion.ModData.TryGetValue("weather", out data))
+            mapregion.RemoveModdata("weather"); // Old pre 1.18 format
+
+            byte[] data = mapregion.GetModdata("weatherState");
+            if (data != null)
             {
                 try
                 {
@@ -235,7 +241,7 @@ namespace Vintagestory.GameContent
                 //api.World.Logger.Notification("{2}: Random weather pattern @{0}/{1}", regioncoord.X, regioncoord.Z, api.Side);
                 weatherSim.LoadRandomPattern();
                 weatherSim.NewWePattern.OnBeginUse();
-                mapregion.ModData["weather"] = weatherSim.ToBytes();
+                mapregion.SetModdata("weatherState", weatherSim.ToBytes());
             }
 
             weatherSim.MapRegion = mapregion;

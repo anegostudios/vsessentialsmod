@@ -32,7 +32,7 @@ namespace Vintagestory.ServerMods
             Block block = new Block()
             {
                 Code = new AssetLocation("mantle"),
-                Textures = new FakeDictionary<string, CompositeTexture>("all", new CompositeTexture(new AssetLocation("block/mantle"))),
+                Textures = new FastSmallDictionary<string, CompositeTexture>("all", new CompositeTexture(new AssetLocation("block/mantle"))),
                 DrawType = EnumDrawType.Cube,
                 MatterState = EnumMatterState.Solid,
                 BlockMaterial = EnumBlockMaterial.Mantle,

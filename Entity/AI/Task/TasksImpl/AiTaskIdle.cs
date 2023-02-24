@@ -84,8 +84,8 @@ namespace Vintagestory.GameContent
             }
 
 
-
-            idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
+            if (maxduration < 0) idleUntilMs = -1;
+            else idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
@@ -144,7 +144,8 @@ namespace Vintagestory.GameContent
         public override void StartExecute()
         {
             base.StartExecute();
-            idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
+            if (maxduration < 0) idleUntilMs = -1;
+            else idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
             entity.IdleSoundChanceModifier = 0f;
             stopNow = false;
         }
@@ -177,7 +178,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            return !stopNow && entity.World.ElapsedMilliseconds < idleUntilMs;
+            return !stopNow && (idleUntilMs < 0 || entity.World.ElapsedMilliseconds < idleUntilMs);
         }
 
         public override void FinishExecute(bool cancelled)

@@ -405,7 +405,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             base.OnEntityDespawn(despawn);
             

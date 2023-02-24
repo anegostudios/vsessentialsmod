@@ -5,12 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Tavis;
-using Vintagestory.API;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
-using Vintagestory.API.Server;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -43,6 +40,7 @@ namespace Vintagestory.ServerMods.NoObf
         public string FromPath;
         public string Path;
         public PatchModDependence[] DependsOn;
+        public bool Enabled = true;
 
         [Obsolete("Use Side instead")]
         public EnumAppSide? SideType
@@ -70,12 +68,8 @@ namespace Vintagestory.ServerMods.NoObf
             return true;
         }
 
-        public override double ExecuteOrder()
-        {
-            return 0.05;
-        }
+        public override double ExecuteOrder() => 0.05;
 
-        // This is done before assets and items are registered etc, and before remapping, because of the ExecuteOrder, and (server-side) because of the position of ModHandler early in the ServerSystems list
         public override void AssetsLoaded(ICoreAPI api)
         {
             this.api = api;
@@ -110,6 +104,8 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int j = 0; patches != null && j < patches.Length; j++)
                 {
                     JsonPatch patch = patches[j];
+                    if (!patch.Enabled) continue;
+
                     if (patch.Condition != null)
                     {
                         IAttribute attr = worldConfig[patch.Condition.When];

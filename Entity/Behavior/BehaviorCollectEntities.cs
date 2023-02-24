@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -91,6 +92,8 @@ namespace Vintagestory.GameContent
             ItemStack itemstack = foundEntity.OnCollected(this.entity);
             bool collected = false;
 
+            var origStack = itemstack.Clone();
+
             if (itemstack != null && itemstack.StackSize > 0)
             {
                 collected = entity.TryGiveItemStack(itemstack);
@@ -104,6 +107,12 @@ namespace Vintagestory.GameContent
             if (collected)
             {
                 itemstack.Collectible.OnCollected(itemstack, entity);
+
+                TreeAttribute tree = new TreeAttribute();
+                tree["itemstack"] = new ItemstackAttribute(origStack.Clone());
+                tree["byentityid"] = new LongAttribute(this.entity.EntityId);
+                entity.World.Api.Event.PushEvent("onitemcollected", tree);
+
                 entity.World.PlaySoundAt(new AssetLocation("sounds/player/collect"), entity);
                 return true;
             }

@@ -3,20 +3,89 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
+    public class ModSystemDormancyStateChecker : ModSystem
+    {
+        ICoreAPI api;
+
+        public override bool ShouldLoad(EnumAppSide forSide) => true;
+        public override void Start(ICoreAPI api)
+        {
+            api.Event.RegisterGameTickListener(on1stick, 1000);
+
+            this.api = api;
+        }
+
+        private void on1stick(float dt)
+        {
+            if (api.Side == EnumAppSide.Client)
+            {
+                EntityBehaviorPassivePhysics.UsePhysicsDormancyStateClient = (api as ICoreClientAPI).World.LoadedEntities.Count > 1500;
+            }
+            else
+            {
+                EntityBehaviorPassivePhysics.UsePhysicsDormancyStateServer = (api as ICoreServerAPI).World.LoadedEntities.Count > 1500;
+            }
+        }
+    }
+
+    public class ModSystemItemRendererOptimizer : ModSystem, IRenderer
+    {
+        int itemCount;
+        ICoreClientAPI capi;
+
+        public double RenderOrder => 1;
+
+        public int RenderRange => 1;
+
+        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        {
+            EntityItemRenderer.RenderCount = 0;
+        }
+
+        public override bool ShouldLoad(EnumAppSide forSide)
+        {
+            return forSide == EnumAppSide.Client;
+        }
+
+        public override void StartClientSide(ICoreClientAPI api)
+        {
+            capi = api;
+            api.Event.RegisterRenderer(this, EnumRenderStage.Before);
+            api.Event.RegisterGameTickListener(onTick, 1001);
+        }
+
+        private void onTick(float dt)
+        {
+            itemCount = 0;
+            foreach (var val in capi.World.LoadedEntities)
+            {
+                if (val.Value is EntityItem) itemCount++;
+            }
+
+            EntityItemRenderer.RunWittySkipRenderAlgorithm = itemCount > 400;
+            EntityItemRenderer.RenderModulo = itemCount / 200;
+            EntityItemRenderer.LastPos.Set(-99, -99, -99);
+        }
+    }
+
     public class EntityItemRenderer : EntityRenderer
     {
-        EntityItem entityitem;
-        
-        long touchGroundMS;
+        public static bool RunWittySkipRenderAlgorithm;
+        public static BlockPos LastPos = new BlockPos();
+        public static int LastCollectibleId;
+        public static int RenderCount;
+        public static int RenderModulo;
 
+        EntityItem entityitem;
+        long touchGroundMS;
         public float[] ModelMat = Mat4f.Create();
 
         // Tiny item size randomization to prevent z-fighting
         float scaleRand;
-
         float yRotRand;
 
         Vec3d lerpedPos = new Vec3d();
@@ -44,6 +113,28 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
+            // Optimization: If this item is out of view, lets not render its shadow, since its very likely not gonna contribute to the scene anyway
+            if (isShadowPass && !entity.IsRendered) return;
+
+            if (RunWittySkipRenderAlgorithm)
+            {
+                int x = (int)entity.Pos.X;
+                int y = (int)entity.Pos.Y;
+                int z = (int)entity.Pos.Z;
+
+                int collId = (entityitem.Itemstack.Class == EnumItemClass.Block ? -1 : 1) * entityitem.Itemstack.Id;
+
+                if (LastPos.X == x && LastPos.Y == y && LastPos.Z == z && LastCollectibleId == collId)
+                {
+                    if ((entity.EntityId % RenderModulo) != 0) return;
+                } else
+                {
+                    LastPos.Set(x, y, z);
+                }
+
+                LastCollectibleId = collId;
+            }
+
             IRenderAPI rapi = capi.Render;
 
             // the value 22 is just trial&error, should probably be something proportial to the
@@ -54,8 +145,6 @@ namespace Vintagestory.GameContent
 
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground);
             if (renderInfo.ModelRef == null) return;
-
-            //inslot.Itemstack.Collectible.OnBeforeRender(capi, inslot.Itemstack, EnumItemRenderTarget.Ground, ref renderInfo); - why is this called here? its already called by GetItemStackRenderInfo
 
             IStandardShaderProgram prog = null;
             LoadModelMatrix(renderInfo, isShadowPass, dt);
@@ -148,7 +237,6 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
-
             }
 
 
@@ -233,7 +321,6 @@ namespace Vintagestory.GameContent
                     zangle = -GameMath.Sin((float)(ellapseMs / 3000.0)) * 8 * diff;
                 }
             }
-
 
             Mat4f.Translate(ModelMat, ModelMat, dx + renderInfo.Transform.Translation.X, renderInfo.Transform.Translation.Y, dz +  renderInfo.Transform.Translation.Z);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { sizeX + scaleRand, sizeY + scaleRand, sizeZ + scaleRand });

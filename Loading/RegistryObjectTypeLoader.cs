@@ -87,6 +87,8 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "itemtypes/"))
             {
+                if (!entry.Key.Path.EndsWith(".json")) continue;
+
                 try
                 {
                     ItemType et = new ItemType();
@@ -105,6 +107,8 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
             {
+                if (!entry.Key.Path.EndsWith(".json")) continue;
+
                 try
                 {
                     EntityType et = new EntityType();
@@ -121,6 +125,8 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
             {
+                if (!entry.Key.Path.EndsWith(".json")) continue;
+                
                 try
                 {
                     BlockType et = new BlockType();
@@ -207,7 +213,6 @@ namespace Vintagestory.ServerMods.NoObf
         #region Entities
         void LoadEntities(List<RegistryObjectType>[] variantLists)
         {
-            // Step2: create all the entities from their types, and register them: this has to be on the main thread as the registry is not thread-safe
             LoadFromVariants(variantLists, "entitie", (variants) =>
             {
                 foreach (EntityType type in variants)
@@ -246,7 +251,6 @@ namespace Vintagestory.ServerMods.NoObf
 
         void LoadBlocks(List<RegistryObjectType>[] variantLists)
         {
-            // Step2: create all the blocks from the blocktypes, and register them: this has to be on the main thread as the registry is not thread-safe
             LoadFromVariants(variantLists, "block", (variants) =>
             {
                 foreach (BlockType type in variants)

@@ -3,7 +3,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
-namespace Vintagestory.ServerMods.NoObf
+namespace Vintagestory.ServerMods
 {
     public class RegistryObjectVariantGroup
     {

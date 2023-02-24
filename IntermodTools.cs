@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Common;
 
 namespace Vintagestory.ServerMods
@@ -18,7 +15,7 @@ namespace Vintagestory.ServerMods
         public static List<string> LoadedModIds { get; private set; } = new List<string>();
 
 
-        public override double ExecuteOrder() => 0.04; //load before json patching
+        public override double ExecuteOrder() => 0.04; // Load before json patching
 
         public override void StartPre(ICoreAPI api)
         {
@@ -39,7 +36,7 @@ namespace Vintagestory.ServerMods
             foreach (var mod in api.ModLoader.Mods)
             {
                 string prefix = "compatibility/" + mod.Info.ModID + "/";
-                var assets = api.Assets.GetManyInCategory("compatibility", mod.Info.ModID + "/");
+                var assets = api.Assets.GetManyInCategory("compatibility", mod.Info.ModID+"/");
                 foreach (var asset in assets)
                 {
                     // Remap the original asset path to the new path

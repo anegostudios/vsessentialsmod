@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -12,7 +9,6 @@ namespace Vintagestory.ServerMods
 {
     public class Core : ModSystem
 	{
-        ICoreServerAPI sapi;
         ICoreAPI api;
         ICoreClientAPI capi;
 
@@ -42,10 +38,6 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityRendererClass("Shape", typeof(EntityShapeRenderer));
             api.RegisterEntityRendererClass("SkinnableShape", typeof(EntitySkinnableShapeRenderer));
 
-            //api.RegisterDialog("BlockEntityTextInput", typeof(GuiDialogBlockEntityTextInput));
-            //api.RegisterDialog("BlockEntityStove", typeof(GuiDialogBlockEntityStove));
-            //api.RegisterDialog("BlockEntityQuern", typeof(GuiDialogBlockEntityQuern));
-
             api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
 
             capi = api;
@@ -73,13 +65,6 @@ namespace Vintagestory.ServerMods
 
 
 
-        public override void StartServerSide(ICoreServerAPI api)
-        {
-            this.sapi = api;
-        }
-
-
-
         public override void Start(ICoreAPI api)
         {
             this.api = api;
@@ -98,7 +83,7 @@ namespace Vintagestory.ServerMods
         {
             api.RegisterBlockClass("BlockMultiblock", typeof(BlockMultiblock));
         }
-        
+
         private void RegisterDefaultBlockBehaviors()
         {
             api.RegisterBlockBehaviorClass("Decor", typeof(BlockBehaviorDecor));

@@ -12,6 +12,7 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
         protected HashSet<string> targetEntityCodesExact = new HashSet<string>();
@@ -20,7 +21,7 @@ namespace Vintagestory.GameContent
         protected string creatureHostility;
         protected bool friendlyTarget;
 
-        protected Entity targetEntity;
+        public Entity targetEntity;
 
         public virtual bool AggressiveTargeting => true;
 
@@ -34,6 +35,8 @@ namespace Vintagestory.GameContent
 
         protected bool noEntityCodes => targetEntityCodesExact.Count == 0 && targetEntityCodesBeginsWith.Length == 0;
 
+        protected EntityPartitioning partitionUtil;
+
         protected AiTaskBaseTargetable(EntityAgent entity) : base(entity)
         {
         }
@@ -41,6 +44,8 @@ namespace Vintagestory.GameContent
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
             base.LoadConfig(taskConfig, aiConfig);
+
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
             if (taskConfig["entityCodes"] != null)
             {
@@ -128,10 +133,10 @@ namespace Vintagestory.GameContent
         protected BlockSelection blockSel = new BlockSelection();
         protected EntitySelection entitySel = new EntitySelection();
 
-        readonly Vec3d rayTraceFrom = new Vec3d();
-        readonly Vec3d rayTraceTo = new Vec3d();
-        readonly Vec3d tmpPos = new Vec3d();
-        protected bool hasDirectContact(Entity targetEntity, float minDist, float minVerDist)
+        protected readonly Vec3d rayTraceFrom = new Vec3d();
+        protected readonly Vec3d rayTraceTo = new Vec3d();
+        protected readonly Vec3d tmpPos = new Vec3d();
+        protected virtual bool hasDirectContact(Entity targetEntity, float minDist, float minVerDist)
         {
             Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
             tmpPos.Set(entity.ServerPos).Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
@@ -144,7 +149,7 @@ namespace Vintagestory.GameContent
             rayTraceTo.Set(targetEntity.ServerPos);
             rayTraceTo.Y += 1 / 32f;
             bool directContact = false;
-
+            
             entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
             directContact = blockSel == null;
 

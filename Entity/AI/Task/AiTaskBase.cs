@@ -35,8 +35,9 @@ namespace Vintagestory.API.Common
         protected double mincooldownHours;
         protected double maxcooldownHours;
 
+        protected AssetLocation finishSound;
         protected AssetLocation sound;
-        protected float soundRange;
+        protected float soundRange = 16;
         protected int soundStartMs;
         protected int soundRepeatMs;
         protected float soundChance=1.01f;
@@ -124,6 +125,10 @@ namespace Vintagestory.API.Common
                 soundStartMs = taskConfig["soundStartMs"].AsInt(0);
                 soundRepeatMs = taskConfig["soundRepeatMs"].AsInt(0);
             }
+            if (taskConfig["finishSound"].Exists)
+            {
+                finishSound = AssetLocation.Create(taskConfig["finishSound"].AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
+            }
 
             cooldownUntilMs = entity.World.ElapsedMilliseconds + initialmincooldown + entity.World.Rand.Next(initialmaxcooldown - initialmincooldown);
         }
@@ -190,6 +195,11 @@ namespace Vintagestory.API.Common
             {
                 entity.AnimManager.StopAnimation(animMeta.Code);
             }
+
+            if (finishSound != null)
+            {
+                entity.World.PlaySoundAt(finishSound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+            }
         }
 
 
@@ -217,7 +227,7 @@ namespace Vintagestory.API.Common
             
         }
 
-        public virtual void OnEntityDespawn(EntityDespawnReason reason)
+        public virtual void OnEntityDespawn(EntityDespawnData reason)
         {
 
         }

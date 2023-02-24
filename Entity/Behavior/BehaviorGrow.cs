@@ -119,7 +119,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             entity.World.UnregisterCallback(callbackId);
         }

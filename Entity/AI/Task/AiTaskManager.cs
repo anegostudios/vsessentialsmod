@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
@@ -120,6 +121,11 @@ namespace Vintagestory.GameContent
             return default(T);
         }
 
+        public IAiTask GetTask(string id)
+        {
+            return tasks.FirstOrDefault(t => t.Id == id);
+        }
+
         public void ExecuteTask<T>() where T : IAiTask
         {
             foreach (IAiTask task in tasks)
@@ -149,7 +155,6 @@ namespace Vintagestory.GameContent
                 {
                     task.FinishExecute(true);
                     activeTasksBySlot[task.Slot] = null;
-                    //Console.WriteLine("stop " + task.ProfilerName);
                 }
             }
 
@@ -160,16 +165,16 @@ namespace Vintagestory.GameContent
         {
             foreach (IAiTask task in tasks)
             {
+                if (task.Priority < 0) continue;
+
                 int slot = task.Slot;
                 IAiTask oldTask = activeTasksBySlot[slot];
                 if ((oldTask == null || task.Priority > oldTask.PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
                 {
-                    //if (oldTask!=null) Console.WriteLine("stop " + oldTask.ProfilerName);
                     oldTask?.FinishExecute(true);
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
-                    //Console.WriteLine("start " + task.ProfilerName);
                 }
 
                 if (entity.World.FrameProfiler.Enabled)
@@ -188,7 +193,6 @@ namespace Vintagestory.GameContent
                 if (!task.ContinueExecute(dt))
                 {
                     task.FinishExecute(false);
-                    //Console.WriteLine("stop " + task.ProfilerName);
                     activeTasksBySlot[i] = null;
                 }
 
@@ -250,6 +254,26 @@ namespace Vintagestory.GameContent
 
         internal void Notify(string key, object data)
         {
+            if (key == "starttask")
+            {
+                if (activeTasksBySlot.FirstOrDefault(t => t?.Id == (string)data) != null) return;
+                var task = GetTask((string)data);
+                activeTasksBySlot[task.Slot]?.FinishExecute(true);
+                activeTasksBySlot[task.Slot] = null;
+                ExecuteTask(task, task.Slot);
+                return;
+            }
+
+            if (key == "stoptask")
+            {
+                var task = activeTasksBySlot.FirstOrDefault(t => t?.Id == (string)data);
+                if (task == null) return;
+
+                task.FinishExecute(true);
+                activeTasksBySlot[task.Slot] = null;
+                return;
+            }
+
             for (int i = 0; i < tasks.Count; i++)
             {
                 IAiTask task = tasks[i];
@@ -267,7 +291,6 @@ namespace Vintagestory.GameContent
 
                         activeTasksBySlot[slot] = task;
                         task.StartExecute();
-                        //Console.WriteLine("start " + task.ProfilerName);
                         OnTaskStarted?.Invoke(task);
                     }
                 }
@@ -298,7 +321,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        internal void OnEntityDespawn(EntityDespawnReason reason)
+        internal void OnEntityDespawn(EntityDespawnData reason)
         {
             foreach (IAiTask task in tasks)
             {

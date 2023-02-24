@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -53,9 +54,19 @@ namespace Vintagestory.GameContent
                 var block = Api.World.BlockAccessor.GetBlock(Pos);
                 if (block.Id != Block.Id)
                 {
-                    Api.World.Logger.Error("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
                     // Cant delete during init
-                    api.Event.EnqueueMainThreadTask(() => api.World.BlockAccessor.RemoveBlockEntity(Pos), "delete betransient");
+                    if (block.EntityClass == Block.EntityClass)
+                    {
+                        // Attempt to recreate the BlockEntity correctly by a SetBlock call if the two blocks are similar (e.g. Coopers Reed in pre 1.16 worlds with different blocks now due to water layer updates)
+                        Api.World.Logger.Warning("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE and attempt to recreate it", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
+                        api.Event.EnqueueMainThreadTask(() => { api.World.BlockAccessor.RemoveBlockEntity(Pos); Block b = api.World.BlockAccessor.GetBlock(Pos); api.World.BlockAccessor.SetBlock(b.Id, Pos); }, "delete betransient");
+                    }
+                    else
+                    {
+                        // Otherwise simply delete this BlockEntity
+                        Api.World.Logger.Error("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
+                        api.Event.EnqueueMainThreadTask(() => api.World.BlockAccessor.RemoveBlockEntity(Pos), "delete betransient");
+                    }
                     return;
                 }
             }
@@ -172,7 +183,7 @@ namespace Vintagestory.GameContent
                 return;
             }
             
-            AssetLocation blockCode = block.WildCardReplace(
+            AssetLocation blockCode = block.Code.WildCardReplace(
                 new AssetLocation(fromCode), 
                 new AssetLocation(toCode)
             );

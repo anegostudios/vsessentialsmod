@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Server;
-using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -17,7 +13,6 @@ namespace Vintagestory.GameContent
         CircleTarget,
         TacticalRetreat  // ( ͡° ͜ʖ ͡°)
     }
-
 
     public class AiTaskSeekEntity : AiTaskBaseTargetable
     {
@@ -51,7 +46,6 @@ namespace Vintagestory.GameContent
         protected long attackModeBeginTotalMs;
         protected long lastHurtByTargetTotalMs;
 
-        protected EntityPartitioning partitionUtil;
         protected float extraTargetDistance = 0f;
 
         protected bool lowTempMode;
@@ -72,8 +66,6 @@ namespace Vintagestory.GameContent
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
-            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
-
             base.LoadConfig(taskConfig, aiConfig);
 
             leapAnimationCode = taskConfig["leapAnimation"].AsString("jump");
@@ -205,8 +197,6 @@ namespace Vintagestory.GameContent
 
         private void OnSiegeUnable()
         {
-            //Console.WriteLine("unable to besiege");
-
             if (targetPos.DistanceTo(entity.ServerPos.XYZ) < NowSeekRange)
             {
                 if (!TryCircleTarget())
@@ -218,14 +208,11 @@ namespace Vintagestory.GameContent
 
         public void OnCircleTargetUnable()
         {
-            //Console.WriteLine("no circle path found");
             tryTacticalRetreat();
         }
 
         private bool TryCircleTarget()
         {
-           // Console.WriteLine("try circle target");
-
             bool giveUpWhenNoPath = targetPos.SquareDistanceTo(entity.Pos) < 12 * 12;
             int searchDepth = 3500;
             attackPattern = EnumAttackPattern.CircleTarget;

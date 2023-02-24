@@ -200,7 +200,7 @@ namespace Vintagestory.GameContent
             IMapRegion mapregion = sapi.WorldManager.GetMapRegion(state.RegionX, state.RegionZ);
             if (mapregion != null)
             {
-                mapregion.SetModdata("weather", SerializerUtil.Serialize(state));
+                mapregion.SetModdata("weatherState", SerializerUtil.Serialize(state));
             }
         }
 
@@ -228,7 +228,7 @@ namespace Vintagestory.GameContent
                 IMapRegion mapregion = sapi.WorldManager.GetMapRegion(val.Key);
                 if (mapregion != null)
                 {
-                    mapregion.SetModdata("weather", val.Value.ToBytes());
+                    mapregion.SetModdata("weatherState", val.Value.ToBytes());
                 } else
                 {
                     toRemove.Add(val.Key);

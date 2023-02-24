@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API.Client;
+﻿using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -54,11 +49,7 @@ namespace Vintagestory.GameContent
         internal NameTagRendererDelegate GetNameTagRenderer(Entity entity)
         {
             EntityPlayer eplr = entity as EntityPlayer;
-
             var entitlements = eplr?.Player.Entitlements;
-
-            //entitlements = new List<Entitlement>();
-            //entitlements.Add(new Entitlement() { Code = "vsteam", Name = "vsteam" });
 
             if (entitlements?.Count > 0)
             {

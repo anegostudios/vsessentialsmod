@@ -188,6 +188,12 @@ namespace Vintagestory.ServerMods.NoObf
             block.LiquidSelectable = this.LiquidSelectable;
             block.LiquidCode = this.LiquidCode;
             block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? new BlockEntityBehaviorType[0];
+
+            if (block.EntityClass == null && block.BlockEntityBehaviors != null && block.BlockEntityBehaviors.Length > 0)
+            {
+                block.EntityClass = "Generic";
+            }
+
             block.WalkSpeedMultiplier = this.WalkspeedMultiplier;
             block.DragMultiplier = this.DragMultiplier;
             block.Durability = this.Durability;
@@ -219,8 +225,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.Lod2Shape = this.Lod2Shape;
             block.ShapeInventory = this.ShapeInventory;
             block.DoNotRenderAtLod2 = this.DoNotRenderAtLod2;
-            block.TexturesInventory = this.TexturesInventory == null ? null : new FakeDictionary<string, CompositeTexture>(this.TexturesInventory);
-            block.Textures = this.Textures == null ? null : new FakeDictionary<string, CompositeTexture>(this.Textures);
+            block.TexturesInventory = this.TexturesInventory == null ? null : new FastSmallDictionary<string, CompositeTexture>(this.TexturesInventory);
+            block.Textures = this.Textures == null ? null : new FastSmallDictionary<string, CompositeTexture>(this.Textures);
             block.ClimateColorMap = this.ClimateColorMap;
             block.SeasonColorMap = this.SeasonColorMap;
             block.Ambientocclusion = this.Ambientocclusion;
@@ -376,7 +382,6 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 ResolveDict(SideSolidOpaqueAo, ref SideSolid);
                 ResolveDict(SideSolidOpaqueAo, ref SideOpaque);
-                ResolveDict(SideSolidOpaqueAo, ref SideAo);
                 ResolveDict(SideSolidOpaqueAo, ref EmitSideAo);
             }
 

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
@@ -11,8 +10,6 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using AnimatedGif;
-using System.Diagnostics;
-using Vintagestory.API.Util;
 using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.GameContent
@@ -39,13 +36,13 @@ namespace Vintagestory.GameContent
         {
             this.sapi = sapi;
 
-            sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
 #if DEBUG
             sapi.RegisterCommand("prectest", "Precipitation test export", "", cmdPrecTestServer, Privilege.controlserver);
             sapi.RegisterCommand("snowaccum", "Snow accum test", "", cmdSnowAccum, Privilege.controlserver);
 #endif
 
             sapi.RegisterCommand("whenwillitstopraining", "When does it finally stop to rain around here?!", "", cmdWhenWillItStopRaining, Privilege.controlserver);
+            sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
         }
 
         private void cmdWhenWillItStopRaining(IServerPlayer player, int groupId, CmdArgs args)
@@ -149,7 +146,7 @@ namespace Vintagestory.GameContent
 
                 double lastSnowAccumUpdateTotalHours = mc.GetModdata<double>("lastSnowAccumUpdateTotalHours");
 
-                player.SendMessage(groupId, "lastSnowAccumUpdateTotalHours: " + lastSnowAccumUpdateTotalHours, EnumChatType.CommandSuccess);
+                player.SendMessage(groupId, "lastSnowAccumUpdate: " + (api.World.Calendar.TotalHours - lastSnowAccumUpdateTotalHours) + " hours ago", EnumChatType.CommandSuccess);
 
                 int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
                 int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
@@ -172,7 +169,7 @@ namespace Vintagestory.GameContent
                 float max = 3 + 0.5f;
 
                 int len = simregion.SnowAccumSnapshots.Length;
-                int i = simregion.SnowAccumSnapshots.Start;
+                int i = simregion.SnowAccumSnapshots.EndPosition;
                 
                 // This code here causes wacky snow patterns
                 // The lerp itself is fine!!!
@@ -494,6 +491,21 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+            if (arg == "randomevent")
+            {
+                foreach (var val in wsysServer.weatherSimByMapRegion)
+                {
+                    val.Value.selectRandomWeatherEvent();
+                    val.Value.sendWeatherUpdatePacket();
+                }
+
+                player.SendMessage(groupId, "Random weather event selected for all regions", EnumChatType.CommandError);
+            }
+            if (arg == "events")
+            {
+
+            }
+
             if (arg == "setev" || arg == "setevr" || arg == "setevf")
             {
                 wsysServer.ReloadConfigs();
@@ -680,20 +692,18 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    /*sb.AppendLine(string.Format("{10}% of {0}@{8}/{9}: {1}% {2}, {3}% {4}. Prec: {5}, Wind: {6} (v={7})",
-                        cornerNames[i], (int)(100 * sim.Weight), sim.NewWePattern.GetWeatherName(), (int)(100 - 100 * sim.Weight),
-                        sim.OldWePattern.GetWeatherName(), sim.weatherData.PrecIntensity.ToString("0.###"),
-                        sim.CurWindPattern.GetWindName(), sim.GetWindSpeed(pos.Y).ToString("0.###"),
-                        sim.regionX, sim.regionZ,
-                        lerps[i]
-                    )) ;*/
+                    string weatherpattern = sim.OldWePattern.GetWeatherName();
+                    if (sim.Weight < 1)
+                    {
+                        weatherpattern = string.Format("{0} transitioning to {1} ({2}%)", sim.OldWePattern.GetWeatherName(), sim.NewWePattern.GetWeatherName(), (int)(100*sim.Weight));
+                    }
 
-                    sb.AppendLine(string.Format("{9}% of {0}@{7}/{8}: {1}% {2}, {3}% {4}. Wind: {5}, Event: {10} (v={6})",
-                        cornerNames[i], (int)(100 * sim.Weight), sim.NewWePattern.GetWeatherName(), (int)(100 - 100 * sim.Weight),
-                        sim.OldWePattern.GetWeatherName(), 
-                        sim.CurWindPattern.GetWindName(), sim.GetWindSpeed(pos.Y).ToString("0.###"),
-                        sim.regionX, sim.regionZ,
+                    sb.AppendLine(string.Format("{0}: {1}% {2}. Wind: {3} (str={4}), Event: {5}",
+                        cornerNames[i],
                         lerps[i],
+                        weatherpattern,
+                        sim.CurWindPattern.GetWindName(),
+                        sim.GetWindSpeed(pos.Y).ToString("0.###"),
                         sim.CurWeatherEvent.config.Code
                     ));
                 }

@@ -56,6 +56,7 @@ namespace Vintagestory.GameContent
 
             if (isSelf)
             {
+                // All movement code was optimized for 60 FPS physics ticks :/
                 frameTime = 1 / 60f;
             }
 
@@ -76,7 +77,7 @@ namespace Vintagestory.GameContent
 
             string playerUID = entity.WatchedAttributes.GetString("playerUID");
             IPlayer player = entity.World.PlayerByUid(playerUID);
-            if (entity.World is IServerWorldAccessor && ((IServerPlayer)player).ConnectionState != EnumClientState.Playing) return;
+            if (entity.World.Side == EnumAppSide.Server && ((IServerPlayer)player).ConnectionState != EnumClientState.Playing) return;
 
             if (player != null)
             {
@@ -91,19 +92,30 @@ namespace Vintagestory.GameContent
                 controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId);
                 controls.NoClip = player.WorldData.NoClip;
                 controls.MovespeedMultiplier = player.WorldData.MoveSpeedMultiplier;
+
+                if (controls.Gliding)
+                {
+                    controls.IsFlying = true;
+                    if (entity.Collided || entity.FeetInLiquid || !entity.Alive || player.WorldData.FreeMove)
+                    {
+                        controls.GlideSpeed = 0;
+                        controls.Gliding = false;
+                        controls.IsFlying = false;
+                    }
+                }
             }
 
-            EntityPos pos = entity.World is IServerWorldAccessor ? entity.ServerPos : entity.Pos;
+            EntityPos pos = entity.World.Side == EnumAppSide.Server ? entity.ServerPos : entity.Pos;
 
 
-            if (controls.TriesToMove && player is IClientPlayer)
+            if ((controls.TriesToMove || controls.Gliding) && player is IClientPlayer)
             {
                 IClientPlayer cplr = player as IClientPlayer;
 
                 float prevYaw = pos.Yaw;
                 pos.Yaw = (entity.Api as ICoreClientAPI).Input.MouseYaw;
 
-                if (entity.Swimming)
+                if (entity.Swimming || controls.Gliding)
                 {
                     float prevPitch = pos.Pitch;
                     pos.Pitch = cplr.CameraPitch;
@@ -123,7 +135,7 @@ namespace Vintagestory.GameContent
                 eplr.WalkYaw += GameMath.Clamp(yawDist, -6 * dt * GlobalConstants.OverallSpeedMultiplier, 6 * dt * GlobalConstants.OverallSpeedMultiplier);
                 eplr.WalkYaw = GameMath.Mod(eplr.WalkYaw, GameMath.TWOPI);
 
-                if (entity.Swimming)
+                if (entity.Swimming || controls.Gliding)
                 {
                     float desiredPitch = -(float)Math.Sin(pos.Pitch);
                     float pitchDist = GameMath.AngleRadDistance(eplr.WalkPitch, desiredPitch);

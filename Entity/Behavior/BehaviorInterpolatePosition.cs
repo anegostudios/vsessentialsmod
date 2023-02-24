@@ -20,13 +20,15 @@ namespace Vintagestory.GameContent
 
         float accum;
         bool serverposApplied;
+
+        ICoreClientAPI capi;
         
         
         public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
         {
             if (entity.World.Side == EnumAppSide.Server) throw new Exception("Not made for server side!");
 
-            ICoreClientAPI capi = entity.Api as ICoreClientAPI;
+            capi = entity.Api as ICoreClientAPI;
             capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "interpolateposition");
         }
 
@@ -34,12 +36,23 @@ namespace Vintagestory.GameContent
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             // Don't interpolate for ourselves
-            if (entity == ((IClientWorldAccessor)entity.World).Player.Entity) return;
-            if ((entity.World.Api as ICoreClientAPI).IsGamePaused) return;
+            if (entity == capi.World.Player.Entity) return;
+            if (capi.IsGamePaused) return;
 
-            // When mounted, the entities position is set by the physics sim
             bool isMounted = (entity as EntityAgent)?.MountedOn != null;
 
+            // If the client player is currently mounted on this entity and controlling it we don't interpolate the position
+            // as the physics sim of this entity is now determined by the client
+            if (entity is IMountableSupplier ims)
+            {
+                foreach (var seat in ims.MountPoints)
+                {
+                    if (seat.MountedBy == capi.World.Player.Entity && seat.CanControl)
+                    {
+                        return;
+                    }
+                }
+            }
 
             float interval = 0.2f;
             accum += deltaTime;
@@ -56,7 +69,7 @@ namespace Vintagestory.GameContent
                 double posDiffSq = posDiffX * posDiffX + posDiffY * posDiffY + posDiffZ * posDiffZ;
 
                 // "|| accum > 1" mitigates items at the edge of block constantly jumping up and down
-                if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05f) || (accum > 1 && posDiffSq < 0.1 * 0.1))
+                if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05) || (accum > 1 && posDiffSq < 0.1 * 0.1))
                 {
                     if (!serverposApplied && !isMounted)
                     {
@@ -94,7 +107,6 @@ namespace Vintagestory.GameContent
                 entity.Pos.Z += GameMath.Clamp(posDiffZ, -signPZ * percentPosz, signPZ * percentPosz);
             }
 
-
             int signR = Math.Sign(percentrolldiff); 
             int signY = Math.Sign(percentyawdiff);
             int signP = Math.Sign(percentpitchdiff);
@@ -107,15 +119,11 @@ namespace Vintagestory.GameContent
             entity.Pos.Yaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw), -signY * percentyawdiff, signY * percentyawdiff);
             entity.Pos.Yaw = entity.Pos.Yaw % GameMath.TWOPI;
 
-
             entity.Pos.Pitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch), -signP * percentpitchdiff, signP * percentpitchdiff);
             entity.Pos.Pitch = entity.Pos.Pitch % GameMath.TWOPI;
 
-
-
             entity.Pos.HeadYaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadYaw, entity.ServerPos.HeadYaw), -signHY * percentheadyawdiff, signHY * percentheadyawdiff);
             entity.Pos.HeadYaw = entity.Pos.HeadYaw % GameMath.TWOPI;
-
 
             entity.Pos.HeadPitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadPitch, entity.ServerPos.HeadPitch), -signHP * percentheadpitchdiff, signHP * percentheadpitchdiff);
             entity.Pos.HeadPitch = entity.Pos.HeadPitch % GameMath.TWOPI;
@@ -134,10 +142,9 @@ namespace Vintagestory.GameContent
         public override void OnReceivedServerPos(bool isTeleport, ref EnumHandling handled)
         {
             // Don't interpolate for ourselves
-            if (entity == ((IClientWorldAccessor)entity.World).Player.Entity) return;
+            if (entity == capi.World.Player.Entity) return;
             
             handled = EnumHandling.PreventDefault;
-
 
             posDiffX = entity.ServerPos.X - entity.Pos.X;
             posDiffY = entity.ServerPos.Y - entity.Pos.Y;
@@ -152,7 +159,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             base.OnEntityDespawn(despawn);
             (entity.Api as ICoreClientAPI).Event.UnregisterRenderer(this, EnumRenderStage.Before);

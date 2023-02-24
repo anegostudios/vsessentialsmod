@@ -108,7 +108,6 @@ namespace Vintagestory.GameContent
             LoadShader();
 
             
-            
             double time = capi.World.Calendar.TotalHours * 60;
             windOffsetX += 2f * time;
             windOffsetZ += 0.1f * time;
@@ -342,15 +341,15 @@ namespace Vintagestory.GameContent
 
 
             prog.UniformMatrix("modelViewMatrix", mvMat.Values);
+
             capi.Render.RenderMeshInstanced(cloudTilesMeshRef, QuantityCloudTiles);
-            
 
             // Very slightly rotate all the clouds so it looks better when they pass through blocks 
             // Putting this line before translate = Clouds no longer centered around the player
             // Putting it after the translate = Clouds hop by a few pixels on every reload
             // Need to find a correct solution for this
             // Mat4.Rotate(mv, mv, 0.04f, new float[] { 0, 1, 0 });
-            
+
             prog.Stop();
             
         }
@@ -408,7 +407,6 @@ namespace Vintagestory.GameContent
             int prevTopLeftRegX = -9999;
             int prevTopLeftRegZ = -9999;
             Vec3i tileOffset = new Vec3i(offThreadState.TileOffsetX - offThreadState.WindTileOffsetX, 0, offThreadState.TileOffsetZ - offThreadState.WindTileOffsetZ);
-            
             Vec3i tileCenterPos = offThreadState.CenterTilePos;
 
             for (int i = 0; i < cnt; i++)
@@ -461,7 +459,6 @@ namespace Vintagestory.GameContent
                 double density = GameMath.Clamp(wreaderpreload.GetBlendedCloudThicknessAt(cloudTileX, cloudTileZ), 0, 1);
                 double bright = wreaderpreload.GetBlendedCloudBrightness(1) * (0.85f + cloudTile.brightnessRand.NextFloat() * 0.15f);
 
-                
 
                 cloudTile.TargetBrightnes = (short)(GameMath.Clamp(bright, 0, 1) * short.MaxValue);
                 cloudTile.TargetThickness = (short)GameMath.Clamp(density * short.MaxValue, 0, short.MaxValue);
@@ -484,22 +481,22 @@ namespace Vintagestory.GameContent
                 // South: Positive Z
                 if (i > 0)
                 {
-                    Tiles[i - 1].NorthThickness = cloudTile.SelfThickness;
+                    Tiles[i - 1].NorthTileThickness = cloudTile.SelfThickness;
                 }
                 if (i < Tiles.Length - 1)
                 {
-                    Tiles[i+1].SouthThickness = cloudTile.SelfThickness;
+                    Tiles[i+1].SouthTileThickness = cloudTile.SelfThickness;
                 }
 
                 // East: Positive X
                 // West: Negative X
                 if (i < CloudTileLength - 1)
                 {
-                    Tiles[i + CloudTileLength].EastThickness = cloudTile.SelfThickness;
+                    Tiles[i + CloudTileLength].EastTileThickness = cloudTile.SelfThickness;
                 }
                 if (i > CloudTileLength - 1)
                 {
-                    Tiles[i - CloudTileLength].WestThickness = cloudTile.SelfThickness;
+                    Tiles[i - CloudTileLength].WestTileThickness = cloudTile.SelfThickness;
                 }
             }            
         }
@@ -598,10 +595,10 @@ namespace Vintagestory.GameContent
                 mesh.CustomShorts.Values[pos++] = (short)(CloudTileSize * tile.GridXOffset);
                 mesh.CustomShorts.Values[pos++] = (short)(CloudTileSize * tile.GridZOffset);
                 
-                mesh.CustomShorts.Values[pos++] = tile.NorthThickness;
-                mesh.CustomShorts.Values[pos++] = tile.EastThickness;
-                mesh.CustomShorts.Values[pos++] = tile.SouthThickness;
-                mesh.CustomShorts.Values[pos++] = tile.WestThickness;
+                mesh.CustomShorts.Values[pos++] = tile.NorthTileThickness;
+                mesh.CustomShorts.Values[pos++] = tile.EastTileThickness;
+                mesh.CustomShorts.Values[pos++] = tile.SouthTileThickness;
+                mesh.CustomShorts.Values[pos++] = tile.WestTileThickness;
 
                 mesh.CustomShorts.Values[pos++] = tile.SelfThickness;
                 mesh.CustomShorts.Values[pos++] = tile.Brightness;

@@ -15,6 +15,7 @@ namespace Vintagestory.GameContent
     {
         Vec3d pushVector = new Vec3d();
         EntityPartitioning partitionUtil;
+        bool movable = true;
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
@@ -25,6 +26,7 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(properties, attributes);
 
+            movable = attributes["movable"].AsBool(true);
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
         }
 
@@ -33,7 +35,7 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable) return;
+            if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable || !movable) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
 
             double touchdist = entity.SelectionBox.XSize / 2;

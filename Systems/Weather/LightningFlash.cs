@@ -168,21 +168,24 @@ namespace Vintagestory.GameContent
 
                 if (handling == EnumHandling.PassThrough)
                 {
-                    var dmgSrc = new DamageSource()
+                    if (api.World.Config.GetBool("lightningDamage", true))
                     {
-                        KnockbackStrength = 2,
-                        Source = EnumDamageSource.Weather,
-                        Type = EnumDamageType.Electricity,
-                        SourcePos = origin,
-                        HitPosition = new Vec3d()
-                    };
+                        var dmgSrc = new DamageSource()
+                        {
+                            KnockbackStrength = 2,
+                            Source = EnumDamageSource.Weather,
+                            Type = EnumDamageType.Electricity,
+                            SourcePos = origin,
+                            HitPosition = new Vec3d()
+                        };
 
-                    api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(origin, 8, (entity) =>
-                    {
-                        float damage = 6;
-                        entity.ReceiveDamage(dmgSrc, damage);
-                        return true;
-                    });
+                        api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(origin, 8, (entity) =>
+                        {
+                            float damage = 6;
+                            entity.ReceiveDamage(dmgSrc, damage);
+                            return true;
+                        });
+                    }
                 }
 
             }
@@ -261,9 +264,8 @@ namespace Vintagestory.GameContent
         public void Dispose()
         {
             quadRef?.Dispose();
-
-            capi.Render.RemovePointLight(pointLights[0]);
-            capi.Render.RemovePointLight(pointLights[1]);
+            capi?.Render.RemovePointLight(pointLights[0]);
+            capi?.Render.RemovePointLight(pointLights[1]);
         }
     }
 

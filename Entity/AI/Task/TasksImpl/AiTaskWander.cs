@@ -28,8 +28,6 @@ namespace Vintagestory.GameContent
         public bool StayCloseToSpawn;
         public Vec3d SpawnPosition;
         public double MaxDistanceToSpawn;
-        public bool TeleportWhenOutOfRange = true;
-        public double TeleportInGameHours = 1;
 
         long lastTimeInRangeMs;
         int failedWanders;
@@ -76,9 +74,6 @@ namespace Vintagestory.GameContent
             {
                 StayCloseToSpawn = true;
                 MaxDistanceToSpawn = taskConfig["maxDistanceToSpawn"].AsDouble(10);
-
-                TeleportWhenOutOfRange = taskConfig["teleportWhenOutOfRange"].AsBool(true);
-                TeleportInGameHours = taskConfig["teleportInGameHours"].AsDouble(1);
             }
 
             if (taskConfig["targetDistance"] != null)

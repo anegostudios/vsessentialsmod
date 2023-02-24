@@ -1,22 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.CommandAbbr;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace Vintagestory.Essentials
 {
     public class PathFindDebug : ModSystem
-    {
-        
+    {   
         BlockPos start;
         BlockPos end;
-
         ICoreServerAPI sapi;
 
         public override bool ShouldLoad(EnumAppSide forSide)
@@ -30,12 +25,22 @@ namespace Vintagestory.Essentials
             base.StartServerSide(api);
             sapi = api;
 
-            api.RegisterCommand("astar", "A* path finding debug testing", "[start|end]", onCmdAStar, Privilege.controlserver);
+            api.ChatCommands
+                .GetOrCreate("debug")
+                .BeginSub("astar")
+                    .WithDesc("A* path finding debug testing tool")
+                    .RequiresPrivilege(Privilege.controlserver)
+                    .RequiresPlayer()
+                    .WithArgs(api.ChatCommands.Parsers.WordRange("command", "start", "end", "bench", "clear"))
+                    .HandleWith(onAstarCmd)
+                .EndSub()
+            ;
         }
 
-        private void onCmdAStar(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult onAstarCmd(TextCommandCallingArgs args)
         {
-            string subcmd = args.PopWord();
+            string subcmd = (string)args[0];
+            var player = args.Caller.Player;
 
             BlockPos plrPos = player.Entity.ServerPos.XYZ.AsBlockPos;
             PathfindSystem pfs = sapi.ModLoader.GetModSystem<PathfindSystem>();
@@ -60,7 +65,7 @@ namespace Vintagestory.Essentials
                     sapi.World.HighlightBlocks(player, 27, new List<BlockPos>() { end }, new List<int>() { ColorUtil.ColorFromRgba(255, 0, 255, 128) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     break;
                 case "bench":
-                    if (start == null || end == null) return;
+                    if (start == null || end == null) return TextCommandResult.Error("Start/End not set");
 
                     Stopwatch sw = new Stopwatch();
                     sw.Start();
@@ -73,8 +78,7 @@ namespace Vintagestory.Essentials
                     sw.Stop();
                     float timeMs = (float)sw.ElapsedMilliseconds / 15f;
 
-                    player.SendMessage(groupId, string.Format("15 searches average: {0} ms", (int)timeMs), EnumChatType.Notification);
-                    return;
+                    return TextCommandResult.Success(string.Format("15 searches average: {0} ms", (int)timeMs));
                     
                 case "clear":
                     start = null;
@@ -99,15 +103,13 @@ namespace Vintagestory.Essentials
                 sw.Stop();
                 int timeMs = (int)sw.ElapsedMilliseconds;
 
-                player.SendMessage(groupId, string.Format("Search took {0} ms, {1} nodes checked", timeMs, pfs.astar.NodesChecked), EnumChatType.Notification);
+                var message = string.Format("Search took {0} ms, {1} nodes checked", timeMs, pfs.astar.NodesChecked);
 
                 if (nodes == null)
                 {
-                    player.SendMessage(groupId, "No path found", EnumChatType.CommandError);
-
                     sapi.World.HighlightBlocks(player, 2, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     sapi.World.HighlightBlocks(player, 3, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
-                    return;
+                    return TextCommandResult.Success(message + "\n" + "No path found");
                 }
 
                 List<BlockPos> poses = new List<BlockPos>();
@@ -127,7 +129,11 @@ namespace Vintagestory.Essentials
                 }
 
                 sapi.World.HighlightBlocks(player, 3, poses, new List<int>() { ColorUtil.ColorFromRgba(128, 0, 0, 100) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+
+                return TextCommandResult.Success(message);
             }
+
+            return TextCommandResult.Success();
         }
     }
 }

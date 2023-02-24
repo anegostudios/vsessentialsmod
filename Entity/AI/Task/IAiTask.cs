@@ -78,7 +78,7 @@ namespace Vintagestory.API.Common
 
         void OnEntityLoaded();
         void OnEntitySpawn();
-        void OnEntityDespawn(EntityDespawnReason reason);
+        void OnEntityDespawn(EntityDespawnData reason);
         void OnEntityHurt(DamageSource source, float damage);
         void OnNoPath(Vec3d target);
 

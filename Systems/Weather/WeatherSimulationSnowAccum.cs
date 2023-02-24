@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -16,53 +15,6 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public struct BlockIdAndSnowLevel
-    {
-        public Block Block;
-        public float SnowLevel;
-
-        public BlockIdAndSnowLevel(Block block, float snowLevel)
-        {
-            Block = block;
-            SnowLevel = snowLevel;
-        }
-    }
-
-    public class UpdateSnowLayerChunk : IEquatable<UpdateSnowLayerChunk>
-    {
-        public Vec2i Coords;
-        public double LastSnowAccumUpdateTotalHours;
-        public Dictionary<BlockPos, BlockIdAndSnowLevel> SetBlocks = new Dictionary<BlockPos, BlockIdAndSnowLevel>();
-
-        public bool Equals(UpdateSnowLayerChunk other)
-        {
-            return other.Coords.Equals(Coords);
-        }
-
-        public override bool Equals(object obj)
-        {
-            Vec2i pos;
-            if (obj is UpdateSnowLayerChunk uplc)
-            {
-                pos = uplc.Coords;
-            }
-            else
-            {
-                return false;
-            }
-
-            return Coords.X == pos.X && Coords.Y == pos.Y;
-        }
-
-        public override int GetHashCode()
-        {
-            int hash = 17;
-            hash = hash * 23 + Coords.X.GetHashCode();
-            hash = hash * 23 + Coords.Y.GetHashCode();
-            return hash;
-        }
-    }
-
     public class WeatherSimulationSnowAccum
     {
         int[][] randomShuffles;
@@ -103,7 +55,7 @@ namespace Vintagestory.GameContent
 
             initRandomShuffles();
 
-            sapi.Event.ChunkColumnSnowUpdate += Event_ChunkColumnLoading;
+            sapi.Event.BeginChunkColumnLoadChunkThread += Event_BeginChunkColLoadChunkThread;
             sapi.Event.ChunkColumnLoaded += Event_ChunkColumnLoaded;
             sapi.Event.SaveGameLoaded += Event_SaveGameLoaded;
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
@@ -248,7 +200,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void Event_ChunkColumnLoading(IServerMapChunk mc, int chunkX, int chunkZ, IWorldChunk[] chunks)
+        private void Event_BeginChunkColLoadChunkThread(IServerMapChunk mc, int chunkX, int chunkZ, IWorldChunk[] chunks)
         {
             if (!ProcessChunks) return;
 
@@ -418,15 +370,13 @@ namespace Vintagestory.GameContent
             // 4. Done?
 
 
-            // Idea 8:
+            // Idea 8: (not implemented)
             // - FUCK the region based weather sim. 
             // - Generate clouds patterns like you generate terrain from landforms
             // - Which is grid based indices, neatly abstracted with LerpedIndex2DMap and nicely shaped with domain warping
             // - Give it enough padding to ensure domain warping does not go out of bounds
             // - Every 2-3 minutes regenerate this map in a seperate thread, cloud renderer lerps between old and new map. 
             // - Since the basic indices input is grid based, we can cycle those individually through time
-
-
 
             // for a future version
             // Hm. Maybe one noise generator for cloud coverage?
@@ -448,12 +398,6 @@ namespace Vintagestory.GameContent
             //    - store in an LerpedWeightedIndex2DMap
             // Iterate over every cloud tile
             //  - read cloud pattern data from the map  
-
-
-
-
-
-
 
 
             // Snow accum needs to take the existing world information into account, i.e. current snow level
@@ -513,7 +457,7 @@ namespace Vintagestory.GameContent
             float max = ws.GeneralConfig.SnowLayerBlocks.Count + 0.6f;
 
             int len = simregion.SnowAccumSnapshots.Length;
-            int i = simregion.SnowAccumSnapshots.Start;
+            int i = simregion.SnowAccumSnapshots.EndPosition;
             int newCount = 0;
 
             lock (WeatherSimulationRegion.snowAccumSnapshotLock)

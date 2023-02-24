@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Vintagestory.API.Client;
@@ -38,7 +39,7 @@ namespace Vintagestory.GameContent
         //public string Guid { get; set; }
     }
 
-
+    public delegate LoadedTexture CreateIconTextureDelegate();
 
 
     public class WaypointMapLayer : MarkerMapLayer
@@ -58,15 +59,17 @@ namespace Vintagestory.GameContent
 
         public override bool RequireChunkLoaded => false;
 
-        /// <summary>
-        /// If you add your own custom icon here, make sure to also add an icon renderer to capi.Gui.Icons.CustomIcons with the key prefixed with "wp" and the first letter of your key uppercased
-        /// </summary>
-        public List<string> WaypointIcons { get; set; } = new List<string>()
-        {
-            "circle", "bee", "cave", "home", "ladder", "pick", "rocks", "ruins", "spiral", "star1", "star2", "trader", "vessel"
-        };
 
-        static string[] hexcolors = new string[] { "#F9D0DC", "#F179AF", "#F15A4A", "#ED272A", "#A30A35", "#   FFDE98", "#EFFD5F", "#F6EA5E", "#FDBB3A", "#C8772E", "#F47832", "C3D941", "#9FAB3A", "#94C948", "#47B749", "#366E4F", "#516D66", "93D7E3", "#7698CF", "#20909E", "#14A4DD", "#204EA2", "#28417A", "#C395C4", "#92479B", "#8E007E", "#5E3896", "D9D4CE", "#AFAAA8", "#706D64", "#4F4C2B", "#BF9C86", "#9885530", "#5D3D21", "#FFFFFF", "#080504" };
+        /// <summary>
+        /// List 
+        /// </summary>
+        public OrderedDictionary<string, CreateIconTextureDelegate> WaypointIcons { get; set; } = new OrderedDictionary<string, CreateIconTextureDelegate>();
+
+        static string[] hexcolors = new string[] { 
+            "#F9D0DC", "#F179AF", "#F15A4A", "#ED272A", "#A30A35", "#FFDE98", "#EFFD5F", "#F6EA5E", "#FDBB3A", "#C8772E", "#F47832", 
+            "C3D941", "#9FAB3A", "#94C948", "#47B749", "#366E4F", "#516D66", "93D7E3", "#7698CF", "#20909E", "#14A4DD", "#204EA2",
+            "#28417A", "#C395C4", "#92479B", "#8E007E", "#5E3896", "D9D4CE", "#AFAAA8", "#706D64", "#4F4C2B", "#BF9C86", "#9885530", "#5D3D21", "#FFFFFF", "#080504" 
+        };
 
         public List<int> WaypointColors { get; set; } = new List<int>()
         {
@@ -81,18 +84,75 @@ namespace Vintagestory.GameContent
                 WaypointColors.Add(ColorUtil.Hex2Int(hexcolors[i]));
             }
 
+            var icons = api.Assets.GetMany("textures/icons/worldmap/", null, false);
+            var capi = api as ICoreClientAPI;
+            foreach (var icon in icons)
+            {
+                string name = icon.Name.Substring(0, icon.Name.IndexOf("."));
+
+                name = Regex.Replace(name, @"\d+\-", "");
+
+                if (api.Side == EnumAppSide.Server)
+                {
+                    WaypointIcons[name] = () => null;
+                }
+                else
+                {
+                    WaypointIcons[name] = () =>
+                    {
+                        var size = (int)Math.Ceiling(20 * RuntimeEnv.GUIScale);
+                        return capi.Gui.LoadSvg(icon.Location, size, size, size, size, ColorUtil.WhiteArgb);
+                    };
+
+                    capi.Gui.Icons.CustomIcons["wp" + name.UcFirst()] = (ctx, x, y, w, h, rgba) =>
+                    {
+                        var col = ColorUtil.ColorFromRgba(rgba);
+                        capi.Gui.DrawSvg(icon, ctx.GetTarget() as ImageSurface, x, y, (int)w, (int)h, col);
+                    };
+                }
+            }
+
             if (api.Side == EnumAppSide.Server)
             {
                 ICoreServerAPI sapi = api as ICoreServerAPI;
                 this.sapi = sapi;
 
                 sapi.Event.GameWorldSave += OnSaveGameGettingSaved;
-                sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list]", OnCmdWayPoint, Privilege.chat);
+                sapi.Event.PlayerDeath += Event_PlayerDeath;
+                sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list|deathwp]", OnCmdWayPoint, Privilege.chat);
                 sapi.RegisterCommand("tpwp", "Teleport yourself to a waypoint starting with the supplied name", "[name]", OnCmdTpTo, Privilege.tp);
             } else
             {
                 quadModel = (api as ICoreClientAPI).Render.UploadMesh(QuadMeshUtil.GetQuad());
             }
+        }
+
+        private void Event_PlayerDeath(IServerPlayer byPlayer, DamageSource damageSource)
+        {
+            if (!api.World.Config.GetBool("allowMap", true) || !api.World.Config.GetBool("allowDeathwaypointing", true) || !byPlayer.GetModData<bool>("deathWaypointing", true)) return;
+
+            string title = Lang.Get("You died here");
+            for (int i = 0; i < Waypoints.Count; i++)
+            {
+                var wp = Waypoints[i];
+                if (wp.OwningPlayerUid == byPlayer.PlayerUID && wp.Title == title)
+                {
+                    Waypoints.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            Waypoint waypoint = new Waypoint()
+            {
+                Color = ColorUtil.ColorFromRgba(200,200,200,255),
+                OwningPlayerUid = byPlayer.PlayerUID,
+                Position = byPlayer.Entity.Pos.XYZ,
+                Title = title,
+                Icon = "gravestone",
+                Pinned = true
+            };
+
+            AddWaypoint(waypoint, byPlayer);
         }
 
         private void OnCmdTpTo(IServerPlayer player, int groupId, CmdArgs args)
@@ -126,6 +186,26 @@ namespace Vintagestory.GameContent
 
             switch (cmd)
             {
+                case "deathwp":
+                    if (!api.World.Config.GetBool("allowDeathwaypointing", true))
+                    {
+                        player.SendMessage(groupId, Lang.Get("Death waypointing is disabled on this server"), EnumChatType.CommandError);
+                        return;
+                    }
+
+                    if (args.Length == 0)
+                    {
+                        bool on = player.GetModData<bool>("deathWaypointing");
+                        player.SendMessage(groupId, Lang.Get("Death waypoint is {0}", on ? Lang.Get("on") : Lang.Get("off")), EnumChatType.CommandError);
+                    }
+                    else
+                    {
+                        bool on = (bool)args.PopBool(false);
+                        player.SetModData<bool>("deathWaypointing", on);
+                        player.SendMessage(groupId, Lang.Get("Death waypoint now {0}", on ? Lang.Get("on") : Lang.Get("off")), EnumChatType.CommandError);
+                    }
+                    break;
+
                 case "add":
                     AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle", false); 
                     break;
@@ -343,12 +423,19 @@ namespace Vintagestory.GameContent
                 //Guid = Guid.NewGuid().ToString()
             };
 
+            int nr = AddWaypoint(waypoint, player);
+            player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", nr), EnumChatType.CommandSuccess);
+        }
+
+        public int AddWaypoint(Waypoint waypoint, IServerPlayer player)
+        {
             Waypoints.Add(waypoint);
 
             Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
 
-            player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", ownwpaypoints.Length - 1), EnumChatType.CommandSuccess);
             ResendWaypoints(player);
+
+            return ownwpaypoints.Length - 1;
         }
 
         private void OnSaveGameGettingSaved()
@@ -365,45 +452,37 @@ namespace Vintagestory.GameContent
         
         public override void OnMapOpenedClient()
         {
-            if (texturesByIcon == null)
-            {
-                if (texturesByIcon != null)
-                {
-                    foreach (var val in texturesByIcon)
-                    {
-                        val.Value.Dispose();
-                    }
-                }
+            reloadIconTextures();
 
-                texturesByIcon = new Dictionary<string, LoadedTexture>();
-
-                double scale = RuntimeEnv.GUIScale;
-                int size = (int)(27 * scale);
-
-                ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
-                Context ctx = new Context(surface);
-
-                ICoreClientAPI capi = api as ICoreClientAPI;
-
-                foreach (var val in WaypointIcons)
-                {
-                    ctx.Operator = Operator.Clear;
-                    ctx.SetSourceRGBA(0, 0, 0, 0);
-                    ctx.Paint();
-                    ctx.Operator = Operator.Over;
-
-                    capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 1, 1, size - 2, size - 2, new double[] { 0,0,0,1});
-                    capi.Gui.Icons.DrawIcon(ctx, "wp" + val.UcFirst(), 2, 2, size - 4, size - 4, ColorUtil.WhiteArgbDouble);
-
-                    texturesByIcon[val] = new LoadedTexture(api as ICoreClientAPI, (api as ICoreClientAPI).Gui.LoadCairoTexture(surface, false), (int)(20 * scale), (int)(20 * scale));
-                }
-
-                ctx.Dispose();
-                surface.Dispose();
-            }
-            
+            ensureIconTexturesLoaded();
 
             RebuildMapComponents();
+        }
+
+        public void reloadIconTextures()
+        {
+            if (texturesByIcon != null)
+            {
+                foreach (var val in texturesByIcon)
+                {
+                    val.Value.Dispose();
+                }
+            }
+
+            texturesByIcon = null;
+            ensureIconTexturesLoaded();
+        }
+
+        protected void ensureIconTexturesLoaded()
+        {
+            if (texturesByIcon != null) return;
+            
+            texturesByIcon = new Dictionary<string, LoadedTexture>();
+
+            foreach (var val in WaypointIcons)
+            {
+                texturesByIcon[val.Key] = val.Value();
+            }
         }
 
 
@@ -413,6 +492,7 @@ namespace Vintagestory.GameContent
             {
                 wayPointComponents.Remove(val);
             }
+
             tmpWayPointComponents.Clear();
         }
 
@@ -544,7 +624,7 @@ namespace Vintagestory.GameContent
 
         void ResendWaypoints(IServerPlayer toPlayer)
         {
-            Dictionary<int, PlayerGroupMembership> memberOfGroups = toPlayer.ServerData.PlayerGroupMemberships;
+            Dictionary<int, PlayerGroupMembership> memberOfGroups = toPlayer.ServerData.PlayerGroupMemberShips;
             List<Waypoint> hisMarkers = new List<Waypoint>();
 
             foreach (Waypoint marker in Waypoints)

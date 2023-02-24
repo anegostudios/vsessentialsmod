@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public class AiTaskLookAtEntity : AiTaskBase
+    public class AiTaskLookAtEntity : AiTaskBaseTargetable
     {
-        public Entity targetEntity;
-
+        public bool manualExecute;
         public float moveSpeed = 0.02f;
         public float seekingRange = 25f;
         public float maxFollowTime = 60;
@@ -19,15 +19,30 @@ namespace Vintagestory.GameContent
         float maxTurnAnglePerSec;
         float curTurnRadPerSec;
 
-        public AiTaskLookAtEntity(EntityAgent entity, Entity target) : base(entity)
+        float maxTurnAngleRad;
+        float spawnAngleRad;
+
+        public AiTaskLookAtEntity(EntityAgent entity) : base(entity)
         {
-            targetEntity = target;
+            
         }
 
+        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
+        {
+            base.LoadConfig(taskConfig, aiConfig);
 
+
+            maxTurnAngleRad = taskConfig["maxTurnAngleDeg"].AsFloat(360) * GameMath.DEG2RAD;
+            spawnAngleRad = entity.Attributes.GetFloat("spawnAngleRad");
+        }
 
         public override bool ShouldExecute()
         {
+            if (!manualExecute)
+            {
+                targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, (e) => IsTargetableEntity(e, seekingRange));
+                return targetEntity != null;
+            }
             return false;
         }
 
@@ -67,22 +82,13 @@ namespace Vintagestory.GameContent
 
             float desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
 
+            desiredYaw = GameMath.Clamp(desiredYaw, spawnAngleRad - maxTurnAngleRad, spawnAngleRad + maxTurnAngleRad);
+
             float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
             entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt, curTurnRadPerSec * dt);
             entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
 
             return Math.Abs(yawDist) > 0.01;
-        }
-
-        public bool TargetReached()
-        {
-            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
-            double distance = targetBox.ShortestDistanceFrom(pos);
-
-            float minDist = MinDistanceToTarget();
-
-            return distance < minDist;
         }
 
         

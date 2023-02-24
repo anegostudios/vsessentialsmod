@@ -34,7 +34,7 @@ namespace Vintagestory.GameContent
             TaskManager.OnEntityLoaded();
         }
 
-        public override void OnEntityDespawn(EntityDespawnReason reason)
+        public override void OnEntityDespawn(EntityDespawnData reason)
         {
             base.OnEntityDespawn(reason);
 
@@ -61,7 +61,7 @@ namespace Vintagestory.GameContent
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
             if (tasks == null) return;
 
-            foreach(JsonObject taskConfig in tasks) 
+            foreach (JsonObject taskConfig in tasks) 
             {
                 string taskCode = taskConfig["code"]?.AsString();
                 bool enabled = taskConfig["enabled"].AsBool(true);

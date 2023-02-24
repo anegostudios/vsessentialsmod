@@ -132,10 +132,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (nowHasAir)
-            {
-                if (block.IsLiquid() && block.LiquidLevel / 7f > entity.LocalEyePos.Y - (int)entity.LocalEyePos.Y) nowHasAir = false;
-            }
+            nowHasAir &= !block.IsLiquid() || block.LiquidLevel / 7f < (entity.Swimming ? entity.Properties.SwimmingEyeHeight : entity.Properties.EyeHeight);
 
             HasAir = nowHasAir;
         }
@@ -152,7 +149,7 @@ namespace Vintagestory.GameContent
             {
                 Oxygen = Math.Max(0, Oxygen - deltaTime * 1000);
                 
-                if (Oxygen <=0)
+                if (Oxygen <= 0)
                 {
                     damageAccum += deltaTime;
                     if (damageAccum > 0.75)

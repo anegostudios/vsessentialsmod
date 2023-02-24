@@ -136,7 +136,7 @@ namespace Vintagestory.GameContent
             {
                 if (pinnedTo != null)
                 {
-                    if (pinnedTo.ShouldDespawn && pinnedTo.DespawnReason?.reason != EnumDespawnReason.Unload)
+                    if (pinnedTo.ShouldDespawn && pinnedTo.DespawnReason?.Reason != EnumDespawnReason.Unload)
                     {
                         UnPin();
                         return;

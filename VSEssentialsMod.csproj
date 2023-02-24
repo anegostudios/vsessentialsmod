@@ -21,6 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,6 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug + Flatworld|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -38,6 +40,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'PerfTest|AnyCPU'">
     <DebugType>pdbonly</DebugType>
@@ -48,10 +51,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.2.2.0\lib\net45\0Harmony.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="AnimatedGif">
       <HintPath>..\Lib\AnimatedGif.dll</HintPath>
       <Private>False</Private>
@@ -84,9 +83,9 @@
   <ItemGroup>
     <Compile Include="BlockBehavior\BehaviorMultiblock.cs" />
     <Compile Include="BlockBehavior\BehaviorDecor.cs" />
+    <Compile Include="BlockBehavior\BehaviorBEInteract.cs" />
     <Compile Include="BlockBehavior\BehaviorRopeTieable.cs" />
     <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
-    <Compile Include="BlockEntityRenderer\BEAnimatableRenderer.cs" />
     <Compile Include="BlockEntity\BEGeneric.cs" />
     <Compile Include="BlockEntity\BEParticleEmitter.cs" />
     <Compile Include="BlockEntity\BETransient.cs" />
@@ -177,12 +176,14 @@
     <Compile Include="Systems\Cloth\ClothPoint.cs" />
     <Compile Include="Systems\Cloth\ClothSystem.cs" />
     <Compile Include="Systems\Cloth\ClothManager.cs" />
+    <Compile Include="Systems\Emotes.cs" />
     <Compile Include="Systems\Weather\LightningFlash.cs" />
     <Compile Include="Systems\Weather\Map\MapLayerWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Map\NoiseWeatherPattern.cs" />
     <Compile Include="Systems\Weather\Model\Impl\WeatherEvent.cs" />
     <Compile Include="Systems\Weather\Model\WeatherEventConfig.cs" />
     <Compile Include="Systems\Weather\Model\ConditionalPatternConfig.cs" />
+    <Compile Include="Systems\Weather\UpdateSnowLayerChunk.cs" />
     <Compile Include="Systems\Weather\WeatherDataReader.cs" />
     <Compile Include="Systems\Weather\WeatherSimulationSnowAccum.cs" />
     <Compile Include="Systems\Weather\WeatherSystemConfig.cs" />

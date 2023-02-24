@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
                 pos.Motion *= (float)Math.Pow(airDragValue, dt * 33);
             }
 
-            if (controls.IsFlying)
+            if (controls.IsFlying && !controls.Gliding)
             {
                 pos.Motion *= (float)Math.Pow(GlobalConstants.AirDragFlying, dt * 33);
             }

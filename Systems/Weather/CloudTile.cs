@@ -13,10 +13,10 @@ namespace Vintagestory.GameContent
         public short GridZOffset; // Grid position
 
 
-        public short NorthThickness;
-        public short EastThickness;
-        public short SouthThickness;
-        public short WestThickness;
+        public short NorthTileThickness;
+        public short EastTileThickness;
+        public short SouthTileThickness;
+        public short WestTileThickness;
 
         public short TargetThickness;
         public short TargetBrightnes;

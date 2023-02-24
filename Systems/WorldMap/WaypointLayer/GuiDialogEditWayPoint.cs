@@ -31,7 +31,7 @@ namespace Vintagestory.GameContent
 
         public GuiDialogEditWayPoint(ICoreClientAPI capi, WaypointMapLayer wml, Waypoint waypoint, int index) : base("", capi)
         {
-            icons = wml.WaypointIcons.ToArray();
+            icons = wml.WaypointIcons.Keys.ToArray();
             colors = wml.WaypointColors.ToArray();
 
             this.wpIndex = index;
@@ -92,7 +92,7 @@ namespace Vintagestory.GameContent
                     .AddRichtext(Lang.Get("waypoint-color"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
                     .AddColorListPicker(colors, onColorSelected, leftColumn = leftColumn.BelowCopy(0, 5).WithFixedSize(colorIconSize, colorIconSize), 270, "colorpicker")
 
-                    .AddStaticText(Lang.Get("Icon"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.WithFixedPosition(0, leftColumn.fixedY + leftColumn.fixedHeight).BelowCopy(0, 0))
+                    .AddStaticText(Lang.Get("Icon"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.WithFixedPosition(0, leftColumn.fixedY + leftColumn.fixedHeight).WithFixedWidth(100).BelowCopy(0, 0))
                     .AddIconListPicker(icons, onIconSelected, leftColumn = leftColumn.BelowCopy(0, 5).WithFixedSize(colorIconSize+5, colorIconSize+5), 270, "iconpicker")
 
                     .AddSmallButton(Lang.Get("Cancel"), onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)

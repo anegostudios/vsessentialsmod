@@ -19,7 +19,7 @@ namespace Vintagestory.GameContent
 
         long fleeStartMs;
         bool stuck;
-        EntityPartitioning partitionUtil;
+        
         bool lowStabilityAttracted;
         bool ignoreDeepDayLight;
         float tamingGenerations = 10f;
@@ -33,8 +33,6 @@ namespace Vintagestory.GameContent
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
-            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
-
             base.LoadConfig(taskConfig, aiConfig);
 
             tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);

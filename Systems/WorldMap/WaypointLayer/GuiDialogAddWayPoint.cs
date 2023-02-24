@@ -25,12 +25,12 @@ namespace Vintagestory.GameContent
         string[] icons;
         string curIcon;
         string curColor;
-
-
+        bool autoSuggest = true;
+        bool ignoreNextAutosuggestDisable;
 
         public GuiDialogAddWayPoint(ICoreClientAPI capi, WaypointMapLayer wml) : base("", capi)
         {
-            icons =  wml.WaypointIcons.ToArray();
+            icons =  wml.WaypointIcons.Keys.ToArray();
             colors = wml.WaypointColors.ToArray();
 
             ComposeDialog();
@@ -63,8 +63,6 @@ namespace Vintagestory.GameContent
 
             int colorIconSize = 22;
 
-
-
             curIcon = icons[0];
             curColor = ColorUtil.Int2Hex(colors[0]);
 
@@ -82,7 +80,7 @@ namespace Vintagestory.GameContent
                     .AddRichtext(Lang.Get("waypoint-color"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.BelowCopy(0, 5))
                     .AddColorListPicker(colors, onColorSelected, leftColumn = leftColumn.BelowCopy(0, 5).WithFixedSize(colorIconSize, colorIconSize), 270, "colorpicker")
 
-                    .AddStaticText(Lang.Get("Icon"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.WithFixedPosition(0, leftColumn.fixedY + leftColumn.fixedHeight).BelowCopy(0, 0))
+                    .AddStaticText(Lang.Get("Icon"), CairoFont.WhiteSmallText(), leftColumn = leftColumn.WithFixedPosition(0, leftColumn.fixedY + leftColumn.fixedHeight).WithFixedWidth(200).BelowCopy(0, 0))
                     .AddIconListPicker(icons, onIconSelected, leftColumn = leftColumn.BelowCopy(0, 5).WithFixedSize(colorIconSize+5, colorIconSize+5), 270, "iconpicker")
 
                     .AddSmallButton(Lang.Get("Cancel"), onCancel, buttonRow.FlatCopy().FixedUnder(leftColumn, 0).WithFixedWidth(100), EnumButtonStyle.Normal)
@@ -100,11 +98,14 @@ namespace Vintagestory.GameContent
         private void onIconSelected(int index)
         {
             curIcon = icons[index];
+            autoSuggestName();
         }
+
 
         private void onColorSelected(int index)
         {
             curColor = ColorUtil.Int2Hex(colors[index]);
+            autoSuggestName();
         }
 
         private void onPinnedToggled(bool on)
@@ -112,6 +113,27 @@ namespace Vintagestory.GameContent
             
         }
 
+        private void autoSuggestName()
+        {
+            if (!autoSuggest) return;
+            
+            var textElem = SingleComposer.GetTextInput("nameInput");
+
+            ignoreNextAutosuggestDisable = true;
+            if (Lang.HasTranslation("wpSuggestion-" + curIcon + "-" + curColor))
+            {
+                textElem.SetValue(Lang.Get("wpSuggestion-" + curIcon + "-" + curColor));
+            }
+            else if (Lang.HasTranslation("wpSuggestion-" + curIcon))
+            {
+                textElem.SetValue(Lang.Get("wpSuggestion-" + curIcon));
+            }
+            else
+            {
+                textElem.SetValue("");
+            }
+            
+        }
 
         private bool onSave()
         {
@@ -132,6 +154,13 @@ namespace Vintagestory.GameContent
         private void onNameChanged(string t1)
         {
             SingleComposer.GetButton("saveButton").Enabled = (t1.Trim() != "");
+
+            if (!ignoreNextAutosuggestDisable)
+            {
+                autoSuggest = t1.Length == 0;
+            }
+
+            ignoreNextAutosuggestDisable = false;
         }
 
         public override bool CaptureAllInputs()

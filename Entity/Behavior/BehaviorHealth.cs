@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Vintagestory.API;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -231,10 +228,16 @@ namespace Vintagestory.GameContent
         public override void OnFallToGround(Vec3d positionBeforeFalling, double withYMotion)
         {
             if (!entity.Properties.FallDamage) return;
+            bool gliding = (entity as EntityAgent)?.ServerControls.Gliding == true;
 
             double yDistance = Math.Abs(positionBeforeFalling.Y - entity.Pos.Y);
 
             if (yDistance < 3.5f) return;
+            if (gliding)
+            {
+                yDistance = Math.Min(25, yDistance);
+                withYMotion /= 2;
+            }
 
             // Experimentally determined - at 3.5 blocks the player has a motion of -0.19
             if (withYMotion > -0.19) return;  

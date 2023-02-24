@@ -27,7 +27,7 @@ namespace Vintagestory.GameContent
 
         public override bool Applicable(Entity entity, EntityPos pos, EntityControls controls)
         {
-            return entity.OnGround;
+            return entity.OnGround && !entity.Swimming;
         }
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
             {
                 accum -= frametime;
 
-                if (!entity.Swimming && entity.Alive)
+                if (entity.Alive)
                 {
                     // Apply walk motion
                     double multiplier = (entity as EntityAgent).GetWalkSpeedMultiplier(groundDragFactor);
@@ -55,17 +55,14 @@ namespace Vintagestory.GameContent
                     pos.Motion.Add(motionDelta.X, 0, motionDelta.Z);
                 }
 
-                if (!entity.Swimming)
-                {
-                    // Apply ground drag
-                    double dragstrength = 1 - groundDragFactor;
+                // Apply ground drag
+                double dragstrength = 1 - groundDragFactor;
 
-                    pos.Motion.X *= dragstrength;
-                    pos.Motion.Z *= dragstrength;
-                }
+                pos.Motion.X *= dragstrength;
+                pos.Motion.Z *= dragstrength;
             }
 
-            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive && !entity.Swimming)
+            if (controls.Jump && entity.World.ElapsedMilliseconds - lastJump > 500 && entity.Alive)
             {
                 // Apply jump motion
                 lastJump = entity.World.ElapsedMilliseconds;

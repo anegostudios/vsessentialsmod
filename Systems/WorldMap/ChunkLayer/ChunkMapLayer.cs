@@ -41,7 +41,9 @@ namespace Vintagestory.GameContent
 
 
         MapDB mapdb;
-        
+        ICoreClientAPI capi;
+        Cairo.GaussianBlur blurTool;
+
 
         public string getMapDbFilePath()
         {
@@ -57,6 +59,10 @@ namespace Vintagestory.GameContent
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
             api.Event.ChunkDirty += Event_OnChunkDirty;
+
+            blurTool = new Cairo.GaussianBlur(api.World.BlockAccessor.ChunkSize, api.World.BlockAccessor.ChunkSize);
+
+            capi = api as ICoreClientAPI;
 
             if (api.Side == EnumAppSide.Server)
             {
@@ -253,11 +259,11 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                //api.Logger.Notification("Genpixels @{0}/{1}", cord.X, cord.Y);
+                int[] tintedPixels = new int[chunksize*chunksize];
+                //int[] untintedPixels = new int[chunksize * chunksize];
 
-                int[] pixels = (int[])GenerateChunkImage(cord, mc)?.Clone();
-
-                if (pixels == null)
+                bool ok = GenerateChunkImage(cord, mc, ref tintedPixels/*, ref untintedPixels*/);
+                if (!ok)
                 {
                     lock (chunksToGenLock)
                     {
@@ -267,19 +273,9 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                toSaveList[cord.Copy()] = new MapPieceDB() { Pixels = pixels };
+                toSaveList[cord.Copy()] = new MapPieceDB() { Pixels = tintedPixels };
 
-
-                /// North: Negative Z
-                /// East: Positive X
-                /// South: Positive Z
-                /// West: Negative X
-                /*bool north = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X, cord.Y - 1, chunkmapSizeX));
-                bool east = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X + 1, cord.Y, chunkmapSizeX));
-                bool south = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X, cord.Y + 1, chunkmapSizeX));
-                bool west = !api.World.LoadedMapChunkIndices.Contains(MapUtil.Index2dL(cord.X - 1, cord.Y, chunkmapSizeX));*/
-
-                loadFromChunkPixels(cord, pixels/*, (north ? 1 : 0 ) | (east ? 2 : 0) | (south ? 4 : 0) | (west ? 8 : 0)*/);
+                loadFromChunkPixels(cord, tintedPixels);
             }
 
             if (toSaveList.Count > 100 || diskSaveAccum > 4f)
@@ -353,66 +349,8 @@ namespace Vintagestory.GameContent
             }
         }
 
-        void loadFromChunkPixels(Vec2i cord, int[] pixels/*, int sideSepia*/)
+        void loadFromChunkPixels(Vec2i cord, int[] pixels)
         {
-            /*if (sideSepia == 255)
-            {
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    int pixel = pixels[i];
-                    int r = pixel & 0xff;
-                    int g = (pixel >> 8) & 0xff;
-                    int b = (pixel >> 16) & 0xff;
-
-                    // Sepia
-                    byte rs = (byte)Math.Min(255, (r * 0.393f) + (g * 0.769f) + (b * 0.189f));
-                    byte gs = (byte)Math.Min(255, (r * 0.349f) + (g * 0.686f) + (b * 0.168f));
-                    byte bs = (byte)Math.Min(255, (r * 0.272f) + (g * 0.534f) + (b * 0.131f));
-
-                    pixels[i] = (rs) | (gs << 8) | (bs << 16) | (255 << 24);
-                }
-            }
-            else if (sideSepia != 0)
-            {
-                bool northSepia = (sideSepia & 1) > 0;
-                bool eastSepia = (sideSepia & 2) > 0;
-                bool southSepia = (sideSepia & 4) > 0;
-                bool westSepia = (sideSepia & 8) > 0;
-
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    int pixel = pixels[i];
-                    int r = pixel & 0xff;
-                    int g = (pixel >> 8) & 0xff;
-                    int b = (pixel >> 16) & 0xff;
-
-                    int x = i % chunksize;
-                    int z = i / chunksize;
-
-                    int rnd = GameMath.MurmurHash3Mod(x, 0, z, chunksize / 2);
-
-                    /// North: Negative Z
-                    /// East: Positive X
-                    /// South: Positive Z
-                    /// West: Negative X
-                    bool sepia =
-                        northSepia && rnd > z ||
-                        eastSepia && rnd > chunksize - x ||
-                        southSepia && rnd > chunksize - z ||
-                        westSepia && rnd > x
-                    ;
-
-                    if (!sepia) continue;
-
-                    // Sepia
-                    byte rs = (byte)Math.Min(255, (r * 0.393f) + (g * 0.769f) + (b * 0.189f));
-                    byte gs = (byte)Math.Min(255, (r * 0.349f) + (g * 0.686f) + (b * 0.168f));
-                    byte bs = (byte)Math.Min(255, (r * 0.272f) + (g * 0.534f) + (b * 0.131f));
-
-                    pixels[i] = (rs) | (gs << 8) | (bs << 16) | (255 << 24);
-                }
-            }*/
-
             Vec2i mcord = new Vec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
             Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
 
@@ -483,10 +421,8 @@ namespace Vintagestory.GameContent
         
 
 
-        public int[] GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, bool withSnow = true)
+        public bool GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, ref int[] tintedImage/*, ref int[] untintedImage*/, bool withSnow = true)
         {
-            ICoreClientAPI capi = api as ICoreClientAPI;
-
             BlockPos tmpPos = new BlockPos();
             Vec2i localpos = new Vec2i();
 
@@ -494,7 +430,7 @@ namespace Vintagestory.GameContent
             for (int cy = 0; cy < chunksTmp.Length; cy++)
             {
                 chunksTmp[cy] = capi.World.BlockAccessor.GetChunk(chunkPos.X, cy, chunkPos.Y);
-                if (chunksTmp[cy] == null || !(chunksTmp[cy] as IClientChunk).LoadedFromServer) return null;
+                if (chunksTmp[cy] == null || !(chunksTmp[cy] as IClientChunk).LoadedFromServer) return false;
             }
 
             // Prefetch map chunks
@@ -505,8 +441,10 @@ namespace Vintagestory.GameContent
                 capi.World.BlockAccessor.GetMapChunk(chunkPos.X, chunkPos.Y - 1)            
             };
 
-            int[] texDataTmp = new int[chunksize * chunksize];
-            for (int i = 0; i < texDataTmp.Length; i++)
+            byte[] shadowMap = new byte[tintedImage.Length];
+            for (int i = 0; i < shadowMap.Length; i++) shadowMap[i] = 128;
+
+            for (int i = 0; i < tintedImage.Length; i++)
             {
                 int y = mc.RainHeightMap[i];
                 int cy = y / chunksize;
@@ -550,17 +488,18 @@ namespace Vintagestory.GameContent
                 topX = GameMath.Mod(topX, chunksize);
                 leftZ = GameMath.Mod(leftZ, chunksize);
 
-                leftTop = leftTopMapChunk == null ? 0 : Math.Sign(y - leftTopMapChunk.RainHeightMap[leftZ * chunksize + topX]);
-                rightTop = rightTopMapChunk == null ? 0 : Math.Sign(y - rightTopMapChunk.RainHeightMap[rightZ * chunksize + topX]);
-                leftBot = leftBotMapChunk == null ? 0 : Math.Sign(y - leftBotMapChunk.RainHeightMap[leftZ * chunksize + botX]);
+                leftTop = leftTopMapChunk == null ? 0 : (y - leftTopMapChunk.RainHeightMap[leftZ * chunksize + topX]);
+                rightTop = rightTopMapChunk == null ? 0 : (y - rightTopMapChunk.RainHeightMap[rightZ * chunksize + topX]);
+                leftBot = leftBotMapChunk == null ? 0 : (y - leftBotMapChunk.RainHeightMap[leftZ * chunksize + botX]);
 
-                float slopeness = (leftTop + rightTop + leftBot);
-
-                if (slopeness > 0) b = 1.18f;
-                if (slopeness < 0) b = 0.82f;
-
-                int blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
+                float slopedir = (Math.Sign(leftTop) + Math.Sign(rightTop) + Math.Sign(leftBot));
+                float steepness = Math.Max(Math.Max(Math.Abs(leftTop), Math.Abs(rightTop)), Math.Abs(leftBot));
+                
+                int blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(lx, y % chunksize, lz, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
                 Block block = api.World.Blocks[blockId];
+                
+                if (slopedir > 0) b = 1.08f + Math.Min(0.5f, steepness / 10f) / 1.25f;
+                if (slopedir < 0) b = 0.92f - Math.Min(0.5f, steepness / 10f) / 1.25f;
 
                 if (!withSnow && block.BlockMaterial == EnumBlockMaterial.Snow)
                 {
@@ -581,12 +520,28 @@ namespace Vintagestory.GameContent
                 // Add a bit of randomness to each pixel
                 int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.6f);
 
-                texDataTmp[i] = ColorUtil.ColorMultiply3Clamped(col, b) | 255 << 24;
+                shadowMap[i] = (byte)(shadowMap[i] * b);
+
+                tintedImage[i] = col;
+            }
+
+            byte[] bla = new byte[shadowMap.Length];
+            for (int i = 0; i < bla.Length; i++) bla[i] = shadowMap[i];
+
+            BlurTool.Blur(shadowMap, 32, 32, 2);
+            float sharpen = 1.4f;
+
+            for (int i = 0; i < shadowMap.Length; i++)
+            {
+                float b = ((int)((shadowMap[i]/128f - 1f)*5))/5f;
+                b += (((bla[i] / 128f - 1f)*5) % 1) / 5f;
+
+                tintedImage[i] = ColorUtil.ColorMultiply3Clamped(tintedImage[i], b * sharpen + 1f) | 255 << 24;
             }
 
             for (int cy = 0; cy < chunksTmp.Length; cy++) chunksTmp[cy] = null;
 
-            return texDataTmp;
+            return true;
         }
 
 
@@ -639,7 +594,132 @@ namespace Vintagestory.GameContent
             sapi.WorldManager.ResendMapChunk(cx, cz, true);
             mapchunk.MarkDirty();
         }
+    }
 
+
+    class BlurTool
+    {
+        public static void Blur(byte[] data, int sizeX, int sizeZ, int range)
+        {
+            BoxBlurHorizontal(data, range, 0, 0, sizeX, sizeZ);
+            BoxBlurVertical(data, range, 0, 0, sizeX, sizeZ);
+        }
+
+
+        internal static unsafe void BoxBlurHorizontal(byte[] map, int range, int xStart, int yStart, int xEnd, int yEnd)
+        {
+            fixed (byte* pixels = map)
+            {
+                int w = xEnd - xStart;
+                int h = yEnd - yStart;
+
+                int halfRange = range / 2;
+                int index = yStart * w;
+                byte[] newColors = new byte[w];
+
+                for (int y = yStart; y < yEnd; y++)
+                {
+                    int hits = 0;
+                    int r = 0;
+                    for (int x = xStart - halfRange; x < xEnd; x++)
+                    {
+                        int oldPixel = x - halfRange - 1;
+                        if (oldPixel >= xStart)
+                        {
+                            byte col = pixels[index + oldPixel];
+                            if (col != 0)
+                            {
+                                r -= col;
+                            }
+                            hits--;
+                        }
+
+                        int newPixel = x + halfRange;
+                        if (newPixel < xEnd)
+                        {
+                            byte col = pixels[index + newPixel];
+                            if (col != 0)
+                            {
+                                r += col;
+                            }
+                            hits++;
+                        }
+
+                        if (x >= xStart)
+                        {
+                            byte color = (byte)(r / hits);
+                            newColors[x] = color;
+                        }
+                    }
+
+                    for (int x = xStart; x < xEnd; x++)
+                    {
+                        pixels[index + x] = newColors[x];
+                    }
+
+                    index += w;
+                }
+            }
+        }
+
+        internal static unsafe void BoxBlurVertical(byte[] map, int range, int xStart, int yStart, int xEnd, int yEnd)
+        {
+            fixed (byte* pixels = map)
+            {
+                int w = xEnd - xStart;
+                int h = yEnd - yStart;
+
+                int halfRange = range / 2;
+
+                byte[] newColors = new byte[h];
+                int oldPixelOffset = -(halfRange + 1) * w;
+                int newPixelOffset = (halfRange) * w;
+
+                for (int x = xStart; x < xEnd; x++)
+                {
+                    int hits = 0;
+                    int r = 0;
+                    int index = yStart * w - halfRange * w + x;
+                    for (int y = yStart - halfRange; y < yEnd; y++)
+                    {
+                        int oldPixel = y - halfRange - 1;
+                        if (oldPixel >= yStart)
+                        {
+                            byte col = pixels[index + oldPixelOffset];
+                            if (col != 0)
+                            {
+                                r -= col;
+                            }
+                            hits--;
+                        }
+
+                        int newPixel = y + halfRange;
+                        if (newPixel < yEnd)
+                        {
+                            byte col = pixels[index + newPixelOffset];
+                            if (col != 0)
+                            {
+                                r += col;
+                            }
+                            hits++;
+                        }
+
+                        if (y >= yStart)
+                        {
+                            byte color = (byte)(r / hits);
+                            newColors[y] = color;
+                        }
+
+                        index += w;
+                    }
+
+                    for (int y = yStart; y < yEnd; y++)
+                    {
+                        pixels[y * w + x] = newColors[y];
+                    }
+                }
+            }
+        }
 
 
     }

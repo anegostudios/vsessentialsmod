@@ -56,6 +56,8 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public double EyeHeight = 0.1;
         [JsonProperty]
+        public double? SwimmingEyeHeight = null;
+        [JsonProperty]
         public float Weight = 25;
         [JsonProperty]
         public bool CanClimb = false;
@@ -104,6 +106,7 @@ namespace Vintagestory.ServerMods.NoObf
                     DropsCopy[i] = Drops[i].Clone();
             }
 
+
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
@@ -125,7 +128,9 @@ namespace Vintagestory.ServerMods.NoObf
                 Sounds = Sounds == null ? new Dictionary<string, AssetLocation>() : new Dictionary<string, AssetLocation>(Sounds),
                 IdleSoundChance = IdleSoundChance,
                 IdleSoundRange = IdleSoundRange,
-                Drops = DropsCopy
+                Drops = DropsCopy,
+                EyeHeight = EyeHeight,
+                SwimmingEyeHeight = SwimmingEyeHeight ?? EyeHeight
             };
 
             if (Client != null)
@@ -133,7 +138,7 @@ namespace Vintagestory.ServerMods.NoObf
                 properties.Client = new EntityClientProperties(Client.Behaviors)
                 {
                     RendererName = Client.Renderer,
-                    Textures = new FakeDictionary<string, CompositeTexture>(Client.Textures),
+                    Textures = new FastSmallDictionary<string, CompositeTexture>(Client.Textures),
                     GlowLevel = Client.GlowLevel,
                     PitchStep = Client.PitchStep,
                     Shape = Client.Shape,
@@ -152,8 +157,6 @@ namespace Vintagestory.ServerMods.NoObf
                     SpawnConditions = Server.SpawnConditions
                 };
             }
-
-            properties.SetEyeHeight(EyeHeight);
 
             return properties;
         }

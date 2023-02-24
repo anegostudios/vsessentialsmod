@@ -135,6 +135,8 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
+            if (prog.LoadError) return;
+
             if (stage == EnumRenderStage.Opaque)
             {
                 prog.Use();
@@ -200,7 +202,6 @@ namespace Vintagestory.GameContent
                     sunGlowAmb.AmbientColor.Weight = Math.Min(sunGlowAmb.AmbientColor.Weight, nowWeight);
                 }
 
-
                 lightningTime -= dt / 1.7f;
 
                 if (lightningTime <= 0)
@@ -229,6 +230,7 @@ namespace Vintagestory.GameContent
 
                 if (!lflash.Alive)
                 {
+                    lflash.Dispose();
                     lightningFlashes.RemoveAt(i);
                     i--;
                 }
@@ -260,7 +262,10 @@ namespace Vintagestory.GameContent
 
 
         public void Dispose() {
-            foreach (var lflash in lightningFlashes) lflash.Dispose();
+            foreach (var lflash in lightningFlashes)
+            {
+                lflash.Dispose();
+            }
         }
     }
 

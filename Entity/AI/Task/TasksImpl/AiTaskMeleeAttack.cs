@@ -19,7 +19,7 @@ namespace Vintagestory.GameContent
         protected float knockbackStrength = 1f;
         protected float minDist = 1.5f;
         protected float minVerDist = 1f;
-
+        protected float attackAngleRangeDeg = 20f;
 
         protected bool damageInflicted = false;
 
@@ -30,8 +30,9 @@ namespace Vintagestory.GameContent
 
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
-        float tamingGenerations = 10f;
-
+        protected float tamingGenerations = 10f;
+        protected float attackRange = 3f;
+        protected bool turnToTarget = true;
 
         public AiTaskMeleeAttack(EntityAgent entity) : base(entity)
         {            
@@ -48,6 +49,7 @@ namespace Vintagestory.GameContent
 
             this.damage = taskConfig["damage"].AsFloat(2);
             this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 2f));
+            this.attackAngleRangeDeg = taskConfig["attackAngleRangeDeg"].AsFloat(20);
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
 
@@ -94,7 +96,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                targetEntity = entity.World.GetNearestEntity(pos, 3f * fearReductionFactor, 3f * fearReductionFactor, (e) =>
+                targetEntity = entity.World.GetNearestEntity(pos, attackRange * fearReductionFactor, attackRange * fearReductionFactor, (e) =>
                 {
                     return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
                 });
@@ -114,49 +116,37 @@ namespace Vintagestory.GameContent
         {
             didStartAnim = false;
             curTurnRadPerSec = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser.curTurnRadPerSec;
+
+            if (!turnToTarget) base.StartExecute();
         }
 
         public override bool ContinueExecute(float dt)
         {
             EntityPos own = entity.ServerPos;
             EntityPos his = targetEntity.ServerPos;
+            bool correctYaw = true;
 
-            float desiredYaw = (float)Math.Atan2(his.X - own.X, his.Z - own.Z);
-            float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
-            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
-            entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
-
-            bool correctYaw = Math.Abs(yawDist) < 20 * GameMath.DEG2RAD;
-            if (correctYaw && !didStartAnim)
+            if (turnToTarget)
             {
-                didStartAnim = true;
-                base.StartExecute();
-            }   
+                float desiredYaw = (float)Math.Atan2(his.X - own.X, his.Z - own.Z);
+                float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
+                entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier, curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier);
+                entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
+
+                correctYaw = Math.Abs(yawDist) < attackAngleRangeDeg * GameMath.DEG2RAD;
+
+                if (correctYaw && !didStartAnim)
+                {
+                    didStartAnim = true;
+                    base.StartExecute();
+                }
+            }
 
             if (lastCheckOrAttackMs + damagePlayerAtMs > entity.World.ElapsedMilliseconds) return true;
 
             if (!damageInflicted && correctYaw)
             {
-                if (!hasDirectContact(targetEntity, minDist, minVerDist)) return false;
-
-                bool alive = targetEntity.Alive;
-                
-                targetEntity.ReceiveDamage(
-                    new DamageSource() { 
-                        Source = EnumDamageSource.Entity, 
-                        SourceEntity = entity, 
-                        Type = damageType,
-                        DamageTier = damageTier,
-                        KnockbackStrength = knockbackStrength
-                    },
-                    damage * GlobalConstants.CreatureDamageModifier
-                );
-
-                if (alive && !targetEntity.Alive)
-                {
-                    bhEmo?.TryTriggerState("saturated", targetEntity.EntityId);
-                }
-
+                attackTarget();
                 damageInflicted = true;
             }
 
@@ -165,8 +155,28 @@ namespace Vintagestory.GameContent
         }
 
 
+        protected virtual void attackTarget()
+        {
+            if (!hasDirectContact(targetEntity, minDist, minVerDist)) return;
 
-        
+            bool alive = targetEntity.Alive;
 
+            targetEntity.ReceiveDamage(
+                new DamageSource()
+                {
+                    Source = EnumDamageSource.Entity,
+                    SourceEntity = entity,
+                    Type = damageType,
+                    DamageTier = damageTier,
+                    KnockbackStrength = knockbackStrength
+                },
+                damage * GlobalConstants.CreatureDamageModifier
+            );
+
+            if (alive && !targetEntity.Alive)
+            {
+                bhEmo?.TryTriggerState("saturated", targetEntity.EntityId);
+            }
+        }
     }
 }

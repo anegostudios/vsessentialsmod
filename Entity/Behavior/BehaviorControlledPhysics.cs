@@ -34,8 +34,9 @@ namespace Vintagestory.GameContent
         protected Vec3d windForce = new Vec3d();
 
         bool applyWindForce;
+        bool isMountable;
 
-        public override void OnEntityDespawn(EntityDespawnReason despawn)
+        public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             (entity.World.Api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Before);
             Dispose();
@@ -48,6 +49,8 @@ namespace Vintagestory.GameContent
             Locomotors.Add(new EntityInAir());
             Locomotors.Add(new EntityApplyGravity());
             Locomotors.Add(new EntityMotionDrag());
+
+            isMountable = entity is IMountable || entity is IMountableSupplier;
         }
 
 
@@ -115,12 +118,14 @@ namespace Vintagestory.GameContent
                 accumulator = GlobalConstants.MaxPhysicsIntervalInSlowTicks;
             }
 
+            float frameTime = GlobalConstants.PhysicsFrameTime;
+            if (isMountable) frameTime = 1 / 60f;
 
             collisionTester.NewTick();
-            while (accumulator >= GlobalConstants.PhysicsFrameTime)
+            while (accumulator >= frameTime)
             {
-                TickEntityPhysicsPre(entity, GlobalConstants.PhysicsFrameTime);
-                accumulator -= GlobalConstants.PhysicsFrameTime;
+                TickEntityPhysicsPre(entity, frameTime);
+                accumulator -= frameTime;
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
@@ -226,7 +231,13 @@ namespace Vintagestory.GameContent
             EntityAgent agent = entity as EntityAgent;
             if (agent?.MountedOn != null)
             {
-                pos.SetFrom(agent.MountedOn.MountPosition);
+                entity.Swimming = false;
+                entity.OnGround = false;
+                bool serverSidePlayer = entity.World.Side == EnumAppSide.Server && agent is EntityPlayer;
+                if (!serverSidePlayer)
+                {
+                    pos.SetPos(agent.MountedOn.MountPosition);
+                }
                 pos.Motion.X = 0;
                 pos.Motion.Y = 0;
                 pos.Motion.Z = 0;
@@ -260,17 +271,6 @@ namespace Vintagestory.GameContent
 
 
             profiler.Leave();
-
-
-            // Shake the player violently when falling at high speeds
-            /*if (movedy < -50)
-            {
-                pos.X += (rand.NextDouble() - 0.5) / 5 * (-movedy / 50f);
-                pos.Z += (rand.NextDouble() - 0.5) / 5 * (-movedy / 50f);
-            }
-            */
-
-            //return result;
         }
 
 
@@ -310,7 +310,7 @@ namespace Vintagestory.GameContent
                 {
                     tmpPos.Set((int)pos.X, (int)pos.Y + dy, (int)pos.Z);
                     Block nblock = blockAccess.GetBlock(tmpPos);
-                    if (!nblock.Climbable && !entity.Properties.CanClimbAnywhere) continue;
+                    if (!nblock.IsClimbable(tmpPos) && !entity.Properties.CanClimbAnywhere) continue;
 
                     Cuboidf[] collBoxes = nblock.GetCollisionBoxes(blockAccess, tmpPos);
                     if (collBoxes == null) continue;
@@ -348,7 +348,7 @@ namespace Vintagestory.GameContent
                     {
                         tmpPos.Set((int)pos.X + facing.Normali.X, (int)pos.Y + dy, (int)pos.Z + facing.Normali.Z);
                         Block nblock = blockAccess.GetBlock(tmpPos);
-                        if (!nblock.Climbable && !(entity.Properties.CanClimbAnywhere && entity.Alive)) continue;
+                        if (!nblock.IsClimbable(tmpPos) && !(entity.Properties.CanClimbAnywhere && entity.Alive)) continue;
 
                         Cuboidf[] collBoxes = nblock.GetCollisionBoxes(blockAccess, tmpPos);
                         if (collBoxes == null) continue;
@@ -551,7 +551,8 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
+            tmpPos.Set((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
+            Block belowBlock = entity.World.BlockAccessor.GetBlock(tmpPos);
 
 
             // Test for X
@@ -559,7 +560,7 @@ namespace Vintagestory.GameContent
             if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
             {
                 // Weird hack so you can climb down ladders more easily
-                if (belowBlock.Climbable)
+                if (belowBlock.IsClimbable(tmpPos))
                 {
                     outposition.X += (pos.X - outposition.X) / 10;
                 }
@@ -575,7 +576,7 @@ namespace Vintagestory.GameContent
             if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
             {
                 // Weird hack so you can climb down ladders more easily
-                if (belowBlock.Climbable)
+                if (belowBlock.IsClimbable(tmpPos))
                 {
                     outposition.Z += (pos.Z - outposition.Z) / 10;
                 }

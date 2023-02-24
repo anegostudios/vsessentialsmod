@@ -26,7 +26,6 @@ namespace Vintagestory.GameContent
         float quarterSecAccum = 0;
         BlockPos plrPos = new BlockPos();
         Vec3d plrPosd = new Vec3d();
-        float smoothedLightLevel;
 
 
         public bool haveLevelFinalize;
@@ -131,21 +130,9 @@ namespace Vintagestory.GameContent
                 WeatherDataAtPlayer.LoadAdjacentSimsAndLerpValues(plrPosd, dt);
                 WeatherDataAtPlayer.UpdateAdjacentAndBlendWeatherData();
 
-                int lightlevel = Math.Max(
-                    capi.World.BlockAccessor.GetLightLevel(plrPos, EnumLightLevelType.OnlySunLight),
-                    capi.World.BlockAccessor.GetLightLevel(plrPos.Up(), EnumLightLevelType.OnlySunLight)
-                );
-                smoothedLightLevel += (lightlevel - smoothedLightLevel) * dt * 4;
 
-                // light level > 17 = 100% fog
-                // light level <= 2 = 0% fog
-                float fogMultiplier = GameMath.Clamp(smoothedLightLevel / 20f, 0f, 1);
-                float fac = (float)GameMath.Clamp(capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel, 0, 1);
-                fac *= fac;
-                fogMultiplier *= fac;
-
-                WeatherDataAtPlayer.BlendedWeatherData.Ambient.FlatFogDensity.Weight *= fogMultiplier;
-                WeatherDataAtPlayer.BlendedWeatherData.Ambient.FogDensity.Weight *= fogMultiplier;
+                /*WeatherDataAtPlayer.BlendedWeatherData.Ambient.FlatFogDensity.Weight *= fogMultiplier;
+                WeatherDataAtPlayer.BlendedWeatherData.Ambient.FogDensity.Weight *= fogMultiplier;*/
 
                 
                 dt = Math.Min(0.5f, dt);
@@ -304,8 +291,6 @@ namespace Vintagestory.GameContent
             simSounds.Initialize();
             simParticles.Initialize();
             cloudRenderer = new CloudRenderer(capi, this);
-
-            smoothedLightLevel = capi.World.BlockAccessor.GetLightLevel(capi.World.Player.Entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
 
             capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", WeatherDataAtPlayer.BlendedWeatherData.Ambient);
             haveLevelFinalize = true;

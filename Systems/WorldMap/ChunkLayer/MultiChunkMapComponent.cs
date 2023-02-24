@@ -17,6 +17,8 @@ namespace Vintagestory.GameContent
         public Vec2i chunkCoord;
         public LoadedTexture Texture;
 
+        static int[] emptyPixels;
+
 
         Vec3d worldPos;
         Vec2f viewPos = new Vec2f();
@@ -56,7 +58,15 @@ namespace Vintagestory.GameContent
             chunksize = capi.World.BlockAccessor.ChunkSize;
 
             worldPos = new Vec3d(baseChunkCord.X * chunksize, 0, baseChunkCord.Y * chunksize);
+
+            if (emptyPixels == null)
+            {
+                int size = ChunkLen * chunksize;
+                emptyPixels = new int[size * size];
+            }
         }
+
+        
 
         public void setChunk(int dx, int dz, int[] pixels)
         {
@@ -71,7 +81,7 @@ namespace Vintagestory.GameContent
             {
                 int size = ChunkLen * chunksize;
                 Texture = new LoadedTexture(capi, 0, size, size);
-                capi.Render.LoadOrUpdateTextureFromRgba(new int[size * size], false, 0, ref Texture);
+                capi.Render.LoadOrUpdateTextureFromRgba(emptyPixels, false, 0, ref Texture);
             }
             
             capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref tmpTexture);
@@ -93,8 +103,6 @@ namespace Vintagestory.GameContent
             chunkSet[dx, dz] = false;
         }
 
-        
-
 
         public override void Render(GuiElementMap map, float dt)
         {
@@ -112,25 +120,6 @@ namespace Vintagestory.GameContent
                 (int)(Texture.Height * map.ZoomLevel),
                 renderZ
             );
-
-            /*var width = Texture.Width * map.ZoomLevel;
-            var height = Texture.Height * map.ZoomLevel;
-            var col = ColorUtil.ColorFromRgba(255, 255, 255, 128);
-
-            for (int x = 0; x < ChunkLen; x++)
-            {
-                for (int z = 0; z < ChunkLen; z++)
-                {
-                    capi.Render.RenderRectangle(
-                        (int)(map.Bounds.renderX + viewPos.X + width/3 * x),
-                        (int)(map.Bounds.renderY + viewPos.Y + width / 3 * z),
-                        renderZ,
-                        (int)(width/3),
-                        (int)(height/3),
-                        col
-                    );
-                }
-            }*/
         }
 
         public override void Dispose()
@@ -162,6 +151,7 @@ namespace Vintagestory.GameContent
         public static void DisposeStatic()
         {
             tmpTexture?.Dispose();
+            emptyPixels = null;
             tmpTexture = null;
         }
     }

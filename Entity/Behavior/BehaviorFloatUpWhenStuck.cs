@@ -17,6 +17,7 @@ namespace Vintagestory.GameContent
 
         int counter = 0;
         bool stuckInBlock;
+        float pushVelocityMul = 1f;
         Vec3d tmpPos = new Vec3d();
 
 
@@ -30,6 +31,7 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, attributes);
 
             onlyWhenDead = attributes["onlyWhenDead"].AsBool(false);
+            pushVelocityMul = attributes["pushVelocityMul"].AsFloat(1f);
         }
 
 
@@ -47,7 +49,7 @@ namespace Vintagestory.GameContent
                 if (!entity.Swimming)
                 {
                     tmpPos.Set(entity.SidedPos.X, entity.SidedPos.Y, entity.SidedPos.Z);
-                    Cuboidd collbox = entity.World.CollisionTester.GetCollidingCollisionBox(entity.World.BlockAccessor, entity.CollisionBox, tmpPos, false);
+                    Cuboidd collbox = entity.World.CollisionTester.GetCollidingCollisionBox(entity.World.BlockAccessor, entity.CollisionBox.Clone().ShrinkBy(0.01f), tmpPos, false);
 
                     if (collbox != null)
                     {
@@ -66,39 +68,34 @@ namespace Vintagestory.GameContent
             double posX = entity.SidedPos.X;
             double posY = entity.SidedPos.Y;
             double posZ = entity.SidedPos.Z;
-            /// North: Negative Z
-            /// East: Positive X
-            /// South: Positive Z
-            /// West: Negative X
 
-            double[] distByFacing = new double[]
-            {
-                posZ - collBox.Z1, // N
-                collBox.X2 - posX, // E
-                collBox.Z2 - posZ, // S
-                posX - collBox.X1, // W
-                collBox.Y2 - posY, // U
-                99 // D
-            };
+            var ba = entity.World.BlockAccessor;
 
-            BlockFacing pushDir = BlockFacing.UP;
+            Vec3i pushDir = null;
             double shortestDist = 99;
-            for (int i = 0; i < distByFacing.Length; i++)
+            for (int i = 0; i < Cardinal.ALL.Length; i++)
             {
-                BlockFacing face = BlockFacing.ALLFACES[i];
-                if (distByFacing[i] < shortestDist && (
-                    !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X, posY, posZ + face.Normali.Z), false)
-                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X/2f, posY, posZ + face.Normali.Z/2f), false)
-                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X/4f, posY, posZ + face.Normali.Z/4f), false)
-                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X / 8f, posY, posZ + face.Normali.Z / 8f), false)
-                    || !entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, tmpPos.Set(posX + face.Normali.X / 16f, posY, posZ + face.Normali.Z / 16f), false)
-                ))
+                // Already found a good solution, no need to search further
+                if (shortestDist <= 0.25f) break;
+
+                var cardinal = Cardinal.ALL[i];
+                for (int dist = 1; dist <= 4; dist++)
                 {
-                    shortestDist = distByFacing[i];
-                    pushDir = face;
+                    var r = dist / 4f;
+                    if (!entity.World.CollisionTester.IsColliding(ba, entity.CollisionBox, tmpPos.Set(posX + cardinal.Normali.X * r, posY, posZ + cardinal.Normali.Z * r), false))
+                    {
+                        if (r < shortestDist)
+                        {
+                                                // Make going diagonal a bit more costly
+                            shortestDist = r + (cardinal.IsDiagnoal ? 0.1f : 0);
+                            pushDir = cardinal.Normali;
+                            break;
+                        }
+                    }
                 }
             }
 
+            if (pushDir == null) pushDir = BlockFacing.UP.Normali;
 
             dt = Math.Min(dt, 0.1f);
 
@@ -107,13 +104,13 @@ namespace Vintagestory.GameContent
             float rndx = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
             float rndz = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
 
-            entity.SidedPos.X += pushDir.Normali.X * dt * 0.4f;
-            entity.SidedPos.Y += pushDir.Normali.Y * dt * 0.4f;
-            entity.SidedPos.Z += pushDir.Normali.Z * dt * 0.4f;
+            entity.SidedPos.X += pushDir.X * dt * 0.4f;
+            entity.SidedPos.Y += pushDir.Y * dt * 0.4f;
+            entity.SidedPos.Z += pushDir.Z * dt * 0.4f;
 
-            entity.SidedPos.Motion.X = pushDir.Normali.X * dt + rndx;
-            entity.SidedPos.Motion.Y = pushDir.Normali.Y * dt * 2;
-            entity.SidedPos.Motion.Z = pushDir.Normali.Z * dt + rndz;
+            entity.SidedPos.Motion.X = pushVelocityMul * pushDir.X * dt + rndx;
+            entity.SidedPos.Motion.Y = pushVelocityMul * pushDir.Y * dt * 2;
+            entity.SidedPos.Motion.Z = pushVelocityMul * pushDir.Z * dt + rndz;
 
             entity.Properties.Habitat = EnumHabitat.Air;
         }

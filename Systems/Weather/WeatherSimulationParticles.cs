@@ -312,6 +312,8 @@ namespace Vintagestory.GameContent
 
             float dtf = dt / 3f;
 
+            targetFogDensity = Math.Max(0, targetFogDensity - 2*WeatherSystemClient.CurrentEnvironmentWetness);
+
             desertStormAmbient.FogColor.Value[0] += (targetFogColor[0] - desertStormAmbient.FogColor.Value[0]) * dtf;
             desertStormAmbient.FogColor.Value[1] += (targetFogColor[1] - desertStormAmbient.FogColor.Value[1]) * dtf;
             desertStormAmbient.FogColor.Value[2] += (targetFogColor[2] - desertStormAmbient.FogColor.Value[2]) * dtf;
@@ -319,7 +321,6 @@ namespace Vintagestory.GameContent
             desertStormAmbient.FogDensity.Value += ((float)Math.Pow(targetFogDensity, 1.2f) - desertStormAmbient.FogDensity.Value) * dtf;
             desertStormAmbient.FogDensity.Weight += (targetFogDensity - desertStormAmbient.FogDensity.Weight) * dtf;
             desertStormAmbient.FogColor.Weight += (Math.Min(1, 2*targetFogDensity) - desertStormAmbient.FogColor.Weight) * dtf;
-
         }
 
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
@@ -446,7 +447,7 @@ namespace Vintagestory.GameContent
                 if (capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid).Id != 0) continue;    // Liquid surface or ice produces no particles
                 if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
                 {
-                    if (rand.NextDouble() < 0.5f) continue;
+                    if (rand.NextDouble() < 0.7f || block.RenderPass == EnumChunkRenderPass.TopSoil) continue;
                 }
                 if (block.BlockMaterial == EnumBlockMaterial.Sand)
                 {
@@ -606,9 +607,17 @@ namespace Vintagestory.GameContent
 
             float wetness = 2.5f * GameMath.Clamp(ws.clientClimateCond.Temperature + 1, 0, 4) / 4f;
 
-            float dx = (float)(plrPos.Motion.X * 40) - (30 - 9 * wetness) * 2 * weatherData.curWindSpeed.X;
-            float dy = (float)(plrPos.Motion.Y * 40);
-            float dz = (float)(plrPos.Motion.Z * 40);
+            float mx = (float)plrPos.Motion.X * 60;
+            float mz = (float)plrPos.Motion.Z * 60;
+
+            float horSpeedSqrt = (float)Math.Pow(mx * mx + mz * mz, 0.25f);
+
+            float dx = (float)(mx) - Math.Max(0, (30 - 9 * wetness) * weatherData.curWindSpeed.X - 5*horSpeedSqrt);
+            float dy = (float)(plrPos.Motion.Y * 60);
+            float dz = (float)(mz);
+
+
+            
 
             snowParticle.MinVelocity.Set(-0.5f + 5 * weatherData.curWindSpeed.X, -1f, -0.5f);
             snowParticle.AddVelocity.Set(1f + 5 * weatherData.curWindSpeed.X, 0.05f, 1f);
@@ -628,6 +637,12 @@ namespace Vintagestory.GameContent
 
             float hrange = 40;
             float vrange = 23;
+            dy -= Math.Min(10, horSpeedSqrt);
+
+            hrange = 20;
+            //snowParticle.GravityEffect *= 3f;
+            snowParticle.MinVelocity.Y = -2f;
+
             snowParticle.MinPos.Set(particlePos.X - hrange + dx, particlePos.Y + vrange + dy, particlePos.Z - hrange + dz);
             snowParticle.AddPos.Set(2 * hrange + dx, -0.66f * vrange + dy, 2 * hrange + dz);
 
