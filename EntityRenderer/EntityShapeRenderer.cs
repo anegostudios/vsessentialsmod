@@ -972,7 +972,7 @@ namespace Vintagestory.GameContent
             }
 
             float scale = entity.Properties.Client.Size;
-            //Mat4f.Translate(ModelMat, ModelMat, 0, entity.SelectionBox.Y2 / 2, 0); - WTF is this foor? It breaks drunken effects and boat rocking rotations
+            //Mat4f.Translate(ModelMat, ModelMat, 0, entity.SelectionBox.Y2 / 2, 0); - WTF is this for? It breaks drunken effects and boat rocking rotations
 
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
 

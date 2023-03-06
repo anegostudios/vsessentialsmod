@@ -44,7 +44,7 @@ namespace Vintagestory.GameContent
         float quarterSecAccum;
 
         bool searchComplete = true;
-        float roomVolumePitchLoss;
+        public static float roomVolumePitchLoss;
 
 
         BlockPos plrPos = new BlockPos();

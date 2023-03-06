@@ -290,7 +290,7 @@ namespace Vintagestory.GameContent
                 float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
                 if (rnd.NextDouble() < CurWeatherEvent.State.LightningRate)
                 {
-                    ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos, EnumGetClimateMode.ForSuppliedDateValues, ws.api.World.Calendar.TotalDays);
+                    ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos, EnumGetClimateMode.NowValues);
                     if (nowcond.Temperature >= targetLightninMinTemp && nowcond.RainCloudOverlay > 0.15)
                     {
                         Vec3d pos = regionCenterPos.ToVec3d().Add(-200 + rnd.NextDouble() * 400, ws.api.World.SeaLevel, -200 + rnd.NextDouble() * 400);

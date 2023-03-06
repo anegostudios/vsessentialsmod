@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
-using System.Runtime.Serialization;
-using Vintagestory.API;
-using System.Linq;
-using System.Text.RegularExpressions;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Common;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
-using System.Reflection;
 using Newtonsoft.Json.Linq;
 using Vintagestory.API.Util;
 using Vintagestory.API.Server;

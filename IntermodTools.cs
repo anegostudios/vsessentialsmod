@@ -33,10 +33,12 @@ namespace Vintagestory.ServerMods
             int quantityAdded = 0;
             int quantityReplaced = 0;
 
+            // For each mod, search all mod origins for a compatibility/{modid} folder.
+            // For all found such folders, remap to base folder
             foreach (var mod in api.ModLoader.Mods)
             {
                 string prefix = "compatibility/" + mod.Info.ModID + "/";
-                var assets = api.Assets.GetManyInCategory("compatibility", mod.Info.ModID+"/");
+                var assets = api.Assets.GetManyInCategory("compatibility", mod.Info.ModID + "/");
                 foreach (var asset in assets)
                 {
                     // Remap the original asset path to the new path
@@ -51,7 +53,10 @@ namespace Vintagestory.ServerMods
                         quantityAdded++;
                     }
 
-                    api.Assets.AllAssets[origPath] = asset;
+                    // Some asset categories are not loaded on the client or server. In those cases, we don't have to patch anything anyway
+                    if ((origPath.Category.SideType & api.Side) == 0) continue;
+
+                    api.Assets.Add(origPath, asset);
                 }
             }
 

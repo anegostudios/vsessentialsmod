@@ -624,7 +624,7 @@ namespace Vintagestory.GameContent
 
         void ResendWaypoints(IServerPlayer toPlayer)
         {
-            Dictionary<int, PlayerGroupMembership> memberOfGroups = toPlayer.ServerData.PlayerGroupMemberShips;
+            Dictionary<int, PlayerGroupMembership> memberOfGroups = toPlayer.ServerData.PlayerGroupMemberships;
             List<Waypoint> hisMarkers = new List<Waypoint>();
 
             foreach (Waypoint marker in Waypoints)

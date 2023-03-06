@@ -462,7 +462,7 @@ namespace Vintagestory.GameContent
 
         public void slowTick3s()
         {
-            windSpeed = api.World.BlockAccessor.GetWindSpeedAt(CenterPosition) * (0.2 + noiseGen.Noise(0, (api.World.Calendar.TotalHours % 2000) * 50) * 0.8);
+            windSpeed = api.World.BlockAccessor.GetWindSpeedAt(CenterPosition) * (0.2 + noiseGen.Noise(0, (api.World.Calendar.TotalHours * 50) % 2000) * 0.8);
         }
 
         public void restoreReferences()

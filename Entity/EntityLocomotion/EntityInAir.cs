@@ -81,12 +81,14 @@ namespace Vintagestory.GameContent
 
                 double glideFac = sinPitch + 0.15;
 
-                controls.GlideSpeed = GameMath.Clamp(controls.GlideSpeed - glideFac * dt * 0.25f, 0.005f, 0.5f);
+                controls.GlideSpeed = GameMath.Clamp(controls.GlideSpeed - glideFac * dt * 0.25f, 0.005f, 0.75f);
+
+                var gs = GameMath.Clamp(controls.GlideSpeed, 0.005f, 0.4f);
 
                 pos.Motion.Add(
-                    -cosPitch * sinYaw * controls.GlideSpeed,
-                    sinPitch * controls.GlideSpeed,
-                    cosPitch * cosYaw * controls.GlideSpeed
+                    -cosPitch * sinYaw * gs,
+                    sinPitch * gs,
+                    cosPitch * cosYaw * gs
                 );
 
                 pos.Motion.Mul(GameMath.Clamp(1 - pos.Motion.Length()*0.13f, 0, 1));

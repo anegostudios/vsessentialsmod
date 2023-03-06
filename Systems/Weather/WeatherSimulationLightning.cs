@@ -45,8 +45,6 @@ namespace Vintagestory.GameContent
                 LoadShader();
 
                 capi.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "lightning");
-
-                //capi.RegisterCommand("lntest", "", "", onCmdLineTest);
             } else
             {
                 api.Event.RegisterGameTickListener(OnServerTick, 40, 3);
@@ -87,7 +85,7 @@ namespace Vintagestory.GameContent
 
             if (weatherSysc.clientClimateCond.Temperature >= weatherData.lightningMinTemp)
             {
-                float deepnessSub = GameMath.Clamp(1 - (float)capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel, 0, 1);
+                float deepnessSub = GameMath.Clamp(1 - (float)Math.Pow(capi.World.Player.Entity.Pos.Y / capi.World.SeaLevel * 1.5 - 0.5, 1.5) - WeatherSimulationSound.roomVolumePitchLoss * 0.5f, 0, 1);
 
                 var rand = capi.World.Rand;
 

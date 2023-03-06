@@ -97,10 +97,13 @@ namespace Vintagestory.GameContent
                     return;
                 }
             }
-            
+
+            var eyeHeight = entity.Swimming ? entity.Properties.SwimmingEyeHeight : entity.Properties.EyeHeight;
+            var eyeHeightMod1 = (entity.SidedPos.Y + eyeHeight) % 1;
+
             BlockPos pos = new BlockPos(
                 (int)(entity.SidedPos.X + entity.LocalEyePos.X),
-                (int)(entity.SidedPos.Y + entity.LocalEyePos.Y),
+                (int)(entity.SidedPos.Y + eyeHeight),
                 (int)(entity.SidedPos.Z + entity.LocalEyePos.Z)
             );
 
@@ -132,7 +135,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            nowHasAir &= !block.IsLiquid() || block.LiquidLevel / 7f < (entity.Swimming ? entity.Properties.SwimmingEyeHeight : entity.Properties.EyeHeight);
+            nowHasAir &= !block.IsLiquid() || block.LiquidLevel / 7f < eyeHeightMod1;
 
             HasAir = nowHasAir;
         }
