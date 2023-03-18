@@ -115,6 +115,7 @@
     <Compile Include="Entity\Behavior\BehaviorMouthInventory.cs" />
     <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
+    <Compile Include="Entity\Behavior\BehaviorOpenableContainer.cs" />
     <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
     <Compile Include="Entity\Pathfinding\Astar\PathNodeSet.cs" />
     <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
@@ -126,7 +127,7 @@
     <Compile Include="Entity\Pathfinding\StraightLineTraverser.cs" />
     <Compile Include="Entity\AI\Task\AiTaskBase.cs" />
     <Compile Include="Entity\AI\Task\IAiTask.cs" />
-    <Compile Include="Gui\GuiDialogCarcassContents.cs" />
+    <Compile Include="Gui\GuiDialogCreatureContents.cs" />
     <Compile Include="IntermodTools.cs" />
     <Compile Include="Inventory\ItemSlotMouth.cs" />
     <Compile Include="JsonExport.cs" />

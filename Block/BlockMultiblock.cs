@@ -6,13 +6,13 @@ using VintagestoryAPI.Math.Vector;
 
 namespace Vintagestory.GameContent
 {
-    public interface IMultiBlockMonolithicBasic
+    public interface IMultiBlockColSelBoxes
     {
         Cuboidf[] MBGetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos, Vec3i offset);
         Cuboidf[] MBGetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos, Vec3i offset);
     }
 
-    public interface IMultiBlockNormal : IMultiBlockMonolithicBasic
+    public interface IMultiBlockInteract
     {
         bool MBDoParticalSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
         bool MBOnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
@@ -25,14 +25,19 @@ namespace Vintagestory.GameContent
         BlockSounds GetSounds(IBlockAccessor blockAccessor, BlockPos pos, ItemStack stack, Vec3i offset);
     }
 
-
-    public interface IMultiBlockExtensive : IMultiBlockNormal
+    public interface IMultiBlockBlockBreaking
     {
-        void OnBlockBroken(IWorldAccessor world, BlockPos pos, Vec3i offset, IPlayer byPlayer, float dropQuantityMultiplier = 1);
+        void MBOnBlockBroken(IWorldAccessor world, BlockPos pos, Vec3i offset, IPlayer byPlayer, float dropQuantityMultiplier = 1);
         int MBGetRandomColor(ICoreClientAPI capi, BlockPos pos, BlockFacing facing, int rndIndex, Vec3i offsetInv);
         int MBGetColorWithoutTint(ICoreClientAPI capi, BlockPos pos, Vec3i offsetInv);
         float MBOnGettingBroken(IPlayer player, BlockSelection blockSel, ItemSlot itemslot, float remainingResistance, float dt, int counter, Vec3i offsetInv);
+    }
+
+    public interface IMultiBlockBlockProperties
+    {
         bool MBCanAttachBlockAt(IBlockAccessor blockAccessor, Block block, BlockPos pos, BlockFacing blockFace, Cuboidi attachmentArea, Vec3i offsetInv);
+        float MBGetLiquidBarrierHeightOnSide(BlockFacing face, BlockPos pos, Vec3i offsetInv);
+        int MBGetHeatRetention(BlockPos pos, BlockFacing facing, Vec3i offsetInv);
     }
 
 
@@ -104,7 +109,7 @@ namespace Vintagestory.GameContent
 
         public override BlockSounds GetSounds(IBlockAccessor ba, BlockPos pos, ItemStack stack = null)
         {
-            return Handle<BlockSounds, IMultiBlockNormal>(
+            return Handle<BlockSounds, IMultiBlockInteract>(
                 ba,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.GetSounds(ba, pos, stack, OffsetInv),
@@ -115,7 +120,7 @@ namespace Vintagestory.GameContent
 
         public override Cuboidf[] GetSelectionBoxes(IBlockAccessor ba, BlockPos pos)
         {
-            return Handle<Cuboidf[], IMultiBlockMonolithicBasic>(
+            return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                (inf) => inf.MBGetSelectionBoxes(ba, pos, OffsetInv),
@@ -126,7 +131,7 @@ namespace Vintagestory.GameContent
 
         public override Cuboidf[] GetCollisionBoxes(IBlockAccessor ba, BlockPos pos)
         {
-            return Handle<Cuboidf[], IMultiBlockMonolithicBasic>(
+            return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
@@ -137,7 +142,7 @@ namespace Vintagestory.GameContent
 
         public override bool DoParticalSelection(IWorldAccessor world, BlockPos pos)
         {
-            return Handle<bool, IMultiBlockNormal>(
+            return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBDoParticalSelection(world, pos, OffsetInv),
@@ -151,7 +156,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            return Handle<float, IMultiBlockExtensive>(
+            return Handle<float, IMultiBlockBlockBreaking>(
                   api.World.BlockAccessor,
                   bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                   (inf) => inf.MBOnGettingBroken(player, blockSel, itemslot, remainingResistance, dt, counter, OffsetInv),
@@ -178,12 +183,12 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            var blockInf = block as IMultiBlockExtensive;
-            if (blockInf == null) blockInf = block.GetBehavior(typeof(IMultiBlockExtensive), true) as IMultiBlockExtensive;
+            var blockInf = block as IMultiBlockBlockBreaking;
+            if (blockInf == null) blockInf = block.GetBehavior(typeof(IMultiBlockBlockBreaking), true) as IMultiBlockBlockBreaking;
 
             if (blockInf != null)
             {
-                blockInf.OnBlockBroken(world, pos, OffsetInv, byPlayer);
+                blockInf.MBOnBlockBroken(world, pos, OffsetInv, byPlayer);
                 return;
             }
 
@@ -195,7 +200,7 @@ namespace Vintagestory.GameContent
 
         public override ItemStack OnPickBlock(IWorldAccessor world, BlockPos pos)
         {
-            return Handle<ItemStack, IMultiBlockNormal>(
+            return Handle<ItemStack, IMultiBlockInteract>(
                 world.BlockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBOnPickBlock(world, pos, OffsetInv),
@@ -209,7 +214,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            return Handle<bool, IMultiBlockNormal>(
+            return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStart(world, byPlayer, blockSel, OffsetInv),
@@ -223,7 +228,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            return Handle<bool, IMultiBlockNormal>(
+            return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, OffsetInv),
@@ -237,7 +242,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            Handle<IMultiBlockNormal>(
+            Handle<IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, OffsetInv),
@@ -251,7 +256,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            return Handle<bool, IMultiBlockNormal>(
+            return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, cancelReason, OffsetInv),
@@ -266,7 +271,7 @@ namespace Vintagestory.GameContent
             var bsOffseted = blockSel.Clone();
             bsOffseted.Position.Add(OffsetInv);
 
-            return Handle<WorldInteraction[], IMultiBlockNormal>(
+            return Handle<WorldInteraction[], IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
                 (inf) => inf.MBGetPlacedBlockInteractionHelp(world, blockSel, forPlayer, OffsetInv),
@@ -284,7 +289,7 @@ namespace Vintagestory.GameContent
         public override int GetRandomColor(ICoreClientAPI capi, BlockPos pos, BlockFacing facing, int rndIndex = -1)
         {
             var world = capi.World;
-            return Handle<int, IMultiBlockExtensive>(
+            return Handle<int, IMultiBlockBlockBreaking>(
                 world.BlockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetRandomColor(capi, pos, facing, rndIndex, OffsetInv),
@@ -296,7 +301,7 @@ namespace Vintagestory.GameContent
         public override int GetColorWithoutTint(ICoreClientAPI capi, BlockPos pos)
         {
             var world = capi.World;
-            return Handle<int, IMultiBlockExtensive>(
+            return Handle<int, IMultiBlockBlockBreaking>(
                 world.BlockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetColorWithoutTint(capi, pos, OffsetInv),
@@ -308,7 +313,7 @@ namespace Vintagestory.GameContent
 
         public override bool CanAttachBlockAt(IBlockAccessor blockAccessor, Block block, BlockPos pos, BlockFacing blockFace, Cuboidi attachmentArea = null)
         {
-            return Handle<bool, IMultiBlockExtensive>(
+            return Handle<bool, IMultiBlockBlockProperties>(
                 blockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBCanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea, OffsetInv),
@@ -317,5 +322,31 @@ namespace Vintagestory.GameContent
             );
         }
 
+
+        public override int GetHeatRetention(BlockPos pos, BlockFacing facing)
+        {
+            var blockAccessor = api.World.BlockAccessor;
+
+            return Handle<int, IMultiBlockBlockProperties>(
+                blockAccessor,
+                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                (inf) => inf.MBGetHeatRetention(pos, facing, OffsetInv),
+                (nblock) => base.GetHeatRetention(pos, facing),
+                (nblock) => nblock.GetHeatRetention(pos, facing)
+            );
+        }
+
+        public override float GetLiquidBarrierHeightOnSide(BlockFacing face, BlockPos pos)
+        {
+            var blockAccessor = api.World.BlockAccessor;
+
+            return Handle<float, IMultiBlockBlockProperties>(
+                blockAccessor,
+                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                (inf) => inf.MBGetLiquidBarrierHeightOnSide(face, pos, OffsetInv),
+                (nblock) => base.GetLiquidBarrierHeightOnSide(face, pos),
+                (nblock) => nblock.GetLiquidBarrierHeightOnSide(face, pos)
+            );
+        }
     }
 }

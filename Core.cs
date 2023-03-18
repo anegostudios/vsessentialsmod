@@ -155,6 +155,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("reviveondeath", typeof(EntityBehaviorReviveOnDeath));
 
             api.RegisterEntityBehaviorClass("mouthinventory", typeof(EntityBehaviorMouthInventory));
+            api.RegisterEntityBehaviorClass("openablecontainer", typeof(EntityBehaviorOpenableContainer));
         }
 
 

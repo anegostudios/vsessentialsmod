@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -64,13 +60,13 @@ namespace Vintagestory.GameContent
             var campos = capi.World.Player.Entity.CameraPos;
 
             quarterSecAccum += deltaTime;
-            if (quarterSecAccum > 0.25f)
+            if (quarterSecAccum > 0.51f)
             {
                 plrPos.X = (int)campos.X;
                 plrPos.Y = capi.World.SeaLevel;
                 plrPos.Z = (int)campos.Z;
 
-                clientClimateCond = capi.World.BlockAccessor.GetClimateAt(plrPos);
+                clientClimateCond = capi.World.BlockAccessor.GetClimateAt(plrPos, EnumGetClimateMode.WorldGenValues);
                 quarterSecAccum = 0;
             }
 

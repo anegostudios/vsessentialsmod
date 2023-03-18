@@ -28,7 +28,7 @@ namespace Vintagestory.GameContent
 
                 if ((controls.TriesToMove || controls.Jump) && entity.World.ElapsedMilliseconds - lastPush > 2000 && playerUID != null)
                 {
-                    push = 8f;
+                    push = 6f;
                     lastPush = entity.World.ElapsedMilliseconds;
                     entity.PlayEntitySound("swim", playerUID == null ? null : entity.World.PlayerByUid(playerUID));
                 }

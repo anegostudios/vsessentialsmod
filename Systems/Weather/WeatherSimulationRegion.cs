@@ -108,7 +108,6 @@ namespace Vintagestory.GameContent
             this.regionZ = regionZ;
             this.SnowAccumSnapshots = new RingArray<SnowAccumSnapshot>((int)(ws.api.World.Calendar.DaysPerYear * ws.api.World.Calendar.HoursPerDay) + 1);
 
-
             int regsize = ws.api.World.BlockAccessor.RegionSize;
 
             LastUpdateTotalHours = ws.api.World.Calendar.TotalHours;
@@ -706,7 +705,7 @@ namespace Vintagestory.GameContent
 
                 int capacity = (int)(ws.api.World.Calendar.DaysPerYear * ws.api.World.Calendar.HoursPerDay) + 1;
                 SnowAccumSnapshots = new RingArray<SnowAccumSnapshot>(capacity, state.SnowAccumSnapshots);
-                SnowAccumSnapshots.EndPosition = state.Ringarraycursor;
+                SnowAccumSnapshots.EndPosition = GameMath.Clamp(state.Ringarraycursor, 0, capacity - 1);
 
                 if (state.WeatherEvent != null)
                 {

@@ -15,12 +15,13 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+
     public class EntityBehaviorHarvestable : EntityBehavior
     {
         protected BlockDropItemStack[] jsonDrops;
 
         protected InventoryGeneric inv;
-        protected GuiDialogCarcassContents dlg;
+        protected GuiDialogCreatureContents dlg;
 
         bool GotCrushed
         {
@@ -254,7 +255,7 @@ namespace Vintagestory.GameContent
             
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
-                dlg = new GuiDialogCarcassContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI);
+                dlg = new GuiDialogCreatureContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI, "carcasscontents");
                 if (dlg.TryOpen())
                 {
                     (entity.World.Api as ICoreClientAPI).Network.SendPacketClient(inv.Open(player));

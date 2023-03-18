@@ -13,7 +13,7 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public class GuiDialogCarcassContents : GuiDialog
+    public class GuiDialogCreatureContents : GuiDialog
     {
         public override string ToggleKeyCombinationCode => null;
 
@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
 
         public override bool UnregisterOnClose => true;
 
-        public GuiDialogCarcassContents(InventoryGeneric inv, EntityAgent owningEntity, ICoreClientAPI capi) : base(capi)
+        public GuiDialogCreatureContents(InventoryGeneric inv, EntityAgent owningEntity, ICoreClientAPI capi, string code) : base(capi)
         {
             this.inv = inv;
             this.owningEntity = owningEntity;
@@ -47,9 +47,9 @@ namespace Vintagestory.GameContent
 
             SingleComposer =
                 capi.Gui
-                .CreateCompo("carcasscontents" + owningEntity.EntityId, dialogBounds)
+                .CreateCompo(code + owningEntity.EntityId, dialogBounds)
                 .AddShadedDialogBG(bgBounds, true)
-                .AddDialogTitleBar(Lang.Get("carcass-contents"), OnTitleBarClose)
+                .AddDialogTitleBar(Lang.Get(code), OnTitleBarClose)
                 .BeginChildElements(bgBounds)
                     .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
                 .EndChildElements()
