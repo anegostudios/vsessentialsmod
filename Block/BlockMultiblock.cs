@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Client;
+﻿using System;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
@@ -283,6 +284,10 @@ namespace Vintagestory.GameContent
         public override string GetPlacedBlockInfo(IWorldAccessor world, BlockPos pos, IPlayer forPlayer)
         {
             var block = world.BlockAccessor.GetBlock(pos.AddCopy(OffsetInv));
+
+            // Prevent Stack overflow
+            if (block is BlockMultiblock) return "";
+
             return block.GetPlacedBlockInfo(world, pos.AddCopy(OffsetInv), forPlayer);
         }
 
@@ -347,6 +352,38 @@ namespace Vintagestory.GameContent
                 (nblock) => base.GetLiquidBarrierHeightOnSide(face, pos),
                 (nblock) => nblock.GetLiquidBarrierHeightOnSide(face, pos)
             );
+        }
+
+        public override AssetLocation GetRotatedBlockCode(int angle)
+        {
+            int angleIndex = ((angle / 90) % 4 + 4) % 4;
+            if (angleIndex == 0) return Code;
+
+            Vec3i offsetNew;
+            switch (angleIndex)
+            {
+                case 1:
+                    offsetNew = new Vec3i(-Offset.Z, Offset.Y, Offset.X);
+                    break;
+                case 2:
+                    offsetNew = new Vec3i(-Offset.X, Offset.Y, -Offset.Z);
+                    break;
+                case 3:
+                    offsetNew = new Vec3i(Offset.Z, Offset.Y, -Offset.X);
+                    break;
+                default:
+                    offsetNew = null;
+                    break;
+            }
+
+            return new AssetLocation(Code.Domain, "multiblock-monolithic" + OffsetToString(offsetNew.X) + OffsetToString(offsetNew.Y) + OffsetToString(offsetNew.Z));
+        }
+
+        private string OffsetToString(int x)
+        {
+            if (x == 0) return "-0";
+            if (x < 0) return "-n" + (-x).ToString();
+            return "-p" + x.ToString();
         }
     }
 }
