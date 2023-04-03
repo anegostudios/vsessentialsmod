@@ -41,7 +41,7 @@ namespace Vintagestory.Essentials
             return astar.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
         }
 
-        internal List<Vec3d> ToWaypoints(List<PathNode> nodes)
+        public List<Vec3d> ToWaypoints(List<PathNode> nodes)
         {
             return astar.ToWaypoints(nodes);
         }

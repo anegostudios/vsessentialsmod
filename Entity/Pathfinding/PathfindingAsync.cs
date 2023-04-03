@@ -17,15 +17,15 @@ namespace Vintagestory.Essentials
 {
     public class PathfindingAsync : ModSystem
     {
-        ICoreServerAPI api;
+        protected ICoreServerAPI api;
         // This system has its own AStar classes to avoid potential cross-thread issues with others (e.g. Essentials.PathfindSystem)
-        AStar astar_offthread;
-        AStar astar_mainthread;
-        Thread pathfindThread;
-        bool isShuttingDown;
+        protected AStar astar_offthread;
+        protected AStar astar_mainthread;
+        protected Thread pathfindThread;
+        protected bool isShuttingDown;
         public ConcurrentQueue<PathfinderTask> PathfinderTasks = new ConcurrentQueue<PathfinderTask>();
-        readonly Stopwatch totalTime = new Stopwatch();
-        private long lastTickTimeMs;
+        protected readonly Stopwatch totalTime = new Stopwatch();
+        protected long lastTickTimeMs;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -48,13 +48,13 @@ namespace Vintagestory.Essentials
         }
 
 
-        private int OffThreadInterval()
+        protected int OffThreadInterval()
         {
             return 5;
         }
 
 
-        private void SeparateThreadLoop()
+        protected void SeparateThreadLoop()
         {
             // This is basically the same logic as a ServerThread, but without the complexity of multiple serversystems
             totalTime.Start();
@@ -91,8 +91,8 @@ namespace Vintagestory.Essentials
             astar_offthread = null;
         }
 
-    
-        private void OnMainThreadTick(float dt)
+
+        protected void OnMainThreadTick(float dt)
         {
             // Normally all queued tasks should be processed asynchronously in the separate thread ticks
 
@@ -106,7 +106,7 @@ namespace Vintagestory.Essentials
             if (initialCount > 0) api.World.FrameProfiler.Mark("ai-pathfinding-overflow " + initialCount + " " + PathfinderTasks.Count);
         }
 
-        private void OnSeparateThreadTick()
+        protected void OnSeparateThreadTick()
         {
             ProcessQueue(astar_offthread, 100);
         }
@@ -131,7 +131,7 @@ namespace Vintagestory.Essentials
         /// <summary>
         /// Threadsafe way of dequeueing next task
         /// </summary>
-        private PathfinderTask Next()
+        protected PathfinderTask Next()
         {
             PathfinderTask task = null;
             if (!PathfinderTasks.TryDequeue(out task)) task = null;

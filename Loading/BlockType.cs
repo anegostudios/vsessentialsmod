@@ -318,28 +318,6 @@ namespace Vintagestory.ServerMods.NoObf
             return outcubes;
         }
 
-        Cuboidf[] ToCuboidf(InerhitableRotatableCube cube, Cuboidf parentCube)
-        {
-            if (parentCube == null) parentCube = DefaultCollisionBox;
-            return new Cuboidf[] { cube.InheritedCopy(parentCube) };
-        }
-
-
-        Cuboidf[] ToCuboidf(InerhitableRotatableCube[] cubes, Cuboidf[] parentCubes)
-        {
-            Cuboidf[] outcubes = new Cuboidf[cubes.Length];
-            for (int i = 0; i < cubes.Length; i++)
-            {
-                Cuboidf parentCube = null;
-                if (i < parentCubes.Length) parentCube = parentCubes[i];
-                else parentCube = DefaultCollisionBox;
-
-                outcubes[i] = cubes[i].InheritedCopy(parentCube);
-            }
-
-            return outcubes;
-        }
-
         override internal void OnDeserialized()
         {
             base.OnDeserialized();

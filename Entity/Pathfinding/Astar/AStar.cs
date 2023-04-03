@@ -18,7 +18,7 @@ namespace Vintagestory.Essentials
         public double centerOffsetX = 0.5;
         public double centerOffsetZ = 0.5;
 
-        CollisionTester collTester;
+        protected CollisionTester collTester;
 
         public AStar(ICoreServerAPI api)
         {
@@ -30,13 +30,13 @@ namespace Vintagestory.Essentials
         public PathNodeSet openSet = new PathNodeSet();
         public HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
-        public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
+        public virtual List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
         {
             List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance);
             return nodes == null ? null : ToWaypoints(nodes);
         }
 
-        public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
+        public virtual List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
         {
             if (entityCollBox.XSize > 100 || entityCollBox.YSize > 100 || entityCollBox.ZSize > 100)
             {
@@ -112,7 +112,7 @@ namespace Vintagestory.Essentials
         /// <summary>
         /// Actually now only sets fields in neighbourNode as appropriate.  The calling code must add this to openSet if necessary.
         /// </summary>
-        private void UpdateNode(PathNode nearestNode, PathNode neighbourNode, float extraCost)
+        protected void UpdateNode(PathNode nearestNode, PathNode neighbourNode, float extraCost)
         {
             neighbourNode.gCost = nearestNode.gCost + nearestNode.distanceTo(neighbourNode) + extraCost;
             neighbourNode.Parent = nearestNode;
@@ -127,9 +127,9 @@ namespace Vintagestory.Essentials
         }
 
 
-        readonly Vec3d tmpVec = new Vec3d();
-        readonly BlockPos tmpPos = new BlockPos();
-        Cuboidd tmpCub = new Cuboidd();
+        protected readonly Vec3d tmpVec = new Vec3d();
+        protected readonly BlockPos tmpPos = new BlockPos();
+        protected Cuboidd tmpCub = new Cuboidd();
 
         protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
         {
@@ -261,7 +261,7 @@ namespace Vintagestory.Essentials
         }
 
 
-        List<PathNode> retracePath(PathNode startNode, PathNode endNode)
+        protected List<PathNode> retracePath(PathNode startNode, PathNode endNode)
         {
             int length = endNode.pathLength;
             List<PathNode> path = new List<PathNode>(length);
