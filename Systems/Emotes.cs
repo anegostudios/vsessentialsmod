@@ -20,6 +20,7 @@ namespace Vintagestory.GameContent
 
             cmdapi
                 .Create("emote")
+                .RequiresPrivilege(Privilege.chat)
                 .WithDescription("Execute an emote on your player")
                 .WithArgs(parsers.OptionalWord("emote"))
                 .HandleWith(args =>
@@ -47,7 +48,7 @@ namespace Vintagestory.GameContent
 
                     return TextCommandResult.Success();
                 })
-            ;
+                ;
         }
     }
 

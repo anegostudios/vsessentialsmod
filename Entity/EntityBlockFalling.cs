@@ -313,6 +313,8 @@ namespace Vintagestory.GameContent
         /// <param name="dt"></param>
         public override void OnGameTick(float dt)
         {
+            World.FrameProfiler.Enter("entity-tick-unsstablefalling");
+
             // (1 - 0.95^(x/100)) / 2
             // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIoMS0wLjk1Xih4LzEwMCkpLzIiLCJjb2xvciI6IiMwMDAwMDAifSx7InR5cGUiOjEwMDAsIndpbmRvdyI6WyIwIiwiMzAwMCIsIjAiLCIxIl19XQ--
             if (physicsBh != null)
@@ -358,6 +360,7 @@ namespace Vintagestory.GameContent
                 nowDustIntensity = 0;
             }
 
+            World.FrameProfiler.Mark("entity-tick-unsstablefalling-sound(etc)");
 
             ticksAlive++;
             if (ticksAlive >= 2 || Api.World.Side == EnumAppSide.Client) // Seems like we have to do it instantly on the client, otherwise we miss the OnChunkRetesselated Event
@@ -372,6 +375,7 @@ namespace Vintagestory.GameContent
                 {
                     behavior.OnGameTick(dt);
                 }
+                World.FrameProfiler.Mark("entity-tick-unsstablefalling-physics(etc)");
             }
 
             pushaccum += dt;
@@ -382,27 +386,37 @@ namespace Vintagestory.GameContent
                 pushaccum = 0;
                 if (!Collided)
                 {
-                    Entity[] entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
+                    Entity[] entities;
+                    if (Api.Side == EnumAppSide.Server)
+                    {
+                        entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
+                    }
+                    else
+                    {
+                        entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => e is EntityPlayer);
+                    }
                     for (int i = 0; i < entities.Length; i++)
                     {
-                        if (Api.Side == EnumAppSide.Server || entities[i] is EntityPlayer)
-                        {
-                            entities[i].SidedPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
-                        }
+                        entities[i].SidedPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
                     }
                 }
             }
 
 
+            World.FrameProfiler.Mark("entity-tick-unsstablefalling-finalizemotion");
             if (Api.Side == EnumAppSide.Server && !Collided && World.Rand.NextDouble() < 0.01)
             {
                 World.BlockAccessor.TriggerNeighbourBlockUpdate(ServerPos.AsBlockPos);
+                World.FrameProfiler.Mark("entity-tick-unsstablefalling-neighborstrigger");
             }
 
             if (CollidedVertically && Pos.Motion.Length() == 0)
             {
                 OnFallToGround(0);
+                World.FrameProfiler.Mark("entity-tick-unsstablefalling-falltoground");
             }
+
+            World.FrameProfiler.Leave();
         }
 
         public override void OnEntityDespawn(EntityDespawnData despawn)
@@ -492,22 +506,23 @@ namespace Vintagestory.GameContent
                     BlockFacing facing = BlockFacing.ALLFACES[i];
 
                     var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y, pos.Z + facing.Normali.Z);
-                    var ndownblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z);
-
-                    if (nblock.Replaceable >= 6000 && ndownblock.Replaceable >= 6000)
+                    if (nblock.Replaceable >= 6000)
                     {
-                        if (Api.Side == EnumAppSide.Server)
+                        nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z);
+                        if (nblock.Replaceable >= 6000)
                         {
-                            SidedPos.X += facing.Normali.X;
-                            SidedPos.Y += facing.Normali.Y;
-                            SidedPos.Z += facing.Normali.Z;
-                        }
+                            if (Api.Side == EnumAppSide.Server)
+                            {
+                                SidedPos.X += facing.Normali.X;
+                                SidedPos.Y += facing.Normali.Y;
+                                SidedPos.Z += facing.Normali.Z;
+                            }
 
-                        fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
-                        return;
+                            fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
+                            return;
+                        }
                     }
                 }
-
             }
 
             //spawnParticles(20f);

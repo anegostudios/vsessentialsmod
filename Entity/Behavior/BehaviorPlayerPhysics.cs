@@ -68,6 +68,18 @@ namespace Vintagestory.GameContent
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
+
+            IPlayer player = eplr.Player;
+            EntityControls controls = eplr.Controls;
+            if (player != null && controls.Gliding)
+            {   
+                if (entity.Collided || entity.FeetInLiquid || !entity.Alive || player.WorldData.FreeMove)
+                {
+                    controls.GlideSpeed = 0;
+                    controls.Gliding = false;
+                    controls.IsFlying = false;
+                }
+            }
         }
 
         public override void TickEntityPhysicsPre(Entity entity, float dt)
@@ -75,8 +87,7 @@ namespace Vintagestory.GameContent
             prevPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
             EntityControls controls = eplr.Controls;
 
-            string playerUID = entity.WatchedAttributes.GetString("playerUID");
-            IPlayer player = entity.World.PlayerByUid(playerUID);
+            IPlayer player = eplr.Player;
             if (entity.World.Side == EnumAppSide.Server && ((IServerPlayer)player).ConnectionState != EnumClientState.Playing) return;
 
             if (player != null)
@@ -93,15 +104,9 @@ namespace Vintagestory.GameContent
                 controls.NoClip = player.WorldData.NoClip;
                 controls.MovespeedMultiplier = player.WorldData.MoveSpeedMultiplier;
 
-                if (controls.Gliding)
+                if (player != null && controls.Gliding)
                 {
                     controls.IsFlying = true;
-                    if (entity.Collided || entity.FeetInLiquid || !entity.Alive || player.WorldData.FreeMove)
-                    {
-                        controls.GlideSpeed = 0;
-                        controls.Gliding = false;
-                        controls.IsFlying = false;
-                    }
                 }
             }
 

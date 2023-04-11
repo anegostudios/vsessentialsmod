@@ -469,18 +469,17 @@ namespace Vintagestory.GameContent
             int posX = (int)(pos.X + offX);
             int posZ = (int)(pos.Z + offZ);
 
-            Block block = blockAccess.GetBlock(posX, (int)(pos.Y), posZ);
-            Block waterOrIce = blockAccess.GetBlock(posX, (int)(pos.Y), posZ, BlockLayersAccess.Fluid);
+            Block blockFluid = blockAccess.GetBlock(posX, (int)(pos.Y), posZ, BlockLayersAccess.Fluid);
             Block middleWOIBlock = blockAccess.GetBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ, BlockLayersAccess.Fluid);
 
             entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
             entity.FeetInLiquid = false;
-            if (waterOrIce.IsLiquid())
+            if (blockFluid.IsLiquid())
             {
                 Block aboveblock = blockAccess.GetBlock(posX, (int)(pos.Y + 1), posZ, BlockLayersAccess.Fluid);
-                entity.FeetInLiquid = ((waterOrIce.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
+                entity.FeetInLiquid = ((blockFluid.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
             }
-            entity.InLava = block.LiquidCode == "lava";
+            entity.InLava = blockFluid.LiquidCode == "lava";
             entity.Swimming = middleWOIBlock.IsLiquid();
 
             if (!onGroundBefore && entity.OnGround)
@@ -522,14 +521,13 @@ namespace Vintagestory.GameContent
 
                         if (collisionTester.tempCuboid.IntersectsOrTouches(testedEntityBox))
                         {
+                            blockAccess.GetBlock(x, y, z).OnEntityInside(entity.World, entity, collisionTester.tmpPos);
+
                             // Saves us a few cpu cycles
                             if (x == (int)pos.X && z == (int)pos.Z && y == (int)pos.Y)
                             {
-                                block.OnEntityInside(entity.World, entity, collisionTester.tmpPos);
                                 continue;
                             }
-
-                            blockAccess.GetBlock(x, y, z).OnEntityInside(entity.World, entity, collisionTester.tmpPos);
                         }
                     }
                 }

@@ -235,7 +235,7 @@ namespace Vintagestory.GameContent
             if (yDistance < 3.5f) return;
             if (gliding)
             {
-                yDistance = Math.Min(25, yDistance);
+                yDistance = Math.Min(14, yDistance);
                 withYMotion /= 2;
             }
 

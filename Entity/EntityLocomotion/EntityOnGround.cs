@@ -1,5 +1,6 @@
 ﻿using System;
 using Vintagestory.API;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -12,10 +13,12 @@ namespace Vintagestory.GameContent
     {
         long lastJump;
         double groundDragFactor = 0.3f;
+        float accum;
+        float coyoteTimer;
 
         Vec3d motionDelta = new Vec3d();
 
-        float accum;
+        
 
         internal override void Initialize(JsonObject physics)
         {
@@ -27,13 +30,19 @@ namespace Vintagestory.GameContent
 
         public override bool Applicable(Entity entity, EntityPos pos, EntityControls controls)
         {
-            return entity.OnGround && !entity.Swimming;
+            bool onGround = entity.OnGround && !entity.Swimming;
+            if (onGround) coyoteTimer = 0.15f;
+
+            return onGround || coyoteTimer > 0;
         }
 
         public override void DoApply(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
-            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y - 0.05f), (int)pos.Z);
+            bool onGround = entity.OnGround && !entity.Swimming;
+            coyoteTimer -= dt;
+            if (!onGround && coyoteTimer < 0) return;
 
+            Block belowBlock = entity.World.BlockAccessor.GetBlock((int)pos.X, (int)(pos.Y - 0.05f), (int)pos.Z);
             accum = Math.Min(1, accum + dt);
             float frametime = 1 / 60f;
 

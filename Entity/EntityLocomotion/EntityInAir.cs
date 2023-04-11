@@ -83,7 +83,7 @@ namespace Vintagestory.GameContent
 
                 controls.GlideSpeed = GameMath.Clamp(controls.GlideSpeed - glideFac * dt * 0.25f, 0.005f, 0.75f);
 
-                var gs = GameMath.Clamp(controls.GlideSpeed, 0.005f, 0.4f);
+                var gs = GameMath.Clamp(controls.GlideSpeed, 0.005f, 0.2f);
 
                 pos.Motion.Add(
                     -cosPitch * sinYaw * gs,
