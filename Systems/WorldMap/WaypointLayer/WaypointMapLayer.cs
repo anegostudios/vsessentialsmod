@@ -1,15 +1,11 @@
 ﻿using Cairo;
-using Newtonsoft.Json;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -20,23 +16,35 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    [ProtoContract]
     public class Waypoint
     {
+        [ProtoMember(6)]
         public Vec3d Position = new Vec3d();
+        [ProtoMember(10)]
         public string Title;
+        [ProtoMember(9)]
         public string Text;
+        [ProtoMember(1)]
         public int Color;
-
+        [ProtoMember(2)]
         public string Icon = "circle";
+        [ProtoMember(7)]
         public bool ShowInWorld;
+        [ProtoMember(5)]
         public bool Pinned;
 
+        [ProtoMember(4)]
         public string OwningPlayerUid = null;
+        [ProtoMember(3)]
         public int OwningPlayerGroupId = -1;
 
+        [ProtoMember(8)]
         public bool Temporary;
-        //public string Guid { get; set; }
+
+        [ProtoMember(11)]
+        public string Guid { get; set; }
+
     }
 
     public delegate LoadedTexture CreateIconTextureDelegate();
@@ -420,7 +428,7 @@ namespace Vintagestory.GameContent
                 Title = title,
                 Icon = icon,
                 Pinned = pinned,
-                //Guid = Guid.NewGuid().ToString()
+                Guid = Guid.NewGuid().ToString()
             };
 
             int nr = AddWaypoint(waypoint, player);
@@ -545,10 +553,10 @@ namespace Vintagestory.GameContent
                     sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: {0}", e);
                 }
 
-                /*foreach (var wp in Waypoints)
+                foreach (var wp in Waypoints)
                 {
                     if (wp.Guid == null) wp.Guid = Guid.NewGuid().ToString();
-                }*/
+                }
             }
             
         }

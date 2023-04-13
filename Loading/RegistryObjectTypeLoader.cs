@@ -79,7 +79,8 @@ namespace Vintagestory.ServerMods.NoObf
 
             api.Logger.VerboseDebug("Starting to gather blocktypes, itemtypes and entities");
             LoadWorldProperties();
-            int threads = Math.Max(1, Environment.ProcessorCount / 2 - 2);
+            int maxThreads = api.Server.IsDedicated ? 3 : 8;
+            int threads = GameMath.Clamp(Environment.ProcessorCount / 2 - 2, 1, maxThreads);
 
             itemTypes = new Dictionary<AssetLocation, RegistryObjectType>();
             blockTypes = new Dictionary<AssetLocation, RegistryObjectType>();
