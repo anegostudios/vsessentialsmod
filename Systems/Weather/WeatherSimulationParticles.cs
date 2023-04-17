@@ -285,7 +285,7 @@ namespace Vintagestory.GameContent
                     var climate = capi.World.BlockAccessor.GetClimateAt(bpos, EnumGetClimateMode.NowValues);
                     var sunlightrel = capi.World.BlockAccessor.GetLightLevel(bpos, EnumLightLevelType.OnlySunLight) / 22f;
 
-                    float climateWeight = 2f * Math.Max(0, weatherData.curWindSpeed.X - 0.5f) * (1 - climate.WorldgenRainfall) * (1 - climate.Rainfall);
+                    float climateWeight = 2f * Math.Max(0, weatherData.curWindSpeed.X - 0.65f) * (1 - climate.WorldgenRainfall) * (1 - climate.Rainfall);
 
                     var pos = capi.World.Player.Entity.Pos.AsBlockPos;
                     targetFogColor[0] = targetFogColor[1] = targetFogColor[2] = 0;
