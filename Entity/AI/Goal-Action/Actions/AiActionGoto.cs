@@ -22,10 +22,7 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
-            }
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
 
             if (entity?.Properties?.Server?.Attributes != null)
             {

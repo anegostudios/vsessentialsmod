@@ -68,56 +68,29 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["eatSound"] != null)
+            string eatsoundstring = taskConfig["eatSound"].AsString(null);
+            if (eatsoundstring != null) eatSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");
+
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
+
+            searchPlayerInv = taskConfig["searchPlayerInv"].AsBool(false);
+
+            eatTime = taskConfig["eatTime"].AsFloat(1.5f);
+
+            doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
+
+            eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
+
+            playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
+
+            foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
             {
-                string eatsoundstring = taskConfig["eatSound"].AsString(null);
-                if (eatsoundstring != null) eatSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");
-            }
-            
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
+                eatItemCategories.Add(val);
             }
 
-            if (taskConfig["searchPlayerInv"] != null)
+            foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
             {
-                searchPlayerInv = taskConfig["searchPlayerInv"].AsBool(false);
-            }
-
-            if (taskConfig["eatTime"] != null)
-            {
-                eatTime = taskConfig["eatTime"].AsFloat(1.5f);
-            }
-
-            if (taskConfig["doConsumePortion"] != null)
-            {
-                doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
-            }
-
-            if (taskConfig["eatLooseItems"] != null)
-            {
-                eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
-            }
-
-            if (taskConfig["playEatAnimForLooseItems"] != null)
-            {
-                playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
-            }
-
-            if (taskConfig["eatItemCategories"] != null)
-            {
-                foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
-                {
-                    eatItemCategories.Add(val);
-                }
-            }
-
-            if (taskConfig["eatItemCodes"] != null)
-            {
-                foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
-                {
-                    eatItemCodes.Add(val);
-                }
+                eatItemCodes.Add(val);
             }
 
             if (taskConfig["eatAnimation"].Exists)

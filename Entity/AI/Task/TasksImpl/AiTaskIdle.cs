@@ -65,23 +65,21 @@ namespace Vintagestory.GameContent
             stopOnHurt = taskConfig["stopOnHurt"].AsBool(false);
             duringDayTimeFrames = taskConfig["duringDayTimeFrames"].AsObject<DayTimeFrame[]>(null);
 
-            if (taskConfig["stopOnNearbyEntityCodes"] != null)
+
+            string[] codes = taskConfig["stopOnNearbyEntityCodes"].AsArray<string>(new string[] { "player" });
+
+            List<string> exact = new List<string>();
+            List<string> beginswith = new List<string>();
+
+            for (int i = 0; i < codes.Length; i++)
             {
-                string[] codes = taskConfig["stopOnNearbyEntityCodes"].AsArray<string>(new string[] { "player" });
-
-                List<string> exact = new List<string>();
-                List<string> beginswith = new List<string>();
-
-                for (int i = 0; i < codes.Length; i++)
-                {
-                    string ecode = codes[i];
-                    if (ecode.EndsWith("*")) beginswith.Add(ecode.Substring(0, ecode.Length - 1));
-                    else exact.Add(ecode);
-                }
-
-                stopOnNearbyEntityCodesExact = exact.ToArray();
-                stopOnNearbyEntityCodesBeginsWith = beginswith.ToArray();
+                string ecode = codes[i];
+                if (ecode.EndsWith("*")) beginswith.Add(ecode.Substring(0, ecode.Length - 1));
+                else exact.Add(ecode);
             }
+
+            stopOnNearbyEntityCodesExact = exact.ToArray();
+            stopOnNearbyEntityCodesBeginsWith = beginswith.ToArray();
 
 
             if (maxduration < 0) idleUntilMs = -1;

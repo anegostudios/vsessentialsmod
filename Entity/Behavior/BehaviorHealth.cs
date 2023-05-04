@@ -95,7 +95,6 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            entity.World.FrameProfiler.Mark("not-bhhealth");
             if (entity.Pos.Y < -30)
             {
                 entity.ReceiveDamage(new DamageSource()

@@ -76,42 +76,21 @@ namespace Vintagestory.GameContent
                 MaxDistanceToSpawn = taskConfig["maxDistanceToSpawn"].AsDouble(10);
             }
 
-            if (taskConfig["targetDistance"] != null)
-            {
-                targetDistance = taskConfig["targetDistance"].AsFloat(0.12f);
-            }
+            targetDistance = taskConfig["targetDistance"].AsFloat(0.12f);
 
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
-            }
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
 
-            if (taskConfig["wanderChance"] != null)
-            {
-                wanderChance = taskConfig["wanderChance"].AsFloat(0.015f);
-            }
+            wanderChance = taskConfig["wanderChance"].AsFloat(0.015f);
 
-            if (taskConfig["wanderRangeMin"] != null)
-            {
-                wanderRangeMin = taskConfig["wanderRangeMin"].AsFloat(3);
-            }
-            if (taskConfig["wanderRangeMax"] != null)
-            {
-                wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
-            }
+            wanderRangeMin = taskConfig["wanderRangeMin"].AsFloat(3);
+            wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
             wanderRangeHorizontal = NatFloat.createInvexp(wanderRangeMin, wanderRangeMax);
 
 
-            if (taskConfig["maxHeight"] != null)
-            {
-                maxHeight = taskConfig["maxHeight"].AsFloat(7f);
-            }
+            maxHeight = taskConfig["maxHeight"].AsFloat(7f);
 
-            if (taskConfig["preferredLightLevel"] != null)
-            {
-                preferredLightLevel = taskConfig["preferredLightLevel"].AsFloat(-99);
-                if (preferredLightLevel < 0) preferredLightLevel = null;
-            }            
+            preferredLightLevel = taskConfig["preferredLightLevel"].AsFloat(-99);
+            if (preferredLightLevel < 0) preferredLightLevel = null;
         }
 
 

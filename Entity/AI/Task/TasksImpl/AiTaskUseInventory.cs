@@ -31,31 +31,23 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["useSound"] != null)
+            JsonObject soundCfg = taskConfig["useSound"];
+            if (soundCfg.Exists)
             {
-                string eatsoundstring = taskConfig["useSound"].AsString(null);
+                string eatsoundstring = soundCfg.AsString(null);
                 if (eatsoundstring != null) useSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");
             }
-            
-            if (taskConfig["useTime"] != null)
+
+            useTime = taskConfig["useTime"].AsFloat(1.5f);
+
+            foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
             {
-                useTime = taskConfig["useTime"].AsFloat(1.5f);
+                eatItemCategories.Add(val);
             }
 
-            if (taskConfig["eatItemCategories"] != null)
+            foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
             {
-                foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
-                {
-                    eatItemCategories.Add(val);
-                }
-            }
-
-            if (taskConfig["eatItemCodes"] != null)
-            {
-                foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
-                {
-                    eatItemCodes.Add(val);
-                }
+                eatItemCodes.Add(val);
             }
         }
 

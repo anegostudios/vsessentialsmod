@@ -63,6 +63,11 @@ namespace Vintagestory.API.Common
         void LoadConfig(JsonObject taskConfig, JsonObject aiConfig);
 
         /// <summary>
+        /// Called after all the entity behaviors have been initialized, in case we need to refer to another behavior
+        /// </summary>
+        void AfterInitialize();
+
+        /// <summary>
         /// Called when the entity changed from active to inactive state and vice versa (inactive means no player is in its ticking range)
         /// </summary>
         /// <param name="beforeState"></param>

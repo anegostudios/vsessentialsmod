@@ -64,25 +64,13 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["movespeed"] != null)
-            {
-                moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-            }
+            moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
 
-            if (taskConfig["sitDays"] != null)
-            {
-                sitDays = taskConfig["sitDays"].AsFloat(1f);
-            }
+            sitDays = taskConfig["sitDays"].AsFloat(1f);
 
-            if (taskConfig["layTime"] != null)
-            {
-                layTime = taskConfig["layTime"].AsFloat(1.5f);
-            }
+            layTime = taskConfig["layTime"].AsFloat(1.5f);
 
-            if (taskConfig["incubationDays"] != null)
-            {
-                incubationDays = taskConfig["incubationDays"].AsDouble(5);
-            }
+            incubationDays = taskConfig["incubationDays"].AsDouble(5);
 
             if (taskConfig["sitAnimation"].Exists)
             {
@@ -94,27 +82,12 @@ namespace Vintagestory.GameContent
                 }.Init();
             }
 
-            if (taskConfig["chickCode"] != null)
-            {
-                chickCode = taskConfig["chickCode"].AsString(null);
-            }
-            if (taskConfig["portionsEatenForLay"] != null)
-            {
-                PortionsEatenForLay = taskConfig["portionsEatenForLay"].AsFloat(3);
-            }
-            if (taskConfig["requiresNearbyEntityCode"] != null)
-            {
-                requiresNearbyEntityCode = taskConfig["requiresNearbyEntityCode"].AsString(null);
-            }
-            if (taskConfig["requiresNearbyEntityRange"] != null)
-            {
-                requiresNearbyEntityRange = taskConfig["requiresNearbyEntityRange"].AsFloat(5);
-            }
-            if (taskConfig["failBlockCode"] != null)
-            {
-                string code = taskConfig["failBlockCode"].AsString(null);
-                if (code != null) failBlockCode = new AssetLocation(code);
-            }
+            chickCode = taskConfig["chickCode"].AsString(null);
+            PortionsEatenForLay = taskConfig["portionsEatenForLay"].AsFloat(3);
+            requiresNearbyEntityCode = taskConfig["requiresNearbyEntityCode"].AsString(null);
+            requiresNearbyEntityRange = taskConfig["requiresNearbyEntityRange"].AsFloat(5);
+            string code = taskConfig["failBlockCode"].AsString(null);
+            if (code != null) failBlockCode = new AssetLocation(code);
         }
 
         public override bool ShouldExecute()

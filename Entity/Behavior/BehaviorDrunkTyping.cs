@@ -33,7 +33,8 @@ namespace Vintagestory.GameContent
             
             if (isself)
             {
-                capi.Event.RegisterEventBusListener(onChatKeyDown, 1, "chatkeydownpost");
+                capi.Event.RegisterEventBusListener(onChatKeyDownPre, 1, "chatkeydownpre");
+                capi.Event.RegisterEventBusListener(onChatKeyDownPost, 1, "chatkeydownpost");
             }
         }
 
@@ -42,56 +43,85 @@ namespace Vintagestory.GameContent
             return "drunktyping";
         }
 
-        private void onChatKeyDown(string eventName, ref EnumHandling handling, IAttribute data)
+        bool isCommand;
+        private void onChatKeyDownPre(string eventName, ref EnumHandling handling, IAttribute data)
+        {
+            var treeAttr = data as TreeAttribute;
+            string text = (treeAttr["text"] as StringAttribute).value;
+            isCommand = text.Length > 0 && (text[0] == '.' || text[0] == '/');
+        }
+
+        private void onChatKeyDownPost(string eventName, ref EnumHandling handling, IAttribute data)
         {
             var treeAttr = data as TreeAttribute;
             int keyCode = (treeAttr["key"] as IntAttribute).value;
             string text = (treeAttr["text"] as StringAttribute).value;
 
-            if (keyCode != (int)GlKeys.BackSpace && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
+            // User is trying to cheese the system
+            if (isCommand && text.Length > 0 && text[0] != '.' && text[0] != '/')
             {
-                var rnd = api.World.Rand;
-                float intox = entity.WatchedAttributes.GetFloat("intoxication");
-                if (rnd.NextDouble() < intox)
+                string newtext = text[0] + "";
+                for (int i = 1; i < text.Length; i++)
                 {
-                    switch (rnd.Next(9))
-                    {
-                        // Flip last 2 chars
-                        case 0:
-                        case 1:
-                            if (text.Length > 1)
-                            {
-                                text = text.Substring(0, text.Length - 2) + text[text.Length - 1] + text[text.Length - 2];
-                            }
-                            break;
-                        // Repeat last char
-                        case 2:
-                        case 3:
-                        case 4:
-                            text = text + text[text.Length - 1];
-                            break;
-                        // Add random letter left/right from the last pressed key
-                        case 5:
-                            string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
-                            var lastchar = text[text.Length - 1];
+                    newtext = slurText(newtext);
+                    newtext += text[i];
+                }
 
-                            for (int i = 0; i < 3; i++)
-                            {
-                                int index = keybLayout[i].IndexOf(lastchar);
-                                if (index >= 0)
-                                {
-                                    int rndoffset = rnd.Next(2) * 2 - 1;
-                                    text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
-                                }
-                            }
-                            break;
+                text = newtext;
+                (treeAttr["text"] as StringAttribute).value = text;
+            }
+            else
+            {
 
-                    }
-
+                if (keyCode != (int)GlKeys.BackSpace && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
+                {
+                    text = slurText(text);
                     (treeAttr["text"] as StringAttribute).value = text;
                 }
             }
+        }
 
+        private string slurText(string text)
+        {
+            var rnd = api.World.Rand;
+            float intox = entity.WatchedAttributes.GetFloat("intoxication");
+            if (rnd.NextDouble() < intox)
+            {
+                switch (rnd.Next(9))
+                {
+                    // Flip last 2 chars
+                    case 0:
+                    case 1:
+                        if (text.Length > 1)
+                        {
+                            text = text.Substring(0, text.Length - 2) + text[text.Length - 1] + text[text.Length - 2];
+                        }
+                        break;
+                    // Repeat last char
+                    case 2:
+                    case 3:
+                    case 4:
+                        text = text + text[text.Length - 1];
+                        break;
+                    // Add random letter left/right from the last pressed key
+                    case 5:
+                        string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
+                        var lastchar = text[text.Length - 1];
+
+                        for (int i = 0; i < 3; i++)
+                        {
+                            int index = keybLayout[i].IndexOf(lastchar);
+                            if (index >= 0)
+                            {
+                                int rndoffset = rnd.Next(2) * 2 - 1;
+                                text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                            }
+                        }
+                        break;
+                }
+            }
+
+            return text;
         }
     }
 }

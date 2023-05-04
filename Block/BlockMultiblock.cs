@@ -246,9 +246,9 @@ namespace Vintagestory.GameContent
             Handle<IMultiBlockInteract>(
                 world.BlockAccessor,
                 bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
-                (inf) => inf.MBOnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, OffsetInv),
-                (block) => base.OnBlockInteractStep(secondsUsed, world, byPlayer, bsOffseted),
-                (block) => block.OnBlockInteractStep(secondsUsed, world, byPlayer, bsOffseted)
+                (inf) => inf.MBOnBlockInteractStop(secondsUsed, world, byPlayer, blockSel, OffsetInv),
+                (block) => base.OnBlockInteractStop(secondsUsed, world, byPlayer, bsOffseted),
+                (block) => block.OnBlockInteractStop(secondsUsed, world, byPlayer, bsOffseted)
             );
         }
 

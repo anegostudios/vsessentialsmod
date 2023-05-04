@@ -97,6 +97,14 @@ namespace Vintagestory.GameContent
             tasks.Remove(task);
         }
 
+        public void AfterInitialize()
+        {
+            foreach (IAiTask task in tasks)
+            {
+                task.AfterInitialize();
+            }
+        }
+
         public void ExecuteTask(IAiTask task, int slot)
         {
             task.StartExecute();

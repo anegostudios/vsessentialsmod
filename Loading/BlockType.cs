@@ -276,6 +276,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.HeldTpUseAnimation = this.HeldTpUseAnimation;
             block.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
             block.AllowSpawnCreatureGroups = (string[])this.AllowSpawnCreatureGroups.Clone();
+            block.AllCreaturesAllowed = block.AllowSpawnCreatureGroups.Length == 1 && block.AllowSpawnCreatureGroups[0] == "*";
 
             // BlockType net only sends the collisionboxes at an accuracy of 1/10000 so we have to make sure they are the same server and client side
             if (block.CollisionBoxes != null)

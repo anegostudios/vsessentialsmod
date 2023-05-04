@@ -62,16 +62,14 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Alive || entity.World.Side == EnumAppSide.Client) return;
 
-            deltaTime = Math.Min(deltaTime, 2);
-
-            accumSeconds += deltaTime;
-            if (accumSeconds > 1 + accumOffset)
+            if ((accumSeconds += deltaTime) > 2.5f + accumOffset)
             {
                 shouldStayAlive = PlayerInRange() || LightLevelOk();
                 accumSeconds = 0;
                 if (shouldStayAlive)
                 {
                     DeathTime = 0;
+                    return;
                 }
             }
 

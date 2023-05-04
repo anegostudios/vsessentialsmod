@@ -325,7 +325,7 @@ namespace Vintagestory.ServerMods.NoObf
             int i = 0;
             foreach (RegistryObjectType val in baseTypes.Values)
             {
-                if (Interlocked.CompareExchange(ref val.parseStarted, 1, 0) == 0)  // In each thread, only do work on RegistryObjectTypes which no other thread has yet worked on
+                if (AsyncHelper.CanProceedOnThisThread(ref val.parseStarted))  // In each thread, only do work on RegistryObjectTypes which no other thread has yet worked on
                 {
                     List<RegistryObjectType> resolvedTypes = new List<RegistryObjectType>();
                     try

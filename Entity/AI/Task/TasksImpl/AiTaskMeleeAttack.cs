@@ -42,10 +42,7 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            if (taskConfig["tamingGenerations"] != null)
-            {
-                tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
-            }
+            this.tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
 
             this.damage = taskConfig["damage"].AsFloat(2);
             this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 2f));

@@ -34,19 +34,22 @@ namespace Vintagestory.GameContent
 
         public virtual void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
-            if (taskConfig["animation"].Exists)
+            JsonObject animationCfg = taskConfig["animation"];
+            if (animationCfg.Exists)
             {
+                string code = animationCfg.AsString()?.ToLowerInvariant();
                 animMeta = new AnimationMetaData()
                 {
-                    Code = taskConfig["animation"].AsString()?.ToLowerInvariant(),
-                    Animation = taskConfig["animation"].AsString()?.ToLowerInvariant(),
+                    Code = code,
+                    Animation = code,
                     AnimationSpeed = taskConfig["animationSpeed"].AsFloat(1f)
                 }.Init();
             }
 
-            if (taskConfig["sound"] != null)
+            JsonObject soundCfg = taskConfig["sound"];
+            if (soundCfg.Exists)
             {
-                sound = taskConfig["sound"].AsString();
+                sound = soundCfg.AsString();
                 soundRange = taskConfig["soundRange"].AsFloat(16);
                 soundStartMs = taskConfig["soundStartMs"].AsInt(0);
             }

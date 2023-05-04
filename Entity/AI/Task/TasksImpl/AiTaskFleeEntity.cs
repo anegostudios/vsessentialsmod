@@ -79,12 +79,22 @@ namespace Vintagestory.GameContent
             ownPos.Set(entity.ServerPos);
             float hereRange = fearReductionFactor * seekingRange;
 
-            targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => {
-                if (!IsTargetableEntity(e, hereRange)) return false;
-                if (!(e is EntityPlayer) || !lowStabilityAttracted) return true;
+            entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-init");
 
-                return e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
-            });
+            if (lowStabilityAttracted)
+            {
+                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) =>
+                {
+                    if (!IsTargetableEntity(e, hereRange)) return false;
+                    if (!(e is EntityPlayer)) return true;
+                    return e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
+                });
+            }
+            else
+            {
+                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
+            }
+            entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 
 
             if (targetEntity != null)

@@ -1,15 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
 {
-    public class EntityBehaviorControlledPhysics : EntityBehavior, IRenderer
+    public class EntityBehaviorControlledPhysics : EntityBehavior, IRenderer, IServerPhysicsTicker
     {
         protected float accumulator = 0;
         protected Vec3d outposition = new Vec3d(); // Temporary field
@@ -17,24 +19,34 @@ namespace Vintagestory.GameContent
 
         internal List<EntityLocomotion> Locomotors = new List<EntityLocomotion>();
 
-        public float stepHeight = 0.6f;
+        public float stepHeight = 0.6f;   // Also read in AiTaskBaseTargetable: if this is ever made modifiable, might need to have that task check for an update to this each gametick
 
         protected Cuboidf sneakTestCollisionbox = new Cuboidf();
         protected Vec3d prevPos = new Vec3d();
 
+        /// <summary>
+        /// True on client, false on server
+        /// </summary>
         protected bool duringRenderFrame;
         public double RenderOrder => 0;
         public int RenderRange => 9999;
 
-        ICoreClientAPI capi;
+        protected ICoreClientAPI capi;
+        protected FrameProfilerUtil profiler;
+        volatile int serverPhysicsTickDone;
+        public ref int FlagDoneTick { get => ref serverPhysicsTickDone; }
 
         protected bool smoothStepping;
 
         protected float accum1s;
+        private long LastServerUpdateMilliseconds;
         protected Vec3d windForce = new Vec3d();
 
         bool applyWindForce;
         bool isMountable;
+        int knockbackState;
+        protected float kbAccum;
+        Vec3d knockbackDir;
 
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
@@ -79,30 +91,48 @@ namespace Vintagestory.GameContent
             applyWindForce = entity.World.Config.GetBool("windAffectedEntityMovement", false);
         }
 
-        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        public virtual void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             if (capi.IsGamePaused) return;
 
-            onPhysicsTick(deltaTime);
+            if (entity.State != EnumEntityState.Inactive)
+            {
+                this.profiler = entity.World.FrameProfiler;
+                profiler.Enter("controlledphysics");
+                onPhysicsTick(deltaTime);
+                profiler.Leave();
+            }
         }
 
 
         public override void OnGameTick(float deltaTime)
         {
-            if (!duringRenderFrame)
+            if (!duringRenderFrame && entity.State != EnumEntityState.Inactive)
             {
-                onPhysicsTick(deltaTime);
+                // Server-side code
+                serverPhysicsTickDone = 0;
+                ((IServerWorldAccessor)entity.World).AddPhysicsTick(this);
+                return;
             }
         }
 
+
+        public virtual void onPhysicsTickServer(long elapsedMS)
+        {
+            this.profiler = entity.World.FrameProfiler;
+            profiler.Enter("on-mainthread");
+            onPhysicsTick((elapsedMS - LastServerUpdateMilliseconds) / 1000f);
+            profiler.Leave();
+            LastServerUpdateMilliseconds = elapsedMS;
+        }
+
+        /// <summary>
+        /// Perform the actual physics tick, potentially more than once if more than physics tick time has passed
+        /// </summary>
+        /// <param name="deltaTime"></param>
         public virtual void onPhysicsTick(float deltaTime)
         {
-            if (entity.State == EnumEntityState.Inactive)
-            {
-                return;
-            }
-
-            entity.World.FrameProfiler.Enter("controlledphysics");
+            if (entity.State != EnumEntityState.Active) return;   // reject both Inactive and Despawned
 
             accum1s += deltaTime;
             if (accum1s > 1.5f)
@@ -121,16 +151,19 @@ namespace Vintagestory.GameContent
             float frameTime = GlobalConstants.PhysicsFrameTime;
             if (isMountable) frameTime = 1 / 60f;
 
-            collisionTester.NewTick();
-            while (accumulator >= frameTime)
+            if (accumulator >= frameTime)   // Only do this code section if we will actually be ticking TickEntityPhysicsPre
             {
-                TickEntityPhysicsPre(entity, frameTime);
-                accumulator -= frameTime;
+                SetupKnockbackValues();
+                collisionTester.NewTick();
+
+                while (accumulator >= frameTime)
+                {
+                    TickEntityPhysicsPre(entity, frameTime);
+                    accumulator -= frameTime;
+                }
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
-
-            entity.World.FrameProfiler.Leave();
         }
 
         protected virtual void updateWindForce()
@@ -167,11 +200,30 @@ namespace Vintagestory.GameContent
         }
 
 
+        private void SetupKnockbackValues()
+        {
+            knockbackState = entity.Attributes.GetInt("dmgkb");   // pre-read this, it seems more efficient to do it once at the start of the physics tick
+            if (knockbackState > 0)
+            {
+                if (knockbackState == 1 || kbAccum + accumulator > 2 / 30f)  // if this condition is met then some knockback motion will be applied
+                {
+                    double kbx = entity.WatchedAttributes.GetDouble("kbdirX");
+                    double kby = entity.WatchedAttributes.GetDouble("kbdirY");
+                    double kbz = entity.WatchedAttributes.GetDouble("kbdirZ");
+                    knockbackDir = new Vec3d(kbx, kby, kbz);   // so preload the directions, which are fixed
+                }
+            }
+            else
+            {
+                kbAccum = 0f;
+                knockbackDir = null;
+            }
+        }
+
 
 
         public void TickEntityPhysics(EntityPos pos, EntityControls controls, float dt)
         {
-            FrameProfilerUtil profiler = entity.World.FrameProfiler;
             profiler.Mark("init");
             float dtFac = 60 * dt;
 
@@ -202,30 +254,35 @@ namespace Vintagestory.GameContent
 
             profiler.Mark("locomotors");
 
-            int knockbackState = entity.Attributes.GetInt("dmgkb");
             if (knockbackState > 0)
             {
-                float acc = entity.Attributes.GetFloat("dmgkbAccum") + dt;
-                entity.Attributes.SetFloat("dmgkbAccum", acc);
+                float acc = kbAccum + dt;
 
                 if (knockbackState == 1)
                 {
                     float str = 1 * 30 * dt * (entity.OnGround ? 1 : 0.5f);
-                    pos.Motion.X += entity.WatchedAttributes.GetDouble("kbdirX") * str;
-                    pos.Motion.Y += entity.WatchedAttributes.GetDouble("kbdirY") * str;
-                    pos.Motion.Z += entity.WatchedAttributes.GetDouble("kbdirZ") * str;
-                    entity.Attributes.SetInt("dmgkb", 2);
+                    pos.Motion.X += knockbackDir.X * str;
+                    pos.Motion.Y += knockbackDir.Y * str;
+                    pos.Motion.Z += knockbackDir.Z * str;
+                    if (acc <= 2 / 30f)
+                    {
+                        entity.Attributes.SetInt("dmgkb", 2);   // don't set this if it will be set to a different value in the very next code section below
+                        knockbackState = 2;
+                    }
                 }
 
                 if (acc > 2 / 30f)
                 {
                     entity.Attributes.SetInt("dmgkb", 0);
-                    entity.Attributes.SetFloat("dmgkbAccum", 0);
+                    knockbackState = 0;
+                    acc = 0;
                     float str = 0.5f * 30 * dt;
-                    pos.Motion.X -= entity.WatchedAttributes.GetDouble("kbdirX") * str;
-                    pos.Motion.Y -= entity.WatchedAttributes.GetDouble("kbdirY") * str;
-                    pos.Motion.Z -= entity.WatchedAttributes.GetDouble("kbdirZ") * str;
+                    pos.Motion.X -= knockbackDir.X * str;
+                    pos.Motion.Y -= knockbackDir.Y * str;
+                    pos.Motion.Z -= knockbackDir.Z * str;
                 }
+
+                kbAccum = acc;
             }
 
             EntityAgent agent = entity as EntityAgent;
@@ -245,7 +302,9 @@ namespace Vintagestory.GameContent
             }
 
             profiler.Mark("knockback-and-mountedcheck");
+#if PERFTEST
             profiler.Enter("collision");
+#endif
 
             if (pos.Motion.LengthSq() > 100D)
             {
@@ -270,7 +329,11 @@ namespace Vintagestory.GameContent
             }
 
 
+#if PERFTEST
             profiler.Leave();
+#else
+            profiler.Mark("collision");
+#endif
         }
 
 
@@ -283,7 +346,6 @@ namespace Vintagestory.GameContent
         public void DisplaceWithBlockCollision(EntityPos pos, EntityControls controls, float dt)
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
-            FrameProfilerUtil profiler = entity.World.FrameProfiler;
             float dtFac = 60 * dt;
             double prevYMotion = pos.Motion.Y;
 
@@ -384,11 +446,15 @@ namespace Vintagestory.GameContent
                 // nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
+#if PERFTEST
             profiler.Mark("prep");
+#endif
 
             collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref outposition, stepHeight);
 
+#if PERFTEST
             profiler.Mark("terraincollision");
+#endif
 
             if (!entity.Properties.CanClimbAnywhere)
             {
@@ -402,7 +468,9 @@ namespace Vintagestory.GameContent
                 }
             }
 
+#if PERFTEST
             profiler.Mark("stepping-checks");
+#endif
 
             HandleSneaking(pos, controls, dt);
 
@@ -444,7 +512,9 @@ namespace Vintagestory.GameContent
 
             pos.SetPos(outposition);
 
+#if PERFTEST
             profiler.Mark("apply-motion");
+#endif
 
             // Set the motion to zero if he collided.
 
@@ -502,7 +572,9 @@ namespace Vintagestory.GameContent
                 entity.PositionBeforeFalling.Set(outposition);
             }
 
+#if PERFTEST
             profiler.Mark("apply-collisionandflags");
+#endif
 
             Cuboidd testedEntityBox = collisionTester.entityBox;
 
@@ -516,23 +588,14 @@ namespace Vintagestory.GameContent
                 {
                     for (int z = zMin; z <= zMax; z++)
                     {
-                        collisionTester.tmpPos.Set(x, y, z);
-                        collisionTester.tempCuboid.Set(x, y, z, x + 1, y + 1, z + 1);
-
-                        if (collisionTester.tempCuboid.IntersectsOrTouches(testedEntityBox))
-                        {
-                            blockAccess.GetBlock(x, y, z).OnEntityInside(entity.World, entity, collisionTester.tmpPos);
-
-                            // Saves us a few cpu cycles
-                            if (x == (int)pos.X && z == (int)pos.Z && y == (int)pos.Y)
-                            {
-                                continue;
-                            }
-                        }
+                        Block block = blockAccess.GetBlock(x, y, z);
+                        if (block.Id > 0) block.OnEntityInside(entity.World, entity, tmpPos.Set(x, y, z));
                     }
                 }
             }
+#if PERFTEST
             profiler.Mark("trigger-insideblock");
+#endif
         }
 
         private void HandleSneaking(EntityPos pos, EntityControls controls, float dt)

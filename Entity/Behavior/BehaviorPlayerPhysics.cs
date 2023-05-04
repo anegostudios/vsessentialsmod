@@ -18,6 +18,7 @@ namespace Vintagestory.GameContent
         public EntityBehaviorPlayerPhysics(Entity entity) : base(entity)
         {
             eplr = entity as EntityPlayer;
+            profiler = entity.World.FrameProfiler;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
@@ -25,9 +26,16 @@ namespace Vintagestory.GameContent
             base.Initialize(properties, typeAttributes);
         }
 
+        public override void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        {
+            if (capi.IsGamePaused) return;
+
+            onPhysicsTick(deltaTime);
+        }
 
         public override void OnGameTick(float deltaTime)
         {
+            // Override base behavior, we do not want to change player physics at all using the server physics multithreading
             if (!duringRenderFrame)
             {
                 onPhysicsTick(deltaTime);

@@ -82,15 +82,17 @@ namespace Vintagestory.API.Common
             int initialmincooldown = (int)taskConfig["initialMinCoolDown"]?.AsInt(mincooldown);
             int initialmaxcooldown = (int)taskConfig["initialMaxCoolDown"]?.AsInt(maxcooldown);
 
-            if (taskConfig["animation"].Exists)
+            JsonObject animationCfg = taskConfig["animation"];
+            if (animationCfg.Exists)
             {
-                var code = taskConfig["animation"].AsString()?.ToLowerInvariant();
-                float speed = taskConfig["animationSpeed"].AsFloat(1f);
+                var code = animationCfg.AsString()?.ToLowerInvariant();
+                JsonObject animationSpeedCfg = taskConfig["animationSpeed"];
+                float speed = animationSpeedCfg.AsFloat(1f);
 
                 var cmeta = this.entity.Properties.Client.Animations.FirstOrDefault(a => a.Code == code);
                 if (cmeta != null)
                 {
-                    if (taskConfig["animationSpeed"].Exists)
+                    if (animationSpeedCfg.Exists)
                     {
                         animMeta = cmeta.Clone();
                         animMeta.AnimationSpeed = speed;
@@ -117,20 +119,25 @@ namespace Vintagestory.API.Common
             this.whenInEmotionState = taskConfig["whenInEmotionState"].AsString();
             this.whenNotInEmotionState = taskConfig["whenNotInEmotionState"].AsString();
 
-
-            if (taskConfig["sound"].Exists)
+            JsonObject soundCfg = taskConfig["sound"];
+            if (soundCfg.Exists)
             {
-                sound = AssetLocation.Create(taskConfig["sound"].AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
+                sound = AssetLocation.Create(soundCfg.AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
                 soundRange = taskConfig["soundRange"].AsFloat(16);
                 soundStartMs = taskConfig["soundStartMs"].AsInt(0);
                 soundRepeatMs = taskConfig["soundRepeatMs"].AsInt(0);
             }
-            if (taskConfig["finishSound"].Exists)
+            JsonObject finishSoundCfg = taskConfig["finishSound"];
+            if (finishSoundCfg.Exists)
             {
-                finishSound = AssetLocation.Create(taskConfig["finishSound"].AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
+                finishSound = AssetLocation.Create(finishSoundCfg.AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
             }
 
             cooldownUntilMs = entity.World.ElapsedMilliseconds + initialmincooldown + entity.World.Rand.Next(initialmaxcooldown - initialmincooldown);
+        }
+
+        public virtual void AfterInitialize()
+        {
         }
 
         public virtual int Slot

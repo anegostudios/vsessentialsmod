@@ -107,11 +107,10 @@ namespace Vintagestory.GameContent
                 (int)(entity.SidedPos.Z + entity.LocalEyePos.Z)
             );
 
-            Block block = entity.World.BlockAccessor.GetBlock(pos);
+            Block block = entity.World.BlockAccessor.GetBlock(pos, BlockLayersAccess.FluidOrSolid);
             Cuboidf[] collisionboxes = block.GetCollisionBoxes(entity.World.BlockAccessor, pos);
 
             Cuboidf box = new Cuboidf();
-
             if (collisionboxes != null && block.Attributes?["asphyxiating"].AsBool(true) != false)
             {
                 for (int i = 0; i < collisionboxes.Length; i++)
@@ -135,7 +134,10 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            nowHasAir &= !block.IsLiquid() || block.LiquidLevel / 7f < eyeHeightMod1;
+            if (block.IsLiquid() && block.LiquidLevel / 7f > eyeHeightMod1)
+            {
+                nowHasAir = false;
+            }
 
             HasAir = nowHasAir;
         }

@@ -15,8 +15,9 @@ namespace Vintagestory.GameContent
 
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
-        protected HashSet<string> targetEntityCodesExact = new HashSet<string>();
         protected string[] targetEntityCodesBeginsWith = new string[0];
+        protected string[] targetEntityCodesExact;
+        protected string targetEntityFirstLetters = "";
 
         protected string creatureHostility;
         protected bool friendlyTarget;
@@ -33,9 +34,10 @@ namespace Vintagestory.GameContent
 
         public string triggerEmotionState;
 
-        protected bool noEntityCodes => targetEntityCodesExact.Count == 0 && targetEntityCodesBeginsWith.Length == 0;
+        protected bool noEntityCodes => targetEntityCodesExact.Length == 0 && targetEntityCodesBeginsWith.Length == 0;
 
         protected EntityPartitioning partitionUtil;
+        protected EntityBehaviorControlledPhysics bhPhysics;
 
         protected AiTaskBaseTargetable(EntityAgent entity) : base(entity)
         {
@@ -47,35 +49,56 @@ namespace Vintagestory.GameContent
 
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
-            if (taskConfig["entityCodes"] != null)
-            {
-                string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-
-                List<string> beginswith = new List<string>();
-
-                for (int i = 0; i < codes.Length; i++)
-                {
-                    string code = codes[i];
-                    if (code.EndsWith("*")) beginswith.Add(code.Substring(0, code.Length - 1));
-                    else targetEntityCodesExact.Add(code);
-                }
-                
-                targetEntityCodesBeginsWith = beginswith.ToArray();
-            }
-
             creatureHostility = entity.World.Config.GetString("creatureHostility");
 
             friendlyTarget = taskConfig["friendlyTarget"].AsBool(false);
 
             this.triggerEmotionState = taskConfig["triggerEmotionState"].AsString();
+
+            List<string> targetEntityCodesList = new List<string>();
+            string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
+
+            List<string> beginswith = new List<string>();
+
+            for (int i = 0; i < codes.Length; i++)
+            {
+                string code = codes[i];
+                if (code.EndsWith("*"))
+                {
+                    beginswith.Add(code.Substring(0, code.Length - 1));
+                }
+                else targetEntityCodesList.Add(code);
+            }
+
+            targetEntityCodesBeginsWith = beginswith.ToArray();
+
+            targetEntityCodesExact = new string[targetEntityCodesList.Count];
+            int j = 0;
+            foreach (string code in targetEntityCodesList)
+            {
+                if (code.Length == 0) continue;
+                targetEntityCodesExact[j++] = code;
+                char c = code[0];
+                if (targetEntityFirstLetters.IndexOf(c) < 0) targetEntityFirstLetters += c;
+            }
+
+            foreach (string code in targetEntityCodesBeginsWith)
+            {
+                if (code.Length == 0) continue;
+                char c = code[0];
+                if (targetEntityFirstLetters.IndexOf(c) < 0) targetEntityFirstLetters += c;
+            }
+        }
+
+        public override void AfterInitialize()
+        {
+            bhPhysics = entity.GetBehavior<EntityBehaviorControlledPhysics>();
         }
 
 
         public override void StartExecute()
         {
-            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
-            stepHeight = bh == null ? 0.6f : bh.stepHeight;
-
+            stepHeight = bhPhysics?.stepHeight ?? 0.6f;
             base.StartExecute();
 
             if (triggerEmotionState != null)
@@ -87,14 +110,20 @@ namespace Vintagestory.GameContent
 
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
-            if (!e.Alive || !e.IsInteractable || e.EntityId == entity.EntityId || !CanSense(e, range)) return false;
-            if (ignoreEntityCode) return true;
+            if (!e.Alive || !e.IsInteractable) return false;
+            if (ignoreEntityCode) return CanSense(e, range);
 
-            if (targetEntityCodesExact.Contains(e.Code.Path)) return true;
+            string testPath = e.Code.Path;
+            if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
+
+            for (int i = 0; i < targetEntityCodesExact.Length; i++)
+            {
+                if (testPath == targetEntityCodesExact[i]) return CanSense(e, range);
+            }
 
             for (int i = 0; i < targetEntityCodesBeginsWith.Length; i++)
             {
-                if (e.Code.Path.StartsWithFast(targetEntityCodesBeginsWith[i])) return true;
+                if (testPath.StartsWithFast(targetEntityCodesBeginsWith[i])) return CanSense(e, range);
             }
 
             return false;
@@ -103,6 +132,7 @@ namespace Vintagestory.GameContent
 
         public bool CanSense(Entity e, double range)
         {
+            if (e.EntityId == entity.EntityId) return false;
             if (e is EntityPlayer eplr)
             {
                 if (!friendlyTarget && AggressiveTargeting)

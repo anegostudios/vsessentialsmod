@@ -92,6 +92,11 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public override void AfterInitialize()
+        {
+            TaskManager.AfterInitialize();
+        }
+
 
         public override void OnGameTick(float deltaTime)
         {
