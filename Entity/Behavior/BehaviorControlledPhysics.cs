@@ -48,6 +48,8 @@ namespace Vintagestory.GameContent
         protected float kbAccum;
         Vec3d knockbackDir;
 
+        protected List<Cuboidd> traversed = new List<Cuboidd>(4);
+
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             (entity.World.Api as ICoreClientAPI)?.Event.UnregisterRenderer(this, EnumRenderStage.Before);
@@ -100,6 +102,7 @@ namespace Vintagestory.GameContent
                 this.profiler = entity.World.FrameProfiler;
                 profiler.Enter("controlledphysics");
                 onPhysicsTick(deltaTime);
+                AfterPhysicsTick();
                 profiler.Leave();
             }
         }
@@ -133,6 +136,8 @@ namespace Vintagestory.GameContent
         public virtual void onPhysicsTick(float deltaTime)
         {
             if (entity.State != EnumEntityState.Active) return;   // reject both Inactive and Despawned
+
+            traversed.Clear();   // this will be used by the AfterPhysicsTick() method
 
             accum1s += deltaTime;
             if (accum1s > 1.5f)
@@ -575,9 +580,18 @@ namespace Vintagestory.GameContent
 #if PERFTEST
             profiler.Mark("apply-collisionandflags");
 #endif
+            traversed.Add(collisionTester.entityBox.Clone());
+        }
 
-            Cuboidd testedEntityBox = collisionTester.entityBox;
+        public void AfterPhysicsTick()
+        {
+            IBlockAccessor blockAccess = entity.World.BlockAccessor;
+            foreach (Cuboidd box in traversed) TriggerInsideBlock(box, blockAccess);
+            profiler.Mark("trigger-insideblock");
+        }
 
+        public void TriggerInsideBlock(Cuboidd testedEntityBox, IBlockAccessor blockAccess)
+        {
             int xMax = (int)testedEntityBox.X2;
             int yMax = (int)testedEntityBox.Y2;
             int zMax = (int)testedEntityBox.Z2;
@@ -593,9 +607,6 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-#if PERFTEST
-            profiler.Mark("trigger-insideblock");
-#endif
         }
 
         private void HandleSneaking(EntityPos pos, EntityControls controls, float dt)
