@@ -110,7 +110,7 @@ namespace Vintagestory.GameContent
 
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
-            if (!e.Alive || !e.IsInteractable) return false;
+            if (!e.Alive) return false;
             if (ignoreEntityCode) return CanSense(e, range);
 
             string testPath = e.Code.Path;

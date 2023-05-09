@@ -8,6 +8,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -43,7 +44,7 @@ namespace Vintagestory.GameContent
     }
 
 
-    public class EntityPartitioning : ModSystem
+    public class EntityPartitioning : ModSystem, IEntityPartitioning
     {
         public static int partitionsLength = 8;
         int gridSizeInBlocks;
@@ -96,6 +97,7 @@ namespace Vintagestory.GameContent
         {
             this.sapi = api;
             api.Event.RegisterGameTickListener(OnServerTick, 32);
+            api.Event.PlayerSwitchGameMode += OnSwitchedGameMode;
         }
 
         private void OnClientTick(float dt)
@@ -105,7 +107,7 @@ namespace Vintagestory.GameContent
 
         private void OnServerTick(float dt)
         {
-            partitionEntities(sapi.World.LoadedEntities.Values);
+            partitionEntities(((CachingConcurrentDictionary<long, Entity>)sapi.World.LoadedEntities).Values);
         }
 
         void partitionEntities(ICollection<Entity> entities)
@@ -118,6 +120,7 @@ namespace Vintagestory.GameContent
 
             foreach (var val in entities)
             {
+                if (!val.IsInteractable) continue;
                 LargestTouchDistance = Math.Max(LargestTouchDistance, val.SelectionBox.XSize / 2);
 
                 PartitionEntity(val);
@@ -143,10 +146,33 @@ namespace Vintagestory.GameContent
 
             if (gridIndex < 0) return;
 
-            partition.Entities[gridIndex].Add(entity);
+            var list = partition.Entities[gridIndex];
+            list.Add(entity);
+            if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
         }
 
+
+        public void RePartitionPlayer(EntityPlayer entity)
+        {
+            entity.entityListForPartitioning?.Remove(entity);
+            PartitionEntity(entity);
+        }
+
+        private void OnSwitchedGameMode(IServerPlayer player)
+        {
+            RePartitionPlayer(player.Entity);
+        }
+
+        [Obsolete("Tn version 1.18.2 and later, this returns Interactable entities only, so recommended to call GetNearestInteractableEntity() directly for clarity in the calling code")]
         public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
+        {
+            return GetNearestInteractableEntity(position, radius, matches);
+        }
+
+        /// <summary>
+        /// Search all nearby interactable entities (for which IsInteractable is true) to find the nearest one meeting the "matches" condition
+        /// </summary>
+        public Entity GetNearestInteractableEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
             Entity nearestEntity = null;
             double radiusSq = radius * radius;
@@ -215,6 +241,12 @@ namespace Vintagestory.GameContent
         }
 
 
+        [Obsolete("In version 1.18.2 and later, this walks through Interactable entities only, so recommended to call WalkInteractableEntities() directly for clarity in the calling code")]
+        public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
+        {
+            WalkInteractableEntities(centerPos, radius, callback);
+        }
+
         /// <summary>
         /// This performs a entity search inside a spacially partioned search grid thats refreshed every 16ms.
         /// This can be a lot faster for when there are thousands of entities on a small space. It is used by EntityBehaviorRepulseAgents to improve performance, because otherwise when spawning 1000 creatures nearby, it has to do 1000x1000 = 1mil search operations every frame
@@ -223,7 +255,7 @@ namespace Vintagestory.GameContent
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback">Return false to stop the walk</param>
-        public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
+        public void WalkInteractableEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
             if (api.Side == EnumAppSide.Client)
             {
@@ -235,7 +267,7 @@ namespace Vintagestory.GameContent
         }
 
         /// <summary>
-        /// Same as <see cref="WalkEntities(Vec3d, double, Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
+        /// Same as <see cref="WalkInteractableEntities(Vec3d, double, Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>

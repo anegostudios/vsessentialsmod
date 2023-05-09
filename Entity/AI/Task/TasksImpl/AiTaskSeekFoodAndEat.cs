@@ -134,7 +134,7 @@ namespace Vintagestory.GameContent
             extraTargetDist = 0;
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 10, (e) =>
+            api.ModLoader.GetModSystem<EntityPartitioning>().WalkInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
             {
                 if (e is EntityItem)
                 {

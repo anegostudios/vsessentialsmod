@@ -37,7 +37,8 @@ namespace Vintagestory.GameContent
 
         string[] stopOnNearbyEntityCodesExact = null;
         string[] stopOnNearbyEntityCodesBeginsWith = new string[0];
-        float stopRange=0;
+        string targetEntityFirstLetters = "";
+        float stopRange =0;
         bool stopOnHurt = false;
         EntityPartitioning partitionUtil;
 
@@ -80,6 +81,19 @@ namespace Vintagestory.GameContent
 
             stopOnNearbyEntityCodesExact = exact.ToArray();
             stopOnNearbyEntityCodesBeginsWith = beginswith.ToArray();
+            foreach (string scode in stopOnNearbyEntityCodesExact)
+            {
+                if (scode.Length == 0) continue;
+                char c = scode[0];
+                if (targetEntityFirstLetters.IndexOf(c) < 0) targetEntityFirstLetters += c;
+            }
+
+            foreach (string scode in stopOnNearbyEntityCodesBeginsWith)
+            {
+                if (scode.Length == 0) continue;
+                char c = scode[0];
+                if (targetEntityFirstLetters.IndexOf(c) < 0) targetEntityFirstLetters += c;
+            }
 
 
             if (maxduration < 0) idleUntilMs = -1;
@@ -92,12 +106,14 @@ namespace Vintagestory.GameContent
             stopRange *= fearReductionFactor;
 
             base.LoadConfig(taskConfig, aiConfig);
+
+            lastEntityInRangeTestTotalMs = entity.World.ElapsedMilliseconds - entity.World.Rand.Next(1500);   // randomise time for first expensive tick
         }
 
         public override bool ShouldExecute()
         {
             long ellapsedMs = entity.World.ElapsedMilliseconds;
-            if (entity.World.Rand.NextDouble() < chance && cooldownUntilMs < ellapsedMs)
+            if (cooldownUntilMs < ellapsedMs && entity.World.Rand.NextDouble() < chance)
             {
                 if (entity.Properties.Habitat == EnumHabitat.Land && entity.FeetInLiquid) return false;
 
@@ -126,14 +142,14 @@ namespace Vintagestory.GameContent
                     if (!match) return false;
                 }
 
-                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z);
+                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z, BlockLayersAccess.Solid);
                 // Only with a solid block below (and here not lake ice: entities should not idle on lake ice!)
                 if (!belowBlock.SideSolid[API.MathTools.BlockFacing.UP.Index]) return false;
 
                 if (onBlockBelowCode == null) return true;
                 Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
 
-                return block.WildCardMatch(onBlockBelowCode) || (belowBlock.WildCardMatch(onBlockBelowCode) && block.Replaceable >= 6000);
+                return block.WildCardMatch(onBlockBelowCode) || (block.Replaceable >= 6000 && belowBlock.WildCardMatch(onBlockBelowCode));
             }
 
             return false;
@@ -193,16 +209,18 @@ namespace Vintagestory.GameContent
 
             bool found = false;
 
-            partitionUtil.WalkEntities(entity.ServerPos.XYZ, stopRange, (e) => {
-                if (!e.Alive || !e.IsInteractable || e.EntityId == this.entity.EntityId) return true;
+            partitionUtil.WalkInteractableEntities(entity.ServerPos.XYZ, stopRange, (e) => {
+                if (!e.Alive || e.EntityId == this.entity.EntityId) return true;
 
+                string testPath = e.Code.Path;
+                if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return true;   // early exit if we don't have the first letter
                 for (int i = 0; i < stopOnNearbyEntityCodesExact.Length; i++)
                 {
-                    if (e.Code.Path == stopOnNearbyEntityCodesExact[i])
+                    if (testPath == stopOnNearbyEntityCodesExact[i])
                     {
-                        if (e.Code.Path == "player")
+                        if (e is EntityPlayer entityPlayer)
                         {
-                            IPlayer player = entity.World.PlayerByUid(((EntityPlayer)e).PlayerUID);
+                            IPlayer player = entity.World.PlayerByUid(entityPlayer.PlayerUID);
                             if (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator))
                             {
                                 found = true;
@@ -219,7 +237,7 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < stopOnNearbyEntityCodesBeginsWith.Length; i++)
                 {
-                    if (e.Code.Path.StartsWithFast(stopOnNearbyEntityCodesBeginsWith[i]))
+                    if (testPath.StartsWithFast(stopOnNearbyEntityCodesBeginsWith[i]))
                     {
                         found = true;
                         return false;

@@ -32,6 +32,7 @@ namespace Vintagestory.GameContent
 
             onlyWhenDead = attributes["onlyWhenDead"].AsBool(false);
             pushVelocityMul = attributes["pushVelocityMul"].AsFloat(1f);
+            counter = ((int)entity.EntityId / 10) % 10;   // slightly randomise the counter to prevent one big tick after a chunk with many entities is loaded
         }
 
 
@@ -41,11 +42,11 @@ namespace Vintagestory.GameContent
 
             if (counter++ > 10 || (stuckInBlock && counter > 1))
             {
+                counter = 0;
                 if ((onlyWhenDead && entity.Alive) || entity.Properties.CanClimbAnywhere) return;
 
                 stuckInBlock = false;
-                counter = 0;
-                entity.Properties.Habitat = EnumHabitat.Land;
+                entity.Properties.Habitat = EnumHabitat.Land;   // One effect of this line (1.18.2) is to convert a dead Salmon fom EnumHabitat.Underwater to EnumHabitat.Land
                 if (!entity.Swimming)
                 {
                     tmpPos.Set(entity.SidedPos.X, entity.SidedPos.Y, entity.SidedPos.Z);

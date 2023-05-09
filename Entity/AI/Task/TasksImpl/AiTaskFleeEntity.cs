@@ -83,7 +83,7 @@ namespace Vintagestory.GameContent
 
             if (lowStabilityAttracted)
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) =>
+                targetEntity = (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) =>
                 {
                     if (!IsTargetableEntity(e, hereRange)) return false;
                     if (!(e is EntityPlayer)) return true;
@@ -92,7 +92,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
+                targetEntity = (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
             }
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 

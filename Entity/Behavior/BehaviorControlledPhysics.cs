@@ -58,15 +58,19 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorControlledPhysics(Entity entity) : base(entity)
         {
+            this.MakeLocomotors();
+
+            isMountable = entity is IMountable || entity is IMountableSupplier;
+        }
+
+        protected virtual void MakeLocomotors()
+        {
             Locomotors.Add(new EntityOnGround());
             Locomotors.Add(new EntityInLiquid());
             Locomotors.Add(new EntityInAir());
             Locomotors.Add(new EntityApplyGravity());
             Locomotors.Add(new EntityMotionDrag());
-
-            isMountable = entity is IMountable || entity is IMountableSupplier;
         }
-
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {

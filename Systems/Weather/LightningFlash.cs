@@ -179,7 +179,7 @@ namespace Vintagestory.GameContent
                             HitPosition = new Vec3d()
                         };
 
-                        api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(origin, 8, (entity) =>
+                        api.ModLoader.GetModSystem<EntityPartitioning>().WalkInteractableEntities(origin, 8, (entity) =>
                         {
                             float damage = 6;
                             entity.ReceiveDamage(dmgSrc, damage);

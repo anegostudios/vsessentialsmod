@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
         {
             if (!manualExecute)
             {
-                targetEntity = partitionUtil.GetNearestEntity(entity.ServerPos.XYZ, seekingRange, (e) => IsTargetableEntity(e, seekingRange));
+                targetEntity = partitionUtil.GetNearestInteractableEntity(entity.ServerPos.XYZ, seekingRange, (e) => IsTargetableEntity(e, seekingRange));
                 return targetEntity != null;
             }
             return false;

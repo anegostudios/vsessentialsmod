@@ -8,20 +8,21 @@ using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.GameContent
 {
-    public class EntityBehaviorDespawn : EntityBehavior
+    public class EntityBehaviorDespawn : EntityBehavior, ITimedDespawn
     {
-        float? minPlayerDistance = null;
-        float? belowLightLevel = null;
+        float minPlayerDistance = -1f;
+        float belowLightLevel = -1f;
         float minSeconds = 30;
         float accumSeconds;
-        float accumOffset = 0;
+        float accumOffset = 2.5f;
 
-        bool byCalendarDespawnMode=false;
+        bool byCalendarDespawnMode = false;
+        float deathTimeLocal;   // local copy of the attribute
 
         public float DeathTime
         {
-            get { float? time = entity.Attributes.TryGetFloat("deathTime"); return time == null ? 0 : (float)time; }
-            set { entity.Attributes.SetFloat("deathTime", value); }
+            get { float? time = entity.Attributes.TryGetFloat("deathTime"); return deathTimeLocal = (time == null ? 0 : (float)time); }
+            set { if (value != deathTimeLocal) { entity.Attributes.SetFloat("deathTime", value);  deathTimeLocal = value; } }      // Note: the SetFloat() is costly and creates a new FloatAttribute object every time, is there a better way?
         }
 
         public EntityBehaviorDespawn(Entity entity) : base(entity)
@@ -31,16 +32,13 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             JsonObject minDist = typeAttributes["minPlayerDistance"];
-            minPlayerDistance = null;
-            if (minDist.Exists)
-            {
-                minPlayerDistance = minDist.AsFloat();
-            }
+            minPlayerDistance = minDist.Exists ? minDist.AsFloat() : -1f;
 
             JsonObject belowLight = typeAttributes["belowLightLevel"];
-            belowLightLevel = belowLight.Exists ? (float?)belowLight.AsFloat() : null;
+            belowLightLevel = belowLight.Exists ? belowLight.AsFloat() : -1f;
             
             minSeconds = typeAttributes["minSeconds"].AsFloat(30);
+            minSeconds += (entity.EntityId / 5f) % (minSeconds / 20);    // add 5% randomness, to mitigate many entities in a chunk all attempting to despawn in the same tick
 
             var obj = typeAttributes["afterDays"];
             if (obj.Exists)
@@ -53,51 +51,47 @@ namespace Vintagestory.GameContent
             }
 
             // Reduce chance of many entities running the light check at the same time
-            accumOffset = (float)((entity.EntityId / 1000.0) % 1);
+            accumOffset += (entity.EntityId / 1000f) % 1;
+            float dummy = DeathTime;   // set up the local value of deathTime
         }
 
 
-        bool shouldStayAlive;
         public override void OnGameTick(float deltaTime)
         {
             if (!entity.Alive || entity.World.Side == EnumAppSide.Client) return;
 
-            if ((accumSeconds += deltaTime) > 2.5f + accumOffset)
+            if ((accumSeconds += deltaTime) > accumOffset)
             {
-                shouldStayAlive = PlayerInRange() || LightLevelOk();
                 accumSeconds = 0;
-                if (shouldStayAlive)
+
+                bool playerInRange = PlayerInRange();
+                if (playerInRange || LightLevelOk())
                 {
-                    DeathTime = 0;
+                    DeathTime = 0;   // costly operation, cost of repeated operations mitigated through comparison with the local copy deathTimeLocal
                     return;
                 }
-            }
 
-            if (shouldStayAlive)
-            {
-                return;
-            }
+                if (byCalendarDespawnMode)
+                {
+                    if (!playerInRange && entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
+                    {
+                        entity.Die(EnumDespawnReason.Expire, null);
+                        return;
+                    }
+                }
 
-            if (byCalendarDespawnMode)
-            {
-                if (!PlayerInRange() && entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
+                if ((DeathTime += deltaTime) > minSeconds)
                 {
                     entity.Die(EnumDespawnReason.Expire, null);
                     return;
                 }
-            }
-
-            if ((DeathTime += deltaTime) > minSeconds)
-            {
-                entity.Die(EnumDespawnReason.Expire, null);
-                return;
             }
         }
 
 
         public bool PlayerInRange()
         {
-            if (minPlayerDistance == null) return false;
+            if (minPlayerDistance < 0f) return false;
 
             /*EntityPos pos = entity.ServerPos;
             EntityPlayer player = entity.World.NearestPlayer(pos.X, pos.Y, pos.Z)?.Entity;
@@ -109,7 +103,7 @@ namespace Vintagestory.GameContent
 
         public bool LightLevelOk()
         {
-            if (belowLightLevel == null) return false;
+            if (belowLightLevel < 0f) return false;
 
             EntityPos pos = entity.ServerPos;
             int level = entity.World.BlockAccessor.GetLightLevel((int) pos.X, (int)pos.Y, (int)pos.Z, EnumLightLevelType.MaxLight);
@@ -131,6 +125,11 @@ namespace Vintagestory.GameContent
 
 
             base.GetInfoText(infotext);
+        }
+
+        public void SetTimer(int value)
+        {
+            minSeconds = value;
         }
     }
 }

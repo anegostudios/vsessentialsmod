@@ -116,7 +116,7 @@ namespace Vintagestory.GameContent
                 attackedByEntity = null;
             }
 
-            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && IsTargetableEntity(attackedByEntity, range, true))
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, range, true))
             {
                 targetEntity = attackedByEntity;
                 targetPos = targetEntity.ServerPos.XYZ;
@@ -125,7 +125,7 @@ namespace Vintagestory.GameContent
             else
             {
                 ownPos.Set(entity.ServerPos);
-                targetEntity = partitionUtil.GetNearestEntity(ownPos, range, (e) => IsTargetableEntity(e, range));
+                targetEntity = partitionUtil.GetNearestInteractableEntity(ownPos, range, (e) => IsTargetableEntity(e, range));
 
                 if (targetEntity != null)
                 {

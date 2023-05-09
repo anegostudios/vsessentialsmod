@@ -13,8 +13,6 @@ namespace Vintagestory.GameContent
         public float airMovingStrength = 0.05f;
         double wallDragFactor = 0.3f;
 
-        float airMovingStrengthFalling;
-
         internal override void Initialize(JsonObject physics)
         {
             if (physics != null)
@@ -22,8 +20,6 @@ namespace Vintagestory.GameContent
                 wallDragFactor = 0.3 * (float)physics["wallDragFactor"].AsDouble(1);
                 airMovingStrength = (float)physics["airMovingStrength"].AsDouble(0.05);
             }
-
-            airMovingStrengthFalling = airMovingStrength / 4;
         }
 
         public override bool Applicable(Entity entity, EntityPos pos, EntityControls controls)
@@ -43,7 +39,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void ApplyOnGround(float dt, Entity entity, EntityPos pos, EntityControls controls)
+        protected virtual void ApplyOnGround(float dt, Entity entity, EntityPos pos, EntityControls controls)
         {
             if (controls.IsClimbing)
             {
@@ -54,14 +50,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                float strength = airMovingStrength * (float)Math.Min(1, entity.Stats?.GetBlended("walkspeed") ?? 1.0) * dt * 60f;
-
-                if (!controls.Jump && entity is EntityPlayer)
-                {
-                    strength = airMovingStrengthFalling;
-                    pos.Motion.X *= (float)Math.Pow(0.98f, dt * 33);
-                    pos.Motion.Z *= (float)Math.Pow(0.98f, dt * 33);
-                }
+                float strength = airMovingStrength * dt * 60f;
 
                 pos.Motion.Add(controls.WalkVector.X * strength, controls.WalkVector.Y * strength, controls.WalkVector.Z * strength);
             }
@@ -69,38 +58,13 @@ namespace Vintagestory.GameContent
 
         
 
-        private static void ApplyFlying(float dt, EntityPos pos, EntityControls controls)
+        protected virtual void ApplyFlying(float dt, EntityPos pos, EntityControls controls)
         {
-            if (controls.Gliding)
-            {
-                double cosPitch = Math.Cos(pos.Pitch);
-                double sinPitch = Math.Sin(pos.Pitch);
+            pos.Motion.Add(controls.FlyVector.X, (controls.Up || controls.Down) ? 0 : controls.FlyVector.Y, controls.FlyVector.Z);
 
-                double cosYaw = Math.Cos(Math.PI / 2 - pos.Yaw);
-                double sinYaw = Math.Sin(Math.PI / 2 - pos.Yaw);
+            float moveSpeed = dt * GlobalConstants.BaseMoveSpeed * controls.MovespeedMultiplier / 2;
 
-                double glideFac = sinPitch + 0.15;
-
-                controls.GlideSpeed = GameMath.Clamp(controls.GlideSpeed - glideFac * dt * 0.25f, 0.005f, 0.75f);
-
-                var gs = GameMath.Clamp(controls.GlideSpeed, 0.005f, 0.2f);
-
-                pos.Motion.Add(
-                    -cosPitch * sinYaw * gs,
-                    sinPitch * gs,
-                    cosPitch * cosYaw * gs
-                );
-
-                pos.Motion.Mul(GameMath.Clamp(1 - pos.Motion.Length()*0.13f, 0, 1));
-            }
-            else
-            {
-                pos.Motion.Add(controls.FlyVector.X, (controls.Up || controls.Down) ? 0 : controls.FlyVector.Y, controls.FlyVector.Z);
-
-                float moveSpeed = dt * GlobalConstants.BaseMoveSpeed * controls.MovespeedMultiplier / 2;
-
-                pos.Motion.Add(0, (controls.Up ? moveSpeed : 0) + (controls.Down ? -moveSpeed : 0), 0);
-            }
+            pos.Motion.Add(0, (controls.Up ? moveSpeed : 0) + (controls.Down ? -moveSpeed : 0), 0);
         }
     }
 }

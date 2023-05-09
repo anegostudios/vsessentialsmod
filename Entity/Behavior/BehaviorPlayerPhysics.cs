@@ -21,9 +21,19 @@ namespace Vintagestory.GameContent
             profiler = entity.World.FrameProfiler;
         }
 
+        protected override void MakeLocomotors()
+        {
+            Locomotors.Add(new EntityOnGround());
+            Locomotors.Add(new EntityInLiquid());
+            Locomotors.Add(new PlayerEntityInAir());    // special player version of this locomotor
+            Locomotors.Add(new EntityApplyGravity());
+            Locomotors.Add(new EntityMotionDrag());
+        }
+
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             base.Initialize(properties, typeAttributes);
+            this.profiler = entity.World.FrameProfiler;
         }
 
         public override void OnRenderFrame(float deltaTime, EnumRenderStage stage)
@@ -44,6 +54,7 @@ namespace Vintagestory.GameContent
 
         public override void onPhysicsTick(float deltaTime)
         {
+            profiler.Enter("behavior-playerphysics");
             accum1s += deltaTime;
             if (accum1s > 1.5f)
             {
@@ -88,6 +99,7 @@ namespace Vintagestory.GameContent
                     controls.IsFlying = false;
                 }
             }
+            profiler.Leave();
         }
 
         public override void TickEntityPhysicsPre(Entity entity, float dt)

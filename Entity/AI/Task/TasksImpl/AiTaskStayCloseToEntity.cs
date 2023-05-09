@@ -49,9 +49,20 @@ namespace Vintagestory.GameContent
 
             if (targetEntity == null || !targetEntity.Alive)
             {
-                targetEntity = entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, 2, (e) => {
-                    return e.Code.Path.Equals(entityCode) && (!onlyIfLowerId || e.EntityId < entity.EntityId);
-                });
+                if (onlyIfLowerId)
+                {
+                    targetEntity = entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, 2, (e) =>
+                    {
+                        return e.EntityId < entity.EntityId && e.Code.Path.Equals(entityCode);
+                    });
+                }
+                else
+                {
+                    targetEntity = entity.World.GetNearestEntity(entity.ServerPos.XYZ, range, 2, (e) =>
+                    {
+                        return e.Code.Path.Equals(entityCode);
+                    });
+                }
             }
 
             if (targetEntity != null && (!targetEntity.Alive || targetEntity.ShouldDespawn)) targetEntity = null;
