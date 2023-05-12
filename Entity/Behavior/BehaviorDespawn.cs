@@ -38,7 +38,7 @@ namespace Vintagestory.GameContent
             belowLightLevel = belowLight.Exists ? belowLight.AsFloat() : -1f;
             
             minSeconds = typeAttributes["minSeconds"].AsFloat(30);
-            minSeconds += (entity.EntityId / 5f) % (minSeconds / 20);    // add 5% randomness, to mitigate many entities in a chunk all attempting to despawn in the same tick
+            minSeconds += (float)((entity.EntityId / 5.0) % (minSeconds / 20));    // add 5% randomness, to mitigate many entities in a chunk all attempting to despawn in the same tick
 
             var obj = typeAttributes["afterDays"];
             if (obj.Exists)
@@ -51,7 +51,7 @@ namespace Vintagestory.GameContent
             }
 
             // Reduce chance of many entities running the light check at the same time
-            accumOffset += (entity.EntityId / 1000f) % 1;
+            accumOffset += (float)((entity.EntityId / 1000.0) % 1);
             float dummy = DeathTime;   // set up the local value of deathTime
         }
 
