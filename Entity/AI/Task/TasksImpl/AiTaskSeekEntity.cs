@@ -103,8 +103,8 @@ namespace Vintagestory.GameContent
 
             if (belowTempThreshold > -99)
             {
-                ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
-                lowTempMode = conds != null && conds.Temperature <= belowTempThreshold;
+                float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
+                lowTempMode = temperature <= belowTempThreshold;
             }
 
             float range = NowSeekRange;
@@ -457,7 +457,7 @@ namespace Vintagestory.GameContent
         {
             base.OnEntityHurt(source, damage);
 
-            if (targetEntity == source.SourceEntity || !active)
+            if (targetEntity == source.GetCauseEntity() || !active)
             {
                 lastHurtByTargetTotalMs = entity.World.ElapsedMilliseconds;
                 float dist = targetEntity == null ? 0 : (float)targetEntity.ServerPos.DistanceTo(entity.ServerPos);

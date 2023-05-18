@@ -435,15 +435,15 @@ namespace Vintagestory.GameContent
 
             bool harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
 
-            ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
-            if (conds == null || conds.Temperature >= 2 || !harshWinters)
+            float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
+            if (temperature >= 2 || !harshWinters)
             {
                 entity.Stats.Remove("hungerrate", "resistcold");
             }
             else
             {
                 // 0..1
-                float diff = GameMath.Clamp(2 - conds.Temperature, 0, 10);
+                float diff = GameMath.Clamp(2 - temperature, 0, 10);
 
                 Room room = entity.World.Api.ModLoader.GetModSystem<RoomRegistry>().GetRoomForPosition(entity.Pos.AsBlockPos);
 

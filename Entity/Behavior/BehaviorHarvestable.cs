@@ -18,6 +18,7 @@ namespace Vintagestory.GameContent
 
     public class EntityBehaviorHarvestable : EntityBehavior
     {
+        const float minimumWeight = 0.5f;
         protected BlockDropItemStack[] jsonDrops;
 
         protected InventoryGeneric inv;
@@ -112,6 +113,15 @@ namespace Vintagestory.GameContent
             harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
         }
 
+        public override void AfterInitialized(bool onSpawn)
+        {
+            if (onSpawn)
+            {
+                LastWeightUpdateTotalHours = Math.Max(1, entity.World.Calendar.TotalHours - 24 * 7);   // Let it do 1 week's worth of fast-forwarding to reflect recent weather conditions
+                AnimalWeight = (entity is EntityHumanoid) ? minimumWeight : 0.66f + 0.2f * (float)entity.World.Rand.NextDouble();
+            }
+        }
+
         bool harshWinters;
         float accum = 0;
 
@@ -146,35 +156,52 @@ namespace Vintagestory.GameContent
                     float weight = AnimalWeight;
 
                     float step = 3;
-
-                    ClimateCondition baseClimate = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.WorldGenValues);
-                    if (baseClimate == null)
-                    {
-                        base.OnGameTick(deltaTime);
-                        return;
-                    }
-                    float baseTemperature = baseClimate.Temperature;
+                    float baseTemperature = 0f;
+                    ClimateCondition conds = null;
 
                     do
                     {
-                        baseClimate.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
-                        ClimateCondition conds = entity.World.BlockAccessor.GetClimateAt(pos, baseClimate, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hoursPerDay);
-
                         // no need to simulate every single hour
                         startHours += step;
 
                         double mealHourDiff = startHours - lastEatenTotalHours;
-
+                        if (mealHourDiff < 0) mealHourDiff = fourmonthsHours;  // Can't count meals eaten in the future  (that's possible in the fast-forwarding simulation)
                         bool ateSomeTimeAgo = mealHourDiff < fourmonthsHours;
-                        bool ateRecently = mealHourDiff < oneweekHours;
 
-                        if (conds.Temperature <= 0 && !ateSomeTimeAgo)
+                        if (!ateSomeTimeAgo)
                         {
-                            // Loose 0.1% of weight each hour = 2.4% per day
-                            weight = Math.Max(0.5f, weight - step * 0.001f);
+                            if (weight <= minimumWeight)   // No point doing the costly processing if the weight is already at the minimum
+                            {
+                                startHours = totalHours;
+                                break;
+                            }
+
+                            if (conds == null)
+                            {
+                                conds = entity.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hoursPerDay);
+
+                                if (conds == null)
+                                {
+                                    base.OnGameTick(deltaTime);
+                                    return;
+                                }
+                                baseTemperature = conds.WorldGenTemperature;
+                            }
+                            else
+                            {
+                                conds.Temperature = baseTemperature;  // Keep resetting the field we are interested in, because it can be modified by the OnGetClimate event
+                                entity.World.BlockAccessor.GetClimateAt(pos, conds, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, startHours / hoursPerDay);
+                            }
+
+                            if (conds.Temperature <= 0)
+                            {
+                                // Loose 0.1% of weight each hour = 2.4% per day
+                                weight = Math.Max(minimumWeight, weight - step * 0.001f);
+                            }
                         }
                         else
                         {
+                            bool ateRecently = mealHourDiff < oneweekHours;
                             weight = Math.Min(1f, weight + step * (0.001f + (ateRecently ? 0.05f : 0)));
                         }
                     } while (startHours < totalHours - 1);

@@ -53,6 +53,7 @@ namespace Vintagestory.GameContent
         long lastPOISearchTotalMs;
 
         public string[] entityDiet;
+        EntityBehaviorMultiplyBase bhMultiply;
 
         ICoreAPI api;
 
@@ -117,6 +118,11 @@ namespace Vintagestory.GameContent
             entityDiet = entity.Properties.Attributes?["blockDiet"]?.AsArray<string>();
         }
 
+        public override void AfterInitialize()
+        {
+            bhMultiply = entity.GetBehavior<EntityBehaviorMultiplyBase>();
+        }
+
         public override bool ShouldExecute()
         {
             if (entity.World.Rand.NextDouble() < 0.005) return false;
@@ -127,8 +133,7 @@ namespace Vintagestory.GameContent
             if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
             if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
 
-            EntityBehaviorMultiplyBase bh = entity.GetBehavior<EntityBehaviorMultiplyBase>();
-            if (bh != null && !bh.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
+            if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
 
             targetPoi = null;
             extraTargetDist = 0;
@@ -246,8 +251,7 @@ namespace Vintagestory.GameContent
                     entity.AnimManager.StopAnimation(animMeta.Code);
                 }
 
-                EntityBehaviorMultiplyBase bh = entity.GetBehavior<EntityBehaviorMultiplyBase>();
-                if (bh != null && !bh.ShouldEat)
+                if (bhMultiply != null && !bhMultiply.ShouldEat)
                 {
                     return false;
                 }
@@ -301,7 +305,7 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500, 1))
+                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, minDist - 0.15f, OnGoalReached, OnStuck, false, 500, 1))
                     {
                         return false;
                     }

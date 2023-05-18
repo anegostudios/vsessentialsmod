@@ -300,7 +300,7 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityHurt(DamageSource source, float damage)
         {
-            attackedByEntity = source.SourceEntity;
+            attackedByEntity = source.GetCauseEntity();
             attackedByEntityMs = entity.World.ElapsedMilliseconds;
             base.OnEntityHurt(source, damage);
         }

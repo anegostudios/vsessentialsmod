@@ -92,7 +92,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void AfterInitialize()
+        public override void AfterInitialized(bool onSpawn)
         {
             TaskManager.AfterInitialize();
         }

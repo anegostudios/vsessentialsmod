@@ -13,6 +13,8 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorControlledPhysics : EntityBehavior, IRenderer, IServerPhysicsTicker
     {
+        const double collisionboxReductionForInsideBlocksCheck = 0.009;
+
         protected float accumulator = 0;
         protected Vec3d outposition = new Vec3d(); // Temporary field
         protected CachingCollisionTester collisionTester = new CachingCollisionTester();
@@ -48,7 +50,8 @@ namespace Vintagestory.GameContent
         protected float kbAccum;
         Vec3d knockbackDir;
 
-        protected List<Cuboidd> traversed = new List<Cuboidd>(4);
+        protected List<FastVec3i> traversed = new List<FastVec3i>(4);
+        private IComparer<FastVec3i> fastVec3iComparer = new FastVec3iComparer();
 
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
@@ -58,9 +61,14 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorControlledPhysics(Entity entity) : base(entity)
         {
+            this.PreLocomotors(entity);
             this.MakeLocomotors();
 
             isMountable = entity is IMountable || entity is IMountableSupplier;
+        }
+
+        protected virtual void PreLocomotors(Entity entity)
+        {
         }
 
         protected virtual void MakeLocomotors()
@@ -584,33 +592,42 @@ namespace Vintagestory.GameContent
 #if PERFTEST
             profiler.Mark("apply-collisionandflags");
 #endif
-            traversed.Add(collisionTester.entityBox.Clone());
+            var testedEntityBox = collisionTester.entityBox;
+            int xMax = (int)(testedEntityBox.X2 - collisionboxReductionForInsideBlocksCheck);
+            int yMax = (int)(testedEntityBox.Y2 - collisionboxReductionForInsideBlocksCheck);
+            int zMax = (int)(testedEntityBox.Z2 - collisionboxReductionForInsideBlocksCheck);
+            int xMin = (int)(testedEntityBox.X1 + collisionboxReductionForInsideBlocksCheck);
+            int zMin = (int)(testedEntityBox.Z1 + collisionboxReductionForInsideBlocksCheck);
+            for (int y = (int)(testedEntityBox.Y1 + collisionboxReductionForInsideBlocksCheck); y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    for (int z = zMin; z <= zMax; z++)
+                    {
+                        var posTraversed = new FastVec3i(x, y, z);
+                        int index = traversed.BinarySearch(posTraversed, fastVec3iComparer);
+                        if (index < 0) index = ~index;
+                        traversed.Insert(index, posTraversed);
+                    }
+                }
+            }
         }
 
         public void AfterPhysicsTick()
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
-            foreach (Cuboidd box in traversed) TriggerInsideBlock(box, blockAccess);
-            profiler.Mark("trigger-insideblock");
-        }
-
-        public void TriggerInsideBlock(Cuboidd testedEntityBox, IBlockAccessor blockAccess)
-        {
-            int xMax = (int)testedEntityBox.X2;
-            int yMax = (int)testedEntityBox.Y2;
-            int zMax = (int)testedEntityBox.Z2;
-            int zMin = (int)testedEntityBox.Z1;
-            for (int y = (int)testedEntityBox.Y1; y <= yMax; y++)
+            tmpPos.Set(-1, -1, -1);
+            Block block = null;
+            foreach (FastVec3i pos in traversed)
             {
-                for (int x = (int)testedEntityBox.X1; x <= xMax; x++)
+                if (!pos.Equals(tmpPos))
                 {
-                    for (int z = zMin; z <= zMax; z++)
-                    {
-                        Block block = blockAccess.GetBlock(x, y, z);
-                        if (block.Id > 0) block.OnEntityInside(entity.World, entity, tmpPos.Set(x, y, z));
-                    }
+                    tmpPos.Set(pos);
+                    block = blockAccess.GetBlock(tmpPos);
                 }
+                if (block.Id > 0) block.OnEntityInside(entity.World, entity, tmpPos);
             }
+            profiler.Mark("trigger-insideblock");
         }
 
         private void HandleSneaking(EntityPos pos, EntityControls controls, float dt)

@@ -65,7 +65,7 @@ namespace Vintagestory.GameContent
 
             // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
             // Has to be checked every tick because the drifter attributes change during temporal storms  (grrr, this is a slow way to do it)
-            if (!entity.Attributes.GetBool("ignoreDaylightFlee", false))
+            if (minDayLight > 0 && !entity.Attributes.GetBool("ignoreDaylightFlee", false))
             {
                 if (ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) return false;
 

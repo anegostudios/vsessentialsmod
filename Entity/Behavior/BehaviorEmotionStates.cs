@@ -95,10 +95,11 @@ namespace Vintagestory.GameContent
             var beh = entity.GetBehavior<EntityBehaviorHealth>();
             healthRel = beh == null ? 1 : beh.Health / beh.MaxHealth;
 
-            long sourceEntityId = damageSource.SourceEntity?.EntityId ?? 0;
+            var damagedBy = damageSource.GetCauseEntity();
+            long sourceEntityId = damagedBy?.EntityId ?? 0;
 
 
-            if (TryTriggerState("alarmherdondamage", sourceEntityId) && damageSource.SourceEntity != null && (entity as EntityAgent).HerdId > 0)
+            if (TryTriggerState("alarmherdondamage", sourceEntityId) && damagedBy != null && (entity as EntityAgent).HerdId > 0)
             {
                 EmotionState state = availableStates.First((s) => s.Code == "alarmherdondamage");
                 entity.World.GetNearestEntity(entity.ServerPos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
@@ -196,7 +197,7 @@ namespace Vintagestory.GameContent
                 }
 
                 float duration = newstate.Duration;
-                if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues).Temperature < newstate.BelowTempDuration)
+                if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature < newstate.BelowTempThreshold)
                 {
                     duration = newstate.BelowTempDuration;
                 }

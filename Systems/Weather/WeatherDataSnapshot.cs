@@ -32,28 +32,13 @@ namespace Vintagestory.GameContent
             float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.Rainfall, 4), 0, 1);
             float fogMultiplier = drynessMultiplier;
 
-
-            Ambient.FlatFogDensity.Value = (right.State.nowMistDensity * w + left.State.nowMistDensity * (1 - w)) / 250f;
-            Ambient.FlatFogDensity.Weight = 1;
-            Ambient.FlatFogDensity.Weight *= fogMultiplier;
-
-            Ambient.FlatFogYPos.Value = right.State.nowMistYPos * w + left.State.nowMistYPos * (1 - w);
-            Ambient.FlatFogYPos.Weight = 1;
-
-            Ambient.FogDensity.Value = (addFogDensity + right.State.nowFogDensity * w + left.State.nowFogDensity * (1 - w)) / 1000f;
-            Ambient.FogDensity.Weight = fogMultiplier;
-
-            Ambient.CloudBrightness.Value = right.State.nowCloudBrightness * w + left.State.nowCloudBrightness * (1 - w);
-            Ambient.CloudBrightness.Weight = 1;
-
-            Ambient.CloudDensity.Value = right.State.nowbaseThickness * w + left.State.nowbaseThickness * (1 - w);
-            Ambient.CloudDensity.Weight = 1;
-
-            Ambient.SceneBrightness.Value = right.State.nowSceneBrightness * w + left.State.nowSceneBrightness * (1 - w);
-            Ambient.SceneBrightness.Weight = 1f;
-
-            Ambient.FogBrightness.Value = right.State.nowFogBrightness * w + left.State.nowFogBrightness * (1 - w);
-            Ambient.FogBrightness.Weight = 1f;
+            Ambient.FlatFogDensity.Set((right.State.nowMistDensity * w + left.State.nowMistDensity * (1 - w)) / 250f, fogMultiplier);
+            Ambient.FlatFogYPos.Set(right.State.nowMistYPos * w + left.State.nowMistYPos * (1 - w));
+            Ambient.FogDensity.Set((addFogDensity + right.State.nowFogDensity * w + left.State.nowFogDensity * (1 - w)) / 1000f, fogMultiplier);
+            Ambient.CloudBrightness.Set(right.State.nowCloudBrightness * w + left.State.nowCloudBrightness * (1 - w));
+            Ambient.CloudDensity.Set(right.State.nowbaseThickness * w + left.State.nowbaseThickness * (1 - w));
+            Ambient.SceneBrightness.Set(right.State.nowSceneBrightness * w + left.State.nowSceneBrightness * (1 - w));
+            Ambient.FogBrightness.Set(right.State.nowFogBrightness * w + left.State.nowFogBrightness * (1 - w));
         }
 
         public void SetAmbient(WeatherPattern left, float addFogDensity = 0)
@@ -63,31 +48,17 @@ namespace Vintagestory.GameContent
             float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.Rainfall, 4), 0, 1);
             float fogMultiplier = drynessMultiplier;
 
-
-            Ambient.FlatFogDensity.Value = left.State.nowMistDensity / 250f;
-            Ambient.FlatFogDensity.Weight = 1;
-            Ambient.FlatFogDensity.Weight *= fogMultiplier;
-
-            Ambient.FlatFogYPos.Value = left.State.nowMistYPos;
-            Ambient.FlatFogYPos.Weight = 1;
-
-            Ambient.FogDensity.Value = (addFogDensity + left.State.nowFogDensity) / 1000f;
-            Ambient.FogDensity.Weight = fogMultiplier;
-
-            Ambient.CloudBrightness.Value = left.State.nowCloudBrightness;
-            Ambient.CloudBrightness.Weight = 1;
+            Ambient.FlatFogDensity.Set(left.State.nowMistDensity / 250f, fogMultiplier);
+            Ambient.FlatFogYPos.Set(left.State.nowMistYPos);
+            Ambient.FogDensity.Set((addFogDensity + left.State.nowFogDensity) / 1000f, fogMultiplier);
+            Ambient.CloudBrightness.Set(left.State.nowCloudBrightness);
 
             //PrecParticleSize = left.State.nowPrecParticleSize;
             //PrecIntensity = drynessMultiplier * left.State.nowPrecIntensity;
 
-            Ambient.CloudDensity.Value = left.State.nowbaseThickness;
-            Ambient.CloudDensity.Weight = 1;
-
-            Ambient.SceneBrightness.Value = left.State.nowSceneBrightness;
-            Ambient.SceneBrightness.Weight = 1f;
-
-            Ambient.FogBrightness.Value = left.State.nowFogBrightness;
-            Ambient.FogBrightness.Weight = 1f;
+            Ambient.CloudDensity.Set(left.State.nowbaseThickness);
+            Ambient.SceneBrightness.Set(left.State.nowSceneBrightness);
+            Ambient.FogBrightness.Set(left.State.nowFogBrightness);
         }
 
         public void SetLerped(WeatherDataSnapshot left, WeatherDataSnapshot right, float w)

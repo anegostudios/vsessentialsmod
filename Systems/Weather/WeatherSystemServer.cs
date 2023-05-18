@@ -184,7 +184,9 @@ namespace Vintagestory.GameContent
         public void SendWeatherStateUpdate(WeatherState state)
         {
             int regionSize = sapi.WorldManager.RegionSize;
+            byte[] data = SerializerUtil.Serialize(state);
 
+            List<IServerPlayer> playersToSend = new List<IServerPlayer>(sapi.World.AllOnlinePlayers.Length);
             foreach (var plr in sapi.World.AllOnlinePlayers)
             {
                 int plrRegionX = (int)plr.Entity.ServerPos.X / regionSize;
@@ -192,15 +194,16 @@ namespace Vintagestory.GameContent
 
                 if (Math.Abs(state.RegionX - plrRegionX) <= 1 && Math.Abs(state.RegionZ - plrRegionZ) <= 1)
                 {
-                    serverChannel.SendPacket(state, plr as IServerPlayer);
+                    playersToSend.Add(plr as IServerPlayer);
                 }
             }
+            if (playersToSend.Count > 0) serverChannel.SendPacket(state, data, playersToSend.ToArray());
 
             // Instanty store the change, so that players that connect shortly after also get the update
             IMapRegion mapregion = sapi.WorldManager.GetMapRegion(state.RegionX, state.RegionZ);
             if (mapregion != null)
             {
-                mapregion.SetModdata("weatherState", SerializerUtil.Serialize(state));
+                mapregion.SetModdata("weatherState", data);
             }
         }
 
@@ -208,14 +211,18 @@ namespace Vintagestory.GameContent
 
         private void OnServerGameTick(float dt)
         {
+            sapi.World.FrameProfiler.Enter("weathersimulation");
             foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
             {
                 WeatherSimulationRegion weatherSim = getOrCreateWeatherSimForRegion(val.Key, val.Value);
                 weatherSim.TickEvery25ms(dt);
+                sapi.World.FrameProfiler.Mark("finishedtick");
                 weatherSim.UpdateWeatherData();
+                sapi.World.FrameProfiler.Mark("updatedata");
             }
 
             rainOverlaySnap.SetAmbient(rainOverlayPattern, 0);
+            sapi.World.FrameProfiler.Leave();
         }
 
 

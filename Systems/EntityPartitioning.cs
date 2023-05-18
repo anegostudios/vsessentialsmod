@@ -21,14 +21,14 @@ namespace Vintagestory.GameContent
         public EntityPartitionChunk()
         {
             Entities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
+        }
 
-            for (int x = 0; x < EntityPartitioning.partitionsLength; x++)
-            {
-                for (int z = 0; z < EntityPartitioning.partitionsLength; z++)
-                {
-                    Entities[z * EntityPartitioning.partitionsLength + x] = new List<Entity>();
-                }
-            }
+        public List<Entity> Add(Entity e, int gridIndex)
+        {
+            var list = Entities[gridIndex];
+            if (list == null) Entities[gridIndex] = list = new List<Entity>(4);
+            list.Add(e);
+            return list;
         }
     }
 
@@ -46,7 +46,7 @@ namespace Vintagestory.GameContent
 
     public class EntityPartitioning : ModSystem, IEntityPartitioning
     {
-        public static int partitionsLength = 8;
+        public const int partitionsLength = 8;
         int gridSizeInBlocks;
 
         ICoreAPI api;
@@ -114,17 +114,18 @@ namespace Vintagestory.GameContent
         {
             chunkMapSizeX = api.World.BlockAccessor.MapSizeX / chunkSize;
             chunkMapSizeZ = api.World.BlockAccessor.MapSizeZ / chunkSize;
-            LargestTouchDistance = 0;
+            double largestTouchDistance = 0;
 
             Partitions.Clear();
 
             foreach (var val in entities)
             {
                 if (!val.IsInteractable) continue;
-                LargestTouchDistance = Math.Max(LargestTouchDistance, val.SelectionBox.XSize / 2);
+                largestTouchDistance = Math.Max(largestTouchDistance, val.SelectionBox.XSize / 2);
 
                 PartitionEntity(val);
             }
+            this.LargestTouchDistance = largestTouchDistance;   // Only write to the field when we finished the operation, there could be 10k entities
         }
 
 
@@ -135,7 +136,8 @@ namespace Vintagestory.GameContent
             int lgx = ((int)pos.X / gridSizeInBlocks) % partitionsLength;
             int lgz = ((int)pos.Z / gridSizeInBlocks) % partitionsLength;
             int gridIndex = lgz * partitionsLength + lgx;
-            
+            if (gridIndex < 0) return;    // entities could be outside the map edge
+
             long nowInChunkIndex3d = MapUtil.Index3dL((int)pos.X / chunkSize, (int)pos.Y / chunkSize, (int)pos.Z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
 
             EntityPartitionChunk partition;
@@ -144,10 +146,7 @@ namespace Vintagestory.GameContent
                 Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
             }
 
-            if (gridIndex < 0) return;
-
-            var list = partition.Entities[gridIndex];
-            list.Add(entity);
+            var list = partition.Add(entity, gridIndex);
             if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
         }
 
@@ -295,41 +294,36 @@ namespace Vintagestory.GameContent
 
             double radiusSq = radius * radius;
 
-            long indexBefore = -1;
-            IWorldChunk chunk = null;
             EntityPartitionChunk partitionChunk = null;
+            long index3d;
+            long lastIndex3d = -1;
 
-            for (int gridX = mingx; gridX <= maxgx; gridX++)
+            for (int cy = mincy; cy <= maxcy; cy++)
             {
-                int cx = gridX * gridSizeInBlocks / chunkSize;
-                int lgx = gridX % partitionsLength;
-
-                for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
+                for (int gridX = mingx; gridX <= maxgx; gridX++)
                 {
-                    int cz = gridZ * gridSizeInBlocks / chunkSize;
-                    int lgz = gridZ % partitionsLength;
-                    lgz = lgz * partitionsLength + lgx;
+                    int cx = gridX * gridSizeInBlocks / chunkSize;
+                    int lgx = gridX % partitionsLength;
 
-                    for (int cy = mincy; cy <= maxcy; cy++)
+                    for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                     {
-                        long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
+                        int cz = gridZ * gridSizeInBlocks / chunkSize;
 
-                        if (index3d != indexBefore)
+                        index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
+                        if (index3d != lastIndex3d)
                         {
-                            indexBefore = index3d;
-                            chunk = api.World.BlockAccessor.GetChunk(cx, cy, cz);
-                            if (chunk == null || chunk.Entities == null) continue;
+                            lastIndex3d = index3d;
                             Partitions.TryGetValue(index3d, out partitionChunk);
                         }
-                        else if (chunk == null || chunk.Entities == null) continue;
-
                         if (partitionChunk == null) continue;
 
-                        List<Entity> entities = partitionChunk.Entities[lgz];
+                        int lgz = gridZ % partitionsLength;
+                        List<Entity> entities = partitionChunk.Entities[lgz * partitionsLength + lgx];
+                        if (entities == null) continue;
 
-                        for (int i = 0; i < entities.Count; i++)
+                        foreach (Entity entity in entities)
                         {
-                            if (onRangeTest(entities[i], centerPos, radiusSq) && !callback(entities[i]))
+                            if (onRangeTest(entity, centerPos, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
                             {
                                 return;
                             }

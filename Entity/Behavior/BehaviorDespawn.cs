@@ -36,9 +36,13 @@ namespace Vintagestory.GameContent
 
             JsonObject belowLight = typeAttributes["belowLightLevel"];
             belowLightLevel = belowLight.Exists ? belowLight.AsFloat() : -1f;
-            
-            minSeconds = typeAttributes["minSeconds"].AsFloat(30);
-            minSeconds += (float)((entity.EntityId / 5.0) % (minSeconds / 20));    // add 5% randomness, to mitigate many entities in a chunk all attempting to despawn in the same tick
+
+            int minSecondsOverride = entity.Attributes.GetInt("minsecondsToDespawn");
+            if (minSecondsOverride > 0) minSeconds = minSecondsOverride;
+            else {
+                minSeconds = typeAttributes["minSeconds"].AsFloat(30);
+                minSeconds += (float)((entity.EntityId / 5.0) % (minSeconds / 20));    // add 5% randomness, to mitigate many entities in a chunk all attempting to despawn in the same tick
+            }
 
             var obj = typeAttributes["afterDays"];
             if (obj.Exists)
@@ -62,11 +66,10 @@ namespace Vintagestory.GameContent
 
             if ((accumSeconds += deltaTime) > accumOffset)
             {
-                accumSeconds = 0;
-
                 bool playerInRange = PlayerInRange();
                 if (playerInRange || LightLevelOk())
                 {
+                    accumSeconds = 0;
                     DeathTime = 0;   // costly operation, cost of repeated operations mitigated through comparison with the local copy deathTimeLocal
                     return;
                 }
@@ -76,15 +79,19 @@ namespace Vintagestory.GameContent
                     if (!playerInRange && entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
                     {
                         entity.Die(EnumDespawnReason.Expire, null);
+                        accumSeconds = 0;
                         return;
                     }
                 }
 
-                if ((DeathTime += deltaTime) > minSeconds)
+                if ((DeathTime += accumSeconds) > minSeconds)
                 {
                     entity.Die(EnumDespawnReason.Expire, null);
+                    accumSeconds = 0;
                     return;
                 }
+
+                accumSeconds = 0;
             }
         }
 

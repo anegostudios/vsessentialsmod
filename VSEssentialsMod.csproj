@@ -116,6 +116,7 @@
     <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
     <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
     <Compile Include="Entity\Behavior\BehaviorOpenableContainer.cs" />
+    <Compile Include="Entity\EntityLocomotion\PlayerEntityInLiquid.cs" />
     <Compile Include="Entity\EntityLocomotion\PlayerEntityInAir.cs" />
     <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
     <Compile Include="Entity\Pathfinding\Astar\PathNodeSet.cs" />

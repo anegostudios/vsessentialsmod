@@ -284,6 +284,7 @@ namespace Vintagestory.GameContent
                     TickEveryInGameHourServer(LastUpdateTotalHours);
                     LastUpdateTotalHours++;
                 }
+                ws.api.World.FrameProfiler.Mark("hourlyticks");
 
                 var rnd = ws.api.World.Rand;
                 float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
@@ -295,6 +296,7 @@ namespace Vintagestory.GameContent
                         Vec3d pos = regionCenterPos.ToVec3d().Add(-200 + rnd.NextDouble() * 400, ws.api.World.SeaLevel, -200 + rnd.NextDouble() * 400);
                         ws.SpawnLightningFlash(pos);
                     }
+                    ws.api.World.FrameProfiler.Mark("lightningcheck");
                 }
             }
 
@@ -314,6 +316,7 @@ namespace Vintagestory.GameContent
                 if (ws.autoChangePatterns && ws.api.Side == EnumAppSide.Server && ws.api.World.Calendar.TotalHours > NewWePattern.State.ActiveUntilTotalHours)
                 {
                     TriggerTransition();
+                    ws.api.World.FrameProfiler.Mark("weathertransition");
                 }
             }
 
@@ -338,6 +341,7 @@ namespace Vintagestory.GameContent
                 {
                     sendWeatherUpdatePacket();
                 }
+                ws.api.World.FrameProfiler.Mark("weatherchange");
             }
 
 

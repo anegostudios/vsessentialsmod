@@ -24,7 +24,7 @@ namespace Vintagestory.GameContent
         protected override void MakeLocomotors()
         {
             Locomotors.Add(new EntityOnGround());
-            Locomotors.Add(new EntityInLiquid());
+            Locomotors.Add(new PlayerEntityInLiquid(entity as EntityPlayer));
             Locomotors.Add(new PlayerEntityInAir());    // special player version of this locomotor
             Locomotors.Add(new EntityApplyGravity());
             Locomotors.Add(new EntityMotionDrag());
@@ -55,6 +55,8 @@ namespace Vintagestory.GameContent
         public override void onPhysicsTick(float deltaTime)
         {
             profiler.Enter("behavior-playerphysics");
+            traversed.Clear();
+
             accum1s += deltaTime;
             if (accum1s > 1.5f)
             {
@@ -99,6 +101,7 @@ namespace Vintagestory.GameContent
                     controls.IsFlying = false;
                 }
             }
+            AfterPhysicsTick();
             profiler.Leave();
         }
 
