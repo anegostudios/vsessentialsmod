@@ -212,6 +212,7 @@ namespace Vintagestory.GameContent
             weatherData.SetAmbientLerped(OldWePattern, NewWePattern, Weight, capi == null ? 0 : capi.Ambient.Base.FogDensity.Value);
         }
 
+        [Obsolete("We now use UpdateSnowAccumulation")]
         public void TickEveryInGameHourServer(double nowTotalHours)
         {
             SnowAccumSnapshot latestSnap = new SnowAccumSnapshot() {
@@ -266,7 +267,80 @@ namespace Vintagestory.GameContent
             latestSnap.Checks++;
         }
 
-        
+
+        public void UpdateSnowAccumulation(int count)
+        {
+            SnowAccumSnapshot[] snaps = new SnowAccumSnapshot[count];
+            for (int i = 0; i < count; i++)
+            {
+                snaps[i] = new SnowAccumSnapshot()
+                {
+                    TotalHours = LastUpdateTotalHours + i,
+                    SnowAccumulationByRegionCorner = new FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
+                };
+            }
+
+            // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations
+            // lets try with just the 8 corner points of the region cuboid and lerp
+            BlockPos tmpPos = new BlockPos();
+            int regsize = ws.api.World.BlockAccessor.RegionSize;
+
+            for (int ix = 0; ix < snowAccumResolution; ix++)
+            {
+                for (int iy = 0; iy < snowAccumResolution; iy++)
+                {
+                    for (int iz = 0; iz < snowAccumResolution; iz++)
+                    {
+                        int y = iy == 0 ? ws.api.World.SeaLevel : ws.api.World.BlockAccessor.MapSizeY - 1;
+
+                        tmpPos.Set(
+                            regionX * regsize + ix * (regsize - 1),
+                            y,
+                            regionZ * regsize + iz * (regsize - 1)
+                        );
+
+                        ClimateCondition nowcond = null;
+                        for (int i = 0; i < snaps.Length; i++)
+                        {
+                            double nowTotalDays = (LastUpdateTotalHours + i + 0.5) / ws.api.World.Calendar.HoursPerDay;
+                            if (nowcond == null)
+                            {
+                                nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.ForSuppliedDate_TemperatureRainfallOnly, nowTotalDays);
+                                if (nowcond == null) return;
+                            }
+                            else
+                            {
+                                // Use more efficient climate updater
+                                ws.api.World.BlockAccessor.GetClimateAt(tmpPos, nowcond, EnumGetClimateMode.ForSuppliedDate_TemperatureRainfallOnly, nowTotalDays);
+                            }
+
+                            var latestSnap = snaps[i];
+                            if (nowcond.Temperature > 1.5f || (nowcond.Rainfall < 0.05 && nowcond.Temperature > 0))
+                            {
+                                latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, -nowcond.Temperature / 15f);
+                            }
+                            else
+                            {
+                                latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 3f);
+                            }
+                        }
+
+                    }
+                }
+            }
+
+            lock (snowAccumSnapshotLock)
+            {
+                for (int i = 0; i < snaps.Length; i++)
+                {
+                    var latestSnap = snaps[i];
+                    SnowAccumSnapshots.Add(latestSnap);
+                    latestSnap.Checks++;
+                }
+            }
+
+            LastUpdateTotalHours += count;
+        }
 
 
 
@@ -277,14 +351,9 @@ namespace Vintagestory.GameContent
                 clientUpdate(dt);
             } else
             {
-                double nowTotalHours = ws.api.World.Calendar.TotalHours;
-                int i = 0;
-                while (nowTotalHours - LastUpdateTotalHours > 1 && i++ < 1000)
-                {
-                    TickEveryInGameHourServer(LastUpdateTotalHours);
-                    LastUpdateTotalHours++;
-                }
-                ws.api.World.FrameProfiler.Mark("hourlyticks");
+                int hourCount = (int)(ws.api.World.Calendar.TotalHours - LastUpdateTotalHours);
+                if (hourCount > 0) UpdateSnowAccumulation(Math.Min(hourCount, 480));
+                ws.api.World.FrameProfiler.Mark("snowaccum");
 
                 var rnd = ws.api.World.Rand;
                 float targetLightninMinTemp = CurWeatherEvent.State.LightningMinTemp;
@@ -704,8 +773,8 @@ namespace Vintagestory.GameContent
                 Rand.mapGenSeed = state.LcgMapGenSeed;
 
                 double nowTotalHours = ws.api.World.Calendar.TotalHours;
-                // Cap that at max 1 year or we simulate forever on startup
-                LastUpdateTotalHours = Math.Max(LastUpdateTotalHours, nowTotalHours - 12 * 12 * 24);
+                // Cap that at max 1 year or we simulate forever on startup, add one hour's worth of randomness so that future updates are not all synced
+                LastUpdateTotalHours = Math.Max(LastUpdateTotalHours, nowTotalHours - ws.api.World.Calendar.DaysPerYear * 24 + ws.api.World.Rand.NextDouble());
 
                 int capacity = (int)(ws.api.World.Calendar.DaysPerYear * ws.api.World.Calendar.HoursPerDay) + 1;
                 SnowAccumSnapshots = new RingArray<SnowAccumSnapshot>(capacity, state.SnowAccumSnapshots);
