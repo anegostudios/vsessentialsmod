@@ -84,7 +84,11 @@ namespace Vintagestory.GameContent
 
             foreach (string code in targetEntityCodesBeginsWith)
             {
-                if (code.Length == 0) continue;
+                if (code.Length == 0)
+                {
+                    targetEntityFirstLetters = "";   // code.Length zero indicates universal wildcard "*", therefore IsTargetableEntity should match everything - used by BeeMob for example
+                    break;
+                }
                 char c = code[0];
                 if (targetEntityFirstLetters.IndexOf(c) < 0) targetEntityFirstLetters += c;
             }
@@ -111,7 +115,7 @@ namespace Vintagestory.GameContent
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
             if (!e.Alive) return false;
-            if (ignoreEntityCode) return CanSense(e, range);
+            if (ignoreEntityCode || targetEntityFirstLetters.Length == 0) return CanSense(e, range);
 
             string testPath = e.Code.Path;
             if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter

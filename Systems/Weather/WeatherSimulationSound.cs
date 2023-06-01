@@ -182,7 +182,7 @@ namespace Vintagestory.GameContent
                     float val = (float)Math.Pow(Math.Max(0, (capi.World.BlockAccessor.GetDistanceToRainFall(plrPos, 12, 4) - 2) / 10f), 2);
                     roomVolumePitchLoss = GameMath.Clamp(val, 0, 1);
                     searchComplete = true;
-                });
+                }, "weathersimulationsound");
             }
 
             EnumPrecipitationType precType = weatherData.BlendedPrecType;

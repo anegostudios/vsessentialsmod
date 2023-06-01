@@ -142,7 +142,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             blockVariants = new List<RegistryObjectType>[blockTypes.Count];
 
-            TyronThreadPool.QueueTask(GatherAllTypes_Async);   // Now we've loaded everything, let's add one more gathering thread :)
+            TyronThreadPool.QueueTask(GatherAllTypes_Async, "gatheralltypes");   // Now we've loaded everything, let's add one more gathering thread :)
 
             api.Logger.StoryEvent(Lang.Get("It remembers..."));
             api.Logger.VerboseDebug("Gathered all types, starting to load items");
@@ -275,7 +275,7 @@ namespace Vintagestory.ServerMods.NoObf
         void PrepareForLoading(int threadsCount)
         {
             // JSON parsing is slooowww, so let's multithread the **** out of it :)
-            for (int i = 0; i < threadsCount; i++) TyronThreadPool.QueueTask(GatherAllTypes_Async);
+            for (int i = 0; i < threadsCount; i++) TyronThreadPool.QueueTask(GatherAllTypes_Async, "gatheralltypes" + i);
         }
 
 

@@ -16,6 +16,7 @@ namespace Vintagestory.GameContent
         Vec3d pushVector = new Vec3d();
         EntityPartitioning partitionUtil;
         bool movable = true;
+        bool ignorePlayers = false;
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
@@ -28,6 +29,7 @@ namespace Vintagestory.GameContent
 
             movable = attributes["movable"].AsBool(true);
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
+            ignorePlayers = entity is EntityPlayer && entity.World.Config.GetAsBool("player2PlayerCollisions", true);
         }
 
         double ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ;
@@ -59,7 +61,7 @@ namespace Vintagestory.GameContent
 
         private bool WalkEntity(Entity e)
         {
-            if (!e.hasRepulseBehavior || !e.IsInteractable || e == entity) return true;
+            if (!e.hasRepulseBehavior || !e.IsInteractable || e == entity || (ignorePlayers && e is EntityPlayer)) return true;
             
             double dx = ownPosRepulseX - e.ownPosRepulse.X;
             double dy = ownPosRepulseY - e.ownPosRepulse.Y;
