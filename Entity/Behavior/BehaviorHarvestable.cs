@@ -118,11 +118,13 @@ namespace Vintagestory.GameContent
             if (onSpawn)
             {
                 LastWeightUpdateTotalHours = Math.Max(1, entity.World.Calendar.TotalHours - 24 * 7);   // Let it do 1 week's worth of fast-forwarding to reflect recent weather conditions
-                AnimalWeight = (entity is EntityHumanoid) ? minimumWeight : 0.66f + 0.2f * (float)entity.World.Rand.NextDouble();
+                AnimalWeight = fixedWeight ? 1.0f : 0.66f + 0.2f * (float)entity.World.Rand.NextDouble();
             }
+            else if (fixedWeight) AnimalWeight = 1.0f;
         }
 
         bool harshWinters;
+        bool fixedWeight;
         float accum = 0;
 
         public override void OnGameTick(float deltaTime)
@@ -134,7 +136,7 @@ namespace Vintagestory.GameContent
             if (accum > 1.5f)
             {
                 accum = 0;
-                if (!harshWinters)
+                if (!harshWinters || fixedWeight)
                 {
                     AnimalWeight = 1;
                     return;
@@ -154,6 +156,7 @@ namespace Vintagestory.GameContent
                     double oneweekHours = 7 * hoursPerDay;
                     BlockPos pos = entity.Pos.AsBlockPos;
                     float weight = AnimalWeight;
+                    float previousweight = weight;
 
                     float step = 3;
                     float baseTemperature = 0f;
@@ -205,13 +208,13 @@ namespace Vintagestory.GameContent
                             weight = Math.Min(1f, weight + step * (0.001f + (ateRecently ? 0.05f : 0)));
                         }
                     } while (startHours < totalHours - 1);
-                    AnimalWeight = weight;
+                    if (weight != previousweight) AnimalWeight = weight;
                 }
 
                 LastWeightUpdateTotalHours = startHours;
             }
 
-            base.OnGameTick(deltaTime);
+            //base.OnGameTick(deltaTime);    // Currently commented out because (a) it does nothing; (b) we have server-side return paths which do not reach this line
         }
 
         private void Inv_SlotModified(int slotid)
@@ -263,7 +266,9 @@ namespace Vintagestory.GameContent
                 jsonDrops = typeAttributes["drops"].AsObject<BlockDropItemStack[]>();
             }
 
-            baseHarvestDuration = typeAttributes["duration"].AsFloat(5);   
+            baseHarvestDuration = typeAttributes["duration"].AsFloat(5);
+
+            fixedWeight = typeAttributes["fixedweight"].AsBool(false);
         }
 
 
@@ -446,19 +451,24 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (AnimalWeight >= 0.95f)
+            if (!fixedWeight)
             {
-                infotext.AppendLine(Lang.Get("creature-weight-good"));
-            } else if (AnimalWeight >= 0.75f)
-            {
-                infotext.AppendLine(Lang.Get("creature-weight-ok"));
-            }
-            else if (AnimalWeight >= 0.5f)
-            {
-                infotext.AppendLine(Lang.Get("creature-weight-low"));
-            } else
-            {
-                infotext.AppendLine(Lang.Get("creature-weight-starving"));
+                if (AnimalWeight >= 0.95f)
+                {
+                    infotext.AppendLine(Lang.Get("creature-weight-good"));
+                }
+                else if (AnimalWeight >= 0.75f)
+                {
+                    infotext.AppendLine(Lang.Get("creature-weight-ok"));
+                }
+                else if (AnimalWeight >= 0.5f)
+                {
+                    infotext.AppendLine(Lang.Get("creature-weight-low"));
+                }
+                else
+                {
+                    infotext.AppendLine(Lang.Get("creature-weight-starving"));
+                }
             }
 
             base.GetInfoText(infotext);

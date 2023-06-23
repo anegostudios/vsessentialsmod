@@ -15,13 +15,12 @@ using Vintagestory.Essentials;
 
 namespace Vintagestory.Essentials
 {
-    public class PathfindingAsync : ModSystem
+    public class PathfindingAsync : ModSystem, IAsyncServerSystem
     {
         protected ICoreServerAPI api;
         // This system has its own AStar classes to avoid potential cross-thread issues with others (e.g. Essentials.PathfindSystem)
         protected AStar astar_offthread;
         protected AStar astar_mainthread;
-        protected Thread pathfindThread;
         protected bool isShuttingDown;
         public ConcurrentQueue<PathfinderTask> PathfinderTasks = new ConcurrentQueue<PathfinderTask>();
         protected readonly Stopwatch totalTime = new Stopwatch();
@@ -42,54 +41,50 @@ namespace Vintagestory.Essentials
             api.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
             api.Event.RegisterGameTickListener(OnMainThreadTick, 20);
 
-            pathfindThread = new Thread(new ThreadStart(SeparateThreadLoop));
-            pathfindThread.IsBackground = true;
-            pathfindThread.Start();
+            api.Server.AddServerThread("aipathfinding", this);
         }
 
 
-        protected int OffThreadInterval()
+        public int OffThreadInterval()
         {
             return 5;
         }
 
 
-        protected void SeparateThreadLoop()
-        {
-            // This is basically the same logic as a ServerThread, but without the complexity of multiple serversystems
-            totalTime.Start();
-            long elapsedMs;
+        //protected void SeparateThreadLoop()
+        //{
+        //    // This is basically the same logic as a ServerThread, but without the complexity of multiple serversystems
+        //    totalTime.Start();
+        //    long elapsedMs;
 
-            try
-            {
-                while(!isShuttingDown)
-                {
-                    elapsedMs = totalTime.ElapsedMilliseconds;
-                    if (elapsedMs - lastTickTimeMs >= OffThreadInterval())
-                    {
-                        lastTickTimeMs = elapsedMs;
-                        this.OnSeparateThreadTick();
-                    }
+        //    try
+        //    {
+        //        while(!isShuttingDown)
+        //        {
+        //            elapsedMs = totalTime.ElapsedMilliseconds;
+        //            if (elapsedMs - lastTickTimeMs >= OffThreadInterval())
+        //            {
+        //                lastTickTimeMs = elapsedMs;
+        //                this.OnSeparateThreadTick();
+        //            }
 
-                    Thread.Sleep(1);
-                }
+        //            Thread.Sleep(1);
+        //        }
 
-            }
-            catch (ThreadAbortException) { } // ignore these because we can.
-            catch (Exception e)
-            {
-                api.Logger.Fatal("Caught unhandled exception in pathfinding thread.");
-                api.Logger.Fatal(e.ToString());
-                api.Event.EnqueueMainThreadTask(() =>
-                {
-                    api.Server.ShutDown();
-                }, "pathfinding");
+        //    }
+        //    catch (ThreadAbortException) { } // ignore these because we can.
+        //    catch (Exception e)
+        //    {
+        //        api.Logger.Fatal("Caught unhandled exception in pathfinding thread.");
+        //        api.Logger.Fatal(e.ToString());
+        //        api.Event.EnqueueMainThreadTask(() =>
+        //        {
+        //            api.Server.ShutDown();
+        //        }, "pathfinding");
 
-            }
+        //    }
 
-            astar_offthread.Dispose();
-            astar_offthread = null;
-        }
+        //}
 
 
         protected void OnMainThreadTick(float dt)
@@ -106,7 +101,7 @@ namespace Vintagestory.Essentials
             if (initialCount > 0) api.World.FrameProfiler.Mark("ai-pathfinding-overflow " + initialCount + " " + PathfinderTasks.Count);
         }
 
-        protected void OnSeparateThreadTick()
+        public void OnSeparateThreadTick()
         {
             ProcessQueue(astar_offthread, 100);
         }
@@ -149,6 +144,12 @@ namespace Vintagestory.Essentials
         {
             astar_mainthread?.Dispose();   // astar_mainthread will be null clientside, as this ModSystem is only started on servers
             astar_mainthread = null;
+        }
+
+        public void ThreadDispose()
+        {
+            astar_offthread.Dispose();
+            astar_offthread = null;
         }
     }
 }

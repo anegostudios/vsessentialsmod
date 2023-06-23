@@ -115,7 +115,8 @@ namespace Vintagestory.GameContent
                     capi.Gui.Icons.CustomIcons["wp" + name.UcFirst()] = (ctx, x, y, w, h, rgba) =>
                     {
                         var col = ColorUtil.ColorFromRgba(rgba);
-                        capi.Gui.DrawSvg(icon, ctx.GetTarget() as ImageSurface, x, y, (int)w, (int)h, col);
+
+                        capi.Gui.DrawSvg(icon, ctx.GetTarget() as ImageSurface, ctx.Matrix, x, y, (int)w, (int)h, col);
                     };
                 }
             }

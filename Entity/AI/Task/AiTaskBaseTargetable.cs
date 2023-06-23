@@ -134,7 +134,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public bool CanSense(Entity e, double range)
+        public virtual bool CanSense(Entity e, double range)
         {
             if (e.EntityId == entity.EntityId) return false;
             if (e is EntityPlayer eplr)

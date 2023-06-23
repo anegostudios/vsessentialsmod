@@ -64,8 +64,7 @@ namespace Vintagestory.GameContent
             sapi.Event.ServerSuspend += Event_ServerSuspend;
             sapi.Event.ServerResume += Event_ServerResume;
 
-            snowLayerScannerThread = new Thread(new ThreadStart(onThreadStart));
-            snowLayerScannerThread.IsBackground = true;
+            snowLayerScannerThread = TyronThreadPool.CreateDedicatedThread(new ThreadStart(onThreadStart), "snowlayerScanner");
         }
 
         private void Event_ServerResume()
@@ -252,6 +251,8 @@ namespace Vintagestory.GameContent
 
         private void onThreadStart()
         {
+            FrameProfilerUtil FrameProfiler = new FrameProfilerUtil("[Thread snowaccum] ");
+
             while (!isShuttingDown)
             {
                 Thread.Sleep(5);
@@ -262,6 +263,7 @@ namespace Vintagestory.GameContent
                     continue;
                 }
                 isThreadPaused = false;
+                FrameProfiler.Begin();
 
                 int i = 0;
 
@@ -283,8 +285,11 @@ namespace Vintagestory.GameContent
                     if (mc != null && sim != null)
                     {
                         UpdateSnowLayerOffThread(sim, mc, chunkCoord);
+                        FrameProfiler.Mark("update " + chunkCoord);
                     }
                 }
+
+                FrameProfiler.OffThreadEnd();
             }
         }
 

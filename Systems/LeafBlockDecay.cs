@@ -172,7 +172,7 @@ namespace Vintagestory.GameContent
 
 
 
-        class CheckDecayThread
+        class CheckDecayThread : IAsyncServerSystem
         {
             public static int leafDecayCheckTickInterval = 10;
             
@@ -193,22 +193,15 @@ namespace Vintagestory.GameContent
                 this.checkDecay = checkDecay;
                 this.performDecay = performDecay;
 
-                Thread thread = new Thread(new ThreadStart(() =>
-                {
-                    while (!sapi.Server.IsShuttingDown && !Stopping)
-                    {
-                        processCheckDecayQueue();
-                        Thread.Sleep(leafDecayCheckTickInterval);
-                    }
-                }));
-
-                thread.Name = "CheckLeafDecay";
-                thread.IsBackground = true;
-                thread.Start();
+                sapi.Server.AddServerThread("CheckLeafDecay", this);
             }
 
+            public int OffThreadInterval()
+            {
+                return leafDecayCheckTickInterval;
+            }
 
-            private void processCheckDecayQueue()
+            public void OnSeparateThreadTick()
             {
                 for (int i = 0; i < 100; i++)
                 {
@@ -231,6 +224,18 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            public void ThreadDispose()
+            {
+                lock (checkDecayLock)
+                {
+                    checkDecay.Clear();
+                }
+
+                lock (performDecayLock)
+                {
+                    performDecay.Clear();
+                }
+            }
 
 
             private bool shouldDecay(BlockPos startPos)

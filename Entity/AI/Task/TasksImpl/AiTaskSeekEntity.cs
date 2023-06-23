@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -59,6 +60,9 @@ namespace Vintagestory.GameContent
         protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < 30000;
         protected bool RemainInTacticalRetreat => entity.World.ElapsedMilliseconds - tacticalRetreatBeginTotalMs < 20000;
         protected bool RemainInOffensiveMode => entity.World.ElapsedMilliseconds - attackModeBeginTotalMs < 20000;
+
+        protected Vec3d lastGoalReachedPos;
+        protected Dictionary<long, int> futilityCounters;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
@@ -476,6 +480,18 @@ namespace Vintagestory.GameContent
         {
             if (attackPattern == EnumAttackPattern.DirectAttack || attackPattern == EnumAttackPattern.BesiegeTarget)
             {
+                if (lastGoalReachedPos != null && lastGoalReachedPos.SquareDistanceTo(entity.Pos) < 0.001)   // Basically we haven't moved since last time, so we are stuck somehow: e.g. bears chasing small creatures into a hole or crevice
+                {
+                    if (futilityCounters == null) futilityCounters = new Dictionary<long, int>();
+                    else
+                    {
+                        futilityCounters.TryGetValue(targetEntity.EntityId, out int futilityCounter);
+                        futilityCounter++;
+                        futilityCounters[targetEntity.EntityId] = futilityCounter;
+                        if (futilityCounter > 19) return;
+                    }
+                }
+                lastGoalReachedPos = new Vec3d(entity.Pos);
                 pathTraverser.Retarget();
                 return;
             } else
@@ -483,6 +499,20 @@ namespace Vintagestory.GameContent
                 //stopNow = true; - doesn't improve ai behavior
             }
 
+        }
+
+        public override bool CanSense(Entity e, double range)
+        {
+            bool result = base.CanSense(e, range);
+
+            // Do not target entities which have a positive futility value, but slowly decrease that value so that they can eventually be retargeted
+            if (result && futilityCounters != null && futilityCounters.TryGetValue(e.EntityId, out int futilityCounter) && futilityCounter > 0)
+            {
+                futilityCounter -= 2;
+                futilityCounters[e.EntityId] = futilityCounter;
+                return false;
+            }
+            return result;
         }
     }
 }
