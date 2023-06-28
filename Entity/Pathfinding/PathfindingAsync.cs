@@ -41,7 +41,7 @@ namespace Vintagestory.Essentials
             api.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => isShuttingDown = true);
             api.Event.RegisterGameTickListener(OnMainThreadTick, 20);
 
-            api.Server.AddServerThread("aipathfinding", this);
+            api.Server.AddServerThread("ai-pathfinding", this);
         }
 
 
@@ -49,42 +49,6 @@ namespace Vintagestory.Essentials
         {
             return 5;
         }
-
-
-        //protected void SeparateThreadLoop()
-        //{
-        //    // This is basically the same logic as a ServerThread, but without the complexity of multiple serversystems
-        //    totalTime.Start();
-        //    long elapsedMs;
-
-        //    try
-        //    {
-        //        while(!isShuttingDown)
-        //        {
-        //            elapsedMs = totalTime.ElapsedMilliseconds;
-        //            if (elapsedMs - lastTickTimeMs >= OffThreadInterval())
-        //            {
-        //                lastTickTimeMs = elapsedMs;
-        //                this.OnSeparateThreadTick();
-        //            }
-
-        //            Thread.Sleep(1);
-        //        }
-
-        //    }
-        //    catch (ThreadAbortException) { } // ignore these because we can.
-        //    catch (Exception e)
-        //    {
-        //        api.Logger.Fatal("Caught unhandled exception in pathfinding thread.");
-        //        api.Logger.Fatal(e.ToString());
-        //        api.Event.EnqueueMainThreadTask(() =>
-        //        {
-        //            api.Server.ShutDown();
-        //        }, "pathfinding");
-
-        //    }
-
-        //}
 
 
         protected void OnMainThreadTick(float dt)
