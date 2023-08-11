@@ -12,26 +12,28 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorBreathe : EntityBehavior
     {
-        ITreeAttribute oxygenTree => entity.WatchedAttributes.GetTreeAttribute("oxygen");
+        ITreeAttribute oxygenTree;
 
+        private float oxygenCached = -1f;
         public float Oxygen
         {
-            get { return oxygenTree.GetFloat("currentoxygen"); }
+            get { return oxygenCached = oxygenTree.GetFloat("currentoxygen"); }
             set {
-                float prevvalue = oxygenTree.GetFloat("currentoxygen");
-                oxygenTree.SetFloat("currentoxygen", value); 
-                if (value != prevvalue)
+                if (value != oxygenCached)
                 {
+                    oxygenCached = value;
+                    oxygenTree.SetFloat("currentoxygen", value);
                     entity.WatchedAttributes.MarkPathDirty("oxygen");
                 }
                 
             }
         }
 
+        private float maxOxygen;
         public float MaxOxygen
         {
-            get { return oxygenTree.GetFloat("maxoxygen"); }
-            set { oxygenTree.SetFloat("maxoxygen", value); entity.WatchedAttributes.MarkPathDirty("oxygen"); }
+            get { return maxOxygen; }
+            set { maxOxygen = value; oxygenTree.SetFloat("maxoxygen", value); entity.WatchedAttributes.MarkPathDirty("oxygen"); }
         }
 
         public bool HasAir
@@ -39,9 +41,9 @@ namespace Vintagestory.GameContent
             get { return oxygenTree.GetBool("hasair"); }
             set {
                 bool prevValue = oxygenTree.GetBool("hasair");
-                oxygenTree.SetBool("hasair", value);
                 if (prevValue != value)
                 {
+                    oxygenTree.SetBool("hasair", value);
                     entity.WatchedAttributes.MarkPathDirty("oxygen");
                 }
             }
@@ -63,9 +65,10 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(properties, typeAttributes);
 
+            oxygenTree = entity.WatchedAttributes.GetTreeAttribute("oxygen");
             if (oxygenTree == null)
             {
-                entity.WatchedAttributes.SetAttribute("oxygen", new TreeAttribute());
+                entity.WatchedAttributes.SetAttribute("oxygen", oxygenTree = new TreeAttribute());
 
                 float maxoxy = 40000;
                 if (entity is EntityPlayer) maxoxy = entity.World.Config.GetAsInt("lungCapacity", 40000);
@@ -74,6 +77,14 @@ namespace Vintagestory.GameContent
                 Oxygen = typeAttributes["currentoxygen"].AsFloat(MaxOxygen);
                 HasAir = true;
             }
+            else maxOxygen = oxygenTree.GetFloat("maxoxygen");
+
+            breathAccum = (float)entity.World.Rand.NextDouble();
+        }
+
+        protected virtual void OnTreeModified()
+        {
+            ;
         }
 
         public override void OnEntityRevive()
@@ -83,6 +94,7 @@ namespace Vintagestory.GameContent
 
         public void Check()
         {
+            maxOxygen = oxygenTree.GetFloat("maxoxygen");   // Periodically update this, it does not normally change unless a /player maxoxy command is used, but a mod could have changed this
             if (entity.World.Side == EnumAppSide.Client) return;
 
             bool nowHasAir = true;
@@ -108,27 +120,30 @@ namespace Vintagestory.GameContent
             );
 
             Block block = entity.World.BlockAccessor.GetBlock(pos, BlockLayersAccess.FluidOrSolid);
-            Cuboidf[] collisionboxes = block.GetCollisionBoxes(entity.World.BlockAccessor, pos);
-
-            Cuboidf box = new Cuboidf();
-            if (collisionboxes != null && block.Attributes?["asphyxiating"].AsBool(true) != false)
+            if (block.Attributes?["asphyxiating"].AsBool(true) != false)
             {
-                for (int i = 0; i < collisionboxes.Length; i++)
+                Cuboidf[] collisionboxes = block.GetCollisionBoxes(entity.World.BlockAccessor, pos);
+
+                Cuboidf box = new Cuboidf();
+                if (collisionboxes != null)
                 {
-                    box.Set(collisionboxes[i]);
-                    box.OmniGrowBy(-padding);
-                    tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
-                    box.OmniGrowBy(padding);
-
-                    if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
+                    for (int i = 0; i < collisionboxes.Length; i++)
                     {
-                        Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
+                        box.Set(collisionboxes[i]);
+                        box.OmniGrowBy(-padding);
+                        tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
+                        box.OmniGrowBy(padding);
 
-                        if (tmp.Intersects(EntitySuffocationBox))
+                        if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
                         {
-                            nowHasAir = false;
-                            suffocationSourceBlock = block;
-                            break;
+                            Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
+
+                            if (tmp.Intersects(EntitySuffocationBox))
+                            {
+                                nowHasAir = false;
+                                suffocationSourceBlock = block;
+                                break;
+                            }
                         }
                     }
                 }
@@ -152,9 +167,10 @@ namespace Vintagestory.GameContent
 
             if (!HasAir)
             {
-                Oxygen = Math.Max(0, Oxygen - deltaTime * 1000);
-                
-                if (Oxygen <= 0)
+                float oxygen = Math.Max(0, Oxygen - deltaTime * 1000);
+                Oxygen = oxygen;
+
+                if (oxygen <= 0)
                 {
                     damageAccum += deltaTime;
                     if (damageAccum > 0.75)

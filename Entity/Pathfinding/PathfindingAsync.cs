@@ -61,8 +61,20 @@ namespace Vintagestory.Essentials
             // (there may be one task still in progress in the off-thread processor)
 
             int initialCount = PathfinderTasks.Count;
-            ProcessQueue(astar_mainthread, 1000);
-            if (initialCount > 0) api.World.FrameProfiler.Mark("ai-pathfinding-overflow " + initialCount + " " + PathfinderTasks.Count);
+            if (initialCount > 1)   // If it's only one, leave it for the off-thread to do later - seems sometimes there is one slow one (150ms) left, no idea why, maybe lock contention?
+            {
+                api.World.FrameProfiler.Enter("ai-pathfinding-overflow " + initialCount);
+                int maxCount = 1000;
+                PathfinderTask task;
+                while ((task = Next()) != null && maxCount-- > 0)
+                {
+                    task.waypoints = astar_mainthread.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
+                    task.Finished = true;
+                    if (isShuttingDown) break;
+                    api.World.FrameProfiler.Mark("path d:" + task.searchDepth + " r:" + (task.waypoints == null ? "fail" : task.waypoints.Count.ToString()) + " s:" + task.startBlockPos + " e:" + task.targetBlockPos + " w:" + task.collisionBox.Width);
+                }
+                api.World.FrameProfiler.Leave();
+            }
         }
 
         public void OnSeparateThreadTick()

@@ -1,267 +1,52 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{3730FF53-02AB-4CCD-80AB-6199DF67383B}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>VSEssentials</RootNamespace>
     <AssemblyName>VSEssentials</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net7.0</TargetFramework>
+    <OutputPath>..\bin\$(Configuration)</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <Configurations>Debug;Release;PerfTest</Configurations>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\Mods\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\Mods\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug + Flatworld|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>..\bin\Debug\Mods\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'PerfTest|AnyCPU'">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\Mods\</OutputPath>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='PerfTest|AnyCPU'">
     <DefineConstants>TRACE;PERFTEST</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net7.0|AnyCPU'">
+      <NoWarn>1701;1702;1591;1572;1573;0618</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net7.0|AnyCPU'">
+      <NoWarn>1701;1702;1591;1572;1573;0618</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='PerfTest|net7.0|AnyCPU'">
+      <NoWarn>1701;1702;1591;1572;1573;0618</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="AnimatedGif">
-      <HintPath>..\Lib\AnimatedGif.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\Lib\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="protobuf-net">
-      <HintPath>..\Lib\protobuf-net.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data.SQLite">
-      <HintPath>..\Lib\System.Data.SQLite.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="AnimatedGif" Version="1.0.5" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="protobuf-net" Version="2.4.7" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.118" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.7.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cairo\Cairo.csproj" />
+    <ProjectReference Include="..\VintagestoryApi\VintagestoryAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="Tavis.JsonPatch">
       <HintPath>..\Lib\Tavis.JsonPatch.dll</HintPath>
-      <Private>False</Private>
     </Reference>
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="BlockBehavior\BehaviorMultiblock.cs" />
-    <Compile Include="BlockBehavior\BehaviorDecor.cs" />
-    <Compile Include="BlockBehavior\BehaviorBEInteract.cs" />
-    <Compile Include="BlockBehavior\BehaviorRopeTieable.cs" />
-    <Compile Include="BlockEntityBehavior\BEBehaviorAnimatable.cs" />
-    <Compile Include="BlockEntity\BEGeneric.cs" />
-    <Compile Include="BlockEntity\BEParticleEmitter.cs" />
-    <Compile Include="BlockEntity\BETransient.cs" />
-    <Compile Include="Block\BlockMultiblock.cs" />
-    <Compile Include="Block\BlockForFluidsLayer.cs" />
-    <Compile Include="Core.cs" />
-    <Compile Include="Entity\AI\Goal-Action\Actions\AiActionGoto.cs" />
-    <Compile Include="Entity\AI\Goal-Action\AiActionBase.cs" />
-    <Compile Include="Entity\AI\Goal-Action\AiGoalBase.cs" />
-    <Compile Include="Entity\AI\Goal-Action\AIGoalManager.cs" />
-    <Compile Include="Entity\AI\Goal-Action\BehaviorGoalAI.cs" />
-    <Compile Include="Entity\AI\Goap\AIGoapAction.cs" />
-    <Compile Include="Entity\AI\Goap\AIGoal.cs" />
-    <Compile Include="Entity\AI\Goap\GoapCondition.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskBaseTargetable.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\Guard\AiTaskJealousMeleeAttack.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\Guard\AiTaskMeleeAttackTargetingEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekBlockAndLay.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\Guard\AiTaskJealousSeekEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\Guard\AiTaskSeekTargetingEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\Guard\AiTaskStayCloseToGuardedEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskUseInventory.cs" />
-    <Compile Include="Entity\Behavior\BehaviorDecay.cs" />
-    <Compile Include="Entity\Behavior\BehaviorFloatUpWhenStuck.cs" />
-    <Compile Include="Entity\Behavior\BehaviorHarvestable.cs" />
-    <Compile Include="Entity\Behavior\BehaviorDrunkTyping.cs" />
-    <Compile Include="Entity\Behavior\BehaviorMouthInventory.cs" />
-    <Compile Include="Entity\Behavior\BehaviorMultiplyBase.cs" />
-    <Compile Include="Entity\Behavior\BehaviorReviveOnDeath.cs" />
-    <Compile Include="Entity\Behavior\BehaviorOpenableContainer.cs" />
-    <Compile Include="Entity\EntityLocomotion\PlayerEntityInLiquid.cs" />
-    <Compile Include="Entity\EntityLocomotion\PlayerEntityInAir.cs" />
-    <Compile Include="Entity\Pathfinding\Astar\AStar.cs" />
-    <Compile Include="Entity\Pathfinding\Astar\PathNodeSet.cs" />
-    <Compile Include="Entity\Pathfinding\Astar\Pathfind.cs" />
-    <Compile Include="Entity\Pathfinding\Astar\PathNode.cs" />
-    <Compile Include="Entity\Pathfinding\PathFindDebug.cs" />
-    <Compile Include="Entity\Pathfinding\PathfindingAsync.cs" />
-    <Compile Include="Entity\Pathfinding\PathTraverserBase.cs" />
-    <Compile Include="Entity\Pathfinding\Astar\WaypointsTraverser.cs" />
-    <Compile Include="Entity\Pathfinding\StraightLineTraverser.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskBase.cs" />
-    <Compile Include="Entity\AI\Task\IAiTask.cs" />
-    <Compile Include="Gui\GuiDialogCreatureContents.cs" />
-    <Compile Include="IntermodTools.cs" />
-    <Compile Include="Inventory\ItemSlotMouth.cs" />
-    <Compile Include="JsonExport.cs" />
-    <Compile Include="EntityRenderer\EntityBlockFallingRenderer.cs" />
-    <Compile Include="EntityRenderer\EntityItemRenderer.cs" />
-    <Compile Include="EntityRenderer\EntityShapeRenderer.cs" />
-    <Compile Include="EntityRenderer\EntitySkinnableShapeRenderer.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskFleeEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskGetOutOfWater.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskGotoEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskIdle.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskLookAround.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskLookAtEntity.cs" />
-    <Compile Include="Entity\AI\Task\AiTaskManager.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskMeleeAttack.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskSeekFoodAndEat.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskStayCloseToEntity.cs" />
-    <Compile Include="Entity\AI\Task\TasksImpl\AiTaskWander.cs" />
-    <Compile Include="Entity\Behavior\BehaviorAimingAccuracy.cs" />
-    <Compile Include="Entity\Behavior\BehaviorBreathe.cs" />
-    <Compile Include="Entity\Behavior\BehaviorCollectEntities.cs" />
-    <Compile Include="Entity\Behavior\BehaviorControlledPhysics.cs" />
-    <Compile Include="Entity\Behavior\BehaviorPlaceBlock.cs" />
-    <Compile Include="Entity\Behavior\BehaviorDespawn.cs" />
-    <Compile Include="Entity\Behavior\BehaviorEmotionStates.cs" />
-    <Compile Include="Entity\AI\Goap\BehaviorGoapAI.cs" />
-    <Compile Include="Entity\Behavior\BehaviorGrow.cs" />
-    <Compile Include="Entity\Behavior\BehaviorHealth.cs" />
-    <Compile Include="Entity\Behavior\BehaviorHunger.cs" />
-    <Compile Include="Entity\Behavior\BehaviorInterpolatePosition.cs" />
-    <Compile Include="Entity\Behavior\BehaviorMultiply.cs" />
-    <Compile Include="Entity\Behavior\BehaviorPlayerPhysics.cs" />
-    <Compile Include="Entity\Behavior\BehaviorRepulseAgents.cs" />
-    <Compile Include="Entity\AI\Task\BehaviorTaskAI.cs" />
-    <Compile Include="Entity\Behavior\BehaviorTiredness.cs" />
-    <Compile Include="Entity\EntityBlockFalling.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityApplyGravity.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityInAir.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityInLiquid.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityLocomotion.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityMotionDrag.cs" />
-    <Compile Include="Entity\EntityLocomotion\EntityOnGround.cs" />
-    <Compile Include="Loading\LoadColorMaps.cs" />
-    <Compile Include="Systems\CharacterExtraDialogs.cs" />
-    <Compile Include="Systems\Cloth\ClothConstraint.cs" />
-    <Compile Include="Systems\Cloth\ClothPoint.cs" />
-    <Compile Include="Systems\Cloth\ClothSystem.cs" />
-    <Compile Include="Systems\Cloth\ClothManager.cs" />
-    <Compile Include="Systems\Emotes.cs" />
-    <Compile Include="Systems\Weather\LightningFlash.cs" />
-    <Compile Include="Systems\Weather\Map\MapLayerWeatherPattern.cs" />
-    <Compile Include="Systems\Weather\Map\NoiseWeatherPattern.cs" />
-    <Compile Include="Systems\Weather\Model\Impl\WeatherEvent.cs" />
-    <Compile Include="Systems\Weather\Model\WeatherEventConfig.cs" />
-    <Compile Include="Systems\Weather\Model\ConditionalPatternConfig.cs" />
-    <Compile Include="Systems\Weather\UpdateSnowLayerChunk.cs" />
-    <Compile Include="Systems\Weather\WeatherDataReader.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulationSnowAccum.cs" />
-    <Compile Include="Systems\Weather\WeatherSystemConfig.cs" />
-    <Compile Include="Systems\WorldMap\ChunkLayer\MapDB.cs" />
-    <Compile Include="Systems\WorldMap\GuiElementMap.cs" />
-    <Compile Include="Gui\GuiDialogLogViewer.cs" />
-    <Compile Include="Systems\WorldMap\WaypointLayer\GuiDialogAddWayPoint.cs" />
-    <Compile Include="Systems\WorldMap\WaypointLayer\GuiDialogEditWayPoint.cs" />
-    <Compile Include="Systems\WorldMap\GuiDialogWorldMap.cs" />
-    <Compile Include="InerhitableRotatableCube.cs" />
-    <Compile Include="Loading\BasicBlocksLoader.cs" />
-    <Compile Include="Loading\CollectibleBehaviorType.cs" />
-    <Compile Include="Loading\BlockCropPropertiesType.cs" />
-    <Compile Include="Loading\BlockType.cs" />
-    <Compile Include="Loading\CollectibleType.cs" />
-    <Compile Include="Loading\ItemType.cs" />
-    <Compile Include="Loading\CropBehaviorType.cs" />
-    <Compile Include="Loading\EntityType.cs" />
-    <Compile Include="Loading\RegistryObjectTypeLoader.cs" />
-    <Compile Include="Loading\JsonPatchLoader.cs" />
-    <Compile Include="Loading\GridRecipeLoader.cs" />
-    <Compile Include="Loading\RegistryObjectType.cs" />
-    <Compile Include="Loading\RegistryObjectVariantGroup.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Systems\EntityNameTagRenderer.cs" />
-    <Compile Include="Systems\EntityPartitioning.cs" />
-    <Compile Include="Systems\ErrorReporter.cs" />
-    <Compile Include="Systems\LeafBlockDecay.cs" />
-    <Compile Include="Systems\POIRegistry.cs" />
-    <Compile Include="Systems\RoomRegistry.cs" />
-    <Compile Include="Systems\Weather\AuroraRenderer.cs" />
-    <Compile Include="Systems\Weather\CloudMeshUtil.cs" />
-    <Compile Include="Systems\Weather\CloudRenderer.cs" />
-    <Compile Include="Systems\Weather\CloudTile.cs" />
-    <Compile Include="Systems\Weather\WeatherCommands.cs" />
-    <Compile Include="Systems\Weather\WeatherDataSnapshot.cs" />
-    <Compile Include="Systems\Weather\Model\WeatherPatternConfig.cs" />
-    <Compile Include="Systems\Weather\WeatherState.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulationLightning.cs" />
-    <Compile Include="Systems\Weather\WeatherSystemBase.cs" />
-    <Compile Include="Systems\Weather\WeatherSystemClient.cs" />
-    <Compile Include="Systems\Weather\WeatherSystemServer.cs" />
-    <Compile Include="Systems\Weather\Model\Impl\WeatherPattern.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulationRegion.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulationParticles.cs" />
-    <Compile Include="Systems\Weather\WeatherSimulationSound.cs" />
-    <Compile Include="Systems\Weather\Model\Impl\WindPattern.cs" />
-    <Compile Include="Systems\Weather\Model\WindPatternConfig.cs" />
-    <Compile Include="Systems\WorldMap\ChunkLayer\ChunkMapLayer.cs" />
-    <Compile Include="Systems\WorldMap\IMapDataSink.cs" />
-    <Compile Include="Systems\WorldMap\ChunkLayer\MultiChunkMapComponent.cs" />
-    <Compile Include="Systems\WorldMap\EntityLayer\EntityMapComponent.cs" />
-    <Compile Include="Systems\WorldMap\MapComponent.cs" />
-    <Compile Include="Systems\WorldMap\WaypointLayer\WaypointMapComponent.cs" />
-    <Compile Include="Systems\WorldMap\MapLayer.cs" />
-    <Compile Include="Systems\WorldMap\EntityLayer\PlayerMapLayer.cs" />
-    <Compile Include="Systems\WorldMap\WaypointLayer\WaypointMapLayer.cs" />
-    <Compile Include="Systems\WorldMap\WorldMapManager.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Cairo\Cairo.csproj">
-      <Project>{364577db-9728-4951-ac2c-edf7a6fcc09d}</Project>
-      <Name>Cairo</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\VintagestoryApi\VintagestoryAPI.csproj">
-      <Project>{a3582245-a1d1-4135-ba90-8efd7830da83}</Project>
-      <Name>VintagestoryAPI</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Entity\AI\Goal-Action\Goals\" />
-    <Folder Include="Entity\AI\Goap\ActionImpl\" />
-    <Folder Include="Entity\AI\Goap\GoalImpl\" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -1,9 +1,4 @@
-﻿using Cairo;
-using System;
-using System.Drawing;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
+﻿using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;

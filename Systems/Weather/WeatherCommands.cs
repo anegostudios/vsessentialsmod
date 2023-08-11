@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using AnimatedGif;
+using SkiaSharp;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
-using AnimatedGif;
-using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.GameContent
 {
@@ -257,13 +259,13 @@ namespace Vintagestory.GameContent
             ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
 
             int offset = wdt / 2;
-            Bitmap bmp;
+            SKBitmap bmp;
             int[] pixels;
 
             if (subarg == "here")
             {
                 wdt = 400;
-                bmp = new Bitmap(wdt, wdt, PixelFormat.Format32bppArgb);
+                bmp = new SKBitmap(wdt, wdt);
                 pixels = new int[wdt * wdt];
                 posStep = 3f;
                 offset = wdt / 2;
@@ -294,16 +296,20 @@ namespace Vintagestory.GameContent
                 return;
 
             }
+            
+            if (RuntimeEnv.OS != OS.Windows)
+            {
+                player.SendMessage(groupId, "Command only supported on windows, try sub argument \"here\"", EnumChatType.CommandError);
+                return;
+            }
 
-
-            bmp = new Bitmap(wdt, wdt, PixelFormat.Format32bppArgb);
+            var bmpgif =  new Bitmap(wdt, wdt);
             pixels = new int[wdt * wdt];
-
-
-            using (var gif = AnimatedGif.AnimatedGif.Create("precip.gif", 100, -1))
+            
+            using (var gif = new AnimatedGifCreator("precip.gif", 100, -1))
             {
                 for (int i = 0; i < days * 24f; i++) {
-
+            
                     if (climateTest)
                     {
                         for (int dx = 0; dx < wdt; dx++)
@@ -316,7 +322,7 @@ namespace Vintagestory.GameContent
                                 pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
                             }
                         }
-
+            
                     }
                     else
                     {
@@ -330,16 +336,16 @@ namespace Vintagestory.GameContent
                             }
                         }
                     }
-
-
+            
+            
                     totaldays += hourStep / 24f;
-
-                    bmp.SetPixels(pixels);
+            
+                    bmpgif.SetPixels(pixels);
                     
-                    gif.AddFrame(bmp, 100, GifQuality.Grayscale);
+                    gif.AddFrame(bmpgif, 100, GifQuality.Grayscale);
                     
                 }
-
+            
                 
             }
 
@@ -714,9 +720,24 @@ namespace Vintagestory.GameContent
             //sb.AppendLine(string.Format(string.Format("Blended:\nPrecipitation: {0}, Particle size: {1}, Type: {2}, Wind speed: {3}", wData.PrecIntensity, wData.PrecParticleSize, wData.BlendedPrecType, wsys.GetWindSpeed(plrPos))));
             ClimateCondition climate = api.World.BlockAccessor.GetClimateAt(player.Entity.Pos.AsBlockPos, EnumGetClimateMode.NowValues);
             sb.AppendLine(string.Format("Current precipitation: {0}%", (int)(climate.Rainfall * 100f)));
-            sb.AppendLine(string.Format("Current wind: {0}", API.Config.GlobalConstants.CurrentWindSpeedClient));
+            sb.AppendLine(string.Format("Current wind: {0}", GlobalConstants.CurrentWindSpeedClient));
 
             return sb.ToString();
         }
+    }
+}
+
+public static class BitmapExtensions
+{
+    public static void SetPixels(this Bitmap bmp, int[] pixels)
+    {
+        if (bmp.Width * bmp.Height != pixels.Length) throw new ArgumentException("Pixel array must be width*height length");
+
+        Rectangle rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+        var bitmapData = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadWrite, bmp.PixelFormat);
+
+        Marshal.Copy(pixels, 0, bitmapData.Scan0, pixels.Length);
+
+        bmp.UnlockBits(bitmapData);
     }
 }

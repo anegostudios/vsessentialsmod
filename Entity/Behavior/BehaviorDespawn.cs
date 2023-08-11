@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
         float accumSeconds;
         float accumOffset = 2.5f;
 
-        bool byCalendarDespawnMode = false;
+        EnumDespawnMode despawnMode = EnumDespawnMode.Normal;
         float deathTimeLocal;   // local copy of the attribute
 
         public float DeathTime
@@ -45,13 +45,14 @@ namespace Vintagestory.GameContent
             }
 
             var obj = typeAttributes["afterDays"];
-            if (obj.Exists)
+            if (entity.WatchedAttributes.HasAttribute("despawnTotalDays"))
             {
-                byCalendarDespawnMode = true;
-                if (!entity.WatchedAttributes.HasAttribute("despawnTotalDays"))
-                {
-                    entity.WatchedAttributes.SetDouble("despawnTotalDays", entity.World.Calendar.TotalDays + obj.AsFloat(14));
-                }
+                despawnMode = obj.Exists ? EnumDespawnMode.NormalAfterDays : EnumDespawnMode.ForceAfterDays;
+            }
+            else if (obj.Exists)
+            {
+                despawnMode = EnumDespawnMode.NormalAfterDays;
+                entity.WatchedAttributes.SetDouble("despawnTotalDays", entity.World.Calendar.TotalDays + obj.AsFloat(14));
             }
 
             // Reduce chance of many entities running the light check at the same time
@@ -66,6 +67,16 @@ namespace Vintagestory.GameContent
 
             if ((accumSeconds += deltaTime) > accumOffset)
             {
+                if (despawnMode == EnumDespawnMode.ForceAfterDays)
+                {
+                    if (entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
+                    {
+                        entity.Die(EnumDespawnReason.Expire, null);
+                        accumSeconds = 0;
+                        return;
+                    }
+                }
+
                 bool playerInRange = PlayerInRange();
                 if (playerInRange || LightLevelOk())
                 {
@@ -74,9 +85,9 @@ namespace Vintagestory.GameContent
                     return;
                 }
 
-                if (byCalendarDespawnMode)
+                if (despawnMode == EnumDespawnMode.NormalAfterDays && !playerInRange)
                 {
-                    if (!playerInRange && entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
+                    if (entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
                     {
                         entity.Die(EnumDespawnReason.Expire, null);
                         accumSeconds = 0;
@@ -125,7 +136,7 @@ namespace Vintagestory.GameContent
 
         public override void GetInfoText(StringBuilder infotext)
         {
-            if (belowLightLevel != null && !LightLevelOk() && entity.Alive)
+            if (belowLightLevel >= 0 && !LightLevelOk() && entity.Alive)
             {
                 infotext.AppendLine(Lang.Get("Deprived of light, might die soon"));
             }
@@ -138,5 +149,20 @@ namespace Vintagestory.GameContent
         {
             minSeconds = value;
         }
+
+        public void SetForcedCalendarDespawn(double value)
+        {
+            entity.WatchedAttributes.SetDouble("despawnTotalDays", value);
+            despawnMode = EnumDespawnMode.ForceAfterDays;
+        }
+    }
+
+
+
+    enum EnumDespawnMode
+    {
+        Normal = 0,
+        NormalAfterDays = 1,
+        ForceAfterDays = 2
     }
 }

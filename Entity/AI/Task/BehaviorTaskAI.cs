@@ -82,10 +82,10 @@ namespace Vintagestory.GameContent
                 try
                 {
                     task.LoadConfig(taskConfig, aiconfig);
-                } catch (Exception e)
+                } catch (Exception)
                 {
                     entity.World.Logger.Error("Task with code {0} for entity {1}: Unable to load json code.", taskCode, entity.Code);
-                    throw e;
+                    throw;
                 }
 
                 TaskManager.AddTask(task);

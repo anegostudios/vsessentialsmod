@@ -1,17 +1,11 @@
-﻿using ProtoBuf;
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using Vintagestory.API;
+using ProtoBuf;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -66,11 +60,6 @@ namespace Vintagestory.GameContent
 
         // Server side stuff
         IServerNetworkChannel serverChannel;
-
-
-        
-
-
 
 
         public override bool ShouldLoad(EnumAppSide side)
@@ -217,7 +206,7 @@ namespace Vintagestory.GameContent
             {
                 MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));
             }
-            
+
 
             foreach (MapLayer layer in MapLayers)
             {
@@ -239,7 +228,6 @@ namespace Vintagestory.GameContent
 
             mapLayerGenThread.IsBackground = true;
             mapLayerGenThread.Start();
-
         }
 
         private bool OnHotKeyWorldMapHud(KeyCombination comb)
@@ -426,6 +414,5 @@ namespace Vintagestory.GameContent
         }
 
         #endregion
-
     }
 }

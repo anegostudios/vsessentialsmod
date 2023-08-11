@@ -145,15 +145,18 @@ namespace Vintagestory.Essentials
                 {
                     tmpPos.Set(node.X, node.Y - 1, node.Z);
 
-                    block = blockAccess.GetBlock(tmpPos);
-                    if (block.LiquidCode == "lava" || !block.CanStep) return false;
+                    block = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Solid);
+                    if (!block.CanStep) return false;
 
-                    if (blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid).LiquidCode == "water")
+                    Block liquid = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                    if (liquid.LiquidCode == "lava") return false;
+                    if (liquid.LiquidCode == "water")
                     {
                         extraCost = 5;
                         //node.Y--; - we swim on top
                         break;
                     }
+                    if (liquid.BlockMaterial == EnumBlockMaterial.Ice) block = liquid;
 
                     // Do we collide if we go one block down? 
                     // Our hitbox size might be >1 and we might collide with a wall only
@@ -220,7 +223,7 @@ namespace Vintagestory.Essentials
             }
             
             tmpPos.Set(node.X, node.Y, node.Z);
-            block = blockAccess.GetBlock(tmpPos);
+            block = blockAccess.GetBlock(tmpPos, BlockLayersAccess.MostSolid);
             if (!block.CanStep) return false;
 
             // Adjust "step on" height because not all blocks we are stepping onto are a full block high

@@ -172,6 +172,7 @@ namespace Vintagestory.GameContent
 
             if (alive && !targetEntity.Alive)
             {
+                if (!(targetEntity is EntityPlayer)) entity.WatchedAttributes.SetDouble("lastMealEatenTotalHours", entity.World.Calendar.TotalHours);
                 bhEmo?.TryTriggerState("saturated", targetEntity.EntityId);
             }
         }

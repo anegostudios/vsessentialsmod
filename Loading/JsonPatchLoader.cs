@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Tavis;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -11,7 +11,8 @@ using Vintagestory.API.Datastructures;
 
 namespace Vintagestory.ServerMods.NoObf
 {
-    public enum EnumJsonPatchOp {
+    public enum EnumJsonPatchOp
+    {
         Add,
         AddEach,
         Remove,
@@ -73,7 +74,7 @@ namespace Vintagestory.ServerMods.NoObf
         public override void AssetsLoaded(ICoreAPI api)
         {
             this.api = api;
-            
+
             worldConfig = api.World.Config;
             if (worldConfig == null)
             {
@@ -117,9 +118,11 @@ namespace Vintagestory.ServerMods.NoObf
                         }
                         else
                         {
-                            if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
+                            if (!patch.Condition.IsValue.Equals(attr.GetValue() + "",
+                                    StringComparison.InvariantCultureIgnoreCase))
                             {
-                                api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})", asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
+                                api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})",
+                                    asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
                                 unmetConditionCount++;
                                 continue;
                             }
@@ -139,7 +142,9 @@ namespace Vintagestory.ServerMods.NoObf
                         if (!enabled)
                         {
                             unmetConditionCount++;
-                            api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})", asset.Location, j, string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
+                            api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})",
+                                asset.Location, j,
+                                string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
                             continue;
                         }
                     }
@@ -220,9 +225,8 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
 
-
             if (!loc.Path.EndsWith(".json")) loc.Path += ".json";
-            
+
             var asset = api.Assets.TryGet(loc);
             if (asset == null)
             {
@@ -258,7 +262,8 @@ namespace Vintagestory.ServerMods.NoObf
                         errorCount++;
                         return;
                     }
-                    op = new AddOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                    op = new AddOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
                 case EnumJsonPatchOp.AddEach:
                     if (jsonPatch.Value == null)
@@ -267,10 +272,11 @@ namespace Vintagestory.ServerMods.NoObf
                         errorCount++;
                         return;
                     }
-                    op = new AddEachOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                    op = new AddEachOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
                 case EnumJsonPatchOp.Remove:
-                    op = new RemoveOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path) };
+                    op = new RemoveOperation() { Path = new JsonPointer(jsonPatch.Path) };
                     break;
                 case EnumJsonPatchOp.Replace:
                     if (jsonPatch.Value == null)
@@ -279,13 +285,14 @@ namespace Vintagestory.ServerMods.NoObf
                         errorCount++;
                         return;
                     }
-                    op = new ReplaceOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                    op = new ReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
                 case EnumJsonPatchOp.Copy:
-                    op = new CopyOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+                    op = new CopyOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
                     break;
                 case EnumJsonPatchOp.Move:
-                    op = new MoveOperation() { Path = new Tavis.JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+                    op = new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
                     break;
             }
 
@@ -301,7 +308,7 @@ namespace Vintagestory.ServerMods.NoObf
                 errorCount++;
                 return;
             }
-            
+
             try
             {
                 patchdoc.ApplyTo(token);
@@ -324,7 +331,5 @@ namespace Vintagestory.ServerMods.NoObf
 
             applied++;
         }
-
-
     }
 }

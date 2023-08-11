@@ -99,23 +99,21 @@ namespace Vintagestory.GameContent
 
             if (dialogHasFocus)
             {
-                if (/*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up])
+                if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up])
                 {
                     tkeyDeltaY = 15f;
                 }
-                else
-                if (/*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down])
+                else if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down])
                 {
                     tkeyDeltaY = -15f;
                 }
                 else tkeyDeltaY = 0;
 
-                if (/*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left])
+                if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left])
                 {
                     tkeyDeltaX = 15f;
                 }
-                else
-                if (/*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkright"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right])
+                else if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkright"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right])
                 {
                     tkeyDeltaX = -15f;
                 }
@@ -315,13 +313,12 @@ namespace Vintagestory.GameContent
 
             if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up] || //args.KeyCode == api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode || 
                 api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down] || //args.KeyCode == api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode || 
-                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left] ||  //args.KeyCode == api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode || 
+                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left] || //args.KeyCode == api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode || 
                 api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right] //args.KeyCode == api.Input.HotKeys["walkright"].CurrentMapping.KeyCode
-            )
+               )
             {
                 args.Handled = true;
             }
-
         }
 
         public override void OnKeyUp(ICoreClientAPI api, KeyEvent args)
