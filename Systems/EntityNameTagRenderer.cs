@@ -49,7 +49,7 @@ namespace Vintagestory.GameContent
         internal NameTagRendererDelegate GetNameTagRenderer(Entity entity)
         {
             EntityPlayer eplr = entity as EntityPlayer;
-            var entitlements = eplr?.Player.Entitlements;
+            var entitlements = eplr?.Player?.Entitlements;
 
             if (entitlements?.Count > 0)
             {
