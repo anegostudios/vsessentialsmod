@@ -425,6 +425,7 @@ namespace Vintagestory.GameContent
             {
                 Color = parsedColor.ToArgb() | (255 << 24),
                 OwningPlayerUid = player.PlayerUID,
+                OwningPlayerGroupId = groupId,
                 Position = pos,
                 Title = title,
                 Icon = icon,
