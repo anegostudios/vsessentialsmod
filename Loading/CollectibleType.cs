@@ -1,15 +1,9 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -114,13 +108,19 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         public string HeldLeftTpIdleAnimation;
 
+        [JsonProperty]
+        public string HeldLeftReadyAnimation = "helditemready";
+        [JsonProperty]
+        public string HeldRightReadyAnimation = "helditemready";
+
+
         [JsonProperty("heldTpIdleAnimation")]
 #pragma warning disable IDE0044 // Add readonly modifier
         private string HeldOldTpIdleAnimation;
 #pragma warning restore IDE0044 // Add readonly modifier
 
         [JsonProperty]
-        public string HeldTpUseAnimation = "placeblock";
+        public string HeldTpUseAnimation = "interactstatic";
 
         [JsonProperty]
         public AdvancedParticleProperties[] ParticleProperties = null;

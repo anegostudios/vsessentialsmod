@@ -2,7 +2,6 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace Vintagestory.ServerMods
@@ -33,10 +32,13 @@ namespace Vintagestory.ServerMods
         public override void StartClientSide(ICoreClientAPI api)
         {
             api.RegisterEntityRendererClass("Item", typeof(EntityItemRenderer));
-            
+            api.RegisterEntityRendererClass("Dummy", typeof(EntityRendererInvisible));
+
             api.RegisterEntityRendererClass("BlockFalling", typeof(EntityBlockFallingRenderer));
             api.RegisterEntityRendererClass("Shape", typeof(EntityShapeRenderer));
             api.RegisterEntityRendererClass("SkinnableShape", typeof(EntitySkinnableShapeRenderer));
+            api.RegisterEntityRendererClass("PlayerShape", typeof(EntityPlayerShapeRenderer));
+            
 
             api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
 

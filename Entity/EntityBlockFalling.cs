@@ -89,14 +89,14 @@ namespace Vintagestory.GameContent
             {
                 //if (api.Side == EnumAppSide.Server || dustIntensity == 0) return;
 
-                float smokeAdd = 0f;
+                float dustAdd = 0f;
                 if (bef.nowImpacted)
                 {
                     var lblock = capi.World.BlockAccessor.GetBlock(bef.Pos.AsBlockPos, BlockLayersAccess.Fluid);
-                    // No smoke under water
+                    // No dust under water
                     if (lblock.Id == 0)
                     {
-                        smokeAdd = 20f;
+                        dustAdd = 20f;
                     }
                     bef.nowImpacted = false;
                 }
@@ -109,11 +109,11 @@ namespace Vintagestory.GameContent
                     dustParticles.MinPos.Set(bef.Pos.X - 0.2 - 0.5, bef.Pos.Y, bef.Pos.Z - 0.2 - 0.5);
                     dustParticles.MinSize = 1f;
 
-                    float veloMul = smokeAdd / 20f;
+                    float veloMul = dustAdd / 20f;
                     dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)bef.Pos.Motion.Y, -0.2f * veloMul);
                     dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)bef.Pos.Motion.Y + -veloMul, 0.4f * veloMul);
-                    dustParticles.MinQuantity = smokeAdd * bef.dustIntensity * particlemul / 2f;
-                    dustParticles.AddQuantity = (6 * Math.Abs((float)bef.Pos.Motion.Y) + smokeAdd) * bef.dustIntensity * particlemul / 2f;
+                    dustParticles.MinQuantity = dustAdd * bef.dustIntensity * particlemul / 2f;
+                    dustParticles.AddQuantity = (6 * Math.Abs((float)bef.Pos.Motion.Y) + dustAdd) * bef.dustIntensity * particlemul / 2f;
 
                     manager.Spawn(dustParticles);
                 }

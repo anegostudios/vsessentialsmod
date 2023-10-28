@@ -2,10 +2,6 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
@@ -73,7 +69,8 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     catch (Exception e)
                     {
-                        logger.Error("Failed calling Initialize() on collectible behavior {0} for item {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, item.Code, behaviorType.properties.ToString(), e);
+                        logger.Error("Failed calling Initialize() on collectible behavior {0} for item {1}, using properties {2}. Will continue anyway.", behaviorType.name, item.Code, behaviorType.properties.ToString());
+                        logger.Error(e);
                     }
 
                     collbehaviors.Add(behavior);
@@ -136,6 +133,10 @@ namespace Vintagestory.ServerMods.NoObf
             item.HeldTpHitAnimation = this.HeldTpHitAnimation;
             item.HeldRightTpIdleAnimation = this.HeldRightTpIdleAnimation;
             item.HeldLeftTpIdleAnimation = this.HeldLeftTpIdleAnimation;
+
+            item.HeldLeftReadyAnimation = this.HeldLeftReadyAnimation;
+            item.HeldRightReadyAnimation = this.HeldRightReadyAnimation;
+
             item.HeldTpUseAnimation = this.HeldTpUseAnimation;
             item.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
             item.MatterState = this.MatterState;

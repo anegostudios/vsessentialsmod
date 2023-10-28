@@ -1,15 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
-using Vintagestory.API.Util;
-using Vintagestory.Essentials;
 
 namespace Vintagestory.GameContent
 {
@@ -131,13 +126,32 @@ namespace Vintagestory.GameContent
         {
             api.Event.SaveGameLoaded += init;
 
-            api.RegisterCommand("roomregdebug", "Room registry debug tool", "", onRoomRegDbgCmd, Privilege.controlserver);
+            api.ChatCommands.GetOrCreate("debug")
+                .BeginSubCommand("roomregdebug")
+                    .RequiresPrivilege(Privilege.controlserver)
+
+                    .BeginSubCommand("list")
+                        .HandleWith(onRoomRegDbgCmdList)
+                    .EndSubCommand()
+
+                    .BeginSubCommand("hi")
+                        .WithArgs(api.ChatCommands.Parsers.OptionalInt("rindex"))
+                        .RequiresPlayer()
+                        .HandleWith(onRoomRegDbgCmdHi)
+                    .EndSubCommand()
+
+                    .BeginSubCommand("unhi")
+                        .RequiresPlayer()
+                        .HandleWith(onRoomRegDbgCmdUnhi)
+                    .EndSubCommand()
+                .EndSubCommand()
+                ;
         }
 
-        private void onRoomRegDbgCmd(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult onRoomRegDbgCmdHi(TextCommandCallingArgs args)
         {
-            string cmd = args.PopWord();
-
+            int rindex = (int)args.Parsers[0].GetValue();
+            var player = args.Caller.Player as IServerPlayer;
             BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
             ChunkRooms chunkrooms;
@@ -148,79 +162,95 @@ namespace Vintagestory.GameContent
 
             if (chunkrooms == null || chunkrooms.Rooms.Count == 0)
             {
-                player.SendMessage(groupId, "No rooms here", EnumChatType.Notification);
-                return;
+                return TextCommandResult.Success("No rooms here");
             }
 
-            switch (cmd) {
-                case "list":
-                    player.SendMessage(groupId, chunkrooms.Rooms.Count + " Rooms here ", EnumChatType.Notification);
+            if (chunkrooms.Rooms.Count - 1 < rindex || rindex < 0)
+            {
+                if (rindex == 0)
+                {
+                    TextCommandResult.Success("No room here");
+                }
+                else
+                {
+                    TextCommandResult.Success("Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1));
+                }
+            }
+            else
+            {
+                Room room = chunkrooms.Rooms[rindex];
 
-                    lock (chunkrooms.roomsLock)
+                // Debug visualization
+                List<BlockPos> poses = new List<BlockPos>();
+                List<int> colors = new List<int>();
+
+                int sizex = room.Location.X2 - room.Location.X1 + 1;
+                int sizey = room.Location.Y2 - room.Location.Y1 + 1;
+                int sizez = room.Location.Z2 - room.Location.Z1 + 1;
+                
+                for (int dx = 0; dx < sizex; dx++)
+                {
+                    for (int dy = 0; dy < sizey; dy++)
                     {
-                        for (int i = 0; i < chunkrooms.Rooms.Count; i++)
+                        for (int dz = 0; dz < sizez; dz++)
                         {
-                            Room room = chunkrooms.Rooms[i];
-                            int sizex = room.Location.X2 - room.Location.X1 + 1;
-                            int sizey = room.Location.Y2 - room.Location.Y1 + 1;
-                            int sizez = room.Location.Z2 - room.Location.Z1 + 1;
-                            string str = string.Format("{0} - bbox dim: {1}/{2}/{3}, mid: {4}/{5}/{6}", i, sizex, sizey, sizez, room.Location.X1 + sizex / 2f, room.Location.Y1 + sizey / 2f, room.Location.Z1 + sizez / 2f);
-                            player.SendMessage(groupId, str, EnumChatType.Notification);
-                        }
-                    }
-                    break;
+                            int pindex = (dy * sizez + dz) * sizex + dx;
 
-
-                case "hi":
-                    {
-                        int rindex = (int)args.PopInt(0);
-
-                        if (chunkrooms.Rooms.Count - 1 < rindex || rindex < 0)
-                        {
-                            if (rindex == 0) player.SendMessage(groupId, "No room here", EnumChatType.Notification);
-                            else player.SendMessage(groupId, "Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1), EnumChatType.Notification);
-                        }
-                        else
-                        {
-                            Room room = chunkrooms.Rooms[rindex];
-
-                            // Debug visualization
-                            List<BlockPos> poses = new List<BlockPos>();
-                            List<int> colors = new List<int>();
-
-                            int sizex = room.Location.X2 - room.Location.X1 + 1;
-                            int sizey = room.Location.Y2 - room.Location.Y1 + 1;
-                            int sizez = room.Location.Z2 - room.Location.Z1 + 1;
-                            
-                            for (int dx = 0; dx < sizex; dx++)
+                            if ((room.PosInRoom[pindex / 8] & (1 << (pindex % 8))) > 0)
                             {
-                                for (int dy = 0; dy < sizey; dy++)
-                                {
-                                    for (int dz = 0; dz < sizez; dz++)
-                                    {
-                                        int pindex = (dy * sizez + dz) * sizex + dx;
-
-                                        if ((room.PosInRoom[pindex / 8] & (1 << (pindex % 8))) > 0)
-                                        {
-                                            poses.Add(new BlockPos(room.Location.X1 + dx, room.Location.Y1 + dy, room.Location.Z1 + dz));
-                                            colors.Add(ColorUtil.ColorFromRgba(room.ExitCount == 0 ? 0 : 100, room.ExitCount == 0 ? 100 : 0, Math.Min(255, rindex * 30), 150));
-                                        }
-                                    }
-                                }
+                                poses.Add(new BlockPos(room.Location.X1 + dx, room.Location.Y1 + dy, room.Location.Z1 + dz));
+                                colors.Add(ColorUtil.ColorFromRgba(room.ExitCount == 0 ? 0 : 100, room.ExitCount == 0 ? 100 : 0, Math.Min(255, rindex * 30), 150));
                             }
-
-                            api.World.HighlightBlocks(player, 50, poses, 
-                                colors, 
-                                EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary
-                            );
                         }
-                        break;
                     }
+                }
 
-                case "unhi":
-                    api.World.HighlightBlocks(player, 50, new List<BlockPos>(), new List<int>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
-                    break;
+                api.World.HighlightBlocks(player, 50, poses, colors);
+            }   
+            return TextCommandResult.Success();
+        }
+
+        private TextCommandResult onRoomRegDbgCmdUnhi(TextCommandCallingArgs args)
+        {
+            var player = args.Caller.Player as IServerPlayer;
+            api.World.HighlightBlocks(player, 50, new List<BlockPos>(), new List<int>());
+
+            return TextCommandResult.Success();
+        }
+
+        private TextCommandResult onRoomRegDbgCmdList(TextCommandCallingArgs args)
+        {
+            var player = args.Caller.Player as IServerPlayer;
+            BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
+            long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
+            ChunkRooms chunkrooms;
+            lock (roomsByChunkIndexLock)
+            {
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
+
+            if (chunkrooms == null || chunkrooms.Rooms.Count == 0)
+            {
+                return TextCommandResult.Success("No rooms here");
+            }
+            string response = chunkrooms.Rooms.Count + " Rooms here \n";
+
+            lock (chunkrooms.roomsLock)
+            {
+                for (int i = 0; i < chunkrooms.Rooms.Count; i++)
+                {
+                    Room room = chunkrooms.Rooms[i];
+                    int sizex = room.Location.X2 - room.Location.X1 + 1;
+                    int sizey = room.Location.Y2 - room.Location.Y1 + 1;
+                    int sizez = room.Location.Z2 - room.Location.Z1 + 1;
+                    response += string.Format("{0} - bbox dim: {1}/{2}/{3}, mid: {4}/{5}/{6}\n", i, sizex, sizey,
+                        sizez, room.Location.X1 + sizex / 2f, room.Location.Y1 + sizey / 2f,
+                        room.Location.Z1 + sizez / 2f);
+
+                }
+            }
+
+            return TextCommandResult.Success(response);
         }
 
         private void init()

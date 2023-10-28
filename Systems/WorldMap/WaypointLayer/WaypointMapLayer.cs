@@ -128,17 +128,163 @@ namespace Vintagestory.GameContent
 
                 sapi.Event.GameWorldSave += OnSaveGameGettingSaved;
                 sapi.Event.PlayerDeath += Event_PlayerDeath;
-                sapi.RegisterCommand("waypoint", "Put a waypoint at this location which will be visible for you on the map", "[add|addat|modify|remove|list|deathwp]", OnCmdWayPoint, Privilege.chat);
-                sapi.RegisterCommand("tpwp", "Teleport yourself to a waypoint starting with the supplied name", "[name]", OnCmdTpTo, Privilege.tp);
+                var parsers = sapi.ChatCommands.Parsers;
+                sapi.ChatCommands.Create("waypoint")
+                    .WithDescription("Put a waypoint at this location which will be visible for you on the map")
+                    .RequiresPrivilege(Privilege.chat)
+                    .BeginSubCommand("deathwp")
+                        .WithDescription("Enable/Disable automatic adding of a death waypoint")
+                        .WithArgs(parsers.OptionalBool("enabled"))
+                        .RequiresPlayer()
+                        .HandleWith(OnCmdWayPointDeathWp)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("add")
+                        .WithDescription("Add a waypoint to the map")
+                        .RequiresPlayer()
+                        .WithArgs(parsers.Color("color"), parsers.All("title"))
+                        .HandleWith(OnCmdWayPointAdd)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("addp")
+                        .RequiresPlayer()
+                        .WithDescription("Add a waypoint to the map")
+                        .WithArgs(parsers.Color("color"), parsers.All("title"))
+                        .HandleWith(OnCmdWayPointAddp)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("addat")
+                        .WithDescription("Add a waypoint to the map")
+                        .RequiresPlayer()
+                        .WithArgs(parsers.WorldPosition("position"), parsers.Bool("pinned"), parsers.Color("color"), parsers.All("title"))
+                        .HandleWith(OnCmdWayPointAddat)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("addati")
+                        .WithDescription("Add a waypoint to the map")
+                        .RequiresPlayer()
+                        .WithArgs(parsers.Word("icon"),parsers.WorldPosition("position"), parsers.Bool("pinned"), parsers.Color("color"), parsers.All("title"))
+                        .HandleWith(OnCmdWayPointAddati)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("modify")
+                        .WithDescription("")
+                        .RequiresPlayer()
+                        .WithArgs(parsers.Int("waypoint_id"), parsers.Color("color"),parsers.Word("icon"), parsers.Bool("pinned"), parsers.All("title"))
+                        .HandleWith(OnCmdWayPointModify)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("remove")
+                        .WithDescription("Remove a waypoint by its id. Get a lost of ids using /waypoint list")
+                        .RequiresPlayer()
+                        .WithArgs(parsers.Int("waypoint_id"))
+                        .HandleWith(OnCmdWayPointRemove)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("list")
+                        .WithDescription("List your own waypoints")
+                        .RequiresPlayer()
+                        .HandleWith(OnCmdWayPointList)
+                    .EndSubCommand()
+                    ;
+
+                sapi.ChatCommands.Create("tpwp")
+                    .WithDescription("Teleport yourself to a waypoint starting with the supplied name")
+                    .RequiresPrivilege(Privilege.tp)
+                    .WithArgs(parsers.All("name"))
+                    .HandleWith(OnCmdTpTo)
+                    ;
             } else
             {
                 quadModel = (api as ICoreClientAPI).Render.UploadMesh(QuadMeshUtil.GetQuad());
             }
         }
 
+        private TextCommandResult OnCmdWayPointList(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var wps = new StringBuilder();
+            var i = 0;
+            foreach (var p in Waypoints.Where((p) => p.OwningPlayerUid == args.Caller.Player.PlayerUID).ToArray())
+            {
+                var pos = p.Position.Clone();
+                pos.X -= api.World.DefaultSpawnPosition.X;
+                pos.Z -= api.World.DefaultSpawnPosition.Z;
+                wps.AppendLine(string.Format("{0}: {1} at {2}", i, p.Title, pos.AsBlockPos));
+                i++;
+            }
+
+            if (wps.Length == 0)
+            {
+                return TextCommandResult.Success(Lang.Get("You have no waypoints"));
+            }
+
+            return TextCommandResult.Success(Lang.Get("Your waypoints:") + "\n" + wps.ToString());
+        }
+
+        private bool IsMapDisallowed(out TextCommandResult response)
+        {
+            if (!api.World.Config.GetBool("allowMap", true))
+            {
+                response = TextCommandResult.Success(Lang.Get("Maps are disabled on this server"));
+                return true;
+            }
+
+            response = null;
+            return false;
+        }
+
+        private TextCommandResult OnCmdWayPointRemove(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var player = args.Caller.Player as IServerPlayer;
+            var id = (int)args.Parsers[0].GetValue();
+            Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
+
+            if (ownwpaypoints.Length == 0)
+            {
+                return TextCommandResult.Success(Lang.Get("You have no waypoints to delete"));
+            }
+
+            if (args.Parsers[0].IsMissing || id < 0 || id >= ownwpaypoints.Length)
+            {
+                return TextCommandResult.Success(Lang.Get("Invalid waypoint number, valid ones are 0..{0}", ownwpaypoints.Length - 1));
+            }
+
+            Waypoints.Remove(ownwpaypoints[id]);
+            RebuildMapComponents();
+            ResendWaypoints(player);
+            return TextCommandResult.Success(Lang.Get("Ok, deleted waypoint."));
+        }
+
+        private TextCommandResult OnCmdWayPointDeathWp(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            if (!api.World.Config.GetBool("allowDeathwaypointing", true))
+            {
+                return TextCommandResult.Success(Lang.Get("Death waypointing is disabled on this server"));
+            }
+
+            var player = args.Caller.Player as IServerPlayer;
+            if (args.Parsers[0].IsMissing)
+            {
+                bool on = player.GetModData<bool>("deathWaypointing");
+                return TextCommandResult.Success(Lang.Get("Death waypoint is {0}", on ? Lang.Get("on") : Lang.Get("off")));
+            }
+            else
+            {
+                bool on = (bool)args.Parsers[0].GetValue();
+                player.SetModData("deathWaypointing", on);
+                return TextCommandResult.Success(Lang.Get("Death waypoint now {0}", on ? Lang.Get("on") : Lang.Get("off")));
+            }
+        }
+
         private void Event_PlayerDeath(IServerPlayer byPlayer, DamageSource damageSource)
         {
-            if (!api.World.Config.GetBool("allowMap", true) || !api.World.Config.GetBool("allowDeathwaypointing", true) || !byPlayer.GetModData<bool>("deathWaypointing", true)) return;
+            if (!api.World.Config.GetBool("allowMap", true) || !api.World.Config.GetBool("allowDeathwaypointing", true) || !byPlayer.GetModData("deathWaypointing", true)) return;
 
             string title = Lang.Get("You died here");
             for (int i = 0; i < Waypoints.Count; i++)
@@ -164,264 +310,117 @@ namespace Vintagestory.GameContent
             AddWaypoint(waypoint, byPlayer);
         }
 
-        private void OnCmdTpTo(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult OnCmdTpTo(TextCommandCallingArgs args)
         {
-            Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
+            var player = args.Caller.Player;
+            var name = (args.Parsers[0].GetValue() as string).ToLowerInvariant();
+            var playersWaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
 
-            if (args.Length == 0) return;
-
-            string name = args.PopWord().ToLowerInvariant();
-
-            foreach (var wp in ownwpaypoints)
+            foreach (var wp in playersWaypoints)
             {
                 if (wp.Title != null && wp.Title.ToLowerInvariant().StartsWith(name))
                 {
                     player.Entity.TeleportTo(wp.Position);
-                    player.SendMessage(groupId, Lang.Get("Ok teleported you to waypoint {0}.", wp.Title), EnumChatType.CommandSuccess);
-                    return;
+                    return TextCommandResult.Success(Lang.Get("Ok teleported you to waypoint {0}.", wp.Title));
                 }
             }
+            return TextCommandResult.Success(Lang.Get("No such waypoint found"));
         }
 
-        private void OnCmdWayPoint(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult OnCmdWayPointAdd(TextCommandCallingArgs args)
         {
-            string cmd = args.PopWord();
-
-            if (!api.World.Config.GetBool("allowMap", true))
-            {
-                player.SendMessage(groupId, Lang.Get("Maps are disabled on this server"), EnumChatType.CommandError);
-                return;
-            }
-
-            switch (cmd)
-            {
-                case "deathwp":
-                    if (!api.World.Config.GetBool("allowDeathwaypointing", true))
-                    {
-                        player.SendMessage(groupId, Lang.Get("Death waypointing is disabled on this server"), EnumChatType.CommandError);
-                        return;
-                    }
-
-                    if (args.Length == 0)
-                    {
-                        bool on = player.GetModData<bool>("deathWaypointing");
-                        player.SendMessage(groupId, Lang.Get("Death waypoint is {0}", on ? Lang.Get("on") : Lang.Get("off")), EnumChatType.CommandError);
-                    }
-                    else
-                    {
-                        bool on = (bool)args.PopBool(false);
-                        player.SetModData<bool>("deathWaypointing", on);
-                        player.SendMessage(groupId, Lang.Get("Death waypoint now {0}", on ? Lang.Get("on") : Lang.Get("off")), EnumChatType.CommandError);
-                    }
-                    break;
-
-                case "add":
-                    AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle", false); 
-                    break;
-
-                case "addp":
-                    AddWp(player.Entity.ServerPos.XYZ, args, player, groupId, "circle", true);
-                    break;
-
-                case "addat":
-                    {
-                        Vec3d spawnpos = sapi.World.DefaultSpawnPosition.XYZ;
-                        spawnpos.Y = 0;
-                        Vec3d targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
-
-                        if (targetpos == null)
-                        {
-                            player.SendMessage(groupId, Lang.Get("Syntax: /waypoint addat x y z pinned color title"), EnumChatType.CommandError);
-                            return;
-                        }
-
-                        AddWp(targetpos, args, player, groupId, "circle", (bool)args.PopBool(false));
-                        break;
-                    }
-
-                case "addati":
-                    {
-                        if (args.Length == 0)
-                        {
-                            player.SendMessage(groupId, Lang.Get("Syntax: /waypoint addati icon x y z pinned color title"), EnumChatType.CommandError);
-                            return;
-                        }
-
-                        string icon = args.PopWord();
-
-                        Vec3d spawnpos = sapi.World.DefaultSpawnPosition.XYZ;
-                        spawnpos.Y = 0;
-                        Vec3d targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
-
-                        if (targetpos == null)
-                        {
-                            player.SendMessage(groupId, Lang.Get("Invalid position. Syntax: /waypoint addati icon x y z pinned color title"), EnumChatType.CommandError);
-                            return;
-                        }
-
-                        AddWp(targetpos, args, player, groupId, icon, (bool)args.PopBool(false));
-                    }
-                    break;
-
-                case "modify":
-                    ModWp(args, player, groupId);
-                    break;
-
-
-                case "remove":
-                    {
-                        int? id = args.PopInt();
-                        Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
-
-                        if (ownwpaypoints.Length == 0)
-                        {
-                            player.SendMessage(groupId, Lang.Get("You have no waypoints to delete"), EnumChatType.CommandError);
-                            return;
-                        }
-
-                        if (id == null || id < 0 || id >= ownwpaypoints.Length)
-                        {
-                            player.SendMessage(groupId, Lang.Get("Invalid waypoint number, valid ones are 0..{0}", ownwpaypoints.Length - 1), EnumChatType.CommandSuccess);
-                            return;
-                        }
-
-                        Waypoints.Remove(ownwpaypoints[(int)id]);
-                        RebuildMapComponents();
-                        ResendWaypoints(player);
-                        player.SendMessage(groupId, Lang.Get("Ok, deleted waypoint."), EnumChatType.CommandSuccess);
-                    }
-                    break;
-
-
-                case "list":
-
-                    StringBuilder wps = new StringBuilder();
-                    int i = 0;
-                    foreach (Waypoint p in Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray())
-                    {
-                        Vec3d pos = p.Position.Clone();
-                        pos.X -= api.World.DefaultSpawnPosition.X;
-                        pos.Z -= api.World.DefaultSpawnPosition.Z;
-                        wps.AppendLine(string.Format("{0}: {1} at {2}", i, p.Title, pos.AsBlockPos));
-                        i++;
-                    }
-
-                    if (wps.Length == 0)
-                    {
-                        player.SendMessage(groupId, Lang.Get("You have no waypoints"), EnumChatType.CommandSuccess);
-                    } else
-                    {
-                        player.SendMessage(groupId, Lang.Get("Your waypoints:") + "\n" + wps.ToString(), EnumChatType.CommandSuccess);
-                    }
-                    
-                    break;
-
-
-                default:
-                    player.SendMessage(groupId, Lang.Get("Syntax: /waypoint [add|remove|list]"), EnumChatType.CommandError);
-                    break;
-            }
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var parsedColor = (System.Drawing.Color)args.Parsers[0].GetValue();
+            var title = args.Parsers[1].GetValue() as string;
+            var player = args.Caller.Player as IServerPlayer;
+            return AddWp(player, player.Entity.Pos.XYZ, title, parsedColor,"circle", false);
+        }
+        
+        private TextCommandResult OnCmdWayPointAddp(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var parsedColor = (System.Drawing.Color)args.Parsers[0].GetValue();
+            var title = args.Parsers[1].GetValue() as string;
+            var player = args.Caller.Player as IServerPlayer;
+            return AddWp(player, player.Entity.Pos.XYZ, title, parsedColor,"circle", true);
+        }
+        
+        private TextCommandResult OnCmdWayPointAddat(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var pos = args.Parsers[0].GetValue() as Vec3d;
+            var pinned = (bool)args.Parsers[1].GetValue();
+            var parsedColor = (System.Drawing.Color)args.Parsers[2].GetValue();
+            var title = args.Parsers[3].GetValue() as string;
+            
+            
+            var player = args.Caller.Player as IServerPlayer;
+            return AddWp(player, pos, title, parsedColor,"circle", pinned);
+        }
+        
+        private TextCommandResult OnCmdWayPointAddati(TextCommandCallingArgs args)
+        {
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var icon = args.Parsers[0].GetValue() as string;
+            var pos = args.Parsers[1].GetValue() as Vec3d;
+            var pinned = (bool)args.Parsers[2].GetValue();
+            var parsedColor = (System.Drawing.Color)args.Parsers[3].GetValue();
+            var title = args.Parsers[4].GetValue() as string;
+            
+            var player = args.Caller.Player as IServerPlayer;
+            return AddWp(player, pos, title, parsedColor,icon, pinned);
         }
 
-        private void ModWp(CmdArgs args, IServerPlayer player, int groupId)
+        private TextCommandResult OnCmdWayPointModify(TextCommandCallingArgs args)
         {
-            if (args.Length == 0)
+            if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
+            
+            var wpIndex = (int)args.Parsers[0].GetValue();
+            
+            var parsedColor = (System.Drawing.Color)args.Parsers[1].GetValue();
+            var icon = args.Parsers[2].GetValue() as string;
+            var pinned = (bool)args.Parsers[3].GetValue();
+            var title = args.Parsers[4].GetValue() as string;
+            
+            var player = args.Caller.Player as IServerPlayer;
+
+            var playerWaypoints = Waypoints.Where(p => p.OwningPlayerUid == player.PlayerUID).ToArray();
+
+            if (args.Parsers[0].IsMissing || wpIndex < 0 || playerWaypoints.Length < wpIndex - 1)
             {
-                player.SendMessage(groupId, Lang.Get("command-modwaypoint-syntax"), EnumChatType.CommandError);
-                return;
+                return TextCommandResult.Success(Lang.Get("command-modwaypoint-invalidindex", playerWaypoints.Length));
             }
 
-            Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
-            int? wpIndex = args.PopInt();
-
-            if (wpIndex == null || wpIndex < 0 || ownwpaypoints.Length < (int)wpIndex - 1)
+            if (string.IsNullOrEmpty(title))
             {
-                player.SendMessage(groupId, Lang.Get("command-modwaypoint-invalidindex", ownwpaypoints.Length), EnumChatType.CommandError);
-                return;
+                return TextCommandResult.Success( Lang.Get("command-waypoint-notext"));
             }
 
-            string colorstring = args.PopWord();
-            string icon = args.PopWord();
-            bool pinned = (bool)args.PopBool(false);
-            string title = args.PopAll();
-
-            System.Drawing.Color parsedColor;
-
-            if (colorstring.StartsWith("#"))
-            {
-                try
-                {
-                    int argb = Int32.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
-                    parsedColor = System.Drawing.Color.FromArgb(argb);
-                }
-                catch (FormatException)
-                {
-                    player.SendMessage(groupId, Lang.Get("command-waypoint-invalidcolor"), EnumChatType.CommandError);
-                    return;
-                }
-            }
-            else
-            {
-                parsedColor = System.Drawing.Color.FromName(colorstring);
-            }
-
-            if (title == null || title.Length == 0)
-            {
-                player.SendMessage(groupId, Lang.Get("command-waypoint-notext"), EnumChatType.CommandError);
-                return;
-            }
-
-            ownwpaypoints[(int)wpIndex].Color = parsedColor.ToArgb() | (255 << 24);
-            ownwpaypoints[(int)wpIndex].Title = title;
-            ownwpaypoints[(int)wpIndex].Pinned = pinned;
+            playerWaypoints[wpIndex].Color = parsedColor.ToArgb() | (255 << 24);
+            playerWaypoints[wpIndex].Title = title;
+            playerWaypoints[wpIndex].Pinned = pinned;
 
             if (icon != null)
             {
-                ownwpaypoints[(int)wpIndex].Icon = icon;
+                playerWaypoints[wpIndex].Icon = icon;
             }
 
-            player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} modified", (int)wpIndex), EnumChatType.CommandSuccess);
             ResendWaypoints(player);
+            return TextCommandResult.Success(Lang.Get("Ok, waypoint nr. {0} modified", wpIndex));
         }
 
-        private void AddWp(Vec3d pos, CmdArgs args, IServerPlayer player, int groupId, string icon, bool pinned)
+        private TextCommandResult AddWp(IServerPlayer player, Vec3d pos, string title, System.Drawing.Color parsedColor, string icon, bool pinned)
         {
-            if (args.Length == 0)
+            if (string.IsNullOrEmpty(title))
             {
-                player.SendMessage(groupId, Lang.Get("command-waypoint-syntax"), EnumChatType.CommandError);
-                return;
+                return TextCommandResult.Success( Lang.Get("command-waypoint-notext"));
             }
 
-            string colorstring = args.PopWord();
-            string title = args.PopAll();
-
-            System.Drawing.Color parsedColor;
-
-            if (colorstring.StartsWith("#"))
-            {
-                try
-                {
-                    int argb = int.Parse(colorstring.Replace("#", ""), NumberStyles.HexNumber);
-                    parsedColor = System.Drawing.Color.FromArgb(argb);
-                }
-                catch (FormatException)
-                {
-                    player.SendMessage(groupId, Lang.Get("command-waypoint-invalidcolor"), EnumChatType.CommandError);
-                    return;
-                }
-            }
-            else
-            {
-                parsedColor = System.Drawing.Color.FromName(colorstring);
-            }
-
-            if (title == null || title.Length == 0)
-            {
-                player.SendMessage(groupId, Lang.Get("command-waypoint-notext"), EnumChatType.CommandError);
-                return;
-            }
-
-            Waypoint waypoint = new Waypoint()
+            var waypoint = new Waypoint()
             {
                 Color = parsedColor.ToArgb() | (255 << 24),
                 OwningPlayerUid = player.PlayerUID,
@@ -432,8 +431,8 @@ namespace Vintagestory.GameContent
                 Guid = Guid.NewGuid().ToString()
             };
 
-            int nr = AddWaypoint(waypoint, player);
-            player.SendMessage(groupId, Lang.Get("Ok, waypoint nr. {0} added", nr), EnumChatType.CommandSuccess);
+            var nr = AddWaypoint(waypoint, player);
+            return TextCommandResult.Success(Lang.Get("Ok, waypoint nr. {0} added", nr));
         }
 
         public int AddWaypoint(Waypoint waypoint, IServerPlayer player)
@@ -541,17 +540,18 @@ namespace Vintagestory.GameContent
                     for (int i = 0; i < Waypoints.Count; i++)
                     {
                         var wp = Waypoints[i];
-                        if (wp.Title == null) wp.Title = wp.Text; // Not sure how this happens. For some reason the title moved into text
                         if (wp == null)
                         {
-                            sapi.World.Logger.Error("Waypoint with no position loaded, will remove");
+                            sapi.World.Logger.Error("Waypoint with no information loaded, will remove");
                             Waypoints.RemoveAt(i);
                             i--;
                         }
+                        if (wp.Title == null) wp.Title = wp.Text; // Not sure how this happens. For some reason the title moved into text
                     }
                 } catch (Exception e)
                 {
-                    sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown: {0}", e);
+                    sapi.World.Logger.Error("Failed deserializing player map markers. Won't load them, sorry! Exception thrown:");
+                    sapi.World.Logger.Error(e);
                 }
 
                 foreach (var wp in Waypoints)
@@ -607,6 +607,8 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap mapElem, float dt)
         {
+            if (!Active) return;
+
             foreach (var val in wayPointComponents)
             {
                 val.Render(mapElem, dt);
@@ -615,6 +617,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
         {
+            if (!Active) return;
+
             foreach (var val in wayPointComponents)
             {
                 val.OnMouseMove(args, mapElem, hoverText);
@@ -623,6 +627,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
         {
+            if (!Active) return;
+
             foreach (var val in wayPointComponents)
             {
                 val.OnMouseUpOnElement(args, mapElem);
@@ -649,5 +655,7 @@ namespace Vintagestory.GameContent
 
         public override string Title => "Player Set Markers";
         public override EnumMapAppSide DataSide => EnumMapAppSide.Server;
+
+        public override string LayerGroupCode => "waypoints";
     }
 }

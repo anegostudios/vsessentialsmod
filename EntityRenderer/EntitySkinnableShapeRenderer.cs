@@ -6,12 +6,20 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+
     public class EntitySkinnableShapeRenderer : EntityShapeRenderer
     {
-
         public event Action<LoadedTexture, TextureAtlasPosition> OnReloadSkin;
-
         protected int skinTextureSubId;
+        protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
+        public double RenderOrder => 1;
+        public int RenderRange => 1;
+
+
+        public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
+        {
+            api.Event.ReloadTextures += MarkShapeModified;
+        }
 
 
         public override TextureAtlasPosition this[string textureCode]
@@ -29,22 +37,15 @@ namespace Vintagestory.GameContent
         }
 
 
-
-        public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
+        public override void TesselateShape()
         {
-            api.Event.ReloadTextures += () =>
+            base.TesselateShape();
+
+            if (eagent.GearInventory != null)
             {
-                // no longer needed, its now auto reloaded by the engine
-                /*var texturesByLoc = (entity as EntityAgent).extraTextureByLocation; 
-                var texturesByName = (entity as EntityAgent).extraTexturesByTextureName;
-
-                texturesByLoc.Clear();
-                texturesByName.Clear();
-                textureSpaceAllocated = false;*/
-                MarkShapeModified();
-            };
+                reloadSkin();
+            }
         }
-
 
 
 
@@ -70,28 +71,8 @@ namespace Vintagestory.GameContent
 
         public bool doReloadShapeAndSkin = true;
 
-        public override void MarkShapeModified()
-        {
-            if (!doReloadShapeAndSkin) return;
-
-            base.MarkShapeModified();
-        }
-
-        public override void TesselateShape()
-        {
-            if (eagent is EntityPlayer && eagent.GearInventory == null) return; // Player is not fully initialized yet
-
-            base.TesselateShape();
-
-            if (eagent.GearInventory != null)
-            {
-                reloadSkin();
-            }
-        }
 
 
-        
-        
 
         public override void reloadSkin()
         {
@@ -101,9 +82,8 @@ namespace Vintagestory.GameContent
             string skinBaseTextureKey = entity.Properties.Attributes?["skinBaseTextureKey"].AsString();
             if (skinBaseTextureKey != null) origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.Textures[skinBaseTextureKey].Baked.TextureSubId];
 
-            
-
-            LoadedTexture entityAtlas = new LoadedTexture(null) {
+            LoadedTexture entityAtlas = new LoadedTexture(null)
+            {
                 TextureId = origTexPos.atlasTextureId,
                 Width = capi.EntityTextureAtlas.Size.Width,
                 Height = capi.EntityTextureAtlas.Size.Height
@@ -111,6 +91,7 @@ namespace Vintagestory.GameContent
 
             capi.Render.GlToggleBlend(false);
             capi.EntityTextureAtlas.RenderTextureIntoAtlas(
+                skinTexPos.atlasTextureId,
                 entityAtlas,
                 (int)(origTexPos.x1 * AtlasSize.Width),
                 (int)(origTexPos.y1 * AtlasSize.Height),
@@ -158,14 +139,16 @@ namespace Vintagestory.GameContent
                 int itemTextureSubId = stack.Item.FirstTexture.Baked.TextureSubId;
 
                 TextureAtlasPosition itemTexPos = capi.ItemTextureAtlas.Positions[itemTextureSubId];
-                
-                LoadedTexture itemAtlas = new LoadedTexture(null) {
+
+                LoadedTexture itemAtlas = new LoadedTexture(null)
+                {
                     TextureId = itemTexPos.atlasTextureId,
                     Width = capi.ItemTextureAtlas.Size.Width,
                     Height = capi.ItemTextureAtlas.Size.Height
                 };
 
                 capi.EntityTextureAtlas.RenderTextureIntoAtlas(
+                    skinTexPos.atlasTextureId,
                     itemAtlas,
                     itemTexPos.x1 * capi.ItemTextureAtlas.Size.Width,
                     itemTexPos.y1 * capi.ItemTextureAtlas.Size.Height,
@@ -186,7 +169,7 @@ namespace Vintagestory.GameContent
         {
             base.Dispose();
 
-            capi.Event.ReloadTextures -= reloadSkin;
+            capi.Event.ReloadTextures -= MarkShapeModified;
             if (eagent?.GearInventory != null)
             {
                 eagent.GearInventory.SlotModified -= gearSlotModified;

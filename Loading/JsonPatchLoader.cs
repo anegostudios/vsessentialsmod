@@ -99,7 +99,8 @@ namespace Vintagestory.ServerMods.NoObf
                     patches = asset.ToObject<JsonPatch[]>();
                 } catch (Exception e)
                 {
-                    api.Logger.Error("Failed loading patches file {0}: {1}", asset.Location, e);
+                    api.Logger.Error("Failed loading patches file {0}:", asset.Location);
+                    api.Logger.Error(e);
                 }
 
                 for (int j = 0; patches != null && j < patches.Length; j++)
@@ -304,7 +305,8 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} (target: {3}) in {1} failed probably because the syntax of the value is broken: {2}", patchIndex, patchSourcefile, e, loc);
+                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed probably because the syntax of the value is broken:", patchIndex, patchSourcefile, loc);
+                api.World.Logger.Error(e);
                 errorCount++;
                 return;
             }
@@ -321,7 +323,8 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} (target: {3}) in {1} failed, following Exception was thrown: {2}", patchIndex, patchSourcefile, e.Message, loc);
+                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed, following Exception was thrown:", patchIndex, patchSourcefile,loc);
+                api.World.Logger.Error(e);
                 errorCount++;
                 return;
             }

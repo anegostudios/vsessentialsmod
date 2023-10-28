@@ -200,8 +200,8 @@ namespace Vintagestory.GameContent
                         {
                             if (LineDebug)
                             {
-                                debugUpdateMesh.AddVertex(0, 0, 0, color);
-                                debugUpdateMesh.AddVertex(0, 0, 0, color);
+                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
+                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
 
                                 debugUpdateMesh.AddIndex(vertexIndex++);
                                 debugUpdateMesh.AddIndex(vertexIndex++);
@@ -222,8 +222,8 @@ namespace Vintagestory.GameContent
                         {
                             if (LineDebug)
                             {
-                                debugUpdateMesh.AddVertex(0, 0, 0, color);
-                                debugUpdateMesh.AddVertex(0, 0, 0, color);
+                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
+                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
 
                                 debugUpdateMesh.AddIndex(vertexIndex++);
                                 debugUpdateMesh.AddIndex(vertexIndex++);

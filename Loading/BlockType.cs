@@ -273,6 +273,10 @@ namespace Vintagestory.ServerMods.NoObf
             block.HeldTpHitAnimation = this.HeldTpHitAnimation;
             block.HeldRightTpIdleAnimation = this.HeldRightTpIdleAnimation;
             block.HeldLeftTpIdleAnimation = this.HeldLeftTpIdleAnimation;
+
+            block.HeldLeftReadyAnimation = this.HeldLeftReadyAnimation;
+            block.HeldRightReadyAnimation = this.HeldRightReadyAnimation;
+
             block.HeldTpUseAnimation = this.HeldTpUseAnimation;
             block.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
             block.AllowSpawnCreatureGroups = (string[])this.AllowSpawnCreatureGroups.Clone();
@@ -439,7 +443,8 @@ namespace Vintagestory.ServerMods.NoObf
                         behavior.Initialize(behaviorType.properties);
                     } catch (Exception e)
                     {
-                        logger.Error("Failed calling Initialize() on collectible or block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception: {3}", behaviorType.name, block.Code, behaviorType.properties.ToString(), e);
+                        logger.Error("Failed calling Initialize() on collectible or block behavior {0} for block {1}, using properties {2}. Will continue anyway. Exception", behaviorType.name, block.Code, behaviorType.properties.ToString());
+                        logger.Error(e);
                     }
 
                     collbehaviors.Add(behavior);

@@ -1,12 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -34,13 +30,14 @@ namespace Vintagestory.GameContent
     public abstract class MapLayer
     {
         public abstract string Title { get; }
+        public abstract string LayerGroupCode { get; }
+        public bool Active { get; set; }
 
         /// <summary>
         /// Where the data is at. If server side, the server will call the method ToBytes() send that data to the client and decode it there with the FromBytes() method
         /// If client side, no client<->server sync is done
         /// </summary>
         public abstract EnumMapAppSide DataSide { get; }
-
         public virtual bool RequireChunkLoaded => true;
 
         public string RequirePrivilege;
@@ -57,6 +54,7 @@ namespace Vintagestory.GameContent
         {
             this.api = api;
             this.mapSink = mapSink;
+            Active = true;
         }
         
         public virtual void OnOffThreadTick(float dt)
@@ -148,6 +146,11 @@ namespace Vintagestory.GameContent
 
         public virtual void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
         {
+        }
+
+        public virtual void ComposeDialogExtras(GuiDialogWorldMap guiDialogWorldMap, GuiComposer compo)
+        {
+            
         }
     }
 

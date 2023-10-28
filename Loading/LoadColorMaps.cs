@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -46,7 +42,8 @@ namespace Vintagestory.ServerMods
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Failed loading config/colormap.json, error {0}. Will skip", e);
+                api.World.Logger.Error("Failed loading config/colormap.json. Will skip");
+                api.World.Logger.Error(e);
             }
         }
     }

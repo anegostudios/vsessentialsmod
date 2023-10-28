@@ -44,7 +44,7 @@ namespace Vintagestory.GameContent
                         }
                     }
 
-                    api.Network.BroadcastEntityPacket(entity.EntityId, 1203, SerializerUtil.Serialize(emote));
+                    api.Network.BroadcastEntityPacket(entity.EntityId, 197, SerializerUtil.Serialize(emote));
 
                     return TextCommandResult.Success();
                 })

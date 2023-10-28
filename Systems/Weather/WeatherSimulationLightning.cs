@@ -49,34 +49,38 @@ namespace Vintagestory.GameContent
             {
                 api.Event.RegisterGameTickListener(OnServerTick, 40, 3);
 
-                (api as ICoreServerAPI).RegisterCommand("lntest", "", "", onCmdLineTestServer, Privilege.controlserver);
+                api.ChatCommands.GetOrCreate("debug")
+                    .BeginSubCommand("lntest")
+                        .BeginSubCommand("spawn")
+                            .WithDescription("Lightning test")
+                            .WithArgs(api.ChatCommands.Parsers.OptionalInt("range", 10))
+                            .RequiresPlayer()
+                            .RequiresPrivilege(Privilege.controlserver)
+                            .HandleWith(OnCmdLineTestServer)
+                        .EndSubCommand()
+                        .BeginSubCommand("clear")
+                            .WithDescription("Clear all lightning flashes")
+                            .RequiresPrivilege(Privilege.controlserver)
+                            .HandleWith(OnCmdLineTestServerClear)
+                        .EndSubCommand()
+                    .EndSubCommand()
+                    ;
             }
         }
 
-        private void onCmdLineTestServer(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult OnCmdLineTestServerClear(TextCommandCallingArgs args)
         {
-            if (args.PeekWord() == "clear")
-            {
-                foreach (var val in lightningFlashes) val.Dispose();
-                lightningFlashes.Clear();
-                return;
-            }
+            foreach (var val in lightningFlashes) val.Dispose();
+            lightningFlashes.Clear();
+            return TextCommandResult.Success("Cleared all lightning flashes");
+        }
 
-            var pos = player.Entity.Pos.AheadCopy((int)args.PopInt(10)).XYZ;
+        private TextCommandResult OnCmdLineTestServer(TextCommandCallingArgs args)
+        {
+            var range = (int)args.Parsers[0].GetValue();
+            var pos = args.Caller.Entity.Pos.AheadCopy(range).XYZ;
             weatherSys.SpawnLightningFlash(pos);
-        }
-
-        private void onCmdLineTest(int groupId, CmdArgs args)
-        {
-            if (args.PeekWord() == "clear")
-            {
-                foreach (var val in lightningFlashes) val.Dispose();
-                lightningFlashes.Clear();
-                return;
-            }
-
-            var pos = capi.World.Player.Entity.Pos.AheadCopy((int)args.PopInt(10)).XYZ;
-            genLightningFlash(pos);
+            return TextCommandResult.Success($"Spawned lightning {range} block ahead");
         }
 
         public void ClientTick(float dt)

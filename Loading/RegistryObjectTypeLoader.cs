@@ -1,13 +1,9 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -98,7 +94,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Item type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
+                    api.World.Logger.Error("Item type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
+                    api.World.Logger.Error(e);
                     continue;
                 }
             }
@@ -118,7 +115,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
+                    api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
+                    api.World.Logger.Error(e);
                     continue;
                 }
             }
@@ -136,7 +134,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Block type {0} could not be loaded. Will ignore. Exception thrown: {1}", entry.Key, e);
+                    api.World.Logger.Error("Block type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
+                    api.World.Logger.Error(e);
                     continue;
                 }
             }
@@ -241,7 +240,8 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     catch (Exception e)
                     {
-                        api.Server.LogError("Failed registering item {0}: {1}", item.Code, e);
+                        api.Server.Logger.Error("Failed registering item {0}:", item.Code);
+                        api.Server.Logger.Error(e);
                     }
                 }
             });
@@ -264,7 +264,8 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     catch (Exception e)
                     {
-                        api.Server.LogError("Failed registering block {0}: {1}", block.Code, e);
+                        api.Server.Logger.Error("Failed registering block {0}: {1}", block.Code);
+                        api.Server.Logger.Error(e);
                     }
                 }
             });
@@ -358,7 +359,8 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.Server.Logger.Error("Exception thrown while trying to gather all variants of the block/item/entity type with code {0}. May lead to the whole type being ignored. Exception: {1}", baseType.Code, e);
+                    api.Server.Logger.Error("Exception thrown while trying to gather all variants of the block/item/entity type with code {0}. May lead to the whole type being ignored. Exception:", baseType.Code);
+                    api.Server.Logger.Error(e);
                     return;
                 }
             }

@@ -2,10 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -189,7 +186,8 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.Server.Logger.Error("Exception thrown while trying to resolve *byType properties of type {0}, variant {1}. Will ignore most of the attributes. Exception thrown: {2}", this.Code, fullcode, e);
+                api.Server.Logger.Error("Exception thrown while trying to resolve *byType properties of type {0}, variant {1}. Will ignore most of the attributes. Exception thrown:", this.Code, fullcode);
+                api.Server.Logger.Error(e);
             }
 
             try
@@ -198,7 +196,8 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.Server.Logger.Error("Exception thrown while trying to parse json data of the type with code {0}, variant {1}. Will ignore most of the attributes. Exception: {2}", this.Code, fullcode, e);
+                api.Server.Logger.Error("Exception thrown while trying to parse json data of the type with code {0}, variant {1}. Will ignore most of the attributes. Exception:", this.Code, fullcode);
+                api.Server.Logger.Error(e);
             }
 
             resolvedType.Code = fullcode;

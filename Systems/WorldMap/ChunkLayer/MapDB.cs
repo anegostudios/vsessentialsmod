@@ -16,10 +16,10 @@ namespace Vintagestory.GameContent
     }
 
 
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    [ProtoContract]
     public class MapPieceDB
     {
-        //public int[] BlockIndices;
+        [ProtoMember(1)]
         public int[] Pixels;
     }
 

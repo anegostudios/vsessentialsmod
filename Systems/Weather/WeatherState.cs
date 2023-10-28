@@ -1,5 +1,4 @@
 ﻿using ProtoBuf;
-using ProtoBuf.Meta;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 

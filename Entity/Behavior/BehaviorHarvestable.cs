@@ -1,9 +1,7 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -15,6 +13,31 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    public class ModSystemSyncHarvestableDropsToClient : ModSystem
+    {
+        public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
+
+        public override void AssetsFinalize(ICoreAPI api)
+        {
+            base.AssetsFinalize(api);
+
+            foreach (var etype in api.World.EntityTypes)
+            {
+                foreach (var bh in etype.Server.BehaviorsAsJsonObj)
+                {
+                    if (bh["code"].AsString() == "harvestable")
+                    {
+                        if (etype.Attributes == null)
+                        {
+                            etype.Attributes = new JsonObject(JToken.Parse("{}"));
+                        }
+                        etype.Attributes.Token["harvestableDrops"] = bh["drops"].Token;
+                    }
+                }
+            }
+        }
+
+    }
 
     public class EntityBehaviorHarvestable : EntityBehavior
     {
@@ -368,6 +391,13 @@ namespace Vintagestory.GameContent
                 }
 
                 if (stack.StackSize == 0) continue;
+
+                if (stack.Collectible is IResolvableCollectible irc)
+                {
+                    var slot = new DummySlot(stack);
+                    irc.Resolve(slot, entity.World);
+                    stack = slot.Itemstack;
+                }
 
                 todrop.Add(stack);
                 if (dstack.LastDrop) break;

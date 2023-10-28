@@ -143,15 +143,17 @@ namespace Vintagestory.GameContent
             lerpedPos.Y += (entity.Pos.Y - lerpedPos.Y) * 22 * dt;
             lerpedPos.Z += (entity.Pos.Z - lerpedPos.Z) * 22 * dt;
 
-            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground);
+            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground, dt);
             if (renderInfo.ModelRef == null) return;
 
             IStandardShaderProgram prog = null;
             LoadModelMatrix(renderInfo, isShadowPass, dt);
-            
+
+            string textureSampleName = "tex";
+
             if (isShadowPass)
             {
-                rapi.CurrentActiveShader.BindTexture2D("tex2d", renderInfo.TextureId, 0);
+                textureSampleName = "tex2d";
                 float[] mvpMat = Mat4f.Mul(ModelMat, capi.Render.CurrentModelviewMatrix, ModelMat);
                 Mat4f.Mul(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
                 capi.Render.CurrentActiveShader.UniformMatrix("mvpMatrix", mvpMat);
@@ -161,7 +163,6 @@ namespace Vintagestory.GameContent
             {
                 prog = rapi.StandardShader;
                 prog.Use();
-                prog.Tex2D = renderInfo.TextureId;
                 prog.RgbaTint = entity.Swimming ? new Vec4f(0.5f, 0.5f, 0.5f, 1f) : ColorUtil.WhiteArgbVec;
                 prog.DontWarpVertices = 0;
                 prog.NormalShaded = 1;
@@ -245,7 +246,7 @@ namespace Vintagestory.GameContent
                 rapi.GlDisableCullFace();
             }
 
-            rapi.RenderMesh(renderInfo.ModelRef);
+            rapi.RenderMultiTextureMesh(renderInfo.ModelRef, textureSampleName);
 
             if (!renderInfo.CullFaces)
             {

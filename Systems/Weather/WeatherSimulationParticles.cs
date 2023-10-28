@@ -1,12 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -433,8 +429,8 @@ namespace Vintagestory.GameContent
             stormDustParticles.MinSize = 0.1f;
             stormDustParticles.MaxSize = 0.4f;
 
-            stormDustParticles.MinVelocity.Set(-0.025f + 10 * weatherData.curWindSpeed.X, 0f, -0.025f);
-            stormDustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, -0.25f, 0.05f);
+            stormDustParticles.MinVelocity.Set(-0.025f + 10 * weatherData.curWindSpeed.X, 0f, -0.025f).Mul(3);
+            stormDustParticles.AddVelocity.Set(0.05f + 4 * weatherData.curWindSpeed.X, -0.25f, 0.05f).Mul(3);
 
             for (int i = 0; i < dustParticlesPerTick; i++)
             {

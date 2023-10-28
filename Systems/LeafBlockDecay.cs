@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -13,7 +9,7 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    
+
     public class LeafBlockDecay : ModSystem
     {
         private ICoreServerAPI sapi;
@@ -35,19 +31,21 @@ namespace Vintagestory.GameContent
 
         public override void StartServerSide(ICoreServerAPI api)
         {
-            this.sapi = api;
+            sapi = api;
 
             api.Event.SaveGameLoaded += onSaveGameLoaded;
             api.Event.GameWorldSave += onGameGettingSaved;
             api.Event.RegisterEventBusListener(onLeafDecayEventReceived, 0.5, "testForDecay");
             api.Event.RegisterGameTickListener(processReadyToDecayQueue, leafRemovalInterval);
 
-            api.RegisterCommand("leafdecaydebug", "", "", onLeafdecaydebug, Privilege.controlserver);
-        }
 
-        private void onLeafdecaydebug(IServerPlayer player, int groupId, CmdArgs args)
-        {
-            player.SendMessage(groupId, "Queue sizes: pdq: " + performDecayQueue.Count + " / cdq: " + checkDecayQueue.Count, EnumChatType.Notification);
+            sapi.ChatCommands.GetOrCreate("debug")
+                .BeginSubCommand("leafdecaydebug")
+                    .WithDescription("Shows leaf decay stats")
+                    .RequiresPrivilege(Privilege.controlserver)
+                    .HandleWith(_ =>
+                        TextCommandResult.Success("Queue sizes: pdq: " + performDecayQueue.Count + " / cdq: " + checkDecayQueue.Count))
+                .EndSubCommand();
         }
 
         private void processReadyToDecayQueue(float dt)
@@ -150,7 +148,8 @@ namespace Vintagestory.GameContent
             }
             catch (Exception e)
             {
-                sapi.World.Logger.Error("Failed loading LeafBlockDecay.{0}. Resetting. Exception: {1}", name, e);
+                sapi.World.Logger.Error("Failed loading LeafBlockDecay.{0}. Resetting. Exception:", name);
+                sapi.World.Logger.Error(e);
             }
             return new HashSet<BlockPos>();
         }

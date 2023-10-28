@@ -1,10 +1,6 @@
 ﻿using Cairo;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -25,6 +21,7 @@ namespace Vintagestory.GameContent
         public override string Title => "Players";
         public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
 
+        public override string LayerGroupCode => "terrain";
 
         public PlayerMapLayer(ICoreAPI api, IWorldMapManager mapsink) : base(api, mapsink)
         {
@@ -126,6 +123,8 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap mapElem, float dt)
         {
+            if (!Active) return;
+
             foreach (var val in MapComps)
             {
                 val.Value.Render(mapElem, dt);
@@ -134,6 +133,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
         {
+            if (!Active) return;
+
             foreach (var val in MapComps)
             {
                 val.Value.OnMouseMove(args, mapElem, hoverText);
@@ -142,6 +143,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
         {
+            if (!Active) return;
+
             foreach (var val in MapComps)
             {
                 val.Value.OnMouseUpOnElement(args, mapElem);

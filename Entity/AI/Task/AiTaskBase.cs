@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Threading;
-using Vintagestory.API;
-using Vintagestory.API.Client;
-using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using System.Linq;
 using Vintagestory.API.Datastructures;

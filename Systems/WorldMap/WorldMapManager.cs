@@ -38,23 +38,22 @@ namespace Vintagestory.GameContent
         public List<Vec2i> NowHidden = new List<Vec2i>();
     }
 
-
     public class WorldMapManager : ModSystem, IWorldMapManager
     {
         public Dictionary<string, Type> MapLayerRegistry = new Dictionary<string, Type>();
+        public Dictionary<string, double> LayerGroupPositions = new Dictionary<string, double>();
 
         ICoreAPI api;
 
         // Client side stuff
         ICoreClientAPI capi;
         IClientNetworkChannel clientChannel;
-
         public GuiDialogWorldMap worldMapDlg;
-        public List<MapLayer> MapLayers = new List<MapLayer>();
         public bool IsOpened => worldMapDlg?.IsOpened() == true;
 
 
         // Client and Server side stuff
+        public List<MapLayer> MapLayers = new List<MapLayer>();
         Thread mapLayerGenThread;
         public bool IsShuttingDown { get; set; }
 
@@ -76,15 +75,18 @@ namespace Vintagestory.GameContent
 
         public void RegisterDefaultMapLayers()
         {
-            RegisterMapLayer<ChunkMapLayer>("chunks");
-            RegisterMapLayer<PlayerMapLayer>("players");
-            RegisterMapLayer<WaypointMapLayer>("waypoints");
+            RegisterMapLayer<ChunkMapLayer>("chunks", 0);
+            RegisterMapLayer<PlayerMapLayer>("players", 0.5);
+            RegisterMapLayer<WaypointMapLayer>("waypoints", 1);
         }
 
-        public void RegisterMapLayer<T>(string code) where T : MapLayer
+        public void RegisterMapLayer<T>(string code, double position) where T : MapLayer
         {
             MapLayerRegistry[code] = typeof(T);
+            LayerGroupPositions[code] = position;
         }
+
+        #region Client side
 
         public override void StartClientSide(ICoreClientAPI api)
         {
@@ -142,8 +144,8 @@ namespace Vintagestory.GameContent
             }
 
             bool exists = false;
-            var elem = (worldMapDlg.SingleComposer.GetElement("mapElem") as GuiElementMap);
-            var wml = (elem?.mapLayers.FirstOrDefault(ml => ml is WaypointMapLayer) as WaypointMapLayer);
+            var elem = worldMapDlg.SingleComposer.GetElement("mapElem") as GuiElementMap;
+            var wml = elem?.mapLayers.FirstOrDefault(ml => ml is WaypointMapLayer) as WaypointMapLayer;
             Vec3d pos = new Vec3d(x, y, z);
             if (wml != null)
             {
@@ -191,9 +193,15 @@ namespace Vintagestory.GameContent
             }
         }
 
+
+        public bool mapAllowedClient()
+        {
+            return capi.World.Config.GetBool("allowMap", true) || capi.World.Player.Privileges.IndexOf("allowMap") != -1;
+        }
+
         private void OnLoaded()
         {
-            if (capi != null && capi.World.Config.GetBool("allowMap", true))
+            if (capi != null && mapAllowedClient())
             {
                 capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
                 capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
@@ -247,7 +255,7 @@ namespace Vintagestory.GameContent
         {
             bool isDlgOpened = worldMapDlg != null && worldMapDlg.IsOpened();
 
-            if (!capi.World.Config.GetBool("allowMap", true))
+            if (!mapAllowedClient())
             {
                 if (isDlgOpened) worldMapDlg.TryClose();
                 return;
@@ -289,7 +297,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, capi);
+            worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, capi, getTabsOrdered());
             worldMapDlg.OnClosed += () => {
                 foreach (MapLayer layer in MapLayers) layer.OnMapClosedClient();
                 clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = false });
@@ -303,9 +311,22 @@ namespace Vintagestory.GameContent
             if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
         }
 
+        private List<string> getTabsOrdered()
+        {
+            Dictionary<string, double> tabs = new Dictionary<string, double>();
 
+            foreach (MapLayer layer in MapLayers)
+            {
+                if (!tabs.ContainsKey(layer.LayerGroupCode))
+                {
+                    double pos;
+                    if (!LayerGroupPositions.TryGetValue(layer.LayerGroupCode, out pos)) pos = 1;   
+                    tabs[layer.LayerGroupCode] = pos;
+                }
+            }
 
-
+            return tabs.OrderBy(val => val.Value).Select(val => val.Key).ToList();
+        }
 
         private void onViewChangedClient(List<Vec2i> nowVisible, List<Vec2i> nowHidden)
         {
@@ -337,11 +358,9 @@ namespace Vintagestory.GameContent
 
             clientChannel.SendPacket(new MapLayerUpdate() { Maplayers = maplayerdatas.ToArray() });
         }
-
+        #endregion
 
         #region Server Side
-
-
         public override void StartServerSide(ICoreServerAPI sapi)
         {
             sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLoaded);

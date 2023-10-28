@@ -7,7 +7,6 @@ using AnimatedGif;
 using SkiaSharp;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -39,26 +38,684 @@ namespace Vintagestory.GameContent
             this.sapi = sapi;
 
 #if DEBUG
-            sapi.RegisterCommand("prectest", "Precipitation test export", "", cmdPrecTestServer, Privilege.controlserver);
-            sapi.RegisterCommand("snowaccum", "Snow accum test", "", cmdSnowAccum, Privilege.controlserver);
+            sapi.ChatCommands.GetOrCreate("debug")
+            .BeginSubCommand("prectest")
+                .WithDescription("recipitation test export")
+                .RequiresPrivilege(Privilege.controlserver)
+
+                .BeginSubCommand("pos")
+                    .RequiresPlayer()
+                    .HandleWith(CmdPrecTestServerPos)
+                .EndSubCommand()
+
+                .BeginSubCommand("here")
+                    .RequiresPlayer()
+                    .HandleWith(CmdPrecTestServerHere)
+                .EndSubCommand()
+
+                .BeginSubCommand("climate")
+                    .RequiresPlayer()
+                    .WithArgs(api.ChatCommands.Parsers.OptionalBool("climate"))
+                    .HandleWith(CmdPrecTestServerClimate)
+                .EndSubCommand()
+            .EndSubCommand()
+            ;
+                
+            sapi.ChatCommands.GetOrCreate("debug")
+            .BeginSubCommand("snowaccum")
+                .WithDescription("Snow accum test")
+                .RequiresPrivilege(Privilege.controlserver)
+                
+                .BeginSubCommand("on")
+                    .HandleWith(CmdSnowAccumOn)
+                .EndSubCommand()
+                
+                .BeginSubCommand("off")
+                    .HandleWith(CmdSnowAccumOff)
+                .EndSubCommand()
+                
+                .BeginSubCommand("processhere")
+                    .RequiresPlayer()
+                    .HandleWith(CmdSnowAccumProcesshere)
+                .EndSubCommand()
+                
+                .BeginSubCommand("info")
+                    .RequiresPlayer()
+                    .HandleWith(CmdSnowAccumInfo)
+                .EndSubCommand()
+                
+                .BeginSubCommand("here")
+                    .RequiresPlayer()
+                    .WithArgs(api.ChatCommands.Parsers.OptionalFloat("amount"))
+                    .HandleWith(CmdSnowAccumHere)
+                .EndSubCommand()
+            .EndSubCommand()
+            ;
 #endif
 
-            sapi.RegisterCommand("whenwillitstopraining", "When does it finally stop to rain around here?!", "", cmdWhenWillItStopRaining, Privilege.controlserver);
-            sapi.RegisterCommand("weather", "Show/Set current weather info", "", cmdWeatherServer, Privilege.controlserver);
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.GameReady, () =>
+            {
+                sapi.ChatCommands.Create("whenwillitstopraining")
+                    .WithDescription("When does it finally stop to rain around here?!")
+                    .RequiresPrivilege(Privilege.controlserver)
+                    .RequiresPlayer()
+                    .HandleWith(CmdWhenWillItStopRaining);
+
+                var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+                sapi.ChatCommands.Create("weather")
+                    .WithDescription("Show/Set current weather info")
+                    .RequiresPrivilege(Privilege.controlserver)
+                    .HandleWith(CmdWeatherinfo)
+                
+                    .BeginSubCommand("setprecip")
+                        .WithDescription("Running with no arguments returns the current precip. override, if one is set. Including an argument overrides the precipitation intensity and in turn also the rain cloud overlay. '-1' removes all rain clouds, '0' stops any rain but keeps some rain clouds, while '1' causes the heaviest rain and full rain clouds. The server will remain indefinitely in that rain state until reset with '/weather setprecipa'.")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.OptionalWord("level"))
+                        .HandleWith(CmdWeatherSetprecip)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("setprecipa")
+                        .WithDescription("Resets the current precip override to auto mode.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherSetprecipa)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("cloudypos")
+                        .WithAlias("cyp")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.OptionalFloat("level"))
+                        .HandleWith(CmdWeatherCloudypos)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("stoprain")
+                        .WithDescription("Stops any current rain by forwarding to a time in the future where there is no rain.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherStoprain)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("acp")
+                        .WithDescription("Toggles auto-changing weather patterns.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherAcp)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("lp")
+                        .WithDescription("Lists all loaded weather patterns.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherLp)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("t")
+                        .WithDescription("Transitions to a random weather pattern.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherT)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("c")
+                        .WithDescription("Quickly transitions to a random weather pattern.")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherC)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("setw")
+                        .WithDescription("Sets the current wind pattern to the given wind pattern.")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.WordRange("windpattern", wsysServer.WindConfigs.Select(w => w.Code).ToArray()))
+                        .HandleWith(CmdWeatherSetw)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("randomevent")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherRandomevent)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("setev")
+                        .WithAlias("setevr")
+                        .WithDescription("setev - Sets a weather event globally.\n  setevr - Set a weather event only in the player's region.")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.WordRange("weather_event", wsysServer.WeatherEventConfigs.Select(w => w.Code).ToArray()), api.ChatCommands.Parsers.OptionalBool("allowStop"))
+                        .HandleWith(CmdWeatherSetev)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("set")
+                        .WithAlias("seti")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.WordRange("weatherpattern", wsysServer.WeatherConfigs.Select(w => w.Code).ToArray()))
+                        .HandleWith(CmdWeatherSet)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("setirandom")
+                        .RequiresPlayer()
+                        .HandleWith(CmdWeatherSetirandom)
+                    .EndSubCommand()
+                    
+                    .BeginSubCommand("setir")
+                        .RequiresPlayer()
+                        .WithArgs(api.ChatCommands.Parsers.WordRange("weatherpattern", wsysServer.WeatherConfigs.Select(w => w.Code).ToArray()))
+                        .HandleWith(CmdWeatherSetir)
+                    .EndSubCommand()
+                    ;
+            });
         }
 
-        private void cmdWhenWillItStopRaining(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult CmdWeatherinfo(TextCommandCallingArgs args)
         {
-            rainStopFunc(player, groupId);
+            var text = GetWeatherInfo<WeatherSystemServer>(args.Caller.Player);
+            return TextCommandResult.Success(text);
         }
 
-        private void rainStopFunc(IServerPlayer player, int groupId, bool skipForward = false)
+        private TextCommandResult CmdWeatherSetir(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.ReloadConfigs();
+            var code = args.Parsers[0].GetValue() as string;
+            
+            var player = args.Caller.Player as IServerPlayer;
+            var pos = player.Entity.SidedPos.XYZ.AsBlockPos;
+            
+            var regionX = pos.X / api.World.BlockAccessor.RegionSize;
+            var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
+
+            WeatherSimulationRegion weatherSim;
+            long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+            if (weatherSim == null)
+            {
+                return TextCommandResult.Success("Weather sim not loaded (yet) for this region");
+            }
+
+            if (weatherSim.SetWeatherPattern(code, true))
+            {
+                weatherSim.TickEvery25ms(0.025f);
+                return TextCommandResult.Success("Ok weather pattern set for current region");
+            }
+
+            return TextCommandResult.Error("No such weather pattern found");
+        }
+
+        private TextCommandResult CmdWeatherSetirandom(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.ReloadConfigs();
+    
+            bool ok = true;
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                ok &= val.Value.SetWeatherPattern(val.Value.RandomWeatherPattern().config.Code, true);
+                if (ok)
+                {
+                    val.Value.TickEvery25ms(0.025f);
+                }
+            }
+
+            if (ok)
+            {
+                return TextCommandResult.Success("Ok random weather pattern set");
+            }
+            return TextCommandResult.Error("No such weather pattern found");
+        }
+
+        private TextCommandResult CmdWeatherSet(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            var code = args.Parsers[0].GetValue() as string;
+            wsysServer.ReloadConfigs();
+            
+            var ok = true;
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                val.Value.ReloadPatterns(api.World.Seed);
+                ok &= val.Value.SetWeatherPattern(code, true);
+                if (ok)
+                {
+                    val.Value.TickEvery25ms(0.025f);
+                }
+            }
+            if (ok)
+            {
+                return TextCommandResult.Success("Ok weather pattern set for all loaded regions");
+            }
+
+            return TextCommandResult.Error("No such weather pattern found");
+        }
+
+        private TextCommandResult CmdWeatherSetev(TextCommandCallingArgs args)
+        {
+            var code = args.Parsers[0].GetValue() as string;
+            var allowStop = (bool)args.Parsers[1].GetValue();
+            var arg = args.SubCmdCode;
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.ReloadConfigs();
+            
+            var player = args.Caller.Player as IServerPlayer;
+            var pos = player.Entity.SidedPos.XYZ.AsBlockPos;
+            
+            var regionX = pos.X / api.World.BlockAccessor.RegionSize;
+            var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
+
+            WeatherSimulationRegion weatherSim;
+
+            if (arg == "setevr")
+            {
+                var index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+                if (weatherSim == null)
+                {
+                   return TextCommandResult.Success("Weather sim not loaded (yet) for this region");
+                }
+
+                if (weatherSim.SetWeatherEvent(code, true))
+                {
+                    weatherSim.CurWeatherEvent.AllowStop = allowStop;
+
+                    weatherSim.CurWeatherEvent.OnBeginUse();
+                    weatherSim.TickEvery25ms(0.025f);
+                    return TextCommandResult.Success("Ok weather event for this region set");
+                }
+
+                return TextCommandResult.Error("No such weather event found");
+            }
+
+            var ok = true;
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                ok &= val.Value.SetWeatherEvent(code, true);
+
+                val.Value.CurWeatherEvent.AllowStop = allowStop;
+
+                if (!ok) continue;
+                
+                val.Value.CurWeatherEvent.OnBeginUse();
+                val.Value.TickEvery25ms(0.025f);
+            }
+
+            if (ok)
+            {
+                return TextCommandResult.Success("Ok weather event set for all loaded regions");
+            }
+            return TextCommandResult.Error("No such weather event found");
+        }
+
+        private TextCommandResult CmdWeatherRandomevent(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                val.Value.selectRandomWeatherEvent();
+                val.Value.sendWeatherUpdatePacket();
+            }
+
+            return TextCommandResult.Success("Random weather event selected for all regions");
+        }
+
+        private TextCommandResult CmdWeatherSetw(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.ReloadConfigs();
+            var code = args.Parsers[0].GetValue() as string;
+            var ok = true;
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                val.Value.ReloadPatterns(api.World.Seed);
+
+                ok &= val.Value.SetWindPattern(code, true);
+                if (ok)
+                {
+                    val.Value.TickEvery25ms(0.025f);
+                }
+            }
+
+            if (ok)
+            {
+                return TextCommandResult.Success("Ok wind pattern set");
+            }
+
+            return TextCommandResult.Error("No such wind pattern found");
+        }
+
+        private TextCommandResult CmdWeatherC(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                val.Value.TriggerTransition(1f);
+            }
+            return TextCommandResult.Success("Ok selected another weather pattern");
+        }
+
+        private TextCommandResult CmdWeatherT(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            foreach (var val in wsysServer.weatherSimByMapRegion)
+            {
+                val.Value.TriggerTransition();
+            }
+
+            return TextCommandResult.Success("Ok transitioning to another weather pattern");
+        }
+
+        private TextCommandResult CmdWeatherLp(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            var patterns = string.Join(", ", wsysServer.WeatherConfigs.Select(c => c.Code));
+            return TextCommandResult.Success( "Patterns: " + patterns);
+        }
+
+        private TextCommandResult CmdWeatherAcp(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.autoChangePatterns = !wsysServer.autoChangePatterns;
+
+            return TextCommandResult.Success("Ok autochange weather patterns now " + (wsysServer.autoChangePatterns ? "on" : "off"));
+        }
+
+        private TextCommandResult CmdWeatherStoprain(TextCommandCallingArgs args)
+        {
+            var res  = RainStopFunc(args.Caller.Player, true);
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.broadCastConfigUpdate();
+            return res;
+        }
+
+        private TextCommandResult CmdWeatherCloudypos(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            if (args.Parsers[0].IsMissing)
+            {
+                return TextCommandResult.Success("Cloud level rel = " + wsysServer.CloudLevelRel);
+            }
+
+            wsysServer.CloudLevelRel = (float)args.Parsers[0].GetValue();
+
+            wsysServer.serverChannel.BroadcastPacket(new WeatherCloudYposPacket { CloudYRel = wsysServer.CloudLevelRel });
+
+            return TextCommandResult.Success(string.Format("Cloud level rel {0:0.##} set. (y={1})", wsysServer.CloudLevelRel, (int)(wsysServer.CloudLevelRel*wsysServer.api.World.BlockAccessor.MapSizeY)));
+        }
+
+        private TextCommandResult CmdWeatherSetprecip(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            var level = (string)args.Parsers[0].GetValue();
+            if (args.Parsers[0].IsMissing)
+            {
+                if (wsysServer.OverridePrecipitation == null)
+                {
+                    return TextCommandResult.Success("Currently no precipitation override active.");
+                }
+                return TextCommandResult.Success(string.Format("Override precipitation value is currently at {0}.", wsysServer.OverridePrecipitation));
+            }
+
+            float.TryParse(level, out var levelFloat);
+            wsysServer.OverridePrecipitation = levelFloat;
+
+            wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { 
+                OverridePrecipitation = wsysServer.OverridePrecipitation,
+                RainCloudDaysOffset = wsysServer.RainCloudDaysOffset
+            });
+            
+            return TextCommandResult.Success(string.Format("Ok precipitation set to {0}", level));
+        }
+
+        private TextCommandResult CmdWeatherSetprecipa(TextCommandCallingArgs args)
+        {
+            var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsysServer.OverridePrecipitation = null;
+            wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { 
+                OverridePrecipitation = wsysServer.OverridePrecipitation,
+                RainCloudDaysOffset = wsysServer.RainCloudDaysOffset
+            });
+            
+            return TextCommandResult.Success("Ok auto precipitation on");
+        }
+
+        private TextCommandResult CmdPrecTestServerClimate(TextCommandCallingArgs args)
+        {
+            var player = args.Caller.Player;
+            var climate = (bool)args.Parsers[0].GetValue();
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            var pos = player.Entity.Pos;
+
+            var wdt = 400;
+            var hourStep = 4f;
+            var days = 1f;
+            var posStep = 2f;
+
+            var totaldays = api.World.Calendar.TotalDays;
+  
+            var conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
+
+            int offset = wdt / 2;
+            SKBitmap bmp;
+            int[] pixels;
+            
+            if (RuntimeEnv.OS != OS.Windows)
+            {
+                return TextCommandResult.Success("Command only supported on windows, try sub argument \"here\"");
+            }
+
+            var bmpgif =  new Bitmap(wdt, wdt);
+            pixels = new int[wdt * wdt];
+            
+            using (var gif = new AnimatedGifCreator("precip.gif", 100, -1))
+            {
+                for (int i = 0; i < days * 24f; i++) {
+                    if (climate)
+                    {
+                        for (int dx = 0; dx < wdt; dx++)
+                        {
+                            for (int dz = 0; dz < wdt; dz++)
+                            {
+                                conds.Rainfall = (float)i / (days * 24f);
+                                float precip = wsys.GetRainCloudness(conds, pos.X + dx * posStep - offset, pos.Z + dz * posStep - offset, api.World.Calendar.TotalDays);
+                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (int dx = 0; dx < wdt; dx++)
+                        {
+                            for (int dz = 0; dz < wdt; dz++)
+                            {
+                                float precip = wsys.GetPrecipitation(pos.X + dx * posStep - offset, pos.Y, pos.Z + dz * posStep - offset, totaldays);
+                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                            }
+                        }
+                    }
+                    
+                    totaldays += hourStep / 24f;
+                    bmpgif.SetPixels(pixels);
+                    gif.AddFrame(bmpgif, 100, GifQuality.Grayscale);
+                }
+            }
+            return TextCommandResult.Success("Ok exported");
+        }
+
+        private TextCommandResult CmdPrecTestServerHere(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            var pos = args.Caller.Player.Entity.Pos;
+            var wdt = 400;
+            var hourStep = 4f;
+            var days = 1f;
+            var posStep = 2f;
+
+            var totaldays = api.World.Calendar.TotalDays;
+
+            var conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
+
+            var offset = wdt / 2;
+            SKBitmap bmp;
+            int[] pixels;
+
+            wdt = 400;
+            bmp = new SKBitmap(wdt, wdt);
+            pixels = new int[wdt * wdt];
+            posStep = 3f;
+            offset = wdt / 2;
+
+            for (int dx = 0; dx < wdt; dx++)
+            {
+                for (int dz = 0; dz < wdt; dz++)
+                {
+                    float x = dx * posStep - offset;
+                    float z = dz * posStep - offset;
+
+                    if ((int)x == 0 && (int)z == 0)
+                    {
+                        pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(255, 0, 0, 255);
+                        continue;
+                    }
+
+                    float precip = wsys.GetPrecipitation(pos.X + x, pos.Y, pos.Z + z, totaldays);
+                    int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
+                    pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
+                }
+            }
+
+            bmp.SetPixels(pixels);
+            bmp.Save("preciphere.png");
+            return TextCommandResult.Success("Ok exported");
+        }
+
+        private TextCommandResult CmdPrecTestServerPos(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            var pos = args.Caller.Player.Entity.Pos;
+            var precip = wsys.GetPrecipitation(pos.X, pos.Y, pos.Z, api.World.Calendar.TotalDays);
+            return TextCommandResult.Success("Prec here: " + precip);
+        }
+
+        private TextCommandResult CmdSnowAccumHere(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            float amount = (float)args.Parsers[0].GetValue();
+            var player = args.Caller.Player;
+
+            BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+            int chunksize = api.World.BlockAccessor.ChunkSize;
+            Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
+            IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
+            int reso = WeatherSimulationRegion.snowAccumResolution;
+
+            SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
+            {
+                SumTemperatureByRegionCorner = new FloatDataMap3D(reso, reso, reso),
+                SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
+            };
+
+            sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
+
+            var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, null);
+            wsys.snowSimSnowAccu.accum = 1f;
+
+            var ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
+            ba.UpdateSnowAccumMap = false;
+
+            wsys.snowSimSnowAccu.processBlockUpdates(mc, updatepacket, ba);
+            ba.Commit();
+
+            return TextCommandResult.Success("Ok, test snow accum gen complete");
+        }
+
+        private TextCommandResult CmdSnowAccumInfo(TextCommandCallingArgs args)
+        {
+            var player = args.Caller.Player as IServerPlayer;
+            BlockPos plrPos = player.Entity.Pos.AsBlockPos;
+            int chunksize = api.World.BlockAccessor.ChunkSize;
+            Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
+            IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
+
+            double lastSnowAccumUpdateTotalHours = mc.GetModdata<double>("lastSnowAccumUpdateTotalHours");
+
+            player.SendMessage(GlobalConstants.GeneralChatGroup, "lastSnowAccumUpdate: " + (api.World.Calendar.TotalHours - lastSnowAccumUpdateTotalHours) + " hours ago", EnumChatType.CommandSuccess);
+
+            int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
+            int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
+
+            WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
+            long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
+            WeatherSimulationRegion simregion;
+            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out simregion);
+
+            int reso = WeatherSimulationRegion.snowAccumResolution;
+
+            SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
+            {
+                //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
+                SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
+            };
+            float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
+
+            // Can't grow bigger than one full snow block
+            float max = 3 + 0.5f;
+
+            int len = simregion.SnowAccumSnapshots.Length;
+            int i = simregion.SnowAccumSnapshots.EndPosition;
+            
+            // This code here causes wacky snow patterns
+            // The lerp itself is fine!!!
+            while (len-- > 0)
+            {
+                SnowAccumSnapshot hoursnapshot = simregion.SnowAccumSnapshots[i];
+                i = (i + 1) % simregion.SnowAccumSnapshots.Length;
+
+                if(hoursnapshot == null) continue;
+                float[] snowaccumdata = hoursnapshot.SnowAccumulationByRegionCorner.Data;
+                for (int j = 0; j < snowaccumdata.Length; j++)
+                {
+                    sumdata[j] = GameMath.Clamp(sumdata[j] + snowaccumdata[j], -max, max);
+                }
+
+                lastSnowAccumUpdateTotalHours = Math.Max(lastSnowAccumUpdateTotalHours, hoursnapshot.TotalHours);
+            }
+
+            for (int j = 0; j < sumdata.Length; j++)
+            {
+                player.SendMessage(GlobalConstants.GeneralChatGroup, j + ": " + sumdata[j], EnumChatType.CommandSuccess);
+            }
+            return TextCommandResult.Success();
+        }
+
+        private TextCommandResult CmdSnowAccumProcesshere(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            var player = args.Caller.Player;
+            var plrPos = player.Entity.Pos.AsBlockPos;
+            var chunksize = api.World.BlockAccessor.ChunkSize;
+            var chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize); 
+
+            wsys.snowSimSnowAccu.AddToCheckQueue(chunkPos);
+            return TextCommandResult.Success("Ok, added to check queue");
+        }
+
+        private TextCommandResult CmdSnowAccumOff(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsys.snowSimSnowAccu.ProcessChunks = false;
+            return TextCommandResult.Success("Snow accum process chunks off");
+        }
+
+        private TextCommandResult CmdSnowAccumOn(TextCommandCallingArgs args)
+        {
+            var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
+            wsys.snowSimSnowAccu.ProcessChunks = true;
+            return TextCommandResult.Success("Snow accum process chunks on");
+        }
+
+        private TextCommandResult CmdWhenWillItStopRaining(TextCommandCallingArgs args)
+        {
+            return RainStopFunc(args.Caller.Player);
+        }
+
+        private TextCommandResult RainStopFunc(IPlayer player, bool skipForward = false)
         {
             WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
             if (wsys.OverridePrecipitation != null)
             {
-                player.SendMessage(groupId, string.Format("Override precipitation set, rain pattern will not change. Fix by typing /weather setprecip auto."), EnumChatType.CommandSuccess);
-                return;
+                return TextCommandResult.Success("Override precipitation set, rain pattern will not change. Fix by typing /weather setprecipa.");
             }
 
             Vec3d pos = player.Entity.Pos.XYZ;
@@ -96,562 +753,32 @@ namespace Vintagestory.GameContent
                 if (skipForward)
                 {
                     wsys.RainCloudDaysOffset += daysrainless;
-                    player.SendMessage(groupId, string.Format("Ok, forwarded rain simulation by {0:0.##} days. The rain should stop for about {1:0.##} days now", firstRainLessDay, daysrainless), EnumChatType.CommandSuccess);
-                    return;
+                    return TextCommandResult.Success( string.Format("Ok, forwarded rain simulation by {0:0.##} days. The rain should stop for about {1:0.##} days now", firstRainLessDay, daysrainless), EnumChatType.CommandSuccess);
                 }
 
-                player.SendMessage(groupId, string.Format("In about {0:0.##} days the rain should stop for about {1:0.##} days", firstRainLessDay, daysrainless), EnumChatType.CommandSuccess);
+                return TextCommandResult.Success(string.Format("In about {0:0.##} days the rain should stop for about {1:0.##} days", firstRainLessDay, daysrainless));
             }
             else
             {
-                player.SendMessage(groupId, string.Format("No rain less days found for the next 3 in-game weeks :O"), EnumChatType.CommandSuccess);
+                return TextCommandResult.Success("No rain less days found for the next 3 in-game weeks :O");
             }
         }
-
-        private void cmdSnowAccum(IServerPlayer player, int groupId, CmdArgs args)
-        {
-            WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
-
-            string cmd = args.PopWord();
-
-            if (cmd == "on")
-            {
-                wsys.snowSimSnowAccu.ProcessChunks = true;
-                player.SendMessage(groupId, "Snow accum process chunks on", EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (cmd == "off")
-            {
-                wsys.snowSimSnowAccu.ProcessChunks = false;
-                player.SendMessage(groupId, "Snow accum process chunks off", EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (cmd == "processhere")
-            {
-                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
-                int chunksize = api.World.BlockAccessor.ChunkSize;
-                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize); 
-
-                wsys.snowSimSnowAccu.AddToCheckQueue(chunkPos);
-                player.SendMessage(groupId, "Ok, added to check queue", EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (cmd == "info")
-            {
-                BlockPos plrPos = player.Entity.Pos.AsBlockPos; 
-                int chunksize = api.World.BlockAccessor.ChunkSize;
-                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
-                IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
-
-                double lastSnowAccumUpdateTotalHours = mc.GetModdata<double>("lastSnowAccumUpdateTotalHours");
-
-                player.SendMessage(groupId, "lastSnowAccumUpdate: " + (api.World.Calendar.TotalHours - lastSnowAccumUpdateTotalHours) + " hours ago", EnumChatType.CommandSuccess);
-
-                int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
-                int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
-
-                WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
-                long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-                WeatherSimulationRegion simregion;
-                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out simregion);
-
-                int reso = WeatherSimulationRegion.snowAccumResolution;
-
-                SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
-                {
-                    //SumTemperatureByRegionCorner = new API.FloatDataMap3D(reso, reso, reso),
-                    SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
-                };
-                float[] sumdata = sumsnapshot.SnowAccumulationByRegionCorner.Data;
-
-                // Can't grow bigger than one full snow block
-                float max = 3 + 0.5f;
-
-                int len = simregion.SnowAccumSnapshots.Length;
-                int i = simregion.SnowAccumSnapshots.EndPosition;
-                
-                // This code here causes wacky snow patterns
-                // The lerp itself is fine!!!
-                while (len-- > 0)
-                {
-                    SnowAccumSnapshot hoursnapshot = simregion.SnowAccumSnapshots[i];
-                    i = (i + 1) % simregion.SnowAccumSnapshots.Length;
-
-                    float[] snowaccumdata = hoursnapshot.SnowAccumulationByRegionCorner.Data;
-                    for (int j = 0; j < snowaccumdata.Length; j++)
-                    {
-                        sumdata[j] = GameMath.Clamp(sumdata[j] + snowaccumdata[j], -max, max);
-                    }
-
-                    lastSnowAccumUpdateTotalHours = Math.Max(lastSnowAccumUpdateTotalHours, hoursnapshot.TotalHours);
-                }
-
-                
-
-                for (int j = 0; j < sumdata.Length; j++)
-                {
-                    player.SendMessage(groupId, j + ": " + sumdata[j], EnumChatType.CommandSuccess);
-                }
-
-                return;
-            }
-
-            if (cmd == "here")
-            {
-                float amount = (float)args.PopFloat(0);
-
-                BlockPos plrPos = player.Entity.Pos.AsBlockPos;
-                int chunksize = api.World.BlockAccessor.ChunkSize;
-                Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
-                IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
-                int reso = WeatherSimulationRegion.snowAccumResolution;
-
-                SnowAccumSnapshot sumsnapshot = new SnowAccumSnapshot()
-                {
-                    SumTemperatureByRegionCorner = new FloatDataMap3D(reso, reso, reso),
-                    SnowAccumulationByRegionCorner = new FloatDataMap3D(reso, reso, reso)
-                };
-
-                sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
-
-                var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, null);
-                wsys.snowSimSnowAccu.accum = 1f;
-
-                var ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
-                ba.UpdateSnowAccumMap = false;
-
-                wsys.snowSimSnowAccu.processBlockUpdates(mc, updatepacket, ba);
-                ba.Commit();
-
-                player.SendMessage(groupId, "Ok, test snow accum gen complete", EnumChatType.CommandSuccess);
-                return;
-            }
-        }
-
-
-
-        private void cmdPrecTestServer(IServerPlayer player, int groupId, CmdArgs args)
-        {
-            WeatherSystemServer wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
-            EntityPos pos = player.Entity.Pos;
-
-            int wdt = 400;
-            float hourStep = 4f;
-            float days = 1f;
-            float posStep = 2f;
-
-            double totaldays = api.World.Calendar.TotalDays;
-            
-
-            string subarg = args.PopWord();
-            bool climateTest = subarg == "climate";
-
-            if (subarg == "pos")
-            {
-                float precip = wsys.GetPrecipitation(pos.X, pos.Y, pos.Z, totaldays);
-                player.SendMessage(groupId, "Prec here: " + precip, EnumChatType.CommandSuccess);
-                return;
-            }
-
-            ClimateCondition conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
-
-            int offset = wdt / 2;
-            SKBitmap bmp;
-            int[] pixels;
-
-            if (subarg == "here")
-            {
-                wdt = 400;
-                bmp = new SKBitmap(wdt, wdt);
-                pixels = new int[wdt * wdt];
-                posStep = 3f;
-                offset = wdt / 2;
-
-                for (int dx = 0; dx < wdt; dx++)
-                {
-                    for (int dz = 0; dz < wdt; dz++)
-                    {
-                        float x = dx * posStep - offset;
-                        float z = dz * posStep - offset;
-
-                        if ((int)x == 0 && (int)z == 0)
-                        {
-                            pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(255, 0, 0, 255);
-                            continue;
-                        }
-
-                        float precip = wsys.GetPrecipitation(pos.X + x, pos.Y, pos.Z + z, totaldays);
-                        int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
-                        pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
-                    }
-                }
-
-                bmp.SetPixels(pixels);
-                bmp.Save("preciphere.png");
-                player.SendMessage(groupId, "Ok exported", EnumChatType.CommandSuccess);
-
-                return;
-
-            }
-            
-            if (RuntimeEnv.OS != OS.Windows)
-            {
-                player.SendMessage(groupId, "Command only supported on windows, try sub argument \"here\"", EnumChatType.CommandError);
-                return;
-            }
-
-            var bmpgif =  new Bitmap(wdt, wdt);
-            pixels = new int[wdt * wdt];
-            
-            using (var gif = new AnimatedGifCreator("precip.gif", 100, -1))
-            {
-                for (int i = 0; i < days * 24f; i++) {
-            
-                    if (climateTest)
-                    {
-                        for (int dx = 0; dx < wdt; dx++)
-                        {
-                            for (int dz = 0; dz < wdt; dz++)
-                            {
-                                conds.Rainfall = (float)i / (days * 24f);
-                                float precip = wsys.GetRainCloudness(conds, pos.X + dx * posStep - offset, pos.Z + dz * posStep - offset, api.World.Calendar.TotalDays);
-                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
-                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
-                            }
-                        }
-            
-                    }
-                    else
-                    {
-                        for (int dx = 0; dx < wdt; dx++)
-                        {
-                            for (int dz = 0; dz < wdt; dz++)
-                            {
-                                float precip = wsys.GetPrecipitation(pos.X + dx * posStep - offset, pos.Y, pos.Z + dz * posStep - offset, totaldays);
-                                int precipi = (int)GameMath.Clamp(255 * precip, 0, 254);
-                                pixels[dz * wdt + dx] = ColorUtil.ColorFromRgba(precipi, precipi, precipi, 255);
-                            }
-                        }
-                    }
-            
-            
-                    totaldays += hourStep / 24f;
-            
-                    bmpgif.SetPixels(pixels);
-                    
-                    gif.AddFrame(bmpgif, 100, GifQuality.Grayscale);
-                    
-                }
-            
-                
-            }
-
-            player.SendMessage(groupId, "Ok exported", EnumChatType.CommandSuccess);
-        }
-
 
         public override void StartClientSide(ICoreClientAPI capi)
         {
             this.capi = capi;
-            capi.RegisterCommand("weather", "Show current weather info", "", cmdWeatherClient);
+            this.capi.ChatCommands.Create("weather")
+                .WithDescription("Show current weather info")
+                .HandleWith(CmdWeatherClient);
         }
 
-        private void cmdWeatherClient(int groupId, CmdArgs args)
+        private TextCommandResult CmdWeatherClient(TextCommandCallingArgs textCommandCallingArgs)
         {
-            string text = getWeatherInfo<WeatherSystemClient>(capi.World.Player);
-            capi.ShowChatMessage(text);
+            var text = GetWeatherInfo<WeatherSystemClient>(capi.World.Player);
+            return TextCommandResult.Success(text);
         }
 
-
-
-        private void cmdWeatherServer(IServerPlayer player, int groupId, CmdArgs args)
-        {
-            WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
-
-            int regionX = (int)player.Entity.Pos.X / sapi.World.BlockAccessor.RegionSize;
-            int regionZ = (int)player.Entity.Pos.Z / sapi.World.BlockAccessor.RegionSize;
-
-            string arg = args.PopWord();
-
-            if (arg == "setprecip")
-            {
-                if (args.Length == 0)
-                {
-                    if (wsysServer.OverridePrecipitation == null)
-                    {
-                        player.SendMessage(groupId, "Currently no precipitation override active.", EnumChatType.CommandSuccess);
-                    } else
-                    {
-                        player.SendMessage(groupId, string.Format("Override precipitation value is currently at {0}.", wsysServer.OverridePrecipitation), EnumChatType.CommandSuccess);
-                    }
-                    return;
-                }
-
-                string val = args.PopWord();
-
-                if (val == "auto")
-                {
-                    wsysServer.OverridePrecipitation = null;
-                    player.SendMessage(groupId, "Ok auto precipitation on", EnumChatType.CommandSuccess);
-
-                } else
-                {
-                    float level = val.ToFloat(0);
-                    wsysServer.OverridePrecipitation = level;
-                    player.SendMessage(groupId, string.Format("Ok precipitation set to {0}", level), EnumChatType.CommandSuccess);
-                }
-
-                wsysServer.serverChannel.BroadcastPacket(new WeatherConfigPacket() { 
-                    OverridePrecipitation = wsysServer.OverridePrecipitation,
-                    RainCloudDaysOffset = wsysServer.RainCloudDaysOffset
-                });
-
-                return;
-            }
-
-            if (arg == "cloudypos" || arg == "cyp")
-            {
-                if (args.Length==0)
-                {
-                    player.SendMessage(groupId, "Cloud level rel = " + wsysServer.CloudLevelRel, EnumChatType.CommandSuccess);
-                    return;
-                }
-
-                wsysServer.CloudLevelRel = (float)args.PopDouble(0.95f);
-
-                wsysServer.serverChannel.BroadcastPacket(new WeatherCloudYposPacket() { CloudYRel = wsysServer.CloudLevelRel });
-
-                player.SendMessage(groupId, string.Format("Cloud level rel {0:0.##} set. (y={1})", wsysServer.CloudLevelRel, (int)(wsysServer.CloudLevelRel*wsysServer.api.World.BlockAccessor.MapSizeY)), EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (arg == "stoprain")
-            {
-                rainStopFunc(player, groupId, true);
-                wsysServer.broadCastConfigUpdate();
-                return;
-            }
-
-            if (arg == "acp")
-            {
-                wsysServer.autoChangePatterns = !wsysServer.autoChangePatterns;
-                player.SendMessage(groupId, "Ok autochange weather patterns now " + (wsysServer.autoChangePatterns ? "on" : "off"), EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (arg == "lp")
-            {
-                string patterns = string.Join(", ", wsysServer.WeatherConfigs.Select(c => c.Code));
-                player.SendMessage(groupId, "Patterns: " + patterns, EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (arg == "t")
-            {
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    val.Value.TriggerTransition();
-                }
-
-                player.SendMessage(groupId, "Ok transitioning to another weather pattern", EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (arg == "c")
-            {
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    val.Value.TriggerTransition(1f);
-                }
-                player.SendMessage(groupId, "Ok selected another weather pattern", EnumChatType.CommandSuccess);
-                return;
-            }
-
-            if (arg == "setw")
-            {
-                wsysServer.ReloadConfigs();
-                string code = args.PopWord();
-                bool ok = true;
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    val.Value.ReloadPatterns(api.World.Seed);
-
-                    ok &= val.Value.SetWindPattern(code, true);
-                    if (ok)
-                    {
-                        val.Value.TickEvery25ms(0.025f);
-                    }
-                }
-
-                if (!ok)
-                {
-                    player.SendMessage(groupId, "No such wind pattern found", EnumChatType.CommandError);
-                }
-                else
-                {
-                    player.SendMessage(groupId, "Ok wind pattern set", EnumChatType.CommandSuccess);
-                }
-                return;
-            }
-
-            if (arg == "randomevent")
-            {
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    val.Value.selectRandomWeatherEvent();
-                    val.Value.sendWeatherUpdatePacket();
-                }
-
-                player.SendMessage(groupId, "Random weather event selected for all regions", EnumChatType.CommandError);
-            }
-            if (arg == "events")
-            {
-
-            }
-
-            if (arg == "setev" || arg == "setevr" || arg == "setevf")
-            {
-                wsysServer.ReloadConfigs();
-                string code = args.PopWord();
-
-                WeatherSimulationRegion weatherSim;
-
-                if (arg == "setevr")
-                {
-                    long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-                    wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
-                    if (weatherSim == null)
-                    {
-                        player.SendMessage(groupId, "Weather sim not loaded (yet) for this region", EnumChatType.CommandError);
-                        return;
-                    }
-
-                    if (weatherSim.SetWeatherEvent(code, true))
-                    {
-                        weatherSim.CurWeatherEvent.AllowStop = arg != "setevf";
-
-                        weatherSim.CurWeatherEvent.OnBeginUse();
-                        weatherSim.TickEvery25ms(0.025f);
-                        player.SendMessage(groupId, "Ok weather event for this region set", EnumChatType.CommandSuccess);
-                    }
-                    else
-                    {
-                        player.SendMessage(groupId, "No such weather event found", EnumChatType.CommandError);
-                    }
-                } else
-                {
-                    bool ok = true;
-                    foreach (var val in wsysServer.weatherSimByMapRegion)
-                    {
-                        ok &= val.Value.SetWeatherEvent(code, true);
-
-                        val.Value.CurWeatherEvent.AllowStop = arg != "setevf";
-
-                        if (ok)
-                        {
-                            val.Value.CurWeatherEvent.OnBeginUse();
-                            val.Value.TickEvery25ms(0.025f);
-                        }
-                    }
-
-                    if (!ok)
-                    {
-                        player.SendMessage(groupId, "No such weather event found", EnumChatType.CommandError);
-                    }
-                    else
-                    {
-                        player.SendMessage(groupId, "Ok weather event set for all loaded regions", EnumChatType.CommandSuccess);
-                    }
-                }
-                return;
-            }
-
-            if (arg == "set" || arg == "seti")
-            {
-                wsysServer.ReloadConfigs();
-                string code = args.PopWord();
-                bool ok = true;
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    val.Value.ReloadPatterns(api.World.Seed);
-                    ok &= val.Value.SetWeatherPattern(code, true);
-                    if (ok)
-                    {
-                        val.Value.TickEvery25ms(0.025f);
-                    }
-                }
-
-                if (!ok)
-                {
-                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
-                }
-                else
-                {
-                    player.SendMessage(groupId, "Ok weather pattern set for all loaded regions", EnumChatType.CommandSuccess);
-                }
-                return;
-            }
-
-            if (arg == "setirandom")
-            {
-                wsysServer.ReloadConfigs();
-                
-                bool ok = true;
-                foreach (var val in wsysServer.weatherSimByMapRegion)
-                {
-                    ok &= val.Value.SetWeatherPattern(val.Value.RandomWeatherPattern().config.Code, true);
-                    if (ok)
-                    {
-                        val.Value.TickEvery25ms(0.025f);
-                    }
-                }
-
-                if (!ok)
-                {
-                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
-                }
-                else
-                {
-                    player.SendMessage(groupId, "Ok random weather pattern set", EnumChatType.CommandSuccess);
-                }
-                return;
-            }
-
-            if (arg == "setir")
-            {
-                wsysServer.ReloadConfigs();
-                string code = args.PopWord();
-
-                WeatherSimulationRegion weatherSim;
-                long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
-                if (weatherSim == null)
-                {
-                    player.SendMessage(groupId, "Weather sim not loaded (yet) for this region", EnumChatType.CommandError);
-                    return;
-                }
-
-                if (weatherSim.SetWeatherPattern(code, true))
-                {
-                    weatherSim.TickEvery25ms(0.025f);
-                    player.SendMessage(groupId, "Ok weather pattern set for current region", EnumChatType.CommandSuccess);
-                } else
-                {
-                    player.SendMessage(groupId, "No such weather pattern found", EnumChatType.CommandError);
-                }
-                return;
-            }
-
-
-            string text = getWeatherInfo<WeatherSystemServer>(player);
-            player.SendMessage(groupId, text, EnumChatType.CommandSuccess);
-        }
-
-
-        private string getWeatherInfo<T>(IPlayer player) where T: WeatherSystemBase
+        private string GetWeatherInfo<T>(IPlayer player) where T: WeatherSystemBase
         {
             T wsys = api.ModLoader.GetModSystem<T>();
 
@@ -662,8 +789,8 @@ namespace Vintagestory.GameContent
 
             wreader.LoadAdjacentSimsAndLerpValues(plrPos, 1);
 
-            int regionX = (int)pos.X / api.World.BlockAccessor.RegionSize;
-            int regionZ = (int)pos.Z / api.World.BlockAccessor.RegionSize;
+            int regionX = pos.X / api.World.BlockAccessor.RegionSize;
+            int regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
 
             WeatherSimulationRegion weatherSim;
             long index2d = wsys.MapRegionIndex2D(regionX, regionZ);

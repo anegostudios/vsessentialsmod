@@ -5,6 +5,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -40,10 +41,10 @@ namespace Vintagestory.GameContent
                 entity.WatchedAttributes.MarkPathDirty("health");
             }
         }
-        
-
 
         public Dictionary<string, float> MaxHealthModifiers = new Dictionary<string, float>();
+        
+        public float _playerHealthRegenSpeed { get; set; }
 
         public void MarkDirty()
         {
@@ -72,6 +73,7 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             healthTree = entity.WatchedAttributes.GetTreeAttribute("health");
+            _playerHealthRegenSpeed = entity.Api.World.Config.GetString("playerHealthRegenSpeed", "1").ToFloat();
 
             if (healthTree == null)
             {
@@ -92,7 +94,6 @@ namespace Vintagestory.GameContent
             secondsSinceLastUpdate = (float) entity.World.Rand.NextDouble();   // Randomise which game tick these update, a starting server would otherwise start all loaded entities with the same zero timer
         }
 
-
         public override void OnGameTick(float deltaTime)
         {
             if (entity.Pos.Y < -30)
@@ -108,36 +109,35 @@ namespace Vintagestory.GameContent
 
             if (secondsSinceLastUpdate >= 1)
             {
-                secondsSinceLastUpdate = 0;
-
                 if (entity.Alive)
                 {
-                    float health = Health;  // higher performance to read this TreeAttribute only once
-                    float maxHealth = MaxHealth;
+                    var health = Health;  // higher performance to read this TreeAttribute only once
+                    var maxHealth = MaxHealth;
                     if (health < maxHealth)
                     {
-                        float recoverySpeed = 0.01f;
+                        // previous value = 0.01 , -> 0.01 / 30 = 0.000333333f (60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul))
+                        var healthRegenPerGameSecond = 0.000333333f * _playerHealthRegenSpeed; 
+                        var multiplierPerGameSec = secondsSinceLastUpdate * entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul;
 
                         // Only players have the hunger behavior, and the different nutrient saturations
                         if (entity is EntityPlayer plr)
                         {
-                            EntityBehaviorHunger ebh = entity.GetBehavior<EntityBehaviorHunger>();
+                            var ebh = entity.GetBehavior<EntityBehaviorHunger>();
 
                             if (ebh != null)
                             {
-                                if (entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode == EnumGameMode.Creative) return;
+                                if (plr.Player.WorldData.CurrentGameMode == EnumGameMode.Creative) return;
 
                                 // When below 75% satiety, autoheal starts dropping
-                                recoverySpeed = GameMath.Clamp(0.01f * ebh.Saturation / ebh.MaxSaturation * 1 / 0.75f, 0, 0.01f);
+                                healthRegenPerGameSecond = GameMath.Clamp(healthRegenPerGameSecond * ebh.Saturation / ebh.MaxSaturation * 1 / 0.75f, 0, healthRegenPerGameSecond);
 
-                                ebh.ConsumeSaturation(150f * recoverySpeed);
+                                ebh.ConsumeSaturation(150f * multiplierPerGameSec * healthRegenPerGameSecond);
                             }
                         }
 
-                        Health = Math.Min(health + recoverySpeed, maxHealth);
+                        Health = Math.Min(health + multiplierPerGameSec * healthRegenPerGameSecond, maxHealth);
                     }
                 }
-
                 if (entity is EntityPlayer && entity.World.Side == EnumAppSide.Server)
                 {
                     // A costly check every 1s for hail damage, but it applies only to players who are in the open
@@ -158,6 +158,7 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
+                secondsSinceLastUpdate = 0;
             }
         }
 
@@ -234,8 +235,16 @@ namespace Vintagestory.GameContent
             if (yDistance < 3.5f) return;
             if (gliding)
             {
-                yDistance = Math.Min(14, yDistance);
+                yDistance = Math.Min(yDistance / 2, Math.Min(14, yDistance));
                 withYMotion /= 2;
+
+                // 1.5x pi is down
+                // 1 x pi is horizontal
+                // 0.5x pi half is up
+                if (entity.ServerPos.Pitch < 1.25 * GameMath.PI)
+                {
+                    yDistance = 0;
+                }
             }
 
             // Experimentally determined - at 3.5 blocks the player has a motion of -0.19

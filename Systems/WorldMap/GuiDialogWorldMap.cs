@@ -6,55 +6,56 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
     public delegate void OnViewChangedDelegate(List<Vec2i> nowVisibleChunks, List<Vec2i> nowHiddenChunks);
 
-
     public class GuiDialogWorldMap : GuiDialogGeneric
     {
         public override bool PrefersUngrabbedMouse => true;
-
-        EnumDialogType dialogType = EnumDialogType.HUD;
         public override EnumDialogType DialogType => dialogType;
-        
-
-
-        OnViewChangedDelegate viewChanged;
-        long listenerId;
-        bool requireRecompose = false;
-
-        int mapWidth=1200, mapHeight=800;
-
-        GuiComposer fullDialog;
-        GuiComposer hudDialog;
-
         public override double DrawOrder => dialogType == EnumDialogType.HUD ? 0.07 : 0.11;
 
-        public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi) : base("", capi)
+        protected EnumDialogType dialogType = EnumDialogType.HUD;
+        protected OnViewChangedDelegate viewChanged;
+        protected long listenerId;
+        protected bool requireRecompose = false;
+        protected int mapWidth=1200, mapHeight=800;
+        protected GuiComposer fullDialog;
+        protected GuiComposer hudDialog;
+        protected List<GuiTab> tabs;
+
+        List<string> tabnames;
+        HashSet<string> renderLayerGroups = new HashSet<string>();
+
+        public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi, List<string> tabnames) : base("", capi)
         {
             this.viewChanged = viewChanged;
+            this.tabnames = tabnames;
+
             fullDialog = ComposeDialog(EnumDialogType.Dialog);
             hudDialog = ComposeDialog(EnumDialogType.HUD);
-
-            capi.RegisterCommand("worldmapsize", "Set the size of the world map dialog", "width height", onCmdMapSize);
+            
+            var parsers = capi.ChatCommands.Parsers;
+            capi.ChatCommands.GetOrCreate("map")
+                .BeginSubCommand("worldmapsize")
+                .WithDescription("Show/set worldmap size")
+                .WithArgs(parsers.OptionalInt("mapWidth", 1200), parsers.OptionalInt("mapHeight", 800))
+                .HandleWith(OnCmdMapSize);
         }
 
 
-        private void onCmdMapSize(int groupId, CmdArgs args)
+        private TextCommandResult OnCmdMapSize(TextCommandCallingArgs args)
         {
-            if (args.Length == 0)
+            if (args.Parsers[0].IsMissing)
             {
-                capi.ShowChatMessage(string.Format("Current map size: {0}x{1}", mapWidth, mapHeight));
-                return;
+                return TextCommandResult.Success($"Current map size: {mapWidth}x{mapHeight}");
             }
-
-            mapWidth = (int)args.PopInt(1200);
-            mapHeight = (int)args.PopInt(800);
+            mapWidth = (int)args.Parsers[0].GetValue();
+            mapHeight = (int)args.Parsers[1].GetValue();
             fullDialog = ComposeDialog(EnumDialogType.Dialog);
-            capi.ShowChatMessage(string.Format("Map size {0}x{1} set", mapWidth, mapHeight));
+            return TextCommandResult.Success($"Map size {mapWidth}x{mapHeight} set");
         }
 
 
@@ -101,6 +102,21 @@ namespace Vintagestory.GameContent
                 compo.Dispose();
             }
 
+            tabs = new List<GuiTab>();
+            for (int i = 0; i < tabnames.Count; i++)
+            {
+                tabs.Add(new GuiTab()
+                {
+                    Name = Lang.Get("maplayer-" + tabnames[i]),
+                    DataInt = i,
+                    Active = true,
+                });
+            }
+
+            ElementBounds tabBounds = ElementBounds.Fixed(-200, 45, 200, 545);
+
+            var maplayers = capi.ModLoader.GetModSystem<WorldMapManager>().MapLayers;
+
             compo = capi.Gui
                 .CreateCompo("worldmap" + dlgType, dialogBounds)
                 .AddShadedDialogBG(bgBounds, false)
@@ -110,7 +126,10 @@ namespace Vintagestory.GameContent
                 .EndIf()
                 .BeginChildElements(bgBounds)
                     .AddHoverText("", CairoFont.WhiteDetailText(), 350, mapBounds.FlatCopy(), "hoverText")
-                    .AddInteractiveElement(new GuiElementMap(capi.ModLoader.GetModSystem<WorldMapManager>().MapLayers, capi, this, mapBounds, dlgType == EnumDialogType.HUD), "mapElem")
+                    .AddIf(dlgType == EnumDialogType.Dialog)
+                        .AddVerticalToggleTabs(tabs.ToArray(), tabBounds, OnTabClicked, "verticalTabs")
+                    .EndIf()
+                    .AddInteractiveElement(new GuiElementMap(maplayers, capi, this, mapBounds, dlgType == EnumDialogType.HUD), "mapElem")
                 .EndChildElements()
                 .Compose()
             ;
@@ -124,7 +143,6 @@ namespace Vintagestory.GameContent
             }
             mapElem.viewChanged = viewChanged;
             mapElem.ZoomAdd(1, 0.5f, 0.5f);
-
 
 
             var hoverTextElem = compo.GetHoverText("hoverText");
@@ -147,14 +165,61 @@ namespace Vintagestory.GameContent
                             capi.ModLoader.GetModSystem<WorldMapManager>().ToggleMap(dlgtype);
                             requireRecompose = false;
                         }
-
-
                     }
                 , 100);
             }
 
+            if (dlgType == EnumDialogType.Dialog)
+            {
+                foreach (var layer in maplayers)
+                {
+                    layer.ComposeDialogExtras(this, compo);
+                }
+            }
+
             capi.World.FrameProfiler.Mark("composeworldmap");
+            updateMaplayerExtrasState();
+
             return compo;
+        }
+
+        private void OnTabClicked(int arg1, GuiTab tab)
+        {
+            string layerGroupCode = tabnames[arg1];
+
+            if (tab.Active) 
+            {
+                renderLayerGroups.Remove(layerGroupCode);
+            } else
+            {
+                renderLayerGroups.Add(layerGroupCode);
+            }
+
+            foreach (var ml in MapLayers)
+            {
+                if (ml.LayerGroupCode == layerGroupCode)
+                {
+                    ml.Active = tab.Active;
+                }
+            }
+
+            updateMaplayerExtrasState();
+        }
+
+        private void updateMaplayerExtrasState()
+        {
+            if (tabs == null) return;
+
+            for (int i = 0; i < tabs.Count; i++) 
+            {
+                string layerGroupCode = tabnames[i];
+                var tab = tabs[i];
+
+                if (Composers["worldmap-layer-" + layerGroupCode] != null)
+                {
+                    Composers["worldmap-layer-" + layerGroupCode].Enabled = tab.Active && dialogType == EnumDialogType.Dialog;
+                }
+            }
         }
 
         private void OnRecomposed()
@@ -166,12 +231,14 @@ namespace Vintagestory.GameContent
         {
             base.OnGuiOpened();
 
+            updateMaplayerExtrasState();
+
             if (dialogType == EnumDialogType.HUD)
             {
                 SingleComposer = hudDialog;
             } else
             {
-                SingleComposer = fullDialog;
+                SingleComposer = ComposeDialog(EnumDialogType.Dialog);
             }
 
             GuiElementMap mapElem = SingleComposer.GetElement("mapElem") as GuiElementMap;
@@ -208,8 +275,8 @@ namespace Vintagestory.GameContent
         
         public override void OnGuiClosed()
         {
+            updateMaplayerExtrasState();
             base.OnGuiClosed();
-
         }
 
 

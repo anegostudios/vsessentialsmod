@@ -1,6 +1,4 @@
-﻿using System.IO;
-using Vintagestory.API.Client;
-using Vintagestory.API.MathTools;
+﻿using Vintagestory.API.Client;
 
 namespace Vintagestory.GameContent
 {

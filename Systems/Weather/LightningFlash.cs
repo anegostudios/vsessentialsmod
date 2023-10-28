@@ -104,6 +104,8 @@ namespace Vintagestory.GameContent
                 pos.Z += rand.NextDouble() * 2.0 - 1 / 1.0;
             }
 
+            if (points.Count == 0) points.Add(pos.Clone());
+
             points.Reverse();
         }
 

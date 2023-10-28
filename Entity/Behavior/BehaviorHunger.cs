@@ -1,5 +1,4 @@
 ﻿using System;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -22,7 +21,6 @@ namespace Vintagestory.GameContent
         long listenerId;
         long lastMoveMs;
         ICoreAPI api;
-
 
         /*internal float FatReserves
         {
@@ -291,21 +289,24 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            sprintCounter += entityAgent != null && entityAgent.Controls.Sprint ? 1 : 0;
+            if (entityAgent != null && entityAgent.Controls.Sprint) sprintCounter++;
+            
             hungerCounter += deltaTime;
 
             // Once every 10s
             if (hungerCounter > 10)
             {
-                bool isStandingStill = (entity.World.ElapsedMilliseconds - lastMoveMs) > 3000;
-                float satLossMultiplier = isStandingStill ? 1 / 4f : 1f;
-                //if (!entityAgent.LeftHandItemSlot.Empty) satLossMultiplier *= 1.25f; - Now set in InventoryPlayerHotbar
+                var isStandingStill = (entity.World.ElapsedMilliseconds - lastMoveMs) > 3000;
+                var multiplierPerGameSec = entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul;
+                // 60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul) is the default, so we scale according to the default time multiplier
+                var satLossMultiplier = GlobalConstants.HungerSpeedModifier / 30;
+                if(isStandingStill) satLossMultiplier /= 4;
 
                 satLossMultiplier *= 1.2f * (8 + sprintCounter / 15f) / 10f;
 
                 satLossMultiplier *= entity.Stats.GetBlended("hungerrate");
 
-                ReduceSaturation(satLossMultiplier);
+                ReduceSaturation(satLossMultiplier * multiplierPerGameSec);
 
                 hungerCounter = 0;
                 sprintCounter = 0;

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -99,6 +97,7 @@ namespace Vintagestory.GameContent
                     controls.GlideSpeed = 0;
                     controls.Gliding = false;
                     controls.IsFlying = false;
+                    eplr.WalkPitch = 0;
                 }
             }
             AfterPhysicsTick();
@@ -134,11 +133,12 @@ namespace Vintagestory.GameContent
             }
 
             EntityPos pos = entity.World.Side == EnumAppSide.Server ? entity.ServerPos : entity.Pos;
-
+ 
 
             if ((controls.TriesToMove || controls.Gliding) && player is IClientPlayer)
             {
                 IClientPlayer cplr = player as IClientPlayer;
+                
 
                 float prevYaw = pos.Yaw;
                 pos.Yaw = (entity.Api as ICoreClientAPI).Input.MouseYaw;

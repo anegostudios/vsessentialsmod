@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -172,7 +167,8 @@ namespace Vintagestory.GameContent
                 return GameMath.Clamp(State.nowbaseThickness + CloudDensityNoiseCache[GameMath.Clamp(dx + NoisePadding, 0, tilesPerRegion-1), GameMath.Clamp(dz + NoisePadding, 0, tilesPerRegion-1)], 0, 1) * State.nowThicknessMul;
             } catch (Exception)
             {
-                throw new Exception(string.Format("{0}/{1} is out of range. Width/Height: {2}/{3}", dx, dz, CloudDensityNoiseCache.GetLength(0), CloudDensityNoiseCache.GetLength(1)));
+                throw new Exception(
+                    $"{dx}/{dz} is out of range. Width/Height: {CloudDensityNoiseCache.GetLength(0)}/{CloudDensityNoiseCache.GetLength(1)}");
             }
             
         }

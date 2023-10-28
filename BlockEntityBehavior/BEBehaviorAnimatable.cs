@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -108,7 +105,7 @@ namespace Vintagestory.GameContent
 
             shape.ResolveReferences(api.World.Logger, cacheDictKey);
             CacheInvTransforms(shape.Elements);
-            shape.ResolveAndLoadJoints();
+            shape.ResolveAndFindJoints(api.World.Logger, cacheDictKey);
 
             TesselationMetaData meta = new TesselationMetaData()
             {

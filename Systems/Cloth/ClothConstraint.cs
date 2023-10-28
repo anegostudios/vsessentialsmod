@@ -1,7 +1,6 @@
 ﻿using ProtoBuf;
 using System;
 using System.Collections.Generic;
-using System.Runtime.Serialization;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent

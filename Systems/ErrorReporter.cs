@@ -1,9 +1,6 @@
 ﻿using ProtoBuf;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -57,7 +54,10 @@ namespace Vintagestory.GameContent
         {
             this.capi = api;
 
-            api.RegisterCommand("errorreporter", "Reopens the error reporting dialog", "[on|off]", ClientCmdErrorRep);
+            api.ChatCommands.Create("errorreporter")
+                .WithDescription("Reopens the error reporting dialog")
+                .HandleWith(ClientCmdErrorRep);
+                
 
             api.Event.LevelFinalize += OnClientReady;
             api.Network.RegisterChannel("errorreporter")
@@ -66,15 +66,18 @@ namespace Vintagestory.GameContent
             ;
         }
 
-        private void ClientCmdErrorRep(int groupId, CmdArgs args)
+        private TextCommandResult ClientCmdErrorRep(TextCommandCallingArgs textCommandCallingArgs)
         {
             if (dialog != null && dialog.IsOpened())
             {
                 dialog.TryClose();
-                return;
+            }
+            else
+            {
+                ShowDialog();
             }
 
-            ShowDialog();
+            return TextCommandResult.Success();
         }
 
         private void OnClientReady()
@@ -121,7 +124,12 @@ namespace Vintagestory.GameContent
 
         public override void StartServerSide(ICoreServerAPI api)
         {
-            api.RegisterCommand("errorreporter", "Toggles on/off the error reporting dialog on startup", "[on|off]", OnCmdErrRep, Privilege.controlserver);
+            api.ChatCommands.Create("errorreporter")
+                .WithDescription("Toggles on/off the error reporting dialog on startup")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .WithArgs(api.ChatCommands.Parsers.Bool("activate"))
+                .HandleWith(OnCmdErrRep);
 
             serverChannel =
                api.Network.RegisterChannel("errorreporter")
@@ -144,17 +152,18 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void OnCmdErrRep(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult OnCmdErrRep(TextCommandCallingArgs args)
         {
-            bool on = (bool)args.PopBool(true);
+            var on = (bool)args.Parsers[0].GetValue();
+            var player = args.Caller.Player as IServerPlayer;            
             player.ServerData.CustomPlayerData["errorReporting"] = on ? "1" : "0";
-            player.SendMessage(groupId, Lang.Get("Error reporting now {0}", on ? "on" : "off"), EnumChatType.Notification);
+            return TextCommandResult.Success(Lang.Get("Error reporting now {0}", on ? "on" : "off"));
         }
         
 
         private void Logger_EntryAdded(EnumLogType logType, string message, params object[] args)
         {
-            if (logType == EnumLogType.Error || logType == EnumLogType.Fatal || logType == EnumLogType.Warning)
+            if (logType == EnumLogType.Error || logType == EnumLogType.Fatal || logType == EnumLogType.Warning || logType == EnumLogType.Notification)
             {
                 lock (logEntiresLock)
                 {

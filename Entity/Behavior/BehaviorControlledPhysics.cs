@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -1017,15 +1016,14 @@ namespace Vintagestory.GameContent
         /// </summary>
         public void AdjustCollisionBoxToAnimation(float dtFac)
         {
-            float[] hitboxOff = new float[4] { 0, 0, 0, 1 };
-
-            AttachmentPointAndPose apap = entity.AnimManager.Animator.GetAttachmentPointPose("Center");
+            AttachmentPointAndPose apap = entity.AnimManager.Animator?.GetAttachmentPointPose("Center");
 
             if (apap == null)
             {
                 return;
             }
 
+            float[] hitboxOff = new float[4] { 0, 0, 0, 1 };
             AttachmentPoint ap = apap.AttachPoint;
 
             float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;

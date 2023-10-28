@@ -2,29 +2,58 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
     // We probably want to just transmit these maps as int[] blockids through the mapchunks (maybe rainheightmap suffices already?)
     // make a property block.BlockColor for the blocks color
     // and have the chunk intmap cached client side
-
-
-
     public class ChunkMapLayer : RGBMapLayer
     {
-        
+        public static Dictionary<EnumBlockMaterial, string> defaultMapColorCodes = new Dictionary<EnumBlockMaterial, string>()
+        {
+            { EnumBlockMaterial.Soil, "land" },
+            { EnumBlockMaterial.Sand, "desert" },
+            { EnumBlockMaterial.Ore, "land" },
+            { EnumBlockMaterial.Gravel, "desert" },
+            { EnumBlockMaterial.Stone, "land" },
+            { EnumBlockMaterial.Leaves, "forest" },
+            { EnumBlockMaterial.Plant, "plant" },
+            { EnumBlockMaterial.Wood, "forest" },
+            { EnumBlockMaterial.Snow, "glacier" },
+            { EnumBlockMaterial.Liquid, "lake" },
+            { EnumBlockMaterial.Ice, "glacier" },
+            { EnumBlockMaterial.Lava, "lava" }
+        };
+
+        public static OrderedDictionary<string, string> hexColorsByCode = new OrderedDictionary<string, string>()
+        {
+            { "ink", "#483018" },
+            { "settlement", "#856844" },
+            { "wateredge", "#483018" },
+            { "land", "#AC8858" },
+            { "desert", "#C4A468" },
+            { "forest", "#98844C" },
+            { "road", "#805030" },
+            { "plant", "#808650" },
+            { "lake", "#CCC890" },
+            { "ocean", "#CCC890" },
+            { "glacier", "#E0E0C0" }
+        };
+
+        public OrderedDictionary<string, int> colorsByCode = new OrderedDictionary<string, int>() {};
+        int[] colors;
+
+        public byte[] block2Color;
+
         int chunksize;
         IWorldChunk[] chunksTmp;
 
@@ -39,11 +68,12 @@ namespace Vintagestory.GameContent
         public override string Title => "Terrain";
         public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
 
+        public override string LayerGroupCode => "terrain";
 
         MapDB mapdb;
         ICoreClientAPI capi;
-        Cairo.GaussianBlur blurTool;
 
+        bool colorAccurate;
 
         public string getMapDbFilePath()
         {
@@ -53,23 +83,21 @@ namespace Vintagestory.GameContent
             return Path.Combine(path, api.World.SavegameIdentifier + ".db");
         }
 
-
         
 
         public ChunkMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)
         {
+            foreach (var val in hexColorsByCode)
+            {
+                colorsByCode[val.Key] = ColorUtil.ReverseColorBytes(ColorUtil.Hex2Int(val.Value));
+            }
+
             api.Event.ChunkDirty += Event_OnChunkDirty;
-
-            blurTool = new Cairo.GaussianBlur(api.World.BlockAccessor.ChunkSize, api.World.BlockAccessor.ChunkSize);
-
             capi = api as ICoreClientAPI;
 
             if (api.Side == EnumAppSide.Server)
             {
                 (api as ICoreServerAPI).Event.DidPlaceBlock += Event_DidPlaceBlock;
-            } else
-            {
-                (api as ICoreClientAPI).RegisterCommand("map", "world map stuff", "", onMapCmd);
             }
 
             if (api.Side == EnumAppSide.Client)
@@ -83,36 +111,39 @@ namespace Vintagestory.GameContent
                 {
                     throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
                 }
+                
+                api.ChatCommands.Create("map")
+                    .BeginSubCommand("purgedb")
+                        .WithDescription("purge the map db")
+                        .HandleWith(_ =>
+                        {
+                            mapdb.Purge();
+                            return TextCommandResult.Success("Ok, db purged");
+                        })
+                    .EndSubCommand()
+                    .BeginSubCommand("redraw")
+                        .WithDescription("Redraw the map")
+                        .HandleWith(OnMapCmdRedraw)
+                    .EndSubCommand();
             }
         }
 
-        private void onMapCmd(int groupId, CmdArgs args)
+        private TextCommandResult OnMapCmdRedraw(TextCommandCallingArgs args)
         {
-            string cmd = args.PopWord();
-            ICoreClientAPI capi = api as ICoreClientAPI;
-
-            if (cmd == "purgedb")
+            foreach (MultiChunkMapComponent cmp in loadedMapData.Values)
             {
-                mapdb.Purge();
-                capi.ShowChatMessage("Ok, db purged");
+                cmp.ActuallyDispose();
             }
+            loadedMapData.Clear();
 
-            if (cmd == "redraw")
+            lock (chunksToGenLock)
             {
-                foreach (MultiChunkMapComponent cmp in loadedMapData.Values)
+                foreach (Vec2i cord in curVisibleChunks)
                 {
-                    cmp.ActuallyDispose();
-                }
-                loadedMapData.Clear();
-
-                lock (chunksToGenLock)
-                {
-                    foreach (Vec2i cord in curVisibleChunks)
-                    {
-                        chunksToGen.Enqueue(cord.Copy());
-                    }
+                    chunksToGen.Enqueue(cord.Copy());
                 }
             }
+            return TextCommandResult.Success("Redrawing map...");
         }
 
         private void Event_DidPlaceBlock(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel, ItemStack withItemStack)
@@ -146,8 +177,6 @@ namespace Vintagestory.GameContent
 
         private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
-            //api.Logger.Notification("NowDirty @{0}/{1}", chunkCoord.X, chunkCoord.Z);
-
             lock (chunksToGenLock)
             {
                 if (!mapSink.IsOpened) return;
@@ -165,21 +194,52 @@ namespace Vintagestory.GameContent
             }
         }
 
+
         public override void OnLoaded()
         {
             chunksize = api.World.BlockAccessor.ChunkSize;
-            
+            if (api.Side == EnumAppSide.Server) return;
             chunksTmp = new IWorldChunk[api.World.BlockAccessor.MapSizeY / chunksize];
+
+            colors = new int[colorsByCode.Count];
+            for (int i = 0; i < colors.Length; i++)
+            {
+                colors[i] = colorsByCode.GetValueAtIndex(i);
+            }
+
+            var blocks = api.World.Blocks;
+            block2Color = new byte[blocks.Count];
+            for (int i = 0; i < block2Color.Length; i++)
+            {
+                var block = blocks[i];
+                string colorcode = "land";
+                if (block?.Attributes != null)
+                {
+                    colorcode = block.Attributes["mapColorCode"].AsString();
+                    if (colorcode == null)
+                    {
+                        if (!defaultMapColorCodes.TryGetValue(block.BlockMaterial, out colorcode))
+                        {
+                            colorcode = "land";
+                        }
+                    }
+                }
+
+                block2Color[i] = (byte)colorsByCode.IndexOfKey(colorcode);
+                if (colorsByCode.IndexOfKey(colorcode) < 0)
+                {
+                    throw new Exception("No color exists for color code " + colorcode);
+                }
+            }
         }
 
         public override void OnMapOpenedClient()
         {
-
+            colorAccurate = api.World.Config.GetAsBool("colorAccurateWorldmap", false) || (capi.World.Player.Privileges.IndexOf("colorAccurateWorldmap") != -1);
         }
 
         public override void OnMapClosedClient()
         {
-
             lock (chunksToGenLock)
             {
                 chunksToGen.Clear();
@@ -210,7 +270,6 @@ namespace Vintagestory.GameContent
         }
 
         float mtThread1secAccum = 0f;
-
         float genAccum = 0f;
         float diskSaveAccum = 0f;
         Dictionary<Vec2i, MapPieceDB> toSaveList = new Dictionary<Vec2i, MapPieceDB>();
@@ -259,10 +318,9 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                int[] tintedPixels = new int[chunksize*chunksize];
-                //int[] untintedPixels = new int[chunksize * chunksize];
+                int[] tintedPixels = new int[chunksize * chunksize];;
 
-                bool ok = GenerateChunkImage(cord, mc, ref tintedPixels/*, ref untintedPixels*/);
+                bool ok = GenerateChunkImage(cord, mc, ref tintedPixels, colorAccurate);
                 if (!ok)
                 {
                     lock (chunksToGenLock)
@@ -327,6 +385,8 @@ namespace Vintagestory.GameContent
 
         public override void Render(GuiElementMap mapElem, float dt)
         {
+            if (!Active) return;
+
             foreach (var val in loadedMapData)
             {
                 val.Value.Render(mapElem, dt);
@@ -335,6 +395,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
         {
+            if (!Active) return;
+
             foreach (var val in loadedMapData)
             {
                 val.Value.OnMouseMove(args, mapElem, hoverText);
@@ -343,6 +405,8 @@ namespace Vintagestory.GameContent
 
         public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
         {
+            if (!Active) return;
+
             foreach (var val in loadedMapData)
             {
                 val.Value.OnMouseUpOnElement(args, mapElem);
@@ -418,10 +482,14 @@ namespace Vintagestory.GameContent
             }
         }
 
-        
 
 
-        public bool GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, ref int[] tintedImage/*, ref int[] untintedImage*/, bool withSnow = true)
+        private static bool isLake(Block block)
+        {
+            return block.BlockMaterial == EnumBlockMaterial.Liquid || (block.BlockMaterial == EnumBlockMaterial.Ice && block.Code.Path != "glacierice");
+        }
+
+        public bool GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, ref int[] tintedImage, bool colorAccurate = false)
         {
             BlockPos tmpPos = new BlockPos();
             Vec2i localpos = new Vec2i();
@@ -501,35 +569,106 @@ namespace Vintagestory.GameContent
                 if (slopedir > 0) b = 1.08f + Math.Min(0.5f, steepness / 10f) / 1.25f;
                 if (slopedir < 0) b = 0.92f - Math.Min(0.5f, steepness / 10f) / 1.25f;
 
-                if (!withSnow && block.BlockMaterial == EnumBlockMaterial.Snow)
+                if (block.BlockMaterial == EnumBlockMaterial.Snow && !colorAccurate)
                 {
                     y--;
                     cy = y / chunksize;
                     blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
                     block = api.World.Blocks[blockId];
                 }
-
                 tmpPos.Set(chunksize * chunkPos.X + localpos.X, y, chunksize * chunkPos.Y + localpos.Y);
 
+                if (colorAccurate)
+                {
+                    int avgCol = block.GetColor(capi, tmpPos);
+                    int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP, GameMath.MurmurHash3Mod(tmpPos.X, tmpPos.Y, tmpPos.Z, 30));
+                    // Why the eff is r and b flipped
+                    rndCol = ((rndCol & 0xff) << 16) | (((rndCol >> 8) & 0xff) << 8) | (((rndCol >> 16) & 0xff) << 0);
 
-                int avgCol = block.GetColor(capi, tmpPos);
-                int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP, GameMath.MurmurHash3Mod(tmpPos.X, tmpPos.Y, tmpPos.Z, 30));
-                // Why the eff is r and b flipped
-                rndCol = ((rndCol & 0xff) << 16) | (((rndCol >> 8) & 0xff) << 8) | (((rndCol>>16) & 0xff) << 0);
+                    // Add a bit of randomness to each pixel
+                    int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.6f);
 
-                // Add a bit of randomness to each pixel
-                int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.6f);
+                    tintedImage[i] = col;
+                    shadowMap[i] = (byte)(shadowMap[i] * b);
+                }
+                else
+                {
 
-                shadowMap[i] = (byte)(shadowMap[i] * b);
+                    if (isLake(block))
+                    {
+                        // Water.
+                        IWorldChunk lChunk = chunksTmp[cy];
+                        IWorldChunk rChunk = chunksTmp[cy];
+                        IWorldChunk tChunk = chunksTmp[cy];
+                        IWorldChunk bChunk = chunksTmp[cy];
 
-                tintedImage[i] = col;
+                        int leftX = localpos.X - 1;
+                        int rightX = localpos.X + 1;
+                        int topY = localpos.Y - 1;
+                        int bottomY = localpos.Y + 1;
+
+                        if (leftX < 0)
+                        {
+                            lChunk = capi.World.BlockAccessor.GetChunk(chunkPos.X - 1, cy, chunkPos.Y);
+                        }
+                        if (rightX >= chunksize)
+                        {
+                            rChunk = capi.World.BlockAccessor.GetChunk(chunkPos.X + 1, cy, chunkPos.Y);
+                        }
+                        if (topY < 0)
+                        {
+                            tChunk = capi.World.BlockAccessor.GetChunk(chunkPos.X, cy, chunkPos.Y - 1);
+                        }
+                        if (bottomY >= chunksize)
+                        {
+                            bChunk = capi.World.BlockAccessor.GetChunk(chunkPos.X, cy, chunkPos.Y + 1);
+                        }
+
+                        if (lChunk != null && rChunk != null && tChunk != null && bChunk != null)
+                        {
+                            leftX = GameMath.Mod(leftX, chunksize);
+                            rightX = GameMath.Mod(rightX, chunksize);
+                            topY = GameMath.Mod(topY, chunksize);
+                            bottomY = GameMath.Mod(bottomY, chunksize);
+
+                            Block lBlock = api.World.Blocks[lChunk.UnpackAndReadBlock(MapUtil.Index3d(leftX, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid)];
+                            Block rBlock = api.World.Blocks[rChunk.UnpackAndReadBlock(MapUtil.Index3d(rightX, y % chunksize, localpos.Y, chunksize, chunksize), BlockLayersAccess.FluidOrSolid)];
+                            Block tBlock = api.World.Blocks[tChunk.UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, topY, chunksize, chunksize), BlockLayersAccess.FluidOrSolid)];
+                            Block bBlock = api.World.Blocks[bChunk.UnpackAndReadBlock(MapUtil.Index3d(localpos.X, y % chunksize, bottomY, chunksize, chunksize), BlockLayersAccess.FluidOrSolid)];
+
+                            if (isLake(lBlock) && isLake(rBlock) && isLake(tBlock) && isLake(bBlock))
+                            {
+                                // Water.
+                                tintedImage[i] = getColor(block, localpos.X, y, localpos.Y);
+                            }
+                            else
+                            {
+                                // Border.
+                                tintedImage[i] = colorsByCode["wateredge"];
+                            }
+                        }
+                        else
+                        {
+                            // Default to water until chunks are loaded.
+                            tintedImage[i] = getColor(block, localpos.X, y, localpos.Y);
+                        }
+                    }
+                    else
+                    {
+                        shadowMap[i] = (byte)(shadowMap[i] * b);
+                        tintedImage[i] = getColor(block, localpos.X, y, localpos.Y);
+                    }
+                }
+
+
+             
             }
 
             byte[] bla = new byte[shadowMap.Length];
             for (int i = 0; i < bla.Length; i++) bla[i] = shadowMap[i];
 
             BlurTool.Blur(shadowMap, 32, 32, 2);
-            float sharpen = 1.4f;
+            float sharpen = 1.0f;
 
             for (int i = 0; i < shadowMap.Length; i++)
             {
@@ -544,9 +683,12 @@ namespace Vintagestory.GameContent
             return true;
         }
 
-
-        
-        
+        private int getColor(Block block, int x, int y1, int y2)
+        {
+            var colorIndex = block2Color[block.Id];
+            int color = colors[colorIndex];
+            return color;
+        }
 
         void rebuildRainmap(int cx, int cz)
         {
@@ -594,133 +736,5 @@ namespace Vintagestory.GameContent
             sapi.WorldManager.ResendMapChunk(cx, cz, true);
             mapchunk.MarkDirty();
         }
-    }
-
-
-    class BlurTool
-    {
-        public static void Blur(byte[] data, int sizeX, int sizeZ, int range)
-        {
-            BoxBlurHorizontal(data, range, 0, 0, sizeX, sizeZ);
-            BoxBlurVertical(data, range, 0, 0, sizeX, sizeZ);
-        }
-
-
-        internal static unsafe void BoxBlurHorizontal(byte[] map, int range, int xStart, int yStart, int xEnd, int yEnd)
-        {
-            fixed (byte* pixels = map)
-            {
-                int w = xEnd - xStart;
-                int h = yEnd - yStart;
-
-                int halfRange = range / 2;
-                int index = yStart * w;
-                byte[] newColors = new byte[w];
-
-                for (int y = yStart; y < yEnd; y++)
-                {
-                    int hits = 0;
-                    int r = 0;
-                    for (int x = xStart - halfRange; x < xEnd; x++)
-                    {
-                        int oldPixel = x - halfRange - 1;
-                        if (oldPixel >= xStart)
-                        {
-                            byte col = pixels[index + oldPixel];
-                            if (col != 0)
-                            {
-                                r -= col;
-                            }
-                            hits--;
-                        }
-
-                        int newPixel = x + halfRange;
-                        if (newPixel < xEnd)
-                        {
-                            byte col = pixels[index + newPixel];
-                            if (col != 0)
-                            {
-                                r += col;
-                            }
-                            hits++;
-                        }
-
-                        if (x >= xStart)
-                        {
-                            byte color = (byte)(r / hits);
-                            newColors[x] = color;
-                        }
-                    }
-
-                    for (int x = xStart; x < xEnd; x++)
-                    {
-                        pixels[index + x] = newColors[x];
-                    }
-
-                    index += w;
-                }
-            }
-        }
-
-        internal static unsafe void BoxBlurVertical(byte[] map, int range, int xStart, int yStart, int xEnd, int yEnd)
-        {
-            fixed (byte* pixels = map)
-            {
-                int w = xEnd - xStart;
-                int h = yEnd - yStart;
-
-                int halfRange = range / 2;
-
-                byte[] newColors = new byte[h];
-                int oldPixelOffset = -(halfRange + 1) * w;
-                int newPixelOffset = (halfRange) * w;
-
-                for (int x = xStart; x < xEnd; x++)
-                {
-                    int hits = 0;
-                    int r = 0;
-                    int index = yStart * w - halfRange * w + x;
-                    for (int y = yStart - halfRange; y < yEnd; y++)
-                    {
-                        int oldPixel = y - halfRange - 1;
-                        if (oldPixel >= yStart)
-                        {
-                            byte col = pixels[index + oldPixelOffset];
-                            if (col != 0)
-                            {
-                                r -= col;
-                            }
-                            hits--;
-                        }
-
-                        int newPixel = y + halfRange;
-                        if (newPixel < yEnd)
-                        {
-                            byte col = pixels[index + newPixelOffset];
-                            if (col != 0)
-                            {
-                                r += col;
-                            }
-                            hits++;
-                        }
-
-                        if (y >= yStart)
-                        {
-                            byte color = (byte)(r / hits);
-                            newColors[y] = color;
-                        }
-
-                        index += w;
-                    }
-
-                    for (int y = yStart; y < yEnd; y++)
-                    {
-                        pixels[y * w + x] = newColors[y];
-                    }
-                }
-            }
-        }
-
-
     }
 }

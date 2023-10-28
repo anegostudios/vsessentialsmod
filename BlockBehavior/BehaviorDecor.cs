@@ -1,12 +1,13 @@
-﻿using Vintagestory.API;
-using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
+﻿using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    public interface IAcceptsDecor
+    {
+        void SetDecor(Block blockToPlace, BlockPos pos, BlockFacing face);
+    }
 
     public class BlockBehaviorDecor : BlockBehavior
     {
@@ -49,14 +50,6 @@ namespace Vintagestory.GameContent
                 if (sides[i] == blockSel.Face)
                 {
                     BlockPos pos = blockSel.Position.AddCopy(blockSel.Face.Opposite);
-                    Block attachingBlock = world.BlockAccessor.GetBlock(pos);
-                    var mat = attachingBlock.GetBlockMaterial(world.BlockAccessor, pos);
-                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, attachingBlock, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
-                    {
-                        failureCode = "decorrequiressolid";
-                        return false;
-                    }
-                    
 
                     Block blockToPlace;
                     if (sidedVariants)
@@ -83,6 +76,24 @@ namespace Vintagestory.GameContent
                     {
                         blockToPlace = this.block;
                     }
+
+
+                    var iad = this.block.GetInterface<IAcceptsDecor>(world, pos);
+                    if (iad != null)
+                    {
+                        iad.SetDecor(blockToPlace, pos, blockSel.Face);
+                        return true;
+                    }
+
+                    Block attachingBlock = world.BlockAccessor.GetBlock(pos);
+                    var mat = attachingBlock.GetBlockMaterial(world.BlockAccessor, pos);
+                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, attachingBlock, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
+                    {
+                        failureCode = "decorrequiressolid";
+                        return false;
+                    }
+                    
+
                     
                     if (world.BlockAccessor.SetDecor(blockToPlace, pos, blockSel.Face))
                     {

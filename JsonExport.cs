@@ -1,10 +1,6 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -24,12 +20,17 @@ namespace Vintagestory.ServerMods
         {
             base.StartServerSide(api);
 
-            api.RegisterCommand("jsonexport", "Export items and blocks as json files", "", CmdExport, Privilege.controlserver);
+            api.ChatCommands.GetOrCreate("dev")
+                    .BeginSubCommand("jsonexport")
+                    .WithDescription("Export items and blocks as json files")
+                    .RequiresPrivilege(Privilege.controlserver)
+                    .HandleWith(CmdExport)
+                .EndSubCommand();
            
             this.api = api;
         }
 
-        private void CmdExport(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult CmdExport(TextCommandCallingArgs textCommandCallingArgs)
         {   
             StringBuilder sql = new StringBuilder();
             sql.Append("[");
@@ -80,6 +81,8 @@ namespace Vintagestory.ServerMods
             sql.Append("]");
 
             File.WriteAllText("items.json", sql.ToString());
+            
+            return TextCommandResult.Success("All Blocks and Items written to block.json and item.json in " + AppDomain.CurrentDomain.BaseDirectory);
         }
     }
 }
