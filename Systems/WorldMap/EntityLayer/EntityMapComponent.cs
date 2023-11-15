@@ -16,11 +16,14 @@ namespace Vintagestory.GameContent
         Vec2f viewPos = new Vec2f();
         Matrixf mvMat = new Matrixf();
 
-        public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity) : base(capi)
+        int color;
+
+        public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity, string color = null) : base(capi)
         {
             quadModel = capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
             this.Texture = texture;
             this.entity = entity;
+            this.color = color == null ? 0 : (ColorUtil.Hex2Int(color) | 255 << 24);
         }
 
         public override void Render(GuiElementMap map, float dt)
@@ -42,18 +45,29 @@ namespace Vintagestory.GameContent
             capi.Render.GlToggleBlend(true);
 
             IShaderProgram prog = api.Render.GetEngineShader(EnumShaderProgram.Gui);
-            prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
-            prog.Uniform("extraGlow", 0);
+            if (color == 0)
+            {
+                prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
+            } else
+            {
+                Vec4f vec = new Vec4f();
+                ColorUtil.ToRGBAVec4f(color, ref vec);
+                prog.Uniform("rgbaIn", vec);
+            }
+
             prog.Uniform("applyColor", 0);
+            prog.Uniform("extraGlow", 0);
             prog.Uniform("noTexture", 0f);
             prog.BindTexture2D("tex2d", Texture.TextureId, 0);
+
+            float yawoffset = player != null ? 90 : 180; // whyyyy
 
             mvMat
                 .Set(api.Render.CurrentModelviewMatrix)
                 .Translate(x, y, 60)
                 .Scale(Texture.Width, Texture.Height, 0)
                 .Scale(0.5f, 0.5f, 0)
-                .RotateZ(-entity.Pos.Yaw + 90 * GameMath.DEG2RAD)
+                .RotateZ(-entity.Pos.Yaw + yawoffset * GameMath.DEG2RAD)
             ;
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
@@ -84,6 +98,9 @@ namespace Vintagestory.GameContent
                 if (eplr != null)
                 {
                     hoverText.AppendLine("Player " + capi.World.PlayerByUid(eplr.PlayerUID)?.PlayerName);
+                } else
+                {
+                    hoverText.AppendLine(entity.GetName());
                 }
             }
         }

@@ -82,22 +82,7 @@ namespace Vintagestory.GameContent
         public event OnEntityShapeTesselationDelegate OnTesselation;
 
 
-        protected Dictionary<string, CompositeTexture> extraTexturesByTextureName
-        {
-            get
-            {
-                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTexturesByName", () => new Dictionary<string, CompositeTexture>());
-            }
-        }
-
-        protected Dictionary<AssetLocation, BakedCompositeTexture> extraTextureByLocation
-        {
-            get
-            {
-                return ObjectCacheUtil.GetOrCreate(capi, "entityShapeExtraTexturesByLoc", () => new Dictionary<AssetLocation, BakedCompositeTexture>());
-            }
-        }
-
+        
 
         public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
         protected TextureAtlasPosition skinTexPos;
@@ -105,13 +90,7 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                CompositeTexture cpt = null;
-                if (extraTexturesByTextureName?.TryGetValue(textureCode, out cpt) == true)
-                {
-                    return capi.EntityTextureAtlas.Positions[cpt.Baked.TextureSubId];
-                }
-
-                return defaultTexSource[textureCode];
+                return defaultTexSource[textureCode] ?? skinTexPos;
             }
         }
 
@@ -324,14 +303,13 @@ namespace Vintagestory.GameContent
             });
         }
 
-
+        
         protected virtual ITexPositionSource GetTextureSource()
         {
             int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
 
-            return capi.Tesselator.GetTextureSource(entity, extraTexturesByTextureName, altTexNumber);
+            return capi.Tesselator.GetTextureSource(entity, null, altTexNumber);
         }
-
 
         protected void UpdateDebugInfo(float dt)
         {
@@ -509,7 +487,7 @@ namespace Vintagestory.GameContent
 
         float accum = 0;
 
-        protected void RenderHeldItem(float dt, bool isShadowPass, bool right)
+        protected virtual void RenderHeldItem(float dt, bool isShadowPass, bool right)
         {
             IRenderAPI rapi = capi.Render;
             ItemSlot slot = right ? eagent?.RightHandItemSlot : eagent?.LeftHandItemSlot;
@@ -1054,6 +1032,7 @@ namespace Vintagestory.GameContent
         double prevAngleSwing;
         double prevPosXSwing;
         double prevPosZSwing;
+        
 
         void calcSidewaysSwivelForPlayer(float dt)
         {

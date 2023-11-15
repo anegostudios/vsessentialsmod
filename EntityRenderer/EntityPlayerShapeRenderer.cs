@@ -142,6 +142,15 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected override void RenderHeldItem(float dt, bool isShadowPass, bool right)
+        {
+            bool isHandRender = HandRenderMode && !isShadowPass;
+            if (!isHandRender || !capi.Settings.Bool["hideFpHands"])
+            {
+                base.RenderHeldItem(dt, isShadowPass, right);
+            }
+        }
+
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
         {
             bool isHandRender = HandRenderMode && !isShadowPass;
@@ -158,7 +167,10 @@ namespace Vintagestory.GameContent
                 capi.Render.CurrentActiveShader.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
             }
 
-            base.DoRender3DOpaqueBatched(dt, isShadowPass);
+            if (!isHandRender || !capi.Settings.Bool["hideFpHands"])
+            {
+                base.DoRender3DOpaqueBatched(dt, isShadowPass);
+            }
 
             if (isHandRender)
             {

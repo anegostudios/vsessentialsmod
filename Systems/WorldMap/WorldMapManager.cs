@@ -77,6 +77,7 @@ namespace Vintagestory.GameContent
         {
             RegisterMapLayer<ChunkMapLayer>("chunks", 0);
             RegisterMapLayer<PlayerMapLayer>("players", 0.5);
+            RegisterMapLayer<EntityMapLayer>("entities", 0.5);
             RegisterMapLayer<WaypointMapLayer>("waypoints", 1);
         }
 
@@ -93,8 +94,8 @@ namespace Vintagestory.GameContent
             base.StartClientSide(api);
 
             capi = api;
-            capi.Event.BlockTexturesLoaded += OnLoaded;
             capi.Event.LevelFinalize += OnLvlFinalize;
+            
             capi.Event.RegisterGameTickListener(OnClientTick, 20);
 
             capi.Settings.AddWatcher<bool>("showMinimapHud", (on) => {
@@ -177,6 +178,43 @@ namespace Vintagestory.GameContent
 
         private void OnLvlFinalize()
         {
+            if (capi != null && mapAllowedClient())
+            {
+                capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
+                capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
+                capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
+                capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
+                capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
+            }
+
+            foreach (var val in MapLayerRegistry)
+            {   
+                if (val.Key == "entities" && !api.World.Config.GetAsBool("entityMapLayer")) continue;
+                MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));
+            }
+
+
+            foreach (MapLayer layer in MapLayers)
+            {
+                layer.OnLoaded();
+            }
+
+            mapLayerGenThread = new Thread(new ThreadStart(() =>
+            {
+                while (!IsShuttingDown)
+                {
+                    foreach (MapLayer layer in MapLayers)
+                    {
+                        layer.OnOffThreadTick(20 / 1000f);
+                    }
+
+                    Thread.Sleep(20);
+                }
+            }));
+
+            mapLayerGenThread.IsBackground = true;
+            mapLayerGenThread.Start();
+
             if (capi != null && (capi.Settings.Bool["showMinimapHud"] || !capi.Settings.Bool.Exists("showMinimapHud")) && (worldMapDlg == null || !worldMapDlg.IsOpened()))
             {
                 ToggleMap(EnumDialogType.HUD);
@@ -197,45 +235,6 @@ namespace Vintagestory.GameContent
         public bool mapAllowedClient()
         {
             return capi.World.Config.GetBool("allowMap", true) || capi.World.Player.Privileges.IndexOf("allowMap") != -1;
-        }
-
-        private void OnLoaded()
-        {
-            if (capi != null && mapAllowedClient())
-            {
-                capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
-                capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
-                capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
-                capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
-                capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
-            }
-
-            foreach (var val in MapLayerRegistry)
-            {
-                MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));
-            }
-
-
-            foreach (MapLayer layer in MapLayers)
-            {
-                layer.OnLoaded();
-            }
-
-            mapLayerGenThread = new Thread(new ThreadStart(() =>
-            {
-                while (!IsShuttingDown)
-                {
-                    foreach (MapLayer layer in MapLayers)
-                    {
-                        layer.OnOffThreadTick(20/1000f);
-                    }
-
-                    Thread.Sleep(20);
-                }
-            }));
-
-            mapLayerGenThread.IsBackground = true;
-            mapLayerGenThread.Start();
         }
 
         private bool OnHotKeyWorldMapHud(KeyCombination comb)
@@ -363,7 +362,7 @@ namespace Vintagestory.GameContent
         #region Server Side
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLoaded);
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLvlFinalize);;
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => IsShuttingDown = true);
 
             serverChannel =

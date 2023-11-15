@@ -12,9 +12,6 @@ namespace Vintagestory.GameContent
     {
         Dictionary<IPlayer, EntityMapComponent> MapComps = new Dictionary<IPlayer, EntityMapComponent>();
         ICoreClientAPI capi;
-        Vec3d worldPos = new Vec3d();
-        Vec2f viewPos = new Vec2f();
-
         LoadedTexture ownTexture;
         LoadedTexture otherTexture;
 

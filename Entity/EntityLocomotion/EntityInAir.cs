@@ -3,6 +3,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
@@ -58,11 +59,15 @@ namespace Vintagestory.GameContent
 
         protected virtual void ApplyFlying(float dt, EntityPos pos, EntityControls controls)
         {
-            pos.Motion.Add(controls.FlyVector.X, (controls.Up || controls.Down) ? 0 : controls.FlyVector.Y, controls.FlyVector.Z);
+            double deltaY = controls.FlyVector.Y;
+            if (controls.Up || controls.Down)
+            {
+                float moveSpeed = dt * GlobalConstants.BaseMoveSpeed * controls.MovespeedMultiplier / 2;
+                deltaY = (controls.Up ? moveSpeed : 0) + (controls.Down ? -moveSpeed : 0);
+            }
+            if (deltaY > 0 && pos.Y % BlockPos.DimensionBoundary > BlockPos.DimensionBoundary * 3 / 4) deltaY = 0;  // Prevent entities from flying too close to dimension boundaries (e.g. capped at 24k height in the normal world, with first dimension boundary at 32k)
 
-            float moveSpeed = dt * GlobalConstants.BaseMoveSpeed * controls.MovespeedMultiplier / 2;
-
-            pos.Motion.Add(0, (controls.Up ? moveSpeed : 0) + (controls.Down ? -moveSpeed : 0), 0);
+            pos.Motion.Add(controls.FlyVector.X, deltaY, controls.FlyVector.Z);
         }
     }
 }

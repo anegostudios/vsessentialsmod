@@ -174,7 +174,8 @@ namespace Vintagestory.GameContent
 
                 TyronThreadPool.QueueTask(() =>
                 {
-                    float val = (float)Math.Pow(Math.Max(0, (capi.World.BlockAccessor.GetDistanceToRainFall(plrPos, 12, 4) - 2) / 10f), 2);
+                    var dist = capi.World.BlockAccessor.GetDistanceToRainFall(plrPos, 12, 4);
+                    float val = (float)Math.Pow(Math.Max(0, (dist - 2) / 10f), 2);
                     roomVolumePitchLoss = GameMath.Clamp(val, 0, 1);
                     searchComplete = true;
                 }, "weathersimulationsound");

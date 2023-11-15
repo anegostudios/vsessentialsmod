@@ -58,6 +58,14 @@ namespace Vintagestory.GameContent
             }
         }
 
+        bool GotElectrocuted
+        {
+            get
+            {
+                return entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Electricity;
+            }
+        }
+
         public float AnimalWeight
         {
             get
@@ -463,6 +471,10 @@ namespace Vintagestory.GameContent
                 if (GotCrushed)
                 {
                     infotext.AppendLine(Lang.Get("Looks crushed. Won't be able to harvest as much from this carcass."));
+                }
+                if (GotElectrocuted)
+                {
+                    infotext.AppendLine(Lang.Get("Looks partially charred, perhaps due to a lightning strike."));
                 }
                 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");

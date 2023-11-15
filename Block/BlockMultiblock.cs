@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
@@ -36,7 +37,7 @@ namespace Vintagestory.GameContent
     {
         bool MBCanAttachBlockAt(IBlockAccessor blockAccessor, Block block, BlockPos pos, BlockFacing blockFace, Cuboidi attachmentArea, Vec3i offsetInv);
         float MBGetLiquidBarrierHeightOnSide(BlockFacing face, BlockPos pos, Vec3i offsetInv);
-        int MBGetHeatRetention(BlockPos pos, BlockFacing facing, Vec3i offsetInv);
+        int MBGetRetention(BlockPos pos, BlockFacing facing, EnumRetentionType type, Vec3i offsetInv);
     }
 
 
@@ -326,14 +327,14 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override int GetHeatRetention(BlockPos pos, BlockFacing facing)
+        public override int GetRetention(BlockPos pos, BlockFacing facing, EnumRetentionType type)
         {
             var blockAccessor = api.World.BlockAccessor;
 
             return Handle<int, IMultiBlockBlockProperties>(
                 blockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
-                (inf) => inf.MBGetHeatRetention(pos, facing, OffsetInv),
+                (inf) => inf.MBGetRetention(pos, facing, type, OffsetInv),
                 (nblock) => base.GetHeatRetention(pos, facing),
                 (nblock) => nblock.GetHeatRetention(pos, facing)
             );
@@ -350,6 +351,29 @@ namespace Vintagestory.GameContent
                 (nblock) => base.GetLiquidBarrierHeightOnSide(face, pos),
                 (nblock) => nblock.GetLiquidBarrierHeightOnSide(face, pos)
             );
+        }
+
+        public override T GetBlockEntity<T>(BlockPos position)
+        {
+            var block = api.World.BlockAccessor.GetBlock(position.AddCopy(OffsetInv));
+
+            // Prevent endless recursion stack overflow, should we ever end up in a corrupted world situation
+            if (block is BlockMultiblock) return base.GetBlockEntity<T>(position);
+
+            return block.GetBlockEntity<T>(position.AddCopy(OffsetInv));
+        }
+
+        public override T GetBlockEntity<T>(BlockSelection blockSel)
+        {
+            var block = api.World.BlockAccessor.GetBlock(blockSel.Position.AddCopy(OffsetInv));
+
+            // Prevent endless recursion stack overflow, should we ever end up in a corrupted world situation
+            if (block is BlockMultiblock) return base.GetBlockEntity<T>(blockSel);
+
+            var bs = blockSel.Clone();
+            bs.Position.Add(OffsetInv);
+
+            return block.GetBlockEntity<T>(bs);
         }
 
         public override AssetLocation GetRotatedBlockCode(int angle)

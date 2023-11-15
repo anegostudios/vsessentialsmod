@@ -77,17 +77,17 @@ namespace Vintagestory.GameContent
                         blockToPlace = this.block;
                     }
 
+                    Block attachingBlock = world.BlockAccessor.GetBlock(pos);
 
-                    var iad = this.block.GetInterface<IAcceptsDecor>(world, pos);
+                    var iad = attachingBlock.GetInterface<IAcceptsDecor>(world, pos);
                     if (iad != null)
                     {
                         iad.SetDecor(blockToPlace, pos, blockSel.Face);
                         return true;
                     }
 
-                    Block attachingBlock = world.BlockAccessor.GetBlock(pos);
                     var mat = attachingBlock.GetBlockMaterial(world.BlockAccessor, pos);
-                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, attachingBlock, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
+                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, blockToPlace, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
                     {
                         failureCode = "decorrequiressolid";
                         return false;

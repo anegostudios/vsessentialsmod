@@ -9,7 +9,7 @@ namespace Vintagestory.GameContent
 
     public class EntitySkinnableShapeRenderer : EntityShapeRenderer
     {
-        public event Action<LoadedTexture, TextureAtlasPosition> OnReloadSkin;
+        public event Action<LoadedTexture, TextureAtlasPosition, int> OnReloadSkin;
         protected int skinTextureSubId;
         protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
         public double RenderOrder => 1;
@@ -21,20 +21,6 @@ namespace Vintagestory.GameContent
             api.Event.ReloadTextures += MarkShapeModified;
         }
 
-
-        public override TextureAtlasPosition this[string textureCode]
-        {
-            get
-            {
-                CompositeTexture cpt = null;
-                if (extraTexturesByTextureName?.TryGetValue(textureCode, out cpt) == true)
-                {
-                    return capi.EntityTextureAtlas.Positions[cpt.Baked.TextureSubId];
-                }
-
-                return skinTexPos;
-            }
-        }
 
 
         public override void TesselateShape()
@@ -104,7 +90,7 @@ namespace Vintagestory.GameContent
 
             capi.Render.GlToggleBlend(true, EnumBlendMode.Overlay);
 
-            OnReloadSkin?.Invoke(entityAtlas, skinTexPos);
+            OnReloadSkin?.Invoke(entityAtlas, skinTexPos, skinTextureSubId);
 
             int[] renderOrder = new int[]
             {
