@@ -12,6 +12,9 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorControlledPhysics : EntityBehavior, IRenderer, IServerPhysicsTicker
     {
+        public static double ascendingSpeed = 0.035;
+        public static double descendingSpeed = 0.07;
+    
         const double collisionboxReductionForInsideBlocksCheck = 0.009;
 
         protected float accumulator = 0;
@@ -452,8 +455,8 @@ namespace Vintagestory.GameContent
             {
                 if (controls.WalkVector.Y == 0)
                 {
-                    pos.Motion.Y = controls.Sneak ? Math.Max(-0.07, pos.Motion.Y - 0.07) : pos.Motion.Y;
-                    if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
+                    pos.Motion.Y = controls.Sneak ? Math.Max(-descendingSpeed, pos.Motion.Y - descendingSpeed) : pos.Motion.Y;
+                    if (controls.Jump) pos.Motion.Y = ascendingSpeed * dt * 60f;
                 }
 
 
