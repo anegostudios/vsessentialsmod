@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -99,21 +100,21 @@ namespace Vintagestory.GameContent
 
             if (dialogHasFocus)
             {
-                if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up])
+                if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up])
                 {
                     tkeyDeltaY = 15f;
                 }
-                else if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down])
+                else if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down])
                 {
                     tkeyDeltaY = -15f;
                 }
                 else tkeyDeltaY = 0;
 
-                if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left])
+                if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left])
                 {
                     tkeyDeltaX = 15f;
                 }
-                else if ( /*api.Input.KeyboardKeyStateRaw[api.Input.HotKeys["walkright"].CurrentMapping.KeyCode] || */api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right])
+                else if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right])
                 {
                     tkeyDeltaX = -15f;
                 }
@@ -243,7 +244,7 @@ namespace Vintagestory.GameContent
 
         public void EnsureMapFullyLoaded()
         {
-            int chunksize = api.World.BlockAccessor.ChunkSize;
+            const int chunksize = GlobalConstants.ChunkSize;
             
             nowVisible.Clear();
             nowHidden.Clear();
@@ -311,10 +312,10 @@ namespace Vintagestory.GameContent
             }
 
 
-            if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up] || //args.KeyCode == api.Input.HotKeys["walkforward"].CurrentMapping.KeyCode || 
-                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down] || //args.KeyCode == api.Input.HotKeys["walkbackward"].CurrentMapping.KeyCode || 
-                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left] || //args.KeyCode == api.Input.HotKeys["walkleft"].CurrentMapping.KeyCode || 
-                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right] //args.KeyCode == api.Input.HotKeys["walkright"].CurrentMapping.KeyCode
+            if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Up] ||
+                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Down] ||
+                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Left] ||
+                api.Input.KeyboardKeyStateRaw[(int)GlKeys.Right]
                )
             {
                 args.Handled = true;

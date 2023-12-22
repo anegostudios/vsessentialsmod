@@ -252,7 +252,7 @@ namespace Vintagestory.GameContent
                 blockEntityClass = api.World.ClassRegistry.GetBlockEntityClass(removedBlockentity.GetType());
             }
 
-            SimulationRange = (int)(0.75f * GlobalConstants.DefaultTrackingRange);
+            SimulationRange = (int)(0.75f * GlobalConstants.DefaultSimulationRange);
             base.Initialize(properties, api, InChunkIndex3d);
 
             // Need to capture this now before we remove the block and start to fall
@@ -488,7 +488,7 @@ namespace Vintagestory.GameContent
 
             if (Api.Side == EnumAppSide.Server)
             {
-                block = World.BlockAccessor.GetBlock(finalPos, BlockLayersAccess.SolidBlocks);
+                block = World.BlockAccessor.GetMostSolidBlock(finalPos);
 
                 if (block.OnFallOnto(World, finalPos, Block, blockEntityAttributes))
                 {
@@ -529,17 +529,16 @@ namespace Vintagestory.GameContent
             nowImpacted = true;
             
             
-            Block blockAtFinalPos = World.BlockAccessor.GetMostSolidBlock(finalPos);
-
             if (Api.Side == EnumAppSide.Server)
             {
-                if (block.IsReplacableBy(Block))
+                if (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow)
                 {
-                    if (!block.IsLiquid() || Block.BlockMaterial != EnumBlockMaterial.Snow)
-                    {
-                        UpdateBlock(false, finalPos);
-                    }
-
+                    UpdateSnowLayer(finalPos, block);
+                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
+                }
+                else if (block.IsReplacableBy(Block))
+                {
+                    UpdateBlock(false, finalPos);
                     (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
                 }
                 else
@@ -576,6 +575,17 @@ namespace Vintagestory.GameContent
             fallHandled = true;
         }
 
+        /// <summary>
+        /// Simply update the snow level at the current position, no need to touch its BlockEntity (if there is one)
+        /// </summary>
+        private void UpdateSnowLayer(BlockPos finalPos, Block block)
+        {
+            Block snowblock = block.GetSnowCoveredVariant(finalPos, block.snowLevel + 1);
+            if (snowblock != null && snowblock != block)
+            {
+                World.BlockAccessor.ExchangeBlock(snowblock.Id, finalPos);
+            }
+        }
 
         public override void OnReceivedServerPacket(int packetid, byte[] data)
         {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -50,7 +51,7 @@ namespace Vintagestory.GameContent
 
         public Dictionary<long, EntityPartitionChunk> Partitions = new Dictionary<long, EntityPartitionChunk>();
 
-        int chunkSize;
+        const int chunkSize = GlobalConstants.ChunkSize;
         int chunkMapSizeX;
         int chunkMapSizeZ;
 
@@ -74,7 +75,6 @@ namespace Vintagestory.GameContent
         public override void Start(ICoreAPI api)
         {
             this.api = api;
-            chunkSize = api.World.BlockAccessor.ChunkSize;
 
             gridSizeInBlocks = chunkSize / partitionsLength;
         }
@@ -157,7 +157,7 @@ namespace Vintagestory.GameContent
             RePartitionPlayer(player.Entity);
         }
 
-        [Obsolete("Tn version 1.18.2 and later, this returns Interactable entities only, so recommended to call GetNearestInteractableEntity() directly for clarity in the calling code")]
+        [Obsolete("In version 1.18.2 and later, this returns Interactable entities only, so recommended to call GetNearestInteractableEntity() directly for clarity in the calling code")]
         public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
             return GetNearestInteractableEntity(position, radius, matches);
@@ -201,8 +201,6 @@ namespace Vintagestory.GameContent
                     return true;
                 });
             }
-
-            
 
             return nearestEntity;
         }
@@ -261,7 +259,7 @@ namespace Vintagestory.GameContent
         }
 
         /// <summary>
-        /// Same as <see cref="WalkInteractableEntities(Vec3d, double, Action{Entity})"/> but does no exact radius distance check, walks all entities that it finds in the grid
+        /// Same as <see cref="WalkInteractableEntities(Vec3d,double,Vintagestory.API.Common.ActionConsumable{Vintagestory.API.Common.Entities.Entity}(Vintagestory.API.Common.Entities.Entity))"/> but does no exact radius distance check, walks all entities that it finds in the grid
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>

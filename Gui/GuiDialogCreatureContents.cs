@@ -22,8 +22,12 @@ namespace Vintagestory.GameContent
         {
             this.inv = inv;
             this.owningEntity = owningEntity;
-            
 
+            Compose(code);
+        }
+
+        public void Compose(string code)
+        {
             double pad = GuiElementItemSlotGrid.unscaledSlotPadding;
 
             int rows = (int)Math.Ceiling(inv.Count / 4f);
@@ -49,8 +53,7 @@ namespace Vintagestory.GameContent
                 .Compose()
             ;
         }
-        
-        
+
         private void DoSendPacket(object p)
         {
             capi.Network.SendEntityPacket(owningEntity.EntityId, p);

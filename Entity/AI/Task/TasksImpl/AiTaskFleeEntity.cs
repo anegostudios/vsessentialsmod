@@ -54,14 +54,14 @@ namespace Vintagestory.GameContent
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
 
-            if (rand.NextDouble() > 2 * executionChance) return false;
+            // If this flee behavior is due to the 'fleeondamage' condition, then lets make it react 4 times quicker
+            double chanceMod = 4;
+            if (rand.NextDouble() > 3 * executionChance) return false;
+            if (whenInEmotionState == null && rand.NextDouble() > 1/chanceMod) return false;
+
             if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
+            if (!EmotionStatesSatisifed()) return false;
 
-            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
-            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
-
-            // Double exec chance, but therefore halved here again to increase response speed for creature when aggressive
-            if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
 
             // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
             // Has to be checked every tick because the drifter attributes change during temporal storms  (grrr, this is a slow way to do it)

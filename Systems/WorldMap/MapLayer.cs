@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -35,7 +34,7 @@ namespace Vintagestory.GameContent
 
         /// <summary>
         /// Where the data is at. If server side, the server will call the method ToBytes() send that data to the client and decode it there with the FromBytes() method
-        /// If client side, no client<->server sync is done
+        /// If client side, no client &lt;-&gt; server sync is done
         /// </summary>
         public abstract EnumMapAppSide DataSide { get; }
         public virtual bool RequireChunkLoaded => true;

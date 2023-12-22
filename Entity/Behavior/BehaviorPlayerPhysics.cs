@@ -79,11 +79,15 @@ namespace Vintagestory.GameContent
                 frameTime = 1 / 60f;
             }
 
-            collisionTester.NewTick();
-            while (accumulator >= frameTime)
+            if (accumulator >= frameTime)   // Only do this code section if we will actually be ticking TickEntityPhysicsPre
             {
-                TickEntityPhysicsPre(entity, frameTime);
-                accumulator -= frameTime;
+                SetupKnockbackValues();
+                collisionTester.NewTick();
+                while (accumulator >= frameTime)
+                {
+                    TickEntityPhysicsPre(entity, frameTime);
+                    accumulator -= frameTime;
+                }
             }
 
             entity.PhysicsUpdateWatcher?.Invoke(accumulator, prevPos);
@@ -139,7 +143,6 @@ namespace Vintagestory.GameContent
             {
                 IClientPlayer cplr = player as IClientPlayer;
                 
-
                 float prevYaw = pos.Yaw;
                 pos.Yaw = (entity.Api as ICoreClientAPI).Input.MouseYaw;
 
@@ -175,6 +178,17 @@ namespace Vintagestory.GameContent
                 }
             } else
             {
+                if (!entity.Swimming && !controls.Gliding) eplr.WalkPitch = 0;
+                else if (entity.OnGround && eplr.WalkPitch != 0 && player is IClientPlayer)
+                {
+                    if (eplr.WalkPitch < 0.01f || eplr.WalkPitch > GameMath.TWOPI - 0.01f) eplr.WalkPitch = 0;
+                    else
+                    {   // Slowly revert player to upright position if feet touched the bottom of water
+                        eplr.WalkPitch = GameMath.Mod(eplr.WalkPitch, GameMath.TWOPI);
+                        eplr.WalkPitch -= GameMath.Clamp(eplr.WalkPitch, 0, 1.2f * dt * GlobalConstants.OverallSpeedMultiplier);
+                        if (eplr.WalkPitch < 0) eplr.WalkPitch = 0;
+                    }
+                }
                 float prevYaw = pos.Yaw;
                 controls.CalcMovementVectors(pos, dt);
                 pos.Yaw = prevYaw;

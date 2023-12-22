@@ -92,10 +92,9 @@ namespace Vintagestory.GameContent
             if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
 
             // React immediately on hurt, otherwise only 1/10 chance of execution
-            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || bhEmo?.IsInEmotionState(whenInEmotionState) != true) && !RecentlyAttacked) return false;
+            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || IsInEmotionState(whenInEmotionState) != true) && !RecentlyAttacked) return false;
 
-            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
-            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
+            if (!EmotionStatesSatisifed()) return false;
             if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)

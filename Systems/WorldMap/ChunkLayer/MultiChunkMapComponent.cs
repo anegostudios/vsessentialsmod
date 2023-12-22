@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -21,7 +22,7 @@ namespace Vintagestory.GameContent
         Vec2f viewPos = new Vec2f();
 
         bool[,] chunkSet = new bool[ChunkLen, ChunkLen];
-        int chunksize;
+        const int chunksize = GlobalConstants.ChunkSize;
 
         public bool AnyChunkSet
         {
@@ -52,7 +53,6 @@ namespace Vintagestory.GameContent
         public MultiChunkMapComponent(ICoreClientAPI capi, Vec2i baseChunkCord) : base(capi)
         {
             this.chunkCoord = baseChunkCord;
-            chunksize = capi.World.BlockAccessor.ChunkSize;
 
             worldPos = new Vec3d(baseChunkCord.X * chunksize, 0, baseChunkCord.Y * chunksize);
 

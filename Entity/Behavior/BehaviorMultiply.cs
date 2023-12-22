@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -11,15 +12,11 @@ namespace Vintagestory.GameContent
     {
         JsonObject typeAttributes;
         long callbackId;
+        AssetLocation[] spawnEntityCodes;
 
         internal float PregnancyDays
         {
             get { return typeAttributes["pregnancyDays"].AsFloat(3f); }
-        }
-
-        internal AssetLocation SpawnEntityCode
-        {
-            get { return new AssetLocation(typeAttributes["spawnEntityCode"].AsString("")); }
         }
 
         internal string RequiresNearbyEntityCode
@@ -115,7 +112,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        private void CheckMultiply(float dt)
+        protected virtual void CheckMultiply(float dt)
         {
             if (!entity.Alive) return;
 
@@ -153,13 +150,27 @@ namespace Vintagestory.GameContent
                 TotalDaysCooldownUntil = daysNow + (MultiplyCooldownDaysMin + rand.NextDouble() * (MultiplyCooldownDaysMax - MultiplyCooldownDaysMin));
                 IsPregnant = false;
                 entity.WatchedAttributes.MarkPathDirty("multiply");
-                EntityProperties childType = entity.World.GetEntityType(SpawnEntityCode);
 
-                int generation = entity.WatchedAttributes.GetInt("generation", 0);
-                    
+                GiveBirth(q);
+            }
+
+            entity.World.FrameProfiler.Mark("multiply");
+        }
+
+        protected virtual void GiveBirth(float q)
+        {
+            Random rand = entity.World.Rand;
+
+            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            if (spawnEntityCodes == null) PopulateSpawnEntityCodes();
+            if (spawnEntityCodes != null)
+            {
                 while (q > 1 || rand.NextDouble() < q)
                 {
                     q--;
+                    AssetLocation SpawnEntityCode = spawnEntityCodes[rand.Next(spawnEntityCodes.Length)];
+                    EntityProperties childType = entity.World.GetEntityType(SpawnEntityCode);
+                    if (childType == null) continue;
                     Entity childEntity = entity.World.ClassRegistry.CreateEntity(childType);
 
                     childEntity.ServerPos.SetFrom(entity.ServerPos);
@@ -171,13 +182,36 @@ namespace Vintagestory.GameContent
                     childEntity.WatchedAttributes.SetInt("generation", generation + 1);
                     entity.World.SpawnEntity(childEntity);
                 }
-
             }
-
-            entity.World.FrameProfiler.Mark("multiply");
         }
 
-        private bool TryGetPregnant()
+        protected virtual void PopulateSpawnEntityCodes()
+        {
+            JsonObject sec = typeAttributes["spawnEntityCodes"];   // Optional fancier syntax in version 1.19+
+            if (sec == null)
+            {
+                sec = typeAttributes["spawnEntityCode"];    // The simple property as it was pre-1.19 - can still be used, suitable for the majority of cases
+                if (sec != null) spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
+                return;
+            }
+            if (sec.IsArray())
+            {
+                SpawnEntityProperties[] codes = sec.AsArray<SpawnEntityProperties>();
+                spawnEntityCodes = new AssetLocation[codes.Length];
+                for (int i = 0; i < codes.Length; i++) spawnEntityCodes[i] = new AssetLocation(codes[i].Code ?? "");
+            }
+            else
+            {
+                spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
+            }
+        }
+
+        public override void TestCommand(object arg)
+        {
+            GiveBirth((int) arg);
+        }
+
+        protected virtual bool TryGetPregnant()
         {
             if (entity.World.Rand.NextDouble() > 0.06) return false;
             if (TotalDaysCooldownUntil > entity.World.Calendar.TotalDays) return false;
@@ -220,7 +254,7 @@ namespace Vintagestory.GameContent
             return false;
         }
 
-        private Entity GetRequiredEntityNearby()
+        protected virtual Entity GetRequiredEntityNearby()
         {
             if (RequiresNearbyEntityCode == null) return null;
 
@@ -288,5 +322,11 @@ namespace Vintagestory.GameContent
                 }
             }
         }
+    }
+
+    public class SpawnEntityProperties
+    {
+        [JsonProperty]
+        public string Code;
     }
 }

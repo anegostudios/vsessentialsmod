@@ -485,7 +485,6 @@ namespace Vintagestory.GameContent
             var conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
 
             int offset = wdt / 2;
-            SKBitmap bmp;
             int[] pixels;
             
             if (RuntimeEnv.OS != OS.Windows)
@@ -537,24 +536,19 @@ namespace Vintagestory.GameContent
         {
             var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
             var pos = args.Caller.Player.Entity.Pos;
-            var wdt = 400;
-            var hourStep = 4f;
-            var days = 1f;
-            var posStep = 2f;
 
             var totaldays = api.World.Calendar.TotalDays;
 
-            var conds = api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
+            api.World.BlockAccessor.GetClimateAt(new BlockPos((int)pos.X, (int)pos.Y, (int)pos.Z), EnumGetClimateMode.WorldGenValues, totaldays);
 
+            var wdt = 400;
             var offset = wdt / 2;
             SKBitmap bmp;
             int[] pixels;
 
-            wdt = 400;
             bmp = new SKBitmap(wdt, wdt);
             pixels = new int[wdt * wdt];
-            posStep = 3f;
-            offset = wdt / 2;
+            var posStep = 3f;
 
             for (int dx = 0; dx < wdt; dx++)
             {
@@ -595,7 +589,7 @@ namespace Vintagestory.GameContent
             var player = args.Caller.Player;
 
             BlockPos plrPos = player.Entity.Pos.AsBlockPos;
-            int chunksize = api.World.BlockAccessor.ChunkSize;
+            const int chunksize = GlobalConstants.ChunkSize;
             Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
             IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
             int reso = WeatherSimulationRegion.snowAccumResolution;
@@ -624,7 +618,7 @@ namespace Vintagestory.GameContent
         {
             var player = args.Caller.Player as IServerPlayer;
             BlockPos plrPos = player.Entity.Pos.AsBlockPos;
-            int chunksize = api.World.BlockAccessor.ChunkSize;
+            const int chunksize = GlobalConstants.ChunkSize;
             Vec2i chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize);
             IServerMapChunk mc = sapi.WorldManager.GetMapChunk(chunkPos.X, chunkPos.Y);
 
@@ -684,7 +678,7 @@ namespace Vintagestory.GameContent
             var wsys = api.ModLoader.GetModSystem<WeatherSystemServer>();
             var player = args.Caller.Player;
             var plrPos = player.Entity.Pos.AsBlockPos;
-            var chunksize = api.World.BlockAccessor.ChunkSize;
+            const int chunksize = GlobalConstants.ChunkSize;
             var chunkPos = new Vec2i(plrPos.X / chunksize, plrPos.Z / chunksize); 
 
             wsys.snowSimSnowAccu.AddToCheckQueue(chunkPos);

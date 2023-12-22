@@ -123,11 +123,5 @@ namespace Vintagestory.GameContent
             }
             return base.GetRotatedBlockCode(angle, ref handled);
         }
-
-
-        /*
-         * Still to do:
-         *   ? change rendering position of block breaking decal (only necessary for thicker Decor like Linen / Wool, flat Decor like wallpaper is already OK)
-         */
     }
 }

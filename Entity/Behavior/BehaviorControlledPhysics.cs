@@ -46,8 +46,6 @@ namespace Vintagestory.GameContent
         bool applyWindForce;
         bool isMountable;
         int knockbackState;
-        protected float kbAccum;
-        Vec3d knockbackDir;
 
         protected List<FastVec3i> traversed = new List<FastVec3i>(4);
         private IComparer<FastVec3i> fastVec3iComparer = new FastVec3iComparer();
@@ -216,24 +214,9 @@ namespace Vintagestory.GameContent
         }
 
 
-        private void SetupKnockbackValues()
+        protected void SetupKnockbackValues()
         {
             knockbackState = entity.Attributes.GetInt("dmgkb");   // pre-read this, it seems more efficient to do it once at the start of the physics tick
-            if (knockbackState > 0)
-            {
-                if (knockbackState == 1 || kbAccum + accumulator > 2 / 30f)  // if this condition is met then some knockback motion will be applied
-                {
-                    double kbx = entity.WatchedAttributes.GetDouble("kbdirX");
-                    double kby = entity.WatchedAttributes.GetDouble("kbdirY");
-                    double kbz = entity.WatchedAttributes.GetDouble("kbdirZ");
-                    knockbackDir = new Vec3d(kbx, kby, kbz);   // so preload the directions, which are fixed
-                }
-            }
-            else
-            {
-                kbAccum = 0f;
-                knockbackDir = null;
-            }
         }
 
 
@@ -272,33 +255,29 @@ namespace Vintagestory.GameContent
 
             if (knockbackState > 0)
             {
-                float acc = kbAccum + dt;
+                float acc = entity.Attributes.GetFloat("dmgkbAccum") + dt;
+                entity.Attributes.SetFloat("dmgkbAccum", acc);
 
                 if (knockbackState == 1)
                 {
                     float str = 1 * 30 * dt * (entity.OnGround ? 1 : 0.5f);
-                    pos.Motion.X += knockbackDir.X * str;
-                    pos.Motion.Y += knockbackDir.Y * str;
-                    pos.Motion.Z += knockbackDir.Z * str;
-                    if (acc <= 2 / 30f)
-                    {
-                        entity.Attributes.SetInt("dmgkb", 2);   // don't set this if it will be set to a different value in the very next code section below
-                        knockbackState = 2;
-                    }
+                    pos.Motion.X += entity.WatchedAttributes.GetDouble("kbdirX") * str;
+                    pos.Motion.Y += entity.WatchedAttributes.GetDouble("kbdirY") * str;
+                    pos.Motion.Z += entity.WatchedAttributes.GetDouble("kbdirZ") * str;
+                    entity.Attributes.SetInt("dmgkb", 2);
+                    knockbackState = 2;
                 }
 
                 if (acc > 2 / 30f)
                 {
                     entity.Attributes.SetInt("dmgkb", 0);
                     knockbackState = 0;
-                    acc = 0;
+                    entity.Attributes.SetFloat("dmgkbAccum", 0);
                     float str = 0.5f * 30 * dt;
-                    pos.Motion.X -= knockbackDir.X * str;
-                    pos.Motion.Y -= knockbackDir.Y * str;
-                    pos.Motion.Z -= knockbackDir.Z * str;
+                    pos.Motion.X -= entity.WatchedAttributes.GetDouble("kbdirX") * str;
+                    pos.Motion.Y -= entity.WatchedAttributes.GetDouble("kbdirY") * str;
+                    pos.Motion.Z -= entity.WatchedAttributes.GetDouble("kbdirZ") * str;
                 }
-
-                kbAccum = acc;
             }
 
             EntityAgent agent = entity as EntityAgent;
@@ -378,7 +357,7 @@ namespace Vintagestory.GameContent
             entity.ClimbingIntoFace = null;
 
 
-            if (/*!onGroundBefore &&*/ entity.Properties.CanClimb == true)
+            if (!controls.Gliding && entity.Properties.CanClimb == true)
             {
                 int height = (int)Math.Ceiling(entity.CollisionBox.Y2);
 
@@ -455,11 +434,6 @@ namespace Vintagestory.GameContent
                     pos.Motion.Y = controls.Sneak ? Math.Max(-0.07, pos.Motion.Y - 0.07) : pos.Motion.Y;
                     if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
                 }
-
-
-                // what was this for? it causes jitter
-                // moveDelta.Y = pos.Motion.Y * dt * 60f;
-                // nextPosition.Set(pos.X + moveDelta.X, pos.Y + moveDelta.Y, pos.Z + moveDelta.Z);
             }
 
 #if PERFTEST
@@ -705,13 +679,17 @@ namespace Vintagestory.GameContent
             var outerX = walkVecNormalized.X * searchBoxLength;
             var outerZ = walkVecNormalized.Z * searchBoxLength;
 
+            double sensorWidthZ = (entityCollisionBox.Width - 0.001) * 0.5;
+            double sensorWidthX = Math.Abs(walkVecNormalized.Z * sensorWidthZ);
+            sensorWidthZ = Math.Abs(walkVecNormalized.X * sensorWidthZ);
+
             entitySensorBox = new Cuboidd
             {
-                X1 = Math.Min(0, outerX),
-                X2 = Math.Max(0, outerX),
+                X1 = Math.Min(0, outerX) - sensorWidthX,
+                X2 = Math.Max(0, outerX) + sensorWidthX,
 
-                Z1 = Math.Min(0, outerZ),
-                Z2 = Math.Max(0, outerZ),
+                Z1 = Math.Min(0, outerZ) - sensorWidthZ,
+                Z2 = Math.Max(0, outerZ) + sensorWidthZ,
 
 
                 //Y1 = entity.CollisionBox.Y1 - (entity.CollidedVertically ? 0 : 0.05), //also check below if not on ground
@@ -720,12 +698,10 @@ namespace Vintagestory.GameContent
                 Y2 = searchHeight
             };
 
-            entitySensorBox.Translate(center.X, 0, center.Y);
-            entitySensorBox.Translate(pos.X, pos.Y, pos.Z);
+            entitySensorBox.Translate(pos.X + center.X, pos.Y, pos.Z + center.Y);
 
             Vec3d testVec = new Vec3d();
             Vec2d testMotion = new Vec2d();
-
 
             List<Cuboidd> stepableBoxes = FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBox, moveDelta.Y, walkVec);
 
@@ -733,33 +709,33 @@ namespace Vintagestory.GameContent
             {
                 if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, walkVec.Z), dtFac, stepableBoxes, entityCollisionBox)) return true;
 
-                Cuboidd entitySensorBoxXAligned = entitySensorBox.Clone();
-                if (entitySensorBoxXAligned.Z1 == pos.Z + center.Y)
+                Cuboidd entitySensorBoxXZAligned = entitySensorBox.Clone();
+                if (entitySensorBoxXZAligned.Z1 == pos.Z + center.Y - sensorWidthZ)
                 {
-                    entitySensorBoxXAligned.Z2 = entitySensorBoxXAligned.Z1;
+                    entitySensorBoxXZAligned.Z2 = entitySensorBoxXZAligned.Z1 + entityCollisionBox.Width;
                 }
                 else
                 {
-                    entitySensorBoxXAligned.Z1 = entitySensorBoxXAligned.Z2;
+                    entitySensorBoxXZAligned.Z1 = entitySensorBoxXZAligned.Z2 - entityCollisionBox.Width;
                 }
 
 
 
-                if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, 0), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXAligned, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox)) return true;
+                if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, 0), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXZAligned, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox)) return true;
 
 
-                Cuboidd entitySensorBoxZAligned = entitySensorBox.Clone();
-                if (entitySensorBoxZAligned.X1 == pos.X + center.X)
+                entitySensorBoxXZAligned.Set(entitySensorBox);
+                if (entitySensorBoxXZAligned.X1 == pos.X + center.X - sensorWidthX)
                 {
-                    entitySensorBoxZAligned.X2 = entitySensorBoxZAligned.X1;
+                    entitySensorBoxXZAligned.X2 = entitySensorBoxXZAligned.X1 + entityCollisionBox.Width;
                 }
                 else
                 {
-                    entitySensorBoxZAligned.X1 = entitySensorBoxZAligned.X2;
+                    entitySensorBoxXZAligned.X1 = entitySensorBoxXZAligned.X2 - entityCollisionBox.Width;
                 }
 
 
-                if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
+                if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
 
             }
 
@@ -816,25 +792,24 @@ namespace Vintagestory.GameContent
         /// Get all blocks colliding with entityBoxRel
         /// </summary>
         /// <param name="blockAccessor"></param>
-        /// <param name="entityBoxRel"></param>
+        /// <param name="entityBox"></param>
         /// <param name="pos"></param>
         /// <param name="blocks">The found blocks</param>
         /// <param name="alsoCheckTouch"></param>
         /// <returns>If any blocks have been found</returns>
-        public bool GetCollidingCollisionBox(IBlockAccessor blockAccessor, Cuboidf entityBoxRel, Vec3d pos, out CachedCuboidList blocks, bool alsoCheckTouch = true)
+        public bool GetCollidingCollisionBox(IBlockAccessor blockAccessor, Cuboidd entityBox, out CachedCuboidList blocks, bool alsoCheckTouch = true)
         {
             blocks = new CachedCuboidList();
             BlockPos blockPos = new BlockPos();
+            blockPos.dimension = entity.Pos.Dimension;
             Vec3d blockPosVec = new Vec3d();
-            Cuboidd entityBox = entityBoxRel.ToDouble().Translate(pos);
 
-
-            int minX = (int)(entityBoxRel.MinX + pos.X);
-            int minY = (int)(entityBoxRel.MinY + pos.Y - 1);  // -1 for the extra high collision box of fences
-            int minZ = (int)(entityBoxRel.MinZ + pos.Z);
-            int maxX = (int)Math.Ceiling(entityBoxRel.MaxX + pos.X);
-            int maxY = (int)Math.Ceiling(entityBoxRel.MaxY + pos.Y);
-            int maxZ = (int)Math.Ceiling(entityBoxRel.MaxZ + pos.Z);
+            int minX = (int)(entityBox.MinX);
+            int minY = (int)(entityBox.MinY - 1);  // -1 to deepen the search in case the block below has a collision box higher than Y2==1.0, e.g. fences
+            int minZ = (int)(entityBox.MinZ);
+            int maxX = (int)Math.Ceiling(entityBox.MaxX);
+            int maxY = (int)Math.Ceiling(entityBox.MaxY);
+            int maxZ = (int)Math.Ceiling(entityBox.MaxZ);
 
             for (int y = minY; y <= maxY; y++)
             {
@@ -842,22 +817,21 @@ namespace Vintagestory.GameContent
                 {
                     for (int z = minZ; z <= maxZ; z++)
                     {
-                        Block block = blockAccessor.GetBlock(x, y, z);
                         blockPos.Set(x, y, z);
-                        blockPosVec.Set(x, y, z);
+                        Block block = blockAccessor.GetBlock(blockPos);
 
                         Cuboidf[] collisionBoxes = block.GetCollisionBoxes(blockAccessor, blockPos);
+                        if (collisionBoxes == null) continue;
 
-                        for (int i = 0; collisionBoxes != null && i < collisionBoxes.Length; i++)
+                        blockPosVec.Set(x, y, z);
+                        for (int i = 0; i < collisionBoxes.Length; i++)
                         {
                             Cuboidf collBox = collisionBoxes[i];
                             if (collBox == null) continue;
 
-                            bool colliding = alsoCheckTouch ? entityBox.IntersectsOrTouches(collBox, blockPosVec) : entityBox.Intersects(collBox, blockPosVec);
-                            if (colliding)
+                            if (alsoCheckTouch ? entityBox.IntersectsOrTouches(collBox, blockPosVec) : entityBox.Intersects(collBox, blockPosVec))
                             {
                                 blocks.Add(collBox, x, y, z, block);
-
                             }
                         }
                     }
@@ -871,7 +845,7 @@ namespace Vintagestory.GameContent
         {
 
             var stepableBoxes = new List<Cuboidd>();
-            GetCollidingCollisionBox(entity.World.BlockAccessor, entitySensorBox.ToFloat(), new Vec3d(), out var blocks, true);
+            GetCollidingCollisionBox(entity.World.BlockAccessor, entitySensorBox, out var blocks, true);    // returns potentially too many (entitySensorBox is a rectangle not a rhombus), but these will be filtered by the AabbIntersect test later
 
             for (int i = 0; i < blocks.Count; i++)
             {

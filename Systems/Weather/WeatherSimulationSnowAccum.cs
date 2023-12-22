@@ -23,7 +23,7 @@ namespace Vintagestory.GameContent
 
         UniqueQueue<UpdateSnowLayerChunk> updateSnowLayerQueue = new UniqueQueue<UpdateSnowLayerChunk>();
 
-        int chunksize;
+        const int chunksize = GlobalConstants.ChunkSize;
         int regionsize;
         internal float accum;
 
@@ -75,7 +75,6 @@ namespace Vintagestory.GameContent
 
         private void Event_SaveGameLoaded()
         {
-            chunksize = sapi.World.BlockAccessor.ChunkSize;
             regionsize = sapi.WorldManager.RegionSize;
             if (regionsize == 0)
             {
@@ -295,7 +294,7 @@ namespace Vintagestory.GameContent
             randomShuffles = new int[50][];
             for (int i = 0; i < randomShuffles.Length; i++)
             {
-                int[] coords = randomShuffles[i] = new int[sapi.World.BlockAccessor.ChunkSize * sapi.World.BlockAccessor.ChunkSize];
+                int[] coords = randomShuffles[i] = new int[GlobalConstants.ChunkSize * GlobalConstants.ChunkSize];
 
                 for (int j = 0; j < coords.Length; j++)
                 {

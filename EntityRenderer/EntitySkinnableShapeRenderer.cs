@@ -2,7 +2,6 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
@@ -25,12 +24,15 @@ namespace Vintagestory.GameContent
 
         public override void TesselateShape()
         {
-            base.TesselateShape();
+            // Need to call this before tesselate or we will reference the wrong texture
+            defaultTexSource = GetTextureSource();
 
             if (eagent.GearInventory != null)
             {
                 reloadSkin();
             }
+
+            base.TesselateShape();
         }
 
 

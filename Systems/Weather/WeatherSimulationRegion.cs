@@ -206,62 +206,6 @@ namespace Vintagestory.GameContent
             weatherData.SetAmbientLerped(OldWePattern, NewWePattern, Weight, capi == null ? 0 : capi.Ambient.Base.FogDensity.Value);
         }
 
-        [Obsolete("We now use UpdateSnowAccumulation")]
-        public void TickEveryInGameHourServer(double nowTotalHours)
-        {
-            SnowAccumSnapshot latestSnap = new SnowAccumSnapshot() {
-                TotalHours = nowTotalHours,
-                SnowAccumulationByRegionCorner = new FloatDataMap3D(snowAccumResolution, snowAccumResolution, snowAccumResolution)
-            };
-
-            // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations
-            // lets try with just the 8 corner points of the region cuboid and lerp
-            BlockPos tmpPos = new BlockPos();
-            int regsize = ws.api.World.BlockAccessor.RegionSize;
-
-            double nowTotalDays = (nowTotalHours + 0.5) / ws.api.World.Calendar.HoursPerDay;
-
-            for (int ix = 0; ix < snowAccumResolution; ix++)
-            {
-                for (int iy = 0; iy < snowAccumResolution; iy++)
-                {
-                    for (int iz = 0; iz < snowAccumResolution; iz++)
-                    {
-                        int y = iy == 0 ? ws.api.World.SeaLevel : ws.api.World.BlockAccessor.MapSizeY - 1;
-
-                        tmpPos.Set(
-                            regionX * regsize + ix * (regsize - 1),
-                            y,
-                            regionZ * regsize + iz * (regsize - 1)
-                        );
-
-                        ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(tmpPos, EnumGetClimateMode.ForSuppliedDateValues, nowTotalDays);
-                        if (nowcond == null)
-                        {
-                            return;
-                        }
-
-                        if (nowcond.Temperature > 1.5f || (nowcond.Rainfall < 0.05 && nowcond.Temperature > 0))
-                        {
-                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, -nowcond.Temperature / 15f);
-                        }
-                        else
-                        {
-                            latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 3f);
-                        }
-
-                    }
-                }
-            }
-
-            lock (snowAccumSnapshotLock)
-            {
-                SnowAccumSnapshots.Add(latestSnap);
-            }
-            latestSnap.Checks++;
-        }
-
-
         public void UpdateSnowAccumulation(int count)
         {
             SnowAccumSnapshot[] snaps = new SnowAccumSnapshot[count];
@@ -318,7 +262,6 @@ namespace Vintagestory.GameContent
                                 latestSnap.SnowAccumulationByRegionCorner.AddValue(ix, iy, iz, nowcond.Rainfall / 3f);
                             }
                         }
-
                     }
                 }
             }

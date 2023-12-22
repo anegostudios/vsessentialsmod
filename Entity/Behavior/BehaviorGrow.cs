@@ -83,6 +83,7 @@ namespace Vintagestory.GameContent
 
                 // Set adult attribute before we spawn it, so that it initialises correctly (and before the child entity dies!)
                 adult.WatchedAttributes.SetInt("generation", entity.WatchedAttributes.GetInt("generation", 0));
+                adult.WatchedAttributes.SetDouble("birthTotalDays", entity.World.Calendar.TotalDays);
                 // Transfer the textureIndex of the child to the adult, if both have same number of alternates (e.g. used for pullets)
                 if (entity.WatchedAttributes.HasAttribute("textureIndex") && entity.Properties.Client?.FirstTexture?.Alternates != null && adultType.Client?.FirstTexture?.Alternates != null)
                 {

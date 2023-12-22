@@ -1,6 +1,5 @@
 ﻿using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
@@ -335,8 +334,8 @@ namespace Vintagestory.GameContent
                 blockAccessor,
                 pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetRetention(pos, facing, type, OffsetInv),
-                (nblock) => base.GetHeatRetention(pos, facing),
-                (nblock) => nblock.GetHeatRetention(pos, facing)
+                (nblock) => base.GetRetention(pos, facing, EnumRetentionType.Heat),
+                (nblock) => nblock.GetRetention(pos, facing, EnumRetentionType.Heat)
             );
         }
 

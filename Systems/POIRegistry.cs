@@ -1,8 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.Design.Serialization;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -18,16 +22,64 @@ namespace Vintagestory.GameContent
         string Type { get; }
     }
 
+    public class CreatureDiet
+    {
+        /// <summary>
+        /// Categories of food this creature, primarly for dropped items and troughs.
+        /// </summary>
+        public EnumFoodCategory[] FoodCategories;
+        /// <summary>
+        /// Tags as defined in the individual items/blocks attributes
+        /// </summary>
+        public string[] FoodTags;
+        /// <summary>
+        /// Tested first: Blacklist of certain foods
+        /// </summary>
+        public string[] SkipFoodTags;
+
+
+        public bool Matches(EnumFoodCategory foodSourceCategory, params string[] foodSourceTags)
+        {
+            if (SkipFoodTags != null && foodSourceTags != null)
+            {
+                for (int i = 0; i < foodSourceTags.Length; i++)
+                {
+                    if (SkipFoodTags.Contains(foodSourceTags[i])) return false;
+                }
+            }
+
+            if (FoodCategories != null && FoodCategories.Contains(foodSourceCategory)) return true;
+
+            if (this.FoodTags != null && foodSourceTags != null)
+            {
+                for (int i = 0; i < foodSourceTags.Length; i++)
+                {
+                    if (FoodTags.Contains(foodSourceTags[i])) return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool Matches(ItemStack itemstack)
+        {
+            var cobj = itemstack.Collectible;
+            var foodCat = cobj.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition;
+            var foodTags = cobj.Attributes?["foodTags"].AsArray<string>();
+
+            return Matches(foodCat, foodTags);
+        }
+    }
 
     public interface IAnimalFoodSource : IPointOfInterest
     {
-        bool IsSuitableFor(Entity entity, string[] diet);
+        bool IsSuitableFor(Entity entity, CreatureDiet diet);
 
         /// <summary>
         /// Return amount of saturation given from eating this portion
         /// </summary>
         /// <returns></returns>
-        float ConsumeOnePortion();
+        float ConsumeOnePortion(Entity entity);
     }
 
 
@@ -60,7 +112,7 @@ namespace Vintagestory.GameContent
         Dictionary<Vec2i, List<IPointOfInterest>> PoisByChunkColumn = new Dictionary<Vec2i, List<IPointOfInterest>>();
 
         Vec2i tmp = new Vec2i();
-        int chunksize;
+        const int chunksize = GlobalConstants.ChunkSize;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -70,8 +122,6 @@ namespace Vintagestory.GameContent
         public override void StartServerSide(ICoreServerAPI api)
         {
             base.StartServerSide(api);
-
-            chunksize = api.World.BlockAccessor.ChunkSize;
         }
 
         public void WalkPois(Vec3d centerPos, float radius, PoiMatcher callback = null)

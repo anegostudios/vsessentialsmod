@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Client;
@@ -139,7 +138,7 @@ namespace Vintagestory.GameContent
             GuiElementMap mapElem = compo.GetElement("mapElem") as GuiElementMap;
             if (beforeBounds != null)
             {
-                mapElem.chunkViewBoundsBefore = beforeBounds.ToCuboidi().Div(capi.World.BlockAccessor.ChunkSize);
+                mapElem.chunkViewBoundsBefore = beforeBounds.ToCuboidi().Div(GlobalConstants.ChunkSize);
             }
             mapElem.viewChanged = viewChanged;
             mapElem.ZoomAdd(1, 0.5f, 0.5f);

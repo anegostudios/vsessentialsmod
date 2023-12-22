@@ -4,6 +4,7 @@ using System.Linq;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.API.Common
 {
@@ -130,6 +131,30 @@ namespace Vintagestory.API.Common
             }
 
             cooldownUntilMs = entity.World.ElapsedMilliseconds + initialmincooldown + entity.World.Rand.Next(initialmaxcooldown - initialmincooldown);
+        }
+
+        protected bool EmotionStatesSatisifed()
+        {
+            if (whenInEmotionState != null && IsInEmotionState(whenInEmotionState) != true) return false;
+            if (whenNotInEmotionState != null && IsInEmotionState(whenNotInEmotionState) == true) return false;
+            return true;
+        }
+
+        protected bool IsInEmotionState(string emostate)
+        {
+            if (bhEmo == null) return false;
+
+            if (emostate.ContainsFast('|'))
+            {
+                var states = emostate.Split("|");
+                for (int i = 0; i < states.Length; i++)
+                {
+                    if (bhEmo.IsInEmotionState(states[i])) return true;
+                }
+                return false;
+            }
+
+            return bhEmo.IsInEmotionState(emostate);
         }
 
         public virtual void AfterInitialize()

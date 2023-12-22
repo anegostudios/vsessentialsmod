@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -14,6 +15,9 @@ namespace Vintagestory.GameContent
     {
         protected string[] targetEntityCodesBeginsWith = new string[0];
         protected string[] targetEntityCodesExact;
+
+        protected AssetLocation[] skipEntityCodes;
+
         protected string targetEntityFirstLetters = "";
 
         protected string creatureHostility;
@@ -50,10 +54,14 @@ namespace Vintagestory.GameContent
 
             friendlyTarget = taskConfig["friendlyTarget"].AsBool(false);
 
+            retaliateAttacks = taskConfig["retaliateAttacks"].AsBool(true);
+
             this.triggerEmotionState = taskConfig["triggerEmotionState"].AsString();
 
             List<string> targetEntityCodesList = new List<string>();
             string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
+
+            skipEntityCodes = taskConfig["skipEntityCodes"].AsArray<string>()?.Select(str => AssetLocation.Create(str, entity.Code.Domain)).ToArray();
 
             List<string> beginswith = new List<string>();
 
@@ -139,7 +147,7 @@ namespace Vintagestory.GameContent
                 if (!friendlyTarget && AggressiveTargeting)
                 {
                     if (creatureHostility == "off") return false;
-                    if (creatureHostility == "passive" && (bhEmo == null || !bhEmo.IsInEmotionState("aggressiveondamage"))) return false;
+                    if (creatureHostility == "passive" && (bhEmo == null || (!IsInEmotionState("aggressiveondamage") && !IsInEmotionState("aggressivearoundentities")))) return false;
                 }
 
                 float rangeMul = e.Stats.GetBlended("animalSeekingRange");
@@ -155,6 +163,14 @@ namespace Vintagestory.GameContent
                     (rangeMul == 1 || entity.ServerPos.DistanceTo(e.Pos) < range * rangeMul) &&
                     (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
                 ;
+            }
+
+            if (skipEntityCodes != null)
+            {
+                for (int i = 0; i < skipEntityCodes.Length; i++)
+                {
+                    if (WildcardUtil.Match(skipEntityCodes[i], e.Code)) return false;
+                }
             }
 
             return true;

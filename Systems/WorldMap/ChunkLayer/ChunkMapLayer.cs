@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
 
         public byte[] block2Color;
 
-        int chunksize;
+        const int chunksize = GlobalConstants.ChunkSize;
         IWorldChunk[] chunksTmp;
 
         object chunksToGenLock = new object();
@@ -112,7 +112,7 @@ namespace Vintagestory.GameContent
                     throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
                 }
                 
-                api.ChatCommands.Create("map")
+                api.ChatCommands.GetOrCreate("map")
                     .BeginSubCommand("purgedb")
                         .WithDescription("purge the map db")
                         .HandleWith(_ =>
@@ -197,7 +197,6 @@ namespace Vintagestory.GameContent
 
         public override void OnLoaded()
         {
-            chunksize = api.World.BlockAccessor.ChunkSize;
             if (api.Side == EnumAppSide.Server) return;
             chunksTmp = new IWorldChunk[api.World.BlockAccessor.MapSizeY / chunksize];
 
@@ -596,7 +595,7 @@ namespace Vintagestory.GameContent
 
                     if (isLake(block))
                     {
-                        // Water.
+                        // Water
                         IWorldChunk lChunk = chunksTmp[cy];
                         IWorldChunk rChunk = chunksTmp[cy];
                         IWorldChunk tChunk = chunksTmp[cy];
@@ -638,12 +637,10 @@ namespace Vintagestory.GameContent
 
                             if (isLake(lBlock) && isLake(rBlock) && isLake(tBlock) && isLake(bBlock))
                             {
-                                // Water.
                                 tintedImage[i] = getColor(block, localpos.X, y, localpos.Y);
                             }
                             else
                             {
-                                // Border.
                                 tintedImage[i] = colorsByCode["wateredge"];
                             }
                         }

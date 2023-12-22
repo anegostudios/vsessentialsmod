@@ -4,6 +4,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -16,16 +17,13 @@ namespace Vintagestory.GameContent
     public class AiTaskSeekFoodAndEat : AiTaskBase
     {
         AssetLocation eatSound;
-
         POIRegistry porregistry;
         IAnimalFoodSource targetPoi;
 
         float moveSpeed = 0.02f;
         long stuckatMs = 0;
         bool nowStuck = false;
-
         float eatTime = 1f;
-
         float eatTimeNow = 0;
         bool soundPlayed = false;
         bool doConsumePortion = true;
@@ -33,11 +31,6 @@ namespace Vintagestory.GameContent
         bool playEatAnimForLooseItems = true;
 
         bool eatLooseItems;
-        bool searchPlayerInv;
-
-        HashSet<EnumFoodCategory> eatItemCategories = new HashSet<EnumFoodCategory>();
-        HashSet<AssetLocation> eatItemCodes = new HashSet<AssetLocation>();
-
         float quantityEaten;
 
         AnimationMetaData eatAnimMeta;
@@ -48,7 +41,7 @@ namespace Vintagestory.GameContent
         float extraTargetDist;
         long lastPOISearchTotalMs;
 
-        public string[] entityDiet;
+        public CreatureDiet Diet;
         EntityBehaviorMultiplyBase bhMultiply;
 
         ICoreAPI api;
@@ -69,26 +62,11 @@ namespace Vintagestory.GameContent
             if (eatsoundstring != null) eatSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");
 
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-
-            searchPlayerInv = taskConfig["searchPlayerInv"].AsBool(false);
-
             eatTime = taskConfig["eatTime"].AsFloat(1.5f);
-
             doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
-
             eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
-
             playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
-
-            foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
-            {
-                eatItemCategories.Add(val);
-            }
-
-            foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
-            {
-                eatItemCodes.Add(val);
-            }
+            Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>();
 
             if (taskConfig["eatAnimation"].Exists)
             {
@@ -109,9 +87,6 @@ namespace Vintagestory.GameContent
                     AnimationSpeed = taskConfig["eatAnimationSpeedLooseItems"].AsFloat(1f)
                 }.Init();
             }
-
-            // Fetch the entity's diet from its JSON durin initialize as this is a potentially slow operation (for most entities diet will be null)
-            entityDiet = entity.Properties.Attributes?["blockDiet"]?.AsArray<string>();
         }
 
         public override void AfterInitialize()
@@ -126,8 +101,7 @@ namespace Vintagestory.GameContent
             if (lastPOISearchTotalMs + 15000 > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilTotalHours > entity.World.Calendar.TotalHours) return false;
-            if (whenInEmotionState != null && bhEmo?.IsInEmotionState(whenInEmotionState) != true) return false;
-            if (whenNotInEmotionState != null && bhEmo?.IsInEmotionState(whenNotInEmotionState) == true) return false;
+            if (!EmotionStatesSatisifed()) return false;
 
             if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
 
@@ -135,36 +109,18 @@ namespace Vintagestory.GameContent
             extraTargetDist = 0;
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
-            api.ModLoader.GetModSystem<EntityPartitioning>().WalkInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
+            if (eatLooseItems)
             {
-                if (e is EntityItem)
+                api.ModLoader.GetModSystem<EntityPartitioning>().WalkInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
                 {
-                    EntityItem ei = (EntityItem)e;
-                    EnumFoodCategory? cat = ei.Itemstack?.Collectible?.NutritionProps?.FoodCategory;
-                    if (cat != null && eatItemCategories.Contains((EnumFoodCategory)cat))
+                    if (e is EntityItem eitem && suitableFoodSource(eitem.Itemstack))
                     {
-                        targetPoi = new LooseItemFoodSource(ei);
-                        return false;
+                        targetPoi = new LooseItemFoodSource(eitem);
                     }
 
-                    AssetLocation code = ei.Itemstack?.Collectible?.Code;
-                    if (code != null && eatItemCodes.Contains(code))
-                    {
-                        targetPoi = new LooseItemFoodSource(ei);
-                        return false;
-                    }
-                }
-
-                if (searchPlayerInv && e is EntityPlayer eplr)
-                {
-                    if (eplr.Player.InventoryManager.Find(slot => slot.Inventory is InventoryBasePlayer && !slot.Empty && eatItemCodes.Contains(slot.Itemstack.Collectible.Code)))
-                    {
-                        targetPoi = new PlayerPoi(eplr);
-                    }
-                }
-
-                return true;
-            });
+                    return true;
+                });
+            }
 
             if (targetPoi == null)
             {
@@ -173,7 +129,7 @@ namespace Vintagestory.GameContent
                     if (poi.Type != "food") return false;
                     IAnimalFoodSource foodPoi;
 
-                    if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity, entityDiet) == true)
+                    if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity, Diet) == true)
                     {
                         FailedAttempt attempt;
                         failedSeekTargets.TryGetValue(foodPoi, out attempt);
@@ -186,23 +142,27 @@ namespace Vintagestory.GameContent
                     return false;
                 }) as IAnimalFoodSource;
             }
-            
-            /*if (targetPoi != null)
-            {
-                if (targetPoi is BlockEntity || targetPoi is Block)
-                {
-                    Block block = entity.World.BlockAccessor.GetBlock(targetPoi.Position.AsBlockPos);
-                    Cuboidf[] collboxes = block.GetCollisionBoxes(entity.World.BlockAccessor, targetPoi.Position.AsBlockPos);
-                    if (collboxes != null && collboxes.Length != 0 && collboxes[0].Y2 > 0.3f)
-                    {
-                        extraTargetDist = 0.15f;
-                    }
-                }
-            }*/
 
             return targetPoi != null;
         }
 
+        private bool suitableFoodSource(ItemStack itemStack)
+        {
+            EnumFoodCategory? cat = itemStack?.Collectible?.NutritionProps?.FoodCategory;
+            if (cat != null && Diet.FoodCategories.Contains((EnumFoodCategory)cat))
+            {
+                return true;
+            }
+
+            var attr = itemStack.ItemAttributes;
+            if (Diet.FoodTags != null && attr != null && attr["foodTags"].Exists)
+            {
+                var tags = attr["foodTags"].AsArray<string>();
+                for (int i = 0; i < tags.Length; i++) if (Diet.FoodTags.Contains(tags[i])) return true;
+            }
+
+            return false;
+        }
 
         public float MinDistanceToTarget()
         {
@@ -252,7 +212,7 @@ namespace Vintagestory.GameContent
                     return false;
                 }
 
-                if (targetPoi.IsSuitableFor(entity, entityDiet) != true) return false;
+                if (targetPoi.IsSuitableFor(entity, Diet) != true) return false;
                 
                 if (eatAnimMeta != null && !eatAnimStarted)
                 {
@@ -283,7 +243,7 @@ namespace Vintagestory.GameContent
 
                     if (doConsumePortion)
                     {
-                        float sat = targetPoi.ConsumeOnePortion();
+                        float sat = targetPoi.ConsumeOnePortion(entity);
                         quantityEaten += sat;
                         tree.SetFloat("saturation", sat + tree.GetFloat("saturation", 0));
                         entity.WatchedAttributes.SetDouble("lastMealEatenTotalHours", entity.World.Calendar.TotalHours);
@@ -409,12 +369,12 @@ namespace Vintagestory.GameContent
 
         public string Type => "food";
 
-        public float ConsumeOnePortion()
+        public float ConsumeOnePortion(Entity entity)
         {
             return 0;
         }
 
-        public bool IsSuitableFor(Entity entity, string[] diet)
+        public bool IsSuitableFor(Entity entity, CreatureDiet diet)
         {
             return false;
         }
@@ -436,14 +396,14 @@ namespace Vintagestory.GameContent
 
         public string Type => "food";
 
-        public float ConsumeOnePortion()
+        public float ConsumeOnePortion(Entity entity)
         {
-            entity.Itemstack.StackSize--;
-            if (entity.Itemstack.StackSize <= 0) entity.Die();
+            this.entity.Itemstack.StackSize--;
+            if (this.entity.Itemstack.StackSize <= 0) entity.Die();
             return 1f;
         }
 
-        public bool IsSuitableFor(Entity entity, string[] diet)
+        public bool IsSuitableFor(Entity entity, CreatureDiet diet)
         {
             return true;
         }

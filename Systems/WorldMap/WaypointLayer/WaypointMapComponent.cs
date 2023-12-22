@@ -123,8 +123,8 @@ namespace Vintagestory.GameContent
             double dX = args.X - x;
             double dY = args.Y - y;
 
-
-            if (mouseOver = Math.Abs(dX) < 8 && Math.Abs(dY) < 8)
+            var size = RuntimeEnv.GUIScale * 8;
+            if (mouseOver = Math.Abs(dX) < size && Math.Abs(dY) < size)
             {
                 string text = Lang.Get("Waypoint {0}", waypointIndex) + "\n" + waypoint.Title;
                 hoverText.AppendLine(text);
@@ -155,8 +155,8 @@ namespace Vintagestory.GameContent
                 double dX = args.X - x;
                 double dY = args.Y - y;
 
-
-                if (Math.Abs(dX) < 7 && Math.Abs(dY) < 7)
+                var size = RuntimeEnv.GUIScale * 8;
+                if (Math.Abs(dX) < size && Math.Abs(dY) < size)
                 {
                     if (editWpDlg != null)
                     {

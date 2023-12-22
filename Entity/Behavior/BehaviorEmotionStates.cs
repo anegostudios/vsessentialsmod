@@ -21,12 +21,17 @@ namespace Vintagestory.GameContent
         public int Slot = 0;
         public float Priority = 0;
         public float StressLevel = 0;
+        public int MaxGeneration = int.MaxValue;
         public EnumAccumType AccumType = EnumAccumType.Max;  // sum, max or noaccum
 
         public float whenHealthRelBelow = 999f;
 
 
         public string[] NotifyEntityCodes = new string[0];
+        public string[] EntityCodes = null;
+
+        public AssetLocation[] EntityCodeLocs = null;
+
         public float NotifyChances = 0;
         public float NotifyRange = 12;
 
@@ -45,11 +50,11 @@ namespace Vintagestory.GameContent
     {
         EmotionState[] availableStates;
         public Dictionary<string, ActiveEmoState> ActiveStatesByCode = new Dictionary<string, ActiveEmoState>();
-
         TreeAttribute entityAttr;
         float healthRel;
-
         float tickAccum;
+        EntityPartitioning epartSys;
+
 
         public EntityBehaviorEmotionStates(Entity entity) : base(entity)
         {
@@ -75,9 +80,16 @@ namespace Vintagestory.GameContent
             {
                 EmotionState state = obj.AsObject<EmotionState>();
                 availableStates[i++] = state;
+
+                if (state.EntityCodes != null)
+                {
+                    state.EntityCodeLocs = state.EntityCodes.Select(str => new AssetLocation(str)).ToArray();
+                }
             }
 
-            tickAccum = (float)(entity.World.Rand.NextDouble() * 0.33);  //spread out the ticking if a lot of entities load at the same time, such as at server start
+            tickAccum = (float)(entity.World.Rand.NextDouble() * 0.33);  // Spread out the ticking if a lot of entities load at the same time, such as at server start
+
+            epartSys = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
         }
 
         
@@ -192,6 +204,13 @@ namespace Vintagestory.GameContent
                     }
                 }
 
+                if (newstate.MaxGeneration < entity.WatchedAttributes.GetInt("generation"))
+                {
+                    continue;
+                }
+
+                if (statecode == "aggressivearoundentities" && (activeState != null || !entitiesNearby(newstate))) continue;
+
                 float duration = newstate.Duration;
                 if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature < newstate.BelowTempThreshold)
                 {
@@ -211,7 +230,6 @@ namespace Vintagestory.GameContent
                     activeState.SourceEntityId = sourceEntityId;
                 }
                 
-                
                 entityAttr.SetFloat(newstate.Code, newDuration);
                 triggered = true;
             }
@@ -219,11 +237,15 @@ namespace Vintagestory.GameContent
             return triggered;
         }
 
-
+        
         public override void OnGameTick(float deltaTime)
         {
             if ((tickAccum += deltaTime) < 0.33f) return;
             tickAccum = 0;
+
+
+            TryTriggerState("aggressivearoundentities", 0);
+
 
             float nowStressLevel = 0f;
 
@@ -267,6 +289,22 @@ namespace Vintagestory.GameContent
                 entity.DebugAttributes.SetString("emotionstates", string.Join(", ", ActiveStatesByCode.Keys.ToList()));
             }
         }
+
+
+
+        private bool entitiesNearby(EmotionState newstate)
+        {
+            return epartSys.GetNearestInteractableEntity(entity.ServerPos.XYZ, newstate.NotifyRange, (e) =>
+            {
+                for (int i = 0; i < newstate.EntityCodeLocs.Length; i++)
+                {
+                    if (newstate.EntityCodeLocs[i].Equals(e.Code)) return true;
+                }
+
+                return false;
+            }) != null;
+        }
+
 
 
         public override string PropertyName()

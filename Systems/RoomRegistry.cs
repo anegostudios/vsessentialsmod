@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -90,7 +91,7 @@ namespace Vintagestory.GameContent
         protected Dictionary<long, ChunkRooms> roomsByChunkIndex = new Dictionary<long, ChunkRooms>();
         protected object roomsByChunkIndexLock = new object(); 
 
-        int chunksize;
+        const int chunksize = GlobalConstants.ChunkSize;
         int chunkMapSizeX;
         int chunkMapSizeZ;
 
@@ -127,7 +128,7 @@ namespace Vintagestory.GameContent
             api.Event.SaveGameLoaded += init;
 
             api.ChatCommands.GetOrCreate("debug")
-                .BeginSubCommand("roomregdebug")
+                .BeginSubCommand("rooms")
                     .RequiresPrivilege(Privilege.controlserver)
 
                     .BeginSubCommand("list")
@@ -162,23 +163,40 @@ namespace Vintagestory.GameContent
 
             if (chunkrooms == null || chunkrooms.Rooms.Count == 0)
             {
-                return TextCommandResult.Success("No rooms here");
+                return TextCommandResult.Success("No rooms in this chunk");
             }
 
             if (chunkrooms.Rooms.Count - 1 < rindex || rindex < 0)
             {
                 if (rindex == 0)
                 {
-                    TextCommandResult.Success("No room here");
+                    return TextCommandResult.Success("No room at this index");
                 }
                 else
                 {
-                    TextCommandResult.Success("Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1));
+                    return TextCommandResult.Success("Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1));
                 }
             }
             else
             {
                 Room room = chunkrooms.Rooms[rindex];
+
+                if (args.Parsers[0].IsMissing)
+                {
+                    room = null;
+                    foreach (var croom in chunkrooms.Rooms)
+                    {
+                        if (croom.Contains(pos))
+                        {
+                            room = croom;
+                            break;
+                        }
+                    }
+                    if (room == null)
+                    {
+                        return TextCommandResult.Success("No room at your location");
+                    }
+                }
 
                 // Debug visualization
                 List<BlockPos> poses = new List<BlockPos>();
@@ -255,7 +273,6 @@ namespace Vintagestory.GameContent
 
         private void init()
         {
-            chunksize = this.api.World.BlockAccessor.ChunkSize;
             chunkMapSizeX = api.World.BlockAccessor.MapSizeX / chunksize;
             chunkMapSizeZ = api.World.BlockAccessor.MapSizeZ / chunksize;
         }
@@ -429,7 +446,7 @@ namespace Vintagestory.GameContent
                     facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
 
                     // We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
-                    if (bBlock.Id != 0 && bBlock.GetHeatRetention(bpos, facing) != 0)
+                    if (bBlock.Id != 0 && bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat) != 0)
                     {
                         continue;
                     }
@@ -442,7 +459,7 @@ namespace Vintagestory.GameContent
 
                     Block nBlock = blockAccess.GetBlock(npos);
                     allChunksLoaded &= blockAccess.LastChunkLoaded;
-                    int heatRetention = nBlock.GetHeatRetention(npos, facing.Opposite);
+                    int heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
                     // We hit a wall, no need to scan further
                     if (heatRetention != 0)

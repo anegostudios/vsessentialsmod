@@ -269,7 +269,11 @@ namespace Vintagestory.GameContent
             TreeAttribute tree = entity.WatchedAttributes["harvestableInv"] as TreeAttribute;
             if (tree != null)
             {
+                int toadd = tree.GetInt("qslots") - inv.Count;
+                inv.AddSlots(toadd);
                 inv.FromTreeAttributes(tree);
+
+                if (toadd > 0 && dlg?.IsOpened() == true) dlg.Compose("carcasscontents");
             }
 
             // Maybe fixes meat reappearing non nun full harvested animals? (reported by Its Ragnar! on discord)
@@ -370,9 +374,12 @@ namespace Vintagestory.GameContent
                 dropQuantityMultiplier *= byPlayer.Entity.Stats.GetBlended("animalLootDropRate");
             }
 
+            generateDrops(byPlayer, dropQuantityMultiplier);
+        }
 
+        private void generateDrops(IPlayer byPlayer, float dropQuantityMultiplier)
+        {
             List<ItemStack> todrop = new List<ItemStack>();
-            
 
             for (int i = 0; i < jsonDrops.Length; i++)
             {
@@ -411,6 +418,18 @@ namespace Vintagestory.GameContent
                 if (dstack.LastDrop) break;
             }
 
+            var eagent = entity as EntityAgent;
+            if (eagent.GearInventory != null)
+            {
+                foreach (var slot in eagent.GearInventory)
+                {
+                    if (slot.Empty) continue;
+                    todrop.Add(slot.Itemstack);
+                }
+            }
+
+            inv.AddSlots(todrop.Count - inv.Count);
+
             ItemStack[] resolvedDrops = todrop.ToArray();
 
             TreeAttribute tree = new TreeAttribute();
@@ -429,7 +448,6 @@ namespace Vintagestory.GameContent
                 entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.AsBlockPos).MarkModified();
             }
         }
-
 
         WorldInteraction[] interactions = null;
 
