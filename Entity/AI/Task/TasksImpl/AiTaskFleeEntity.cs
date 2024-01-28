@@ -16,6 +16,7 @@ namespace Vintagestory.GameContent
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
         bool cancelOnHurt = false;
+        bool nonInteractableEntity = false;
 
         long fleeStartMs;
         bool stuck;
@@ -45,6 +46,7 @@ namespace Vintagestory.GameContent
             fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 15);
             fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
+            nonInteractableEntity = taskConfig["nonInteractableEntity"].AsBool(false);
         }
 
 
@@ -92,7 +94,9 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
+                targetEntity = nonInteractableEntity ?
+                   (EntityAgent)partitionUtil.GetNearestNonInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange)) :
+                   (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
             }
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 

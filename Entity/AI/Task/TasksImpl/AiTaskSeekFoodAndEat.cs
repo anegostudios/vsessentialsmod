@@ -67,6 +67,7 @@ namespace Vintagestory.GameContent
             eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
             playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
             Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>();
+            if (Diet == null) api.Logger.Warning("Creature " + entity.Code.ToShortString() + " has SeekFoodAndEat task but no Diet specified");
 
             if (taskConfig["eatAnimation"].Exists)
             {
@@ -104,6 +105,7 @@ namespace Vintagestory.GameContent
             if (!EmotionStatesSatisifed()) return false;
 
             if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
+            if (Diet == null) return false;   // Deals with mods which have not properly updated for 1.19, check this condition last because always passes in vanilla
 
             targetPoi = null;
             extraTargetDist = 0;
@@ -111,11 +113,12 @@ namespace Vintagestory.GameContent
 
             if (eatLooseItems)
             {
-                api.ModLoader.GetModSystem<EntityPartitioning>().WalkInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
+                api.ModLoader.GetModSystem<EntityPartitioning>().WalkNonInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
                 {
                     if (e is EntityItem eitem && suitableFoodSource(eitem.Itemstack))
                     {
                         targetPoi = new LooseItemFoodSource(eitem);
+                        return false;   // Stop the walk when food found
                     }
 
                     return true;
@@ -149,7 +152,7 @@ namespace Vintagestory.GameContent
         private bool suitableFoodSource(ItemStack itemStack)
         {
             EnumFoodCategory? cat = itemStack?.Collectible?.NutritionProps?.FoodCategory;
-            if (cat != null && Diet.FoodCategories.Contains((EnumFoodCategory)cat))
+            if (cat != null && Diet.FoodCategories != null && Diet.FoodCategories.Contains((EnumFoodCategory)cat))
             {
                 return true;
             }
@@ -399,7 +402,7 @@ namespace Vintagestory.GameContent
         public float ConsumeOnePortion(Entity entity)
         {
             this.entity.Itemstack.StackSize--;
-            if (this.entity.Itemstack.StackSize <= 0) entity.Die();
+            if (this.entity.Itemstack.StackSize <= 0) this.entity.Die();
             return 1f;
         }
 

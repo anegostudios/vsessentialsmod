@@ -56,21 +56,13 @@ namespace Vintagestory.GameContent
 
             SingleComposer.GetScrollbar("scrollbar").SetHeights(
                 (float)300, (float)logtextBounds.fixedHeight
-            );
-            
+            );            
         }
 
-
-        private void OnTextChanged(string value)
-        {
-            GuiElementDynamicText logtextElem = SingleComposer.GetDynamicText("text");
-            SingleComposer.GetScrollbar("scrollbar").SetNewTotalHeight((float)logtextElem.Bounds.fixedHeight);
-        }
 
         private void OnNewScrollbarvalue(float value)
         {
             GuiElementDynamicText logtextElem = SingleComposer.GetDynamicText("text");
-
             logtextElem.Bounds.fixedY = 3 - value;
             logtextElem.Bounds.CalcWorldBounds();
         }

@@ -849,7 +849,6 @@ namespace Vintagestory.GameContent
 
             for (int i = 0; i < blocks.Count; i++)
             {
-                Cuboidd collisionbox = blocks.cuboids[i];
                 Block block = blocks.blocks[i];
 
                 if (!block.CanStep)
@@ -858,6 +857,20 @@ namespace Vintagestory.GameContent
                     if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
                 }
 
+                BlockPos pos = blocks.positions[i];
+                if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+                {
+                    pos.Down();    // Avoid creating a new BlockPos object
+                    Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
+                    pos.Up();
+                    if (!blockBelow.CanStep)
+                    {
+                        var boxesBelow = blockBelow.CollisionBoxes;   // Could be null for opened gates ...
+                        if (boxesBelow != null && boxesBelow.Length > 0 && entity.CollisionBox.Height < 5 * boxesBelow[0].Height) continue;
+                    }
+                }
+
+                Cuboidd collisionbox = blocks.cuboids[i];
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 //if (intersect == EnumIntersect.NoIntersect) continue;
 
@@ -942,10 +955,11 @@ namespace Vintagestory.GameContent
         {
             Cuboidd stepableBox = null;
 
-            int maxCount = collisionTester.CollisionBoxList.Count;
+            var blocks = collisionTester.CollisionBoxList;
+            int maxCount = blocks.Count;
             for (int i = 0; i < maxCount; i++)
             {
-                Block block = collisionTester.CollisionBoxList.blocks[i];
+                Block block = blocks.blocks[i];
 
                 if (!block.CanStep)
                 {
@@ -953,7 +967,20 @@ namespace Vintagestory.GameContent
                     if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
                 }
 
-                Cuboidd collisionbox = collisionTester.CollisionBoxList.cuboids[i];
+                BlockPos pos = blocks.positions[i];
+                if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+                {
+                    pos.Down();    // Avoid creating a new BlockPos object
+                    Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
+                    pos.Up();
+                    if (!blockBelow.CanStep)
+                    {
+                        var boxesBelow = blockBelow.CollisionBoxes;   // Could be null for opened gates ...
+                        if (boxesBelow != null && boxesBelow.Length > 0 && entity.CollisionBox.Height < 5 * boxesBelow[0].Height) continue;
+                    }
+                }
+
+                Cuboidd collisionbox = blocks.cuboids[i];
                 EnumIntersect intersect = CollisionTester.AabbIntersect(collisionbox, entityCollisionBox, walkVector);
                 if (intersect == EnumIntersect.NoIntersect) continue;
 

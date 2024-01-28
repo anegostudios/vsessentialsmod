@@ -188,10 +188,10 @@ namespace Vintagestory.GameContent
         protected virtual void PopulateSpawnEntityCodes()
         {
             JsonObject sec = typeAttributes["spawnEntityCodes"];   // Optional fancier syntax in version 1.19+
-            if (sec == null)
+            if (!sec.Exists)
             {
                 sec = typeAttributes["spawnEntityCode"];    // The simple property as it was pre-1.19 - can still be used, suitable for the majority of cases
-                if (sec != null) spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
+                if (sec.Exists) spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
                 return;
             }
             if (sec.IsArray())

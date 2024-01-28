@@ -130,7 +130,7 @@ namespace Vintagestory.GameContent
 
                     thirdPersonMeshRef = capi.Render.UploadMultiTextureMesh(meshData);
 
-                    if (capi.Settings.Bool["immersiveFpMode"])
+                    if (IsSelf && capi.Settings.Bool["immersiveFpMode"])
                     {
                         HashSet<int> skipJointIds = new HashSet<int>();
                         loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName("Neck"), skipJointIds);
@@ -215,34 +215,36 @@ namespace Vintagestory.GameContent
                 RenderHeldItem(dt, isShadowPass, true);
             }
 
-            if (isHandRender && !capi.Settings.Bool["hideFpHands"])
+            if (isHandRender)
             {
-                if (entityPlayer.GetBehavior<EntityBehaviorTiredness>().IsSleeping) return;
-                var prog = modSys.fpModeHandShader;
+                if (!capi.Settings.Bool["hideFpHands"] && !entityPlayer.GetBehavior<EntityBehaviorTiredness>().IsSleeping)
+                {
+                    var prog = modSys.fpModeHandShader;
 
-                meshRefOpaque = firstPersonMeshRef;
+                    meshRefOpaque = firstPersonMeshRef;
 
-                prog.Use();
-                prog.Uniform("rgbaAmbientIn", capi.Render.AmbientColor);
-                prog.Uniform("rgbaFogIn", capi.Render.FogColor);
-                prog.Uniform("fogMinIn", capi.Render.FogMin);
-                prog.Uniform("fogDensityIn", capi.Render.FogDensity);
-                prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
-                prog.Uniform("alphaTest", 0.05f);
-                prog.Uniform("lightPosition", capi.Render.ShaderUniforms.LightPosition3D);
-                prog.Uniform("depthOffset", -0.3f);
+                    prog.Use();
+                    prog.Uniform("rgbaAmbientIn", capi.Render.AmbientColor);
+                    prog.Uniform("rgbaFogIn", capi.Render.FogColor);
+                    prog.Uniform("fogMinIn", capi.Render.FogMin);
+                    prog.Uniform("fogDensityIn", capi.Render.FogDensity);
+                    prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
+                    prog.Uniform("alphaTest", 0.05f);
+                    prog.Uniform("lightPosition", capi.Render.ShaderUniforms.LightPosition3D);
+                    prog.Uniform("depthOffset", -0.3f);
 
-                capi.Render.GlPushMatrix();
-                capi.Render.GlLoadMatrix(capi.Render.CameraMatrixOrigin);
+                    capi.Render.GlPushMatrix();
+                    capi.Render.GlLoadMatrix(capi.Render.CameraMatrixOrigin);
 
-                base.DoRender3DOpaqueBatched(dt, false);
+                    base.DoRender3DOpaqueBatched(dt, false);
 
-                capi.Render.GlPopMatrix();
+                    capi.Render.GlPopMatrix();
 
-                prog.Stop();
+                    prog.Stop();
+                }
+
+                capi.Render.Reset3DProjection();
             }
-
-            if (isHandRender) capi.Render.Reset3DProjection();
         }
 
         protected override IShaderProgram getReadyShader()
@@ -272,9 +274,19 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
         {
-            if (HandRenderMode && !isShadowPass) return;
+            if (HandRenderMode && !isShadowPass)
+            {
+                return;
+            }
 
-            meshRefOpaque = player?.ImmersiveFpMode == true && player?.CameraMode == EnumCameraMode.FirstPerson ? firstPersonMeshRef : thirdPersonMeshRef;
+            if (isShadowPass)
+            {
+                meshRefOpaque = thirdPersonMeshRef;
+            }
+            else
+            {
+                meshRefOpaque = IsSelf && player?.ImmersiveFpMode == true && player?.CameraMode == EnumCameraMode.FirstPerson ? firstPersonMeshRef : thirdPersonMeshRef;
+            }
 
             base.DoRender3DOpaqueBatched(dt, isShadowPass);
         }

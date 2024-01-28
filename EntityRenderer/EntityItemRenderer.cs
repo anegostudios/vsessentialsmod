@@ -100,7 +100,7 @@ namespace Vintagestory.GameContent
         {
             entityitem = (EntityItem)entity;
             inslot = entityitem.Slot;
-            rotateWhenFalling = inslot.Itemstack.Collectible?.Attributes?["rotateWhenFalling"].AsBool(true) ?? true;
+            rotateWhenFalling = inslot.Itemstack?.Collectible?.Attributes?["rotateWhenFalling"].AsBool(true) ?? true;   // Slot.Itemstack might be null if the Itemstack did not resolve, see EntityItem.Itemstack_set
 
             scaleRand = (float)api.World.Rand.NextDouble() / 20f - 1/40f;
 

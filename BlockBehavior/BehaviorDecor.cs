@@ -36,6 +36,7 @@ namespace Vintagestory.GameContent
             if (properties["alternateZOffset"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.AlternateZOffset;
             if (properties["notFullFace"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.NotFullFace;
             if (properties["removable"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.Removable;
+            if (sidedVariants) block.decorBehaviorFlags |= DecorFlags.HasSidedVariants;
             block.DecorThickness = properties["thickness"].AsFloat(0.03125f);
 
             base.Initialize(properties);

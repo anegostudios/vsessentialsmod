@@ -264,11 +264,11 @@ namespace Vintagestory.ServerMods.NoObf
                     }
                     catch (Exception e)
                     {
-                        api.Server.Logger.Error("Failed registering block {0}: {1}", block.Code);
+                        api.Server.Logger.Error("Failed registering block {0}", block.Code);
                         api.Server.Logger.Error(e);
                     }
                 }
-            });
+            }); 
         }
         #endregion
 

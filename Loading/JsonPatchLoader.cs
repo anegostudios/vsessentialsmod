@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using JsonPatch.Operations;
+using JsonPatch.Operations.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tavis;
@@ -18,7 +20,8 @@ namespace Vintagestory.ServerMods.NoObf
         Remove,
         Replace,
         Copy,
-        Move
+        Move,
+        AddMerge
     }
 
     public class PatchCondition
@@ -264,7 +267,7 @@ namespace Vintagestory.ServerMods.NoObf
                         return;
                     }
 
-                    op = new AddOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                    op = new AddReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
                 case EnumJsonPatchOp.AddEach:
                     if (jsonPatch.Value == null)
@@ -294,6 +297,9 @@ namespace Vintagestory.ServerMods.NoObf
                     break;
                 case EnumJsonPatchOp.Move:
                     op = new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+                    break;
+                case EnumJsonPatchOp.AddMerge:
+                    op = new AddMergeOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
                     break;
             }
 

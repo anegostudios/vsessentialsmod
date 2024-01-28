@@ -136,6 +136,7 @@ namespace Vintagestory.GameContent
                     .BeginSubCommand("acp")
                         .WithDescription("Toggles auto-changing weather patterns.")
                         .RequiresPlayer()
+                        .WithArgs(sapi.ChatCommands.Parsers.OptionalBool("mode"))
                         .HandleWith(CmdWeatherAcp)
                     .EndSubCommand()
                     
@@ -404,7 +405,14 @@ namespace Vintagestory.GameContent
         private TextCommandResult CmdWeatherAcp(TextCommandCallingArgs args)
         {
             var wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
-            wsysServer.autoChangePatterns = !wsysServer.autoChangePatterns;
+            if (args.Parsers[0].IsMissing)
+            {
+                wsysServer.autoChangePatterns = !wsysServer.autoChangePatterns;
+            }
+            else
+            {
+                wsysServer.autoChangePatterns = (bool)args[0];
+            }
 
             return TextCommandResult.Success("Ok autochange weather patterns now " + (wsysServer.autoChangePatterns ? "on" : "off"));
         }

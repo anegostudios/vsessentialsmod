@@ -109,7 +109,7 @@ namespace Vintagestory.GameContent
 
             TotalHoursDead = entity.World.Calendar.TotalHours;
 
-            if (damageSourceForDeath.Source == EnumDamageSource.Void)
+            if (damageSourceForDeath?.Source == EnumDamageSource.Void)
             {
                 (entity as EntityAgent).AllowDespawn = true;
             }

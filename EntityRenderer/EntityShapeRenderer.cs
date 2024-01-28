@@ -519,7 +519,7 @@ namespace Vintagestory.GameContent
                 prog.Uniform("overlayOpacity", renderInfo.OverlayOpacity);
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
                 {
-                    prog.Uniform("tex2dOverlay", renderInfo.OverlayTexture.TextureId);
+                    prog.BindTexture2D("tex2dOverlay", renderInfo.OverlayTexture.TextureId, 1);
                     prog.Uniform("overlayTextureSize", new Vec2f(renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height));
                     prog.Uniform("baseTextureSize", new Vec2f(renderInfo.TextureSize.Width, renderInfo.TextureSize.Height));
                     TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(stack);

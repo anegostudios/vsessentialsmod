@@ -354,7 +354,6 @@ namespace Vintagestory.GameContent
             if (!Collided && !fallHandled)
             {
                 nowDustIntensity = 1;
-                //spawnParticles(0);
             } else
             {
                 nowDustIntensity = 0;
@@ -390,11 +389,23 @@ namespace Vintagestory.GameContent
                     if (Api.Side == EnumAppSide.Server)
                     {
                         entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => !(e is EntityBlockFalling));
+
+                        bool didhit = false;
+                        foreach (var entity in entities)
+                        {
+                            bool nowhit = entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Block, Type = EnumDamageType.Crushing, SourceBlock = Block, SourcePos = SidedPos.XYZ }, 10 * (float)Math.Abs(ServerPos.Motion.Y) * impactDamageMul);
+                            if (nowhit && !didhit)
+                            {
+                                didhit = nowhit;
+                                Api.World.PlaySoundAt(this.Block.Sounds.Break, entity);
+                            }
+                        }
                     }
                     else
                     {
                         entities = World.GetEntitiesAround(SidedPos.XYZ, 1.1f, 1.1f, (e) => e is EntityPlayer);
                     }
+
                     for (int i = 0; i < entities.Length; i++)
                     {
                         entities[i].SidedPos.Motion.Add(fallMotion.X / 10f, 0, fallMotion.Z / 10f);
@@ -525,7 +536,6 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            //spawnParticles(20f);
             nowImpacted = true;
             
             
@@ -601,7 +611,6 @@ namespace Vintagestory.GameContent
 
                 lingerTicks = 50;
                 fallHandled = true;
-                //spawnParticles(20f);
                 nowImpacted = true;
                 particleSys.Unregister(this);
             }

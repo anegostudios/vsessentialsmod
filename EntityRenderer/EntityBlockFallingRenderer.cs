@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Client;
+﻿using System;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -61,7 +62,6 @@ namespace Vintagestory.GameContent
             prevPos.Set(entity.Pos.X + entity.SelectionBox.X1, entity.Pos.Y + entity.SelectionBox.Y1, entity.Pos.Z + entity.SelectionBox.Z1);
         }
 
-
         public void OnPhysicsTick(float nextAccum, Vec3d prevPos)
         {
             this.accum = nextAccum;
@@ -92,10 +92,14 @@ namespace Vintagestory.GameContent
 
             if (!DoRender || (!blockFallingEntity.InitialBlockRemoved && entity.World.BlockAccessor.GetBlock(blockFallingEntity.initialPos).Id != 0)) return;
 
+            rotaccum += dt;
+
             curPos.Set(entity.Pos.X + entity.SelectionBox.X1, entity.Pos.Y + entity.SelectionBox.Y1, entity.Pos.Z + entity.SelectionBox.Z1);
 
             RenderFallingBlockEntity();
         }
+
+        double rotaccum=0;
 
         private void RenderFallingBlockEntity()
         {
@@ -119,9 +123,9 @@ namespace Vintagestory.GameContent
                     prevPos.Y * (1 - alpha) + curPos.Y * alpha - camPos.Y,
                     prevPos.Z * (1 - alpha) + curPos.Z * alpha - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
                 )
-                .RotateX(GameMath.Sin(capi.InWorldEllapsedMilliseconds / 100f) / 15f / div)
-                .RotateZ(GameMath.Cos(10 + capi.InWorldEllapsedMilliseconds / 90f) / 15f / div)
-                .Values
+                .RotateX((float)(Math.Sin(rotaccum * 10) / 10.0 / div))
+                .RotateZ((float)(Math.Cos(10 + rotaccum * 9.0) / 10.0 / div))
+               .Values
             ;
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
             prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;

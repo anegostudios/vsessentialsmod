@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>VSEssentials</AssemblyName>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>$(FrameworkVersion)</TargetFramework>
     <OutputPath>..\bin\$(Configuration)</OutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <Configurations>Debug;Release;PerfTest</Configurations>
@@ -22,7 +22,9 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="protobuf-net" Version="2.4.7" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="7.0.14" />
-    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.2-vs.1" />
+    <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.8.2" />
+    <PackageReference Include="OpenTK.redist.glfw" Version="3.3.9-vs.1" />
+    <PackageReference Include="Tavis.JsonPatch" Version="0.5.3-vs.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,9 +32,4 @@
     <ProjectReference Include="..\VintagestoryApi\VintagestoryAPI.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="Tavis.JsonPatch">
-      <HintPath>..\Lib\Tavis.JsonPatch.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>
