@@ -113,7 +113,7 @@ namespace Vintagestory.GameContent
 
             if (eatLooseItems)
             {
-                api.ModLoader.GetModSystem<EntityPartitioning>().WalkNonInteractableEntities(entity.ServerPos.XYZ, 10, (e) =>
+                api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.ServerPos.XYZ, 10, (e) =>
                 {
                     if (e is EntityItem eitem && suitableFoodSource(eitem.Itemstack))
                     {
@@ -122,7 +122,7 @@ namespace Vintagestory.GameContent
                     }
 
                     return true;
-                });
+                }, EnumEntitySearchType.Inanimate);
             }
 
             if (targetPoi == null)
@@ -157,7 +157,7 @@ namespace Vintagestory.GameContent
                 return true;
             }
 
-            var attr = itemStack.ItemAttributes;
+            var attr = itemStack?.ItemAttributes;
             if (Diet.FoodTags != null && attr != null && attr["foodTags"].Exists)
             {
                 var tags = attr["foodTags"].AsArray<string>();

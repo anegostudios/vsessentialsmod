@@ -1,5 +1,6 @@
 ﻿using System;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
@@ -16,7 +17,6 @@ namespace Vintagestory.GameContent
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
         bool cancelOnHurt = false;
-        bool nonInteractableEntity = false;
 
         long fleeStartMs;
         bool stuck;
@@ -46,7 +46,6 @@ namespace Vintagestory.GameContent
             fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 15);
             fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
-            nonInteractableEntity = taskConfig["nonInteractableEntity"].AsBool(false);
         }
 
 
@@ -85,18 +84,16 @@ namespace Vintagestory.GameContent
 
             if (lowStabilityAttracted)
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) =>
+                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) =>
                 {
                     if (!IsTargetableEntity(e, hereRange)) return false;
                     if (!(e is EntityPlayer)) return true;
                     return e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
-                });
+                }, EnumEntitySearchType.Creatures);
             }
             else
             {
-                targetEntity = nonInteractableEntity ?
-                   (EntityAgent)partitionUtil.GetNearestNonInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange)) :
-                   (EntityAgent)partitionUtil.GetNearestInteractableEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange));
+                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange), EnumEntitySearchType.Creatures);
             }
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 
@@ -188,6 +185,23 @@ namespace Vintagestory.GameContent
         private void OnGoalReached()
         {
             pathTraverser.Retarget();
+        }
+
+        // Unfortunate minor amount of code duplication but here we need the base method without the e.IsInteractable check
+        public override bool CanSense(Entity e, double range)
+        {
+            if (e.EntityId == entity.EntityId) return false;
+            if (e is EntityPlayer eplr) return CanSensePlayer(eplr, range);
+
+            if (skipEntityCodes != null)
+            {
+                for (int i = 0; i < skipEntityCodes.Length; i++)
+                {
+                    if (WildcardUtil.Match(skipEntityCodes[i], e.Code)) return false;
+                }
+            }
+
+            return true;
         }
     }
 }

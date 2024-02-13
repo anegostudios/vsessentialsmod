@@ -10,6 +10,7 @@ using Tavis;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -214,7 +215,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             var loc = jsonPatch.File.Clone();
 
-            if (jsonPatch.File.Path.EndsWith("*"))
+            if (jsonPatch.File.Path.EndsWith('*'))
             {
                 List<IAsset> assets = api.Assets.GetMany(jsonPatch.File.Path.TrimEnd('*'), jsonPatch.File.Domain, false);
                 foreach (var val in assets)
@@ -229,7 +230,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
 
 
-            if (!loc.Path.EndsWith(".json")) loc.Path += ".json";
+            if (!loc.Path.EndsWithOrdinal(".json")) loc.Path += ".json";
 
             var asset = api.Assets.TryGet(loc);
             if (asset == null)

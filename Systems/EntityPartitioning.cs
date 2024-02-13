@@ -13,17 +13,17 @@ namespace Vintagestory.GameContent
     public class EntityPartitionChunk
     {
         public List<Entity>[] Entities;
-        public List<Entity>[] NonInteractableEntities;
+        public List<Entity>[] InanimateEntities;
 
         public EntityPartitionChunk()
         {
             Entities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
-            NonInteractableEntities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
+            InanimateEntities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
         }
 
         public List<Entity> Add(Entity e, int gridIndex)
         {
-            List<Entity> list = e.IsInteractable ? FetchOrCreateList(ref Entities[gridIndex]) : FetchOrCreateList(ref NonInteractableEntities[gridIndex]);
+            List<Entity> list = e.IsCreature ? FetchOrCreateList(ref Entities[gridIndex]) : FetchOrCreateList(ref InanimateEntities[gridIndex]);
             list.Add(e);
             return list;
         }
@@ -45,6 +45,13 @@ namespace Vintagestory.GameContent
             this.GridIndex = gridIndex;
             this.ChunkIndex = chunkIndex;
         }
+    }
+
+
+    public enum EnumEntitySearchType
+    {
+        Creatures = 0,
+        Inanimate = 1,
     }
 
 
@@ -123,7 +130,7 @@ namespace Vintagestory.GameContent
 
             foreach (var val in entities)
             {
-                if (val.IsInteractable) largestTouchDistance = Math.Max(largestTouchDistance, val.SelectionBox.XSize / 2);
+                if (val.IsCreature) largestTouchDistance = Math.Max(largestTouchDistance, val.SelectionBox.XSize / 2);
 
                 PartitionEntity(val);
             }
@@ -164,29 +171,28 @@ namespace Vintagestory.GameContent
             RePartitionPlayer(player.Entity);
         }
 
-        [Obsolete("In version 1.18.2 and later, this returns Interactable entities only, so recommended to call GetNearestInteractableEntity() or GetNearestNonInteractableEntity() explicitly for clarity in the calling code")]
+        [Obsolete("In version 1.19.2 and later, this searches only entities which are Creatures, which is probably what the caller wants but you should specify EnumEntitySearchType explicitly")]
         public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
-            return GetNearestEntity(position, radius, matches, true);
+            return GetNearestEntity(position, radius, matches, EnumEntitySearchType.Creatures);
         }
 
         /// <summary>
-        /// Search all nearby interactable entities (for which IsInteractable is true) to find the nearest one meeting the "matches" condition
+        /// Search all nearby creatures to find the nearest one which is Interactable
         /// </summary>
         public Entity GetNearestInteractableEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
         {
-            return GetNearestEntity(position, radius, matches, true);
+            if (matches == null)
+            {
+                return GetNearestEntity(position, radius, (e) => e.IsInteractable, EnumEntitySearchType.Creatures);
+            }
+            return GetNearestEntity(position, radius, (e) => matches(e) && e.IsInteractable, EnumEntitySearchType.Creatures);
         }
 
         /// <summary>
-        /// Search all nearby interactable entities (for which IsInteractable is true) to find the nearest one meeting the "matches" condition
+        /// Search all nearby entities (either Creatures or Inanimate, according to searchType) to find the nearest one meeting the "matches" condition
         /// </summary>
-        public Entity GetNearestNonInteractableEntity(Vec3d position, double radius, ActionConsumable<Entity> matches = null)
-        {
-            return GetNearestEntity(position, radius, matches, false);
-        }
-
-        public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches, bool interactable)
+        public Entity GetNearestEntity(Vec3d position, double radius, ActionConsumable<Entity> matches, EnumEntitySearchType searchType)
         {
             Entity nearestEntity = null;
             double radiusSq = radius * radius;
@@ -205,7 +211,7 @@ namespace Vintagestory.GameContent
                     }
 
                     return true;
-                }, onIsInRangePartition, interactable);
+                }, onIsInRangePartition, searchType);
             } else
             {
                 WalkEntities(position, radius, (e) =>
@@ -219,7 +225,7 @@ namespace Vintagestory.GameContent
                     }
 
                     return true;
-                }, onIsInRangePartition, interactable);
+                }, onIsInRangePartition, searchType);
             }
 
             return nearestEntity;
@@ -253,62 +259,52 @@ namespace Vintagestory.GameContent
         }
 
 
-        [Obsolete("In version 1.18.2 and later, this walks through Interactable entities only, so recommended to call WalkInteractableEntities() or WalkNonInteractableEntities() explicitly for clarity in the calling code")]
+        [Obsolete("In version 1.19.2 and later, this walks through Creature entities only, so recommended to call WalkEntityPartitions() specifying the type of search explicitly for clarity in the calling code")]
         public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            WalkEntities(centerPos, radius, callback, true);
+            WalkEntities(centerPos, radius, callback, EnumEntitySearchType.Creatures);
         }
 
-        /// <summary>
-        /// This performs a entity search inside a spacially partioned search grid thats refreshed every 16ms, limited to Interactable entities only for performance reasons.
-        /// This can be a lot faster for when there are thousands of entities on a small space. It is used by EntityBehaviorRepulseAgents to improve performance, because otherwise when spawning 1000 creatures nearby, it has to do 1000x1000 = 1mil search operations every frame
-        /// A small search grid allows us to ignore most of those during the search.  Return false to stop the walk.
-        /// </summary>
-        /// <param name="centerPos"></param>
-        /// <param name="radius"></param>
-        /// <param name="callback">Return false to stop the walk</param>
+        [Obsolete("In version 1.19.2 and later, use WalkEntities specifying the searchtype (Creatures or Inanimate) explitly in the calling code.")]
         public void WalkInteractableEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            WalkEntities(centerPos, radius, callback, true);
+            WalkEntities(centerPos, radius, callback, EnumEntitySearchType.Creatures);
         }
 
         /// <summary>
-        /// This performs a entity search inside a spacially partioned search grid thats refreshed every 16ms, here limited to Non-Interactable entities only
-        /// This can be a lot faster for when there are thousands of entities on a small space. It is used by AITaskSeekAndFindFood to improve performance, it ignores creatures and looks only for non-interactable entities such as dropped items
-        /// A small search grid allows us to ignore most entities during the search.  Return false to stop the walk.
+        /// This performs a entity search inside a spacially partioned search grid thats refreshed every 16ms, limited to Creature entities only for performance reasons.
+        /// This can be a lot faster for when there are thousands of entities on a small space. It is used by EntityBehaviorRepulseAgents to improve performance, because otherwise when spawning 1000 creatures nearby, it has to do 1000x1000 = 1mil search operations every frame
+        /// A small search grid allows us to ignore most of those during the search.  Return false to stop the walk.
+        /// <br/>Note in 1.19.2 onwards we do not do an Interactable check here, calling code must check Interactable if required (e.g. Bees, and player in Spectator mode, are not Interactable)
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback">Return false to stop the walk</param>
-        public void WalkNonInteractableEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
-        {
-            WalkEntities(centerPos, radius, callback, false);
-        }
-
-        private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, bool interactable)
+        /// <param name="searchType">Creatures or Inanimate</param>
+        public void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, EnumEntitySearchType searchType)
         {
             if (api.Side == EnumAppSide.Client)
             {
-                WalkEntities(centerPos, radius, callback, onIsInRangeClient, interactable);
+                WalkEntities(centerPos, radius, callback, onIsInRangeClient, searchType);
             } else
             {
-                WalkEntities(centerPos, radius, callback, onIsInRangeServer, interactable);
+                WalkEntities(centerPos, radius, callback, onIsInRangeServer, searchType);
             }
         }
 
         /// <summary>
-        /// Same as <see cref="WalkInteractableEntities(Vec3d,double,Vintagestory.API.Common.ActionConsumable{Vintagestory.API.Common.Entities.Entity}(Vintagestory.API.Common.Entities.Entity))"/> but does no exact radius distance check, walks all entities that it finds in the grid
+        /// Same as <see cref="WalkEntities(Vec3d,double,Vintagestory.API.Common.ActionConsumable{Vintagestory.API.Common.Entities.Entity}(Vintagestory.API.Common.Entities.Entity))"/> but does no exact radius distance check, walks all entities that it finds in the grid
         /// </summary>
         /// <param name="centerPos"></param>
         /// <param name="radius"></param>
         /// <param name="callback"></param>
         public void WalkEntityPartitions(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            WalkEntities(centerPos, radius, callback, onIsInRangePartition, true);
+            WalkEntities(centerPos, radius, callback, onIsInRangePartition, EnumEntitySearchType.Creatures);
         }
 
 
-        private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest, bool interactable)
+        private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest, EnumEntitySearchType searchType)
         {
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks - 1;
             int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize - 1;
@@ -349,7 +345,7 @@ namespace Vintagestory.GameContent
                         if (partitionChunk == null) continue;
 
                         int index = (gridZ % partitionsLength) * partitionsLength + lgx;
-                        List<Entity> entities = interactable ? partitionChunk.Entities[index] : partitionChunk.NonInteractableEntities[index];
+                        List<Entity> entities = searchType == EnumEntitySearchType.Creatures ? partitionChunk.Entities[index] : partitionChunk.InanimateEntities[index];
                         if (entities == null) continue;
 
                         foreach (Entity entity in entities)

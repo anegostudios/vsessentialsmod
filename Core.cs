@@ -78,6 +78,8 @@ namespace Vintagestory.ServerMods
             RegisterDefaultEntities();
             RegisterDefaultEntityBehaviors();
             RegisterDefaultBlockEntities();
+
+            api.RegisterCollectibleBehaviorClass("AnimationAuthoritative", typeof(CollectibleBehaviorAnimationAuthoritative));
         }
 
 

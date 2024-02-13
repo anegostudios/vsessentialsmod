@@ -51,11 +51,7 @@ namespace Vintagestory.GameContent
         MultiTextureMeshRef firstPersonMeshRef;
         MultiTextureMeshRef thirdPersonMeshRef;
         bool watcherRegistered;
-
-        static float HandRenderFov = 90 * GameMath.DEG2RAD;
-
         EntityPlayer entityPlayer;
-
         ModSystemFpHands modSys;
 
 
@@ -183,6 +179,11 @@ namespace Vintagestory.GameContent
         }
 
 
+        public virtual float HandRenderFov
+        {
+            get { return capi.Settings.Int["fpHandsFoV"] * GameMath.DEG2RAD; }
+        }
+
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
             if (IsSelf) entityPlayer.selfNowShadowPass = isShadowPass;
@@ -292,8 +293,7 @@ namespace Vintagestory.GameContent
         }
 
         bool HandRenderMode => IsSelf && player?.ImmersiveFpMode==false && player?.CameraMode == EnumCameraMode.FirstPerson;
-
-
+        public float? HeldItemPitchFollowOverride { get; set; } = null;
 
         public void loadModelMatrixForPlayer(Entity entity, bool isSelf, float dt, bool isShadowPass)
         {
@@ -331,7 +331,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                bodyYaw = eagent.BodyYaw;
+                bodyYaw = capi.World.Player.ImmersiveFpMode ? eagent.BodyYaw : eagent.Pos.Yaw;
             }
 
 
@@ -350,7 +350,9 @@ namespace Vintagestory.GameContent
             // Rotate player hands with pitch
             if (isSelf && selfEplr != null && !capi.World.Player.ImmersiveFpMode && capi.World.Player.CameraMode == EnumCameraMode.FirstPerson && !isShadowPass)
             {
-                float f = selfEplr?.Controls.IsFlying != true ? 0.75f : 1f;
+                float itemSpecificPitchFollow = eagent.RightHandItemSlot?.Itemstack?.ItemAttributes?["heldItemPitchFollow"].AsFloat(0.75f) ?? 0.75f;
+
+                float f = selfEplr?.Controls.IsFlying != true ? HeldItemPitchFollowOverride ?? (itemSpecificPitchFollow) : 1f;
                 Mat4f.Translate(ModelMat, ModelMat, 0f, (float)entity.LocalEyePos.Y, 0f);
                 Mat4f.RotateZ(ModelMat, ModelMat, (float)(entity.Pos.Pitch - GameMath.PI) * f);
                 Mat4f.Translate(ModelMat, ModelMat, 0, -(float)entity.LocalEyePos.Y, 0f);

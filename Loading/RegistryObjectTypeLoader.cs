@@ -84,7 +84,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "itemtypes/"))
             {
-                if (!entry.Key.Path.EndsWith(".json")) continue;
+                if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
 
                 try
                 {
@@ -105,7 +105,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
             {
-                if (!entry.Key.Path.EndsWith(".json")) continue;
+                if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
 
                 try
                 {
@@ -124,7 +124,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
             {
-                if (!entry.Key.Path.EndsWith(".json")) continue;
+                if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
                 
                 try
                 {

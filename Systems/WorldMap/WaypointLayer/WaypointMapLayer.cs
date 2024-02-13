@@ -95,7 +95,7 @@ namespace Vintagestory.GameContent
             var capi = api as ICoreClientAPI;
             foreach (var icon in icons)
             {
-                string name = icon.Name.Substring(0, icon.Name.IndexOf("."));
+                string name = icon.Name.Substring(0, icon.Name.IndexOf('.'));
 
                 name = Regex.Replace(name, @"\d+\-", "");
 
@@ -317,7 +317,7 @@ namespace Vintagestory.GameContent
 
             foreach (var wp in playersWaypoints)
             {
-                if (wp.Title != null && wp.Title.ToLowerInvariant().StartsWith(name))
+                if (wp.Title != null && wp.Title.StartsWith(name, StringComparison.InvariantCultureIgnoreCase))
                 {
                     player.Entity.TeleportTo(wp.Position);
                     return TextCommandResult.Success(Lang.Get("Ok teleported you to waypoint {0}.", wp.Title));

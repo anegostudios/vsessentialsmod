@@ -128,7 +128,7 @@ namespace Vintagestory.GameContent
             else
             {
                 ownPos.Set(entity.ServerPos);
-                targetEntity = partitionUtil.GetNearestInteractableEntity(ownPos, range, (e) => IsTargetableEntity(e, range));
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, range, (e) => IsTargetableEntity(e, range), EnumEntitySearchType.Creatures);
 
                 if (targetEntity != null)
                 {

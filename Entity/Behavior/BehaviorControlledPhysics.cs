@@ -21,6 +21,8 @@ namespace Vintagestory.GameContent
         internal List<EntityLocomotion> Locomotors = new List<EntityLocomotion>();
 
         public float stepHeight = 0.6f;   // Also read in AiTaskBaseTargetable: if this is ever made modifiable, might need to have that task check for an update to this each gametick
+        public float climbUpSpeed = 0.07f;
+        public float climbDownSpeed = 0.035f;
 
         protected Cuboidf sneakTestCollisionbox = new Cuboidf();
         protected Vec3d prevPos = new Vec3d();
@@ -385,7 +387,8 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-                if (controls.WalkVector.LengthSq() > 0.00001 && entity.Properties.CanClimbAnywhere && entity.Alive)
+                bool canClimbAnywhere = entity.Properties.CanClimbAnywhere && entity.Alive;
+                if (canClimbAnywhere && controls.WalkVector.LengthSq() > 0.00001)
                 {
                     var walkIntoFace = BlockFacing.FromVector(controls.WalkVector.X, controls.WalkVector.Y, controls.WalkVector.Z);
                     if (walkIntoFace != null)
@@ -405,7 +408,7 @@ namespace Vintagestory.GameContent
                     {
                         tmpPos.Set((int)pos.X + facing.Normali.X, (int)pos.Y + dy, (int)pos.Z + facing.Normali.Z);
                         Block nblock = blockAccess.GetBlock(tmpPos);
-                        if (!nblock.IsClimbable(tmpPos) && !(entity.Properties.CanClimbAnywhere && entity.Alive)) continue;
+                        if (!nblock.IsClimbable(tmpPos) && !canClimbAnywhere) continue;
 
                         Cuboidf[] collBoxes = nblock.GetCollisionBoxes(blockAccess, tmpPos);
                         if (collBoxes == null) continue;
@@ -431,8 +434,8 @@ namespace Vintagestory.GameContent
             {
                 if (controls.WalkVector.Y == 0)
                 {
-                    pos.Motion.Y = controls.Sneak ? Math.Max(-0.07, pos.Motion.Y - 0.07) : pos.Motion.Y;
-                    if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
+                    pos.Motion.Y = controls.Sneak ? Math.Max(-climbUpSpeed, pos.Motion.Y - climbUpSpeed) : pos.Motion.Y;
+                    if (controls.Jump) pos.Motion.Y = climbDownSpeed * dt * 60f;
                 }
             }
 
@@ -508,17 +511,17 @@ namespace Vintagestory.GameContent
 
             // Set the motion to zero if he collided.
 
-            if ((nextPosition.X < outposition.X && pos.Motion.X < 0) || (nextPosition.X > outposition.X && pos.Motion.X > 0))
+            if ((nextPosition.X - outposition.X) * pos.Motion.X > 0)    // radfast 31.1.24: this is a simplified test for (nextPosition.X > outposition.X && pos.Motion.X > 0) or similar with a negative sign: negative number * negative number must be positive
             {
                 pos.Motion.X = 0;
             }
 
-            if ((nextPosition.Y < outposition.Y && pos.Motion.Y < 0) || (nextPosition.Y > outposition.Y && pos.Motion.Y > 0))
+            if ((nextPosition.Y - outposition.Y) * pos.Motion.Y > 0)
             {
                 pos.Motion.Y = 0;
             }
 
-            if ((nextPosition.Z < outposition.Z && pos.Motion.Z < 0) || (nextPosition.Z > outposition.Z && pos.Motion.Z > 0))
+            if ((nextPosition.Z - outposition.Z) * pos.Motion.Z > 0)
             {
                 pos.Motion.Z = 0;
             }
@@ -540,7 +543,7 @@ namespace Vintagestory.GameContent
                 entity.FeetInLiquid = ((blockFluid.LiquidLevel + (aboveblock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y);
             }
             entity.InLava = blockFluid.LiquidCode == "lava";
-            entity.Swimming = middleWOIBlock.IsLiquid();
+            entity.Swimming = middleWOIBlock.IsLiquid() && (!controls.Sneak || !entity.OnGround);
 
             if (!onGroundBefore && entity.OnGround)
             {
@@ -845,7 +848,8 @@ namespace Vintagestory.GameContent
         {
 
             var stepableBoxes = new List<Cuboidd>();
-            GetCollidingCollisionBox(entity.World.BlockAccessor, entitySensorBox, out var blocks, true);    // returns potentially too many (entitySensorBox is a rectangle not a rhombus), but these will be filtered by the AabbIntersect test later
+            IBlockAccessor blockAccessor = entity.World.BlockAccessor;
+            GetCollidingCollisionBox(blockAccessor, entitySensorBox, out var blocks, true);    // returns potentially too many (entitySensorBox is a rectangle not a rhombus), but these will be filtered by the AabbIntersect test later
 
             for (int i = 0; i < blocks.Count; i++)
             {
@@ -858,10 +862,10 @@ namespace Vintagestory.GameContent
                 }
 
                 BlockPos pos = blocks.positions[i];
-                if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+                if (!block.SideIsSolid(blockAccessor, pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
                 {
                     pos.Down();    // Avoid creating a new BlockPos object
-                    Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
+                    Block blockBelow = blockAccessor.GetMostSolidBlock(pos);
                     pos.Up();
                     if (!blockBelow.CanStep)
                     {
@@ -954,6 +958,7 @@ namespace Vintagestory.GameContent
         private Cuboidd findSteppableCollisionbox(Cuboidd entityCollisionBox, double motionY, Vec3d walkVector)
         {
             Cuboidd stepableBox = null;
+            IBlockAccessor blockAccessor = entity.World.BlockAccessor;
 
             var blocks = collisionTester.CollisionBoxList;
             int maxCount = blocks.Count;
@@ -968,10 +973,10 @@ namespace Vintagestory.GameContent
                 }
 
                 BlockPos pos = blocks.positions[i];
-                if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+                if (!block.SideIsSolid(blockAccessor, pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
                 {
                     pos.Down();    // Avoid creating a new BlockPos object
-                    Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
+                    Block blockBelow = blockAccessor.GetMostSolidBlock(pos);
                     pos.Up();
                     if (!blockBelow.CanStep)
                     {

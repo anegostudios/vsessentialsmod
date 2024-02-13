@@ -58,17 +58,28 @@ namespace Vintagestory.GameContent
 
             this.triggerEmotionState = taskConfig["triggerEmotionState"].AsString();
 
-            List<string> targetEntityCodesList = new List<string>();
-            string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-
             skipEntityCodes = taskConfig["skipEntityCodes"].AsArray<string>()?.Select(str => AssetLocation.Create(str, entity.Code.Domain)).ToArray();
 
+            string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
+            InitializeTargetCodes(codes, ref targetEntityCodesExact, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
+        }
+
+        /// <summary>
+        /// Makes a similar sytem - "target codes from an array of entity codes with or without wildcards" - available to any other game element which requires it
+        /// </summary>
+        /// <param name="codes"></param>
+        /// <param name="targetEntityCodesExact"></param>
+        /// <param name="targetEntityCodesBeginsWith"></param>
+        /// <param name="targetEntityFirstLetters"></param>
+        public static void InitializeTargetCodes(string[] codes, ref string[] targetEntityCodesExact, ref string[] targetEntityCodesBeginsWith, ref string targetEntityFirstLetters)
+        {
+            List<string> targetEntityCodesList = new List<string>();
             List<string> beginswith = new List<string>();
 
             for (int i = 0; i < codes.Length; i++)
             {
                 string code = codes[i];
-                if (code.EndsWith("*"))
+                if (code.EndsWith('*'))
                 {
                     beginswith.Add(code.Substring(0, code.Length - 1));
                 }
@@ -120,50 +131,34 @@ namespace Vintagestory.GameContent
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
             if (!e.Alive) return false;
-            if (ignoreEntityCode || targetEntityFirstLetters.Length == 0) return CanSense(e, range);
+            if (ignoreEntityCode) return CanSense(e, range);
 
-            string testPath = e.Code.Path;
+            if (IsTargetEntity(e.Code.Path)) return CanSense(e, range);
+
+            return false;
+        }
+
+        private bool IsTargetEntity(string testPath)
+        {
             if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
 
             for (int i = 0; i < targetEntityCodesExact.Length; i++)
             {
-                if (testPath == targetEntityCodesExact[i]) return CanSense(e, range);
+                if (testPath == targetEntityCodesExact[i]) return true;
             }
 
             for (int i = 0; i < targetEntityCodesBeginsWith.Length; i++)
             {
-                if (testPath.StartsWithFast(targetEntityCodesBeginsWith[i])) return CanSense(e, range);
+                if (testPath.StartsWithFast(targetEntityCodesBeginsWith[i])) return true;
             }
 
             return false;
         }
 
-
         public virtual bool CanSense(Entity e, double range)
         {
-            if (e.EntityId == entity.EntityId) return false;
-            if (e is EntityPlayer eplr)
-            {
-                if (!friendlyTarget && AggressiveTargeting)
-                {
-                    if (creatureHostility == "off") return false;
-                    if (creatureHostility == "passive" && (bhEmo == null || (!IsInEmotionState("aggressiveondamage") && !IsInEmotionState("aggressivearoundentities")))) return false;
-                }
-
-                float rangeMul = e.Stats.GetBlended("animalSeekingRange");
-                IPlayer player = eplr.Player;
-
-                // Sneaking reduces the detection range
-                if (eplr.Controls.Sneak && eplr.OnGround)
-                {
-                    rangeMul *= 0.6f;
-                }
-
-                return
-                    (rangeMul == 1 || entity.ServerPos.DistanceTo(e.Pos) < range * rangeMul) &&
-                    (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
-                ;
-            }
+            if (e.EntityId == entity.EntityId || !e.IsInteractable) return false;
+            if (e is EntityPlayer eplr) return CanSensePlayer(eplr, range);
 
             if (skipEntityCodes != null)
             {
@@ -176,6 +171,28 @@ namespace Vintagestory.GameContent
             return true;
         }
 
+        public virtual bool CanSensePlayer(EntityPlayer eplr, double range)
+        {
+            if (!friendlyTarget && AggressiveTargeting)
+            {
+                if (creatureHostility == "off") return false;
+                if (creatureHostility == "passive" && (bhEmo == null || (!IsInEmotionState("aggressiveondamage") && !IsInEmotionState("aggressivearoundentities")))) return false;
+            }
+
+            float rangeMul = eplr.Stats.GetBlended("animalSeekingRange");
+            IPlayer player = eplr.Player;
+
+            // Sneaking reduces the detection range
+            if (eplr.Controls.Sneak && eplr.OnGround)
+            {
+                rangeMul *= 0.6f;
+            }
+
+            return
+                (rangeMul == 1 || entity.ServerPos.DistanceTo(eplr.Pos) < range * rangeMul) &&
+                (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
+            ;
+        }
 
         protected BlockSelection blockSel = new BlockSelection();
         protected EntitySelection entitySel = new EntitySelection();

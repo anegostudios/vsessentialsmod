@@ -294,15 +294,15 @@ namespace Vintagestory.GameContent
 
         private bool entitiesNearby(EmotionState newstate)
         {
-            return epartSys.GetNearestInteractableEntity(entity.ServerPos.XYZ, newstate.NotifyRange, (e) =>
+            return epartSys.GetNearestEntity(entity.ServerPos.XYZ, newstate.NotifyRange, (e) =>
             {
                 for (int i = 0; i < newstate.EntityCodeLocs.Length; i++)
                 {
-                    if (newstate.EntityCodeLocs[i].Equals(e.Code)) return true;
+                    if (newstate.EntityCodeLocs[i].Equals(e.Code)) return e.IsInteractable;
                 }
 
                 return false;
-            }) != null;
+            }, EnumEntitySearchType.Creatures) != null;
         }
 
 

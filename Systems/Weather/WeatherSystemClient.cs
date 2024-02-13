@@ -89,6 +89,8 @@ namespace Vintagestory.GameContent
             simSounds = new WeatherSimulationSound(capi, this);
             simParticles = new WeatherSimulationParticles(capi, this);
             auroraRenderer = new AuroraRenderer(capi, this);
+
+            capi.Logger.Notification("Initialised WeatherSystemClient.  simLightning is " + (simLightning == null ? "null." : "good."));
         }
 
         private void OnCloudLevelRelPacket(WeatherCloudYposPacket msg)
@@ -119,7 +121,15 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
-            simLightning.OnRenderFrame(dt, stage);
+            try
+            {
+                simLightning.OnRenderFrame(dt, stage);
+            }
+            catch (Exception e)
+            {
+                if (simLightning == null) api.Logger.Error("simLightning was null! Please report this as a bug");
+                api.Logger.Error(e);
+            }
 
             if (stage == EnumRenderStage.Before)
             {

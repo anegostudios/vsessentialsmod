@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using System;
+using ProtoBuf;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
@@ -165,9 +166,19 @@ namespace Vintagestory.GameContent
         {
             if (logType == EnumLogType.Error || logType == EnumLogType.Fatal || logType == EnumLogType.Warning || logType == EnumLogType.Notification)
             {
+                string log;
+                try
+                {
+                    log = string.Format("[{0} {1}] {2}", api.Side, logType, string.Format(message, args));
+                }
+                catch (Exception _)
+                {
+                    log = string.Format("[{0} {1}] {2}", api.Side, logType, "Error reporter failed formatting for \"" + message + "\"");
+                }
+                
                 lock (logEntiresLock)
                 {
-                    logEntries.Add(string.Format("[{0} {1}] {2}", api.Side, logType, string.Format(message, args)));
+                    logEntries.Add(log);
                 }
             }
         }

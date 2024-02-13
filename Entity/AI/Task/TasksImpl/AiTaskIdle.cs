@@ -75,7 +75,7 @@ namespace Vintagestory.GameContent
             for (int i = 0; i < codes.Length; i++)
             {
                 string ecode = codes[i];
-                if (ecode.EndsWith("*")) beginswith.Add(ecode.Substring(0, ecode.Length - 1));
+                if (ecode.EndsWith('*')) beginswith.Add(ecode.Substring(0, ecode.Length - 1));
                 else exact.Add(ecode);
             }
 
@@ -208,8 +208,8 @@ namespace Vintagestory.GameContent
 
             bool found = false;
 
-            partitionUtil.WalkInteractableEntities(entity.ServerPos.XYZ, stopRange, (e) => {
-                if (!e.Alive || e.EntityId == this.entity.EntityId) return true;
+            partitionUtil.WalkEntities(entity.ServerPos.XYZ, stopRange, (e) => {
+                if (!e.Alive || e.EntityId == this.entity.EntityId || !e.IsInteractable) return true;
 
                 string testPath = e.Code.Path;
                 if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return true;   // early exit if we don't have the first letter
@@ -244,7 +244,7 @@ namespace Vintagestory.GameContent
                 }
 
                 return true;
-            });
+            }, EnumEntitySearchType.Creatures);
 
             return found;
         }

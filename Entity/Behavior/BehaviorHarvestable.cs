@@ -369,7 +369,7 @@ namespace Vintagestory.GameContent
             if (entity.World.Side == EnumAppSide.Client) return;
 
 
-            if (!entity.Attributes.GetBool("isMechanical", false))
+            if (entity.Properties.Attributes?["isMechanical"].AsBool() != true)
             {
                 dropQuantityMultiplier *= byPlayer.Entity.Stats.GetBlended("animalLootDropRate");
             }

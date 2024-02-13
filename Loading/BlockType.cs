@@ -524,6 +524,12 @@ namespace Vintagestory.ServerMods.NoObf
                     block.SideOpaque[facing.Index] = SideOpaque[facing.Code];
                 }
             }
+
+            if (HeldRightReadyAnimation != null && HeldRightReadyAnimation == HeldRightTpIdleAnimation)
+            {
+                logger.Error("Block {0} HeldRightReadyAnimation and HeldRightTpIdleAnimation is set to the same animation {1}. This invalid and breaks stuff. Will set HeldRightReadyAnimation to null", Code, HeldRightTpIdleAnimation);
+                HeldRightReadyAnimation = null;
+            }
         }
 
         public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, OrderedDictionary<string, string> searchReplace)
