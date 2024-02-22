@@ -171,7 +171,7 @@ namespace Vintagestory.GameContent
                 {
                     log = string.Format("[{0} {1}] {2}", api.Side, logType, string.Format(message, args));
                 }
-                catch (Exception _)
+                catch (Exception)
                 {
                     log = string.Format("[{0} {1}] {2}", api.Side, logType, "Error reporter failed formatting for \"" + message + "\"");
                 }

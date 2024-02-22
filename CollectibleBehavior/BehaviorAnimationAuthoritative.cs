@@ -113,7 +113,6 @@ namespace Vintagestory.GameContent
         public bool StepAttack(ItemSlot slot, EntityAgent byEntity)
         {
             string animCode = collObj.GetHeldTpHitAnimation(slot, byEntity);
-
             return byEntity.AnimManager.IsAnimationActive(animCode);
         }
 

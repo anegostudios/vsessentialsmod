@@ -81,6 +81,22 @@ namespace Vintagestory.GameContent
 
         public virtual MeshData InitializeAnimator(string cacheDictKey, Shape shape = null, ITexPositionSource texSource = null, Vec3f rotationDeg = null)
         {
+            MeshData meshdata = CreateMesh(cacheDictKey, shape, out Shape resultingShape, texSource);
+            InitializeAnimator(cacheDictKey, meshdata, resultingShape, rotationDeg);
+            return meshdata;
+        }
+
+        /// <summary>
+        /// The first of two stages to initialise the animator: pair this with a call to FinishInitializeAnimator().
+        /// </summary>
+        /// <param name="nameForLogging"></param>
+        /// <param name="shape"></param>
+        /// <param name="resultingShape"></param>
+        /// <param name="texSource"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public virtual MeshData CreateMesh(string nameForLogging, Shape shape, out Shape resultingShape, ITexPositionSource texSource)
+        {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
             ICoreClientAPI capi = api as ICoreClientAPI;
@@ -99,13 +115,14 @@ namespace Vintagestory.GameContent
                 if (shape == null)
                 {
                     api.World.Logger.Error("Shape for block {0} not found or errored, was supposed to be at {1}. Block animations not loaded!", this.be.Block.Code, shapePath);
+                    resultingShape = shape;
                     return new MeshData();
                 }
             }
 
-            shape.ResolveReferences(api.World.Logger, cacheDictKey);
+            shape.ResolveReferences(api.World.Logger, nameForLogging);
             CacheInvTransforms(shape.Elements);
-            shape.ResolveAndFindJoints(api.World.Logger, cacheDictKey);
+            shape.ResolveAndFindJoints(api.World.Logger, nameForLogging);
 
             TesselationMetaData meta = new TesselationMetaData()
             {
@@ -114,7 +131,7 @@ namespace Vintagestory.GameContent
                 TexSource = texSource,
                 WithJointIds = true,
                 WithDamageEffect = true,
-                TypeForLogging = cacheDictKey,
+                TypeForLogging = nameForLogging,
                 //Rotation = rotationDeg - why was this here? It breaks animations
             };
 
@@ -122,10 +139,7 @@ namespace Vintagestory.GameContent
             capi.Tesselator.TesselateShape(meta, shape, out meshdata);
             OnAfterTesselate?.Invoke(meshdata);
 
-            if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
-
-            InitializeAnimator(cacheDictKey, meshdata, shape, rotationDeg);
-
+            resultingShape = shape;
             return meshdata;
         }
 
