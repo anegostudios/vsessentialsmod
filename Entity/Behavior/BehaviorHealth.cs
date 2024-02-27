@@ -248,8 +248,9 @@ namespace Vintagestory.GameContent
             }
 
             // Experimentally determined - at 3.5 blocks the player has a motion of -0.19
-            if (withYMotion > -0.19) return;  
+            if (withYMotion > -0.19) return;
 
+            yDistance *= entity.Properties.FallDamageMultiplier;
             double fallDamage = Math.Max(0, yDistance - 3.5f);
 
             // Some super rough experimentally determined formula that always underestimates

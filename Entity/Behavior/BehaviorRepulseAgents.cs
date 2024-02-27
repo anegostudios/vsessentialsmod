@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
             partitionUtil.WalkEntityPartitions(entity.ownPosRepulse, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
 
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
-            pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 3);
+            pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 0.5);
             pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
 
             entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
@@ -75,7 +75,7 @@ namespace Vintagestory.GameContent
             float hisSize = e.SelectionBox.Length * e.SelectionBox.Height;
             float pushDiff = GameMath.Clamp(hisSize / mySize, 0, 1);
 
-            pushVector.Add(px * pushDiff, py * pushDiff, pz * pushDiff);
+            pushVector.Add(px * pushDiff, py * pushDiff * 0.75, pz * pushDiff);
 
             return true;
         }

@@ -114,7 +114,7 @@ namespace Vintagestory.Essentials
 
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.stepHeight;
-            int maxFallHeight = entity.Properties.FallDamage ? 4 - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
+            int maxFallHeight = entity.Properties.FallDamage ? Math.Min(8, (int)Math.Round(3.51 / Math.Max(0.01, entity.Properties.FallDamageMultiplier))) - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
             newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance);
         }

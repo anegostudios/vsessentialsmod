@@ -62,8 +62,11 @@ namespace Vintagestory.ServerMods.NoObf
         public bool CanClimb = false;
         [JsonProperty]
         public bool CanClimbAnywhere = false;
+        [Obsolete("This will be removed in 1.20. Instead set FallDamageMultiplier to 0.0 for no fall damage")]
         [JsonProperty]
         public bool FallDamage = true;
+        [JsonProperty]
+        public float FallDamageMultiplier = 1.0f;
         [JsonProperty]
         public float ClimbTouchDistance = 0.5f;
         [JsonProperty]
@@ -119,7 +122,8 @@ namespace Vintagestory.ServerMods.NoObf
                 Weight = Weight,
                 CanClimb = CanClimb,
                 CanClimbAnywhere = CanClimbAnywhere,
-                FallDamage = FallDamage,
+                FallDamage = FallDamage && FallDamageMultiplier > 0,
+                FallDamageMultiplier = FallDamageMultiplier,
                 ClimbTouchDistance = ClimbTouchDistance,
                 RotateModelOnClimb = RotateModelOnClimb,
                 KnockbackResistance = KnockbackResistance,

@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
@@ -37,6 +38,7 @@ namespace Vintagestory.GameContent
         bool MBCanAttachBlockAt(IBlockAccessor blockAccessor, Block block, BlockPos pos, BlockFacing blockFace, Cuboidi attachmentArea, Vec3i offsetInv);
         float MBGetLiquidBarrierHeightOnSide(BlockFacing face, BlockPos pos, Vec3i offsetInv);
         int MBGetRetention(BlockPos pos, BlockFacing facing, EnumRetentionType type, Vec3i offsetInv);
+        JsonObject MBGetAttributes(IBlockAccessor blockAccessor, BlockPos pos);
     }
 
 
@@ -322,6 +324,18 @@ namespace Vintagestory.GameContent
                 (inf) => inf.MBCanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea, OffsetInv),
                 (nblock) => base.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea),
                 (nblock) => nblock.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea)
+            );
+        }
+
+
+        public override JsonObject GetAttributes(IBlockAccessor blockAccessor, BlockPos pos)
+        {
+            return Handle<JsonObject, IMultiBlockBlockProperties>(
+                blockAccessor,
+                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                (inf) => inf.MBGetAttributes(blockAccessor, pos),
+                (nblock) => base.GetAttributes(blockAccessor, pos),
+                (nblock) => nblock.GetAttributes(blockAccessor, pos)
             );
         }
 

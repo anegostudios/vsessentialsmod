@@ -147,15 +147,16 @@ namespace Vintagestory.Essentials
                     block = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Solid);
                     if (!block.CanStep) return false;
 
-                    Block liquid = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
-                    if (liquid.LiquidCode == "lava") return false;
-                    if (liquid.LiquidCode == "water")
+                    Block fluidLayerBlock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                    if (fluidLayerBlock.IsLiquid())
                     {
-                        extraCost = 5;
+                        if (fluidLayerBlock.LiquidCode == "lava") return false;
+
+                        extraCost = fluidLayerBlock.LiquidCode == "boilingwater" ? 500 : 5;
                         //node.Y--; - we swim on top
                         break;
                     }
-                    if (liquid.BlockMaterial == EnumBlockMaterial.Ice) block = liquid;
+                    if (fluidLayerBlock.BlockMaterial == EnumBlockMaterial.Ice) block = fluidLayerBlock;
 
                     // Do we collide if we go one block down? 
                     // Our hitbox size might be >1 and we might collide with a wall only
