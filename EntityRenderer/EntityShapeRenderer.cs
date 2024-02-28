@@ -26,6 +26,7 @@ namespace Vintagestory.GameContent
         protected LoadedTexture nameTagTexture = null;
         protected int renderRange = 999;
         protected bool showNameTagOnlyWhenTargeted = false;
+        protected long listenerId;
 
         protected LoadedTexture debugTagTexture = null;
 
@@ -112,7 +113,7 @@ namespace Vintagestory.GameContent
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();
-            api.Event.RegisterGameTickListener(UpdateDebugInfo, 250);
+            listenerId = api.Event.RegisterGameTickListener(UpdateDebugInfo, 250);
             OnDebugInfoChanged();
 
             if (DisplayChatMessages)
@@ -459,6 +460,9 @@ namespace Vintagestory.GameContent
 
 
         float accum = 0;
+        // Needed to reproject particles to the correct position
+        protected float[] pMatrixHandFov = null;
+        protected float[] pMatrixNormalFov = null;
 
         protected virtual IShaderProgram getReadyShader() { 
             var prog = capi.Render.StandardShader; 
@@ -570,6 +574,14 @@ namespace Vintagestory.GameContent
                 if (stack.Collectible != null && !capi.IsGamePaused)
                 {
                     Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Collectible.TopMiddlePos.X, stack.Collectible.TopMiddlePos.Y, stack.Collectible.TopMiddlePos.Z, 1));
+
+                    if (pMatrixHandFov != null)
+                    {
+                        var screenSpaceCoordNormalFov = new Matrixf().Set(pMatrixHandFov).Mul(rapi.CameraMatrixOriginf).TransformVector(pos);
+                        var unprojectMatrix = new Matrixf(rapi.CameraMatrixOriginf).Invert().Mul(new Matrixf(pMatrixNormalFov).Invert());
+                        pos = unprojectMatrix.TransformVector(screenSpaceCoordNormalFov);
+                    }
+
                     EntityPlayer entityPlayer = capi.World.Player.Entity;
                     accum += dt;
                     if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > 0.05f)
@@ -582,6 +594,7 @@ namespace Vintagestory.GameContent
 
                             bps.WindAffectednesAtPos = windAffectednessAtPos;
                             bps.WindAffectednes = windAffectednessAtPos;
+
                             bps.basePos.X = pos.X + entity.Pos.X + -(entity.Pos.X - entityPlayer.CameraPos.X);
                             bps.basePos.Y = pos.Y + entity.Pos.Y + -(entity.Pos.Y - entityPlayer.CameraPos.Y);
                             bps.basePos.Z = pos.Z + entity.Pos.Z + -(entity.Pos.Z - entityPlayer.CameraPos.Z);
@@ -592,8 +605,8 @@ namespace Vintagestory.GameContent
                 }
 
             }
-
         }
+
 
         public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
@@ -961,6 +974,8 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
+            capi.World.UnregisterGameTickListener(listenerId);
+
             if (meshRefOpaque != null)
             {
                 meshRefOpaque.Dispose();

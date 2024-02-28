@@ -201,7 +201,15 @@ namespace Vintagestory.GameContent
 
             if (isHandRender)
             {
+                pMatrixNormalFov = (float[])capi.Render.CurrentProjectionMatrix.Clone();
                 capi.Render.Set3DProjection(capi.Render.ShaderUniforms.ZFar, HandRenderFov);
+
+                // Needed to reproject particles to the correct position
+                pMatrixHandFov = (float[])capi.Render.CurrentProjectionMatrix.Clone();
+            } else
+            {
+                pMatrixHandFov = null;
+                pMatrixNormalFov = null;
             }
 
             if (isShadowPass)
