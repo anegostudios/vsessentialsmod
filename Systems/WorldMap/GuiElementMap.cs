@@ -305,6 +305,22 @@ namespace Vintagestory.GameContent
         {
             base.OnKeyDown(api, args);
 
+            if (args.KeyCode == (int)GlKeys.PageUp || args.KeyCode == (int)GlKeys.Plus)
+            {
+                this.ZoomAdd(
+                    zoomDiff: add,
+                    px: (float)((api.Input.MouseX - this.Bounds.absX) / this.Bounds.InnerWidth),
+                    pz: (float)((api.Input.MouseY - this.Bounds.absY) / this.Bounds.InnerHeight));
+            }
+
+            if (args.KeyCode == (int)GlKeys.PageDown || args.KeyCode == (int)GlKeys.Minus)
+            {
+                this.ZoomAdd(
+                    zoomDiff: substract,
+                    px: (float)((api.Input.MouseX - this.Bounds.absX) / this.Bounds.InnerWidth),
+                    pz: (float)((api.Input.MouseY - this.Bounds.absY) / this.Bounds.InnerHeight));
+            }
+
             // Centers the map around the players position  
             if (args.KeyCode == (int)GlKeys.Space)
             {
