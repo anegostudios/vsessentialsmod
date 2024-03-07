@@ -312,7 +312,7 @@ namespace Vintagestory.Essentials
             if (distCheckAccum > 2)
             {
                 distCheckAccum = 0;
-                if (sqDistToTarget - lastDistToTarget < 0.1)
+                if (Math.Abs(sqDistToTarget - lastDistToTarget) < 0.1)
                 {
                     stuck = true;
                     stuckCounter += 30;

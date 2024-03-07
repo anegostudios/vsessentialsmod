@@ -164,35 +164,35 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (totalCount == 0)
             {
-                sb.Append(Lang.Get("Nothing to patch", totalCount));
+                sb.Append(string.Format("Nothing to patch", totalCount));
             }
             else
             {
 
-                sb.Append(Lang.Get("{0} patches total", totalCount));
+                sb.Append(string.Format("{0} patches total", totalCount));
 
                 if (appliedCount > 0)
                 {
-                    sb.Append(Lang.Get(", successfully applied {0} patches", appliedCount));
+                    sb.Append(string.Format(", successfully applied {0} patches", appliedCount));
                 }
 
                 if (notfoundCount > 0)
                 {
-                    sb.Append(Lang.Get(", missing files on {0} patches", notfoundCount));
+                    sb.Append(string.Format(", missing files on {0} patches", notfoundCount));
                 }
 
                 if (unmetConditionCount > 0)
                 {
-                    sb.Append(Lang.Get(", unmet conditions on {0} patches", unmetConditionCount));
+                    sb.Append(string.Format(", unmet conditions on {0} patches", unmetConditionCount));
                 }
 
                 if (errorCount > 0)
                 {
-                    sb.Append(Lang.Get(", had errors on {0} patches", errorCount));
+                    sb.Append(string.Format(", had errors on {0} patches", errorCount));
                 }
                 else
                 {
-                    sb.Append(Lang.Get(", no errors", errorCount));
+                    sb.Append(string.Format(", no errors", errorCount));
                 }
             }
 

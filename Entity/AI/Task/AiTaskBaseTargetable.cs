@@ -140,6 +140,7 @@ namespace Vintagestory.GameContent
 
         private bool IsTargetEntity(string testPath)
         {
+            if (targetEntityFirstLetters.Length == 0) return true;     // target everything (there was a universal wildcard "*", for example BeeMob)
             if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
 
             for (int i = 0; i < targetEntityCodesExact.Length; i++)

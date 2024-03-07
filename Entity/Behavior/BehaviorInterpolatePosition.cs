@@ -146,7 +146,7 @@ namespace Vintagestory.GameContent
             
             handled = EnumHandling.PreventDefault;
 
-            posDiffX = entity.ServerPos.X - entity.Pos.X;
+            posDiffX = entity.ServerPos.X - entity.Pos.X;      // radfast 5.3.24:  isTeleport is ignored because, if teleporting, entityPos will already have been set to match ServerPos
             posDiffY = entity.ServerPos.Y - entity.Pos.Y;
             posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
             rollDiff = GameMath.AngleRadDistance(entity.Pos.Roll, entity.ServerPos.Roll);
