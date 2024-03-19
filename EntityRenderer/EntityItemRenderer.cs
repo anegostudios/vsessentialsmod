@@ -144,7 +144,7 @@ namespace Vintagestory.GameContent
             lerpedPos.Z += (entity.Pos.Z - lerpedPos.Z) * 22 * dt;
 
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground, dt);
-            if (renderInfo.ModelRef == null) return;
+            if (renderInfo.ModelRef == null || renderInfo.Transform == null) return;
 
             IStandardShaderProgram prog = null;
             LoadModelMatrix(renderInfo, isShadowPass, dt);

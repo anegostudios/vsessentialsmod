@@ -7,6 +7,7 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using VSEssentialsMod.Entity.AI.Task;
 
 namespace Vintagestory.GameContent
 {
@@ -20,7 +21,7 @@ namespace Vintagestory.GameContent
 
         protected string targetEntityFirstLetters = "";
 
-        protected string creatureHostility;
+        protected EnumCreatureHostility creatureHostility;
         protected bool friendlyTarget;
 
         public Entity targetEntity;
@@ -50,7 +51,13 @@ namespace Vintagestory.GameContent
 
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
-            creatureHostility = entity.World.Config.GetString("creatureHostility");
+            creatureHostility = entity.World.Config.GetString("creatureHostility") switch
+            {
+                "aggressive" => EnumCreatureHostility.Aggressive,
+                "passive" => EnumCreatureHostility.Passive,
+                "off" => EnumCreatureHostility.NeverHostile,
+                _ => EnumCreatureHostility.Aggressive
+            };
 
             friendlyTarget = taskConfig["friendlyTarget"].AsBool(false);
 
@@ -176,8 +183,8 @@ namespace Vintagestory.GameContent
         {
             if (!friendlyTarget && AggressiveTargeting)
             {
-                if (creatureHostility == "off") return false;
-                if (creatureHostility == "passive" && (bhEmo == null || (!IsInEmotionState("aggressiveondamage") && !IsInEmotionState("aggressivearoundentities")))) return false;
+                if (creatureHostility == EnumCreatureHostility.NeverHostile) return false;
+                if (creatureHostility == EnumCreatureHostility.Passive && (bhEmo == null || (!IsInEmotionState("aggressiveondamage") && !IsInEmotionState("aggressivearoundentities")))) return false;
             }
 
             float rangeMul = eplr.Stats.GetBlended("animalSeekingRange");
@@ -214,7 +221,7 @@ namespace Vintagestory.GameContent
             rayTraceTo.Set(targetEntity.ServerPos);
             rayTraceTo.Y += 1 / 32f;
             bool directContact = false;
-            
+
             entity.World.RayTraceForSelection(this, rayTraceFrom, rayTraceTo, ref blockSel, ref entitySel);
             directContact = blockSel == null;
 

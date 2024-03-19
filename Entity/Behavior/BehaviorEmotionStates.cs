@@ -5,6 +5,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using VSEssentialsMod.Entity.AI.Task;
 
 namespace Vintagestory.GameContent
 {
@@ -54,13 +55,14 @@ namespace Vintagestory.GameContent
         float healthRel;
         float tickAccum;
         EntityPartitioning epartSys;
+        private EnumCreatureHostility _enumCreatureHostility;
 
 
         public EntityBehaviorEmotionStates(Entity entity) : base(entity)
         {
             if (entity.Attributes.HasAttribute("emotionstates"))
             {
-                entityAttr = entity.Attributes["emotionstates"] as TreeAttribute; 
+                entityAttr = entity.Attributes["emotionstates"] as TreeAttribute;
             } else
             {
                 entity.Attributes["emotionstates"] = entityAttr = new TreeAttribute();
@@ -90,16 +92,22 @@ namespace Vintagestory.GameContent
             tickAccum = (float)(entity.World.Rand.NextDouble() * 0.33);  // Spread out the ticking if a lot of entities load at the same time, such as at server start
 
             epartSys = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
+            _enumCreatureHostility = entity.World.Config.GetString("creatureHostility") switch
+            {
+                "aggressive" => EnumCreatureHostility.Aggressive,
+                "passive" => EnumCreatureHostility.Passive,
+                "off" => EnumCreatureHostility.NeverHostile,
+                _ => EnumCreatureHostility.Aggressive
+            };
         }
 
-        
+
         public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            if (damageSource.Source == EnumDamageSource.Fall && entity.World.Config.GetString("creatureHostility") == "passive" && entity.World.Config.GetString("creatureHostility") == "off")
+            if (damageSource.Source == EnumDamageSource.Fall && _enumCreatureHostility == EnumCreatureHostility.Passive && _enumCreatureHostility == EnumCreatureHostility.NeverHostile)
             {
                 return;
             }
-
             var beh = entity.GetBehavior<EntityBehaviorHealth>();
             healthRel = beh == null ? 1 : beh.Health / beh.MaxHealth;
 
@@ -125,18 +133,12 @@ namespace Vintagestory.GameContent
 
             if (TryTriggerState("aggressiveondamage", sourceEntityId))
             {
-                if (TryTriggerState("aggressivealarmondamage", sourceEntityId))
-                {
-
-                }
+                TryTriggerState("aggressivealarmondamage", sourceEntityId);
             }
 
             if (TryTriggerState("fleeondamage", sourceEntityId))
             {
-                if (TryTriggerState("fleealarmondamage", sourceEntityId))
-                {
-
-                }
+                TryTriggerState("fleealarmondamage", sourceEntityId);
             }
         }
 
@@ -169,7 +171,7 @@ namespace Vintagestory.GameContent
             for (int stateid = 0; stateid < availableStates.Length; stateid++)
             {
                 EmotionState newstate = availableStates[stateid];
-            
+
                 if (newstate.Code != statecode || chance > newstate.Chance) continue;
 
                 if (newstate.whenHealthRelBelow < healthRel)
@@ -197,7 +199,7 @@ namespace Vintagestory.GameContent
                         {
                             // New state has priority
                             ActiveStatesByCode.Remove(val.Key);
-                            
+
                             entityAttr.RemoveAttribute(newstate.Code);
                             break;
                         }
@@ -229,7 +231,7 @@ namespace Vintagestory.GameContent
                 {
                     activeState.SourceEntityId = sourceEntityId;
                 }
-                
+
                 entityAttr.SetFloat(newstate.Code, newDuration);
                 triggered = true;
             }
@@ -237,20 +239,23 @@ namespace Vintagestory.GameContent
             return triggered;
         }
 
-        
+
         public override void OnGameTick(float deltaTime)
         {
             if ((tickAccum += deltaTime) < 0.33f) return;
             tickAccum = 0;
 
 
-            TryTriggerState("aggressivearoundentities", 0);
+            if (_enumCreatureHostility == EnumCreatureHostility.Aggressive)
+            {
+                TryTriggerState("aggressivearoundentities", 0);
+            }
 
 
             float nowStressLevel = 0f;
 
             List<string> codesToRemove = null;
-            foreach (var stateAndcode in ActiveStatesByCode) 
+            foreach (var stateAndcode in ActiveStatesByCode)
             {
                 string code = stateAndcode.Key;
                 ActiveEmoState state = stateAndcode.Value;
@@ -259,7 +264,7 @@ namespace Vintagestory.GameContent
                 {
                     if (codesToRemove == null) codesToRemove = new List<string>();
                     codesToRemove.Add(code);
-                    
+
                     entityAttr.RemoveAttribute(code);
                     continue;
                 }
@@ -313,6 +318,6 @@ namespace Vintagestory.GameContent
         }
 
 
-        
+
     }
 }

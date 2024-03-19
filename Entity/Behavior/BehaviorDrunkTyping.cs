@@ -26,7 +26,7 @@ namespace Vintagestory.GameContent
 
             // capi.World.Player is not initialized yet
             bool isself = (entity as EntityPlayer)?.PlayerUID == capi.Settings.String["playeruid"];
-            
+
             if (isself)
             {
                 capi.Event.RegisterEventBusListener(onChatKeyDownPre, 1, "chatkeydownpre");
@@ -40,6 +40,7 @@ namespace Vintagestory.GameContent
         }
 
         bool isCommand;
+
         private void onChatKeyDownPre(string eventName, ref EnumHandling handling, IAttribute data)
         {
             var treeAttr = data as TreeAttribute;
@@ -68,7 +69,6 @@ namespace Vintagestory.GameContent
             }
             else
             {
-
                 if (keyCode != (int)GlKeys.BackSpace && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
                 {
                     text = slurText(text);
@@ -92,27 +92,36 @@ namespace Vintagestory.GameContent
                         {
                             text = text.Substring(0, text.Length - 2) + text[text.Length - 1] + text[text.Length - 2];
                         }
+
                         break;
                     // Repeat last char
                     case 2:
                     case 3:
                     case 4:
-                        text = text + text[text.Length - 1];
+                        if (text.Length > 0)
+                        {
+                            text = text + text[text.Length - 1];
+                        }
+
                         break;
                     // Add random letter left/right from the last pressed key
                     case 5:
-                        string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
-                        var lastchar = text[text.Length - 1];
-
-                        for (int i = 0; i < 3; i++)
+                        if (text.Length > 0)
                         {
-                            int index = keybLayout[i].IndexOf(lastchar);
-                            if (index >= 0)
+                            string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
+                            var lastchar = text[text.Length - 1];
+
+                            for (int i = 0; i < 3; i++)
                             {
-                                int rndoffset = rnd.Next(2) * 2 - 1;
-                                text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                                int index = keybLayout[i].IndexOf(lastchar);
+                                if (index >= 0)
+                                {
+                                    int rndoffset = rnd.Next(2) * 2 - 1;
+                                    text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                                }
                             }
                         }
+
                         break;
                 }
             }
