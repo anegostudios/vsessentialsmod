@@ -53,6 +53,7 @@ namespace Vintagestory.GameContent
             var treeAttr = data as TreeAttribute;
             int keyCode = (treeAttr["key"] as IntAttribute).value;
             string text = (treeAttr["text"] as StringAttribute).value;
+            int deltacaretPos = 0;
 
             // User is trying to cheese the system
             if (isCommand && text.Length > 0 && text[0] != '.' && text[0] != '/')
@@ -60,28 +61,26 @@ namespace Vintagestory.GameContent
                 string newtext = text[0] + "";
                 for (int i = 1; i < text.Length; i++)
                 {
-                    newtext = slurText(newtext);
+                    newtext = slurText(newtext, ref deltacaretPos);
                     newtext += text[i];
                 }
 
                 text = newtext;
                 (treeAttr["text"] as StringAttribute).value = text;
-                treeAttr.SetBool("scrolltoEnd", true);
             }
             else
             {
                 if (keyCode != (int)GlKeys.BackSpace && keyCode != (int)GlKeys.Left && keyCode != (int)GlKeys.Right && keyCode != (int)GlKeys.Delete && keyCode != (int)GlKeys.LAlt && keyCode != (int)GlKeys.ControlLeft && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
                 {
-                    text = slurText(text);
+                    text = slurText(text, ref deltacaretPos);
                     (treeAttr["text"] as StringAttribute).value = text;
-                    treeAttr.SetBool("scrolltoEnd", true);
                 }
             }
 
-            
+            treeAttr.SetInt("deltacaretpos", deltacaretPos);
         }
 
-        private string slurText(string text)
+        private string slurText(string text, ref int caretPos)
         {
             var rnd = api.World.Rand;
             float intox = entity.WatchedAttributes.GetFloat("intoxication");
@@ -105,6 +104,7 @@ namespace Vintagestory.GameContent
                         if (text.Length > 0)
                         {
                             text = text + text[text.Length - 1];
+                            caretPos++;
                         }
 
                         break;
@@ -122,6 +122,7 @@ namespace Vintagestory.GameContent
                                 {
                                     int rndoffset = rnd.Next(2) * 2 - 1;
                                     text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                                    caretPos++;
                                 }
                             }
                         }
