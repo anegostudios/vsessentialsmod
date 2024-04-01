@@ -240,7 +240,7 @@ namespace Vintagestory.GameContent
                     prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
                     prog.Uniform("alphaTest", 0.05f);
                     prog.Uniform("lightPosition", capi.Render.ShaderUniforms.LightPosition3D);
-                    prog.Uniform("depthOffset", -0.3f);
+                    prog.Uniform("depthOffset", -0.3f - GameMath.Max(0, capi.Settings.Int["fieldOfView"] / 90f - 1) / 2f);
 
                     capi.Render.GlPushMatrix();
                     capi.Render.GlLoadMatrix(capi.Render.CameraMatrixOrigin);
@@ -262,7 +262,7 @@ namespace Vintagestory.GameContent
             {
                 var prog = modSys.fpModeItemShader;
                 prog.Use();
-                prog.Uniform("depthOffset", -0.3f);
+                prog.Uniform("depthOffset", -0.3f - GameMath.Max(0, capi.Settings.Int["fieldOfView"] / 90f - 1) / 2f);
                 prog.Uniform("ssaoAttn", 1f);
                 return prog;
             }

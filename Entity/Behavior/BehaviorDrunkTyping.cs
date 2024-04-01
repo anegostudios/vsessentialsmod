@@ -66,15 +66,19 @@ namespace Vintagestory.GameContent
 
                 text = newtext;
                 (treeAttr["text"] as StringAttribute).value = text;
+                treeAttr.SetBool("scrolltoEnd", true);
             }
             else
             {
-                if (keyCode != (int)GlKeys.BackSpace && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
+                if (keyCode != (int)GlKeys.BackSpace && keyCode != (int)GlKeys.Left && keyCode != (int)GlKeys.Right && keyCode != (int)GlKeys.Delete && keyCode != (int)GlKeys.LAlt && keyCode != (int)GlKeys.ControlLeft && (text.Length > 0 && text[0] != '.' && text[0] != '/'))
                 {
                     text = slurText(text);
                     (treeAttr["text"] as StringAttribute).value = text;
+                    treeAttr.SetBool("scrolltoEnd", true);
                 }
             }
+
+            
         }
 
         private string slurText(string text)
