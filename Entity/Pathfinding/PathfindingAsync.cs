@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -82,7 +83,15 @@ namespace Vintagestory.Essentials
             PathfinderTask task;
             while ((task = Next()) != null && maxCount-- > 0)
             {
-                task.waypoints = astar.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
+                try
+                {
+                    task.waypoints = astar.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
+                } catch (Exception e)
+                {
+                    task.waypoints = null;
+                    api.World.Logger.Error("Exception thrown during pathfinding. Will ignore. Exception: {0}", e.ToString());
+                }
+
                 task.Finished = true;
 
                 if (isShuttingDown) break;
