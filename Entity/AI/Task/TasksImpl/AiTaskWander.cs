@@ -71,11 +71,8 @@ namespace Vintagestory.GameContent
             }
 
             targetDistance = taskConfig["targetDistance"].AsFloat(0.12f);
-
             moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
-
-            wanderChance = taskConfig["wanderChance"].AsFloat(0.015f);
-
+            wanderChance = taskConfig["wanderChance"].AsFloat(0.02f);
             wanderRangeMin = taskConfig["wanderRangeMin"].AsFloat(3);
             wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
             wanderRangeHorizontal = NatFloat.createInvexp(wanderRangeMin, wanderRangeMax);

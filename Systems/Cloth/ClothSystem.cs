@@ -1,8 +1,10 @@
 ﻿using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -41,31 +43,26 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// 10 joints per meter
         /// </summary>
-        public static float Resolution = 10;
-        public bool LineDebug;
+        public static float Resolution = 2;
 
+        public float StretchWarn = 0.6f;
+        public float StretchRip = 0.75f;
+
+        public bool LineDebug=false;
         public bool boyant = false;
-
         protected ICoreClientAPI capi;
-        public ICoreAPI api;
-
-
-        
+        public ICoreAPI api;        
         public Vec3d windSpeed = new Vec3d();
-
         public ParticlePhysics pp;
         protected NormalizedSimplexNoise noiseGen;
         protected float[] tmpMat = new float[16];
         protected Vec3f distToCam = new Vec3f();
-
-
-
         protected AssetLocation ropeSectionModel;
-
         protected MeshData debugUpdateMesh;
         protected MeshRef debugMeshRef;
 
-        
+        public float secondsOverStretched;
+
 
         public bool PinnedAnywhere
         {
@@ -82,6 +79,8 @@ namespace Vintagestory.GameContent
                 return false;
             }
         }
+
+        public double MaxExtension => Constraints.Max(c => c.Extension);
 
         public Vec3d CenterPosition
         {
@@ -127,122 +126,187 @@ namespace Vintagestory.GameContent
         public int Length => Points2d[0].Points.Count;
 
 
-        public static ClothSystem CreateCloth(ICoreAPI api, ClothManager cm, BlockPos originPos, float xsize, float zsize)
+        public static ClothSystem CreateCloth(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end)
         {
-            return new ClothSystem(api, cm, originPos, xsize, zsize, EnumClothType.Cloth);
+            return new ClothSystem(api, cm, start, end, EnumClothType.Cloth);
         }
 
-        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, BlockPos originPos, float length, AssetLocation clothSectionModel)
+        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, AssetLocation clothSectionModel)
         {
-            return new ClothSystem(api, cm, originPos, length, 0, EnumClothType.Rope, clothSectionModel);
+            return new ClothSystem(api, cm, start, end, EnumClothType.Rope, clothSectionModel);
         }
 
 
         private ClothSystem() { }
 
-        private ClothSystem(ICoreAPI api, ClothManager cm, BlockPos originPos, float xsize, float zsize, EnumClothType clothType, AssetLocation ropeSectionModel = null)
+        double minLen = 1;
+        double maxLen = 10;
+
+        public bool ChangeRopeLength(double len)
         {
-            this.clothType = clothType;
-            this.ropeSectionModel = ropeSectionModel;
+            var plist = Points2d[0];
 
-            Init(api, cm);
-            Random rand = api.World.Rand;
+            double currentLength = plist.Points.Count / Resolution;
 
-            bool hor = rand.NextDouble() < 0.5;
-            int vertexIndex = 0;
+            bool isAdd = len > 0;
 
+            if (isAdd && len + currentLength > maxLen) return false;
+            if (!isAdd && len + currentLength < minLen) return false;
+
+            int pointIndex = plist.Points.Max(p => p.PointIndex)+1;
+            var fp = FirstPoint;
+            var pine = fp.PinnedToEntity;
+            var pinb = fp.PinnedToBlockPos;
+            var pino = fp.pinnedToOffset;
+            fp.UnPin();
             float step = 1 / Resolution;
-            int numzpoints = (int)Math.Round(zsize * Resolution);
-            int numxpoints = (int)Math.Round(xsize * Resolution);
+            int totalPoints = Math.Abs((int)(len * Resolution));
 
-            if (clothType == EnumClothType.Rope)
+            if (isAdd)
             {
-                numzpoints = 1;
-            }
-
-            float roughness = 0.05f;
-            int k = 0;
-            int pointIndex = 0;
-
-            for (int z = 0; z < numzpoints; z++)
-            {
-                Points2d.Add(new PointList());
-
-                for (int x = 0; x < numxpoints; x++)
+                for (int i = 0; i <= totalPoints; i++)
                 {
-                    float dx = x * step;
-                    float dy = z * step;
-                    float dz = -roughness/2 + (float)rand.NextDouble() * roughness;
+                    plist.Points.Insert(0, new ClothPoint(this, pointIndex++, fp.Pos.X + step*(i+1), fp.Pos.Y, fp.Pos.Z));
 
-                    if (hor)
+                    ClothPoint p1 = plist.Points[0];
+                    ClothPoint p2 = plist.Points[1];
+                    var constraint = new ClothConstraint(p1, p2);
+                    Constraints.Add(constraint);
+                }
+            } else
+            {
+                for (int i = 0; i <= totalPoints; i++)
+                {
+                    var point = plist.Points[0];
+                    plist.Points.RemoveAt(0);
+                        
+                    for (int k = 0; k < Constraints.Count; k++)
                     {
-                        dx = x * step;
-                        dy = -roughness/2 + (float)rand.NextDouble() * roughness;
-                        dz = z * step;
-                    }
-
-                    var point = new ClothPoint(this, pointIndex++, originPos.X + dx, originPos.Y + dy, originPos.Z + dz);
-
-                    Points2d[z].Points.Add(point);
-
-                    int color = (k++ % 2) > 0 ? ColorUtil.WhiteArgb : ColorUtil.BlackArgb;
-
-                    // add a vertical constraint
-                    if (z > 0)
-                    {
-                        ClothPoint p1 = Points2d[z - 1].Points[x];
-                        ClothPoint p2 = Points2d[z].Points[x];
-
-                        var constraint = new ClothConstraint(p1, p2);
-                        Constraints.Add(constraint);
-
-                        if (capi != null)
+                        var c = Constraints[k];
+                        if (c.Point1 == point || c.Point2 == point)
                         {
-                            if (LineDebug)
-                            {
-                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
-                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
-
-                                debugUpdateMesh.AddIndex(vertexIndex++);
-                                debugUpdateMesh.AddIndex(vertexIndex++);
-                            }
-                        }
-                    }
-
-                    // add a new horizontal constraints
-                    if (x > 0)
-                    {
-                        ClothPoint p1 = Points2d[z].Points[x - 1];
-                        ClothPoint p2 = Points2d[z].Points[x];
-
-                        var constraint = new ClothConstraint(p1, p2);
-                        Constraints.Add(constraint);
-
-                        if (capi != null)
-                        {
-                            if (LineDebug)
-                            {
-                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
-                                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
-
-                                debugUpdateMesh.AddIndex(vertexIndex++);
-                                debugUpdateMesh.AddIndex(vertexIndex++);
-                            }
+                            Constraints.RemoveAt(k);
+                            k--;
                         }
                     }
                 }
             }
 
+            if (pine != null) FirstPoint.PinTo(pine, pino);
+            if (pinb != null) FirstPoint.PinTo(pinb, pino);
+            genDebugMesh();
 
+            return true;
+        }
 
-            if (capi != null && LineDebug)
-            {
-                debugUpdateMesh.mode = EnumDrawMode.Lines;
-                debugMeshRef = capi.Render.UploadMesh(debugUpdateMesh);
+        private ClothSystem(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, EnumClothType clothType, AssetLocation ropeSectionModel = null)
+        {
+            this.clothType = clothType;
+            this.ropeSectionModel = ropeSectionModel;
 
-                debugUpdateMesh.Indices = null;
-                debugUpdateMesh.Rgba = null;
+            Init(api, cm);            
+            float step = 1 / Resolution;
+
+            var dir = end - start;
+
+            if (clothType == EnumClothType.Rope) {
+                double len = dir.Length();
+
+                var plist = new PointList();
+                Points2d.Add(plist);
+
+                int totalPoints = (int)(len * Resolution);
+
+                for (int i = 0; i <= totalPoints; i++)
+                {
+                    var t = (float)i / totalPoints;
+
+                    plist.Points.Add(new ClothPoint(this, i, start.X + dir.X * t, start.Y + dir.Y * t, start.Z + dir.Z * t));
+
+                    if (i > 0)
+                    {
+                        ClothPoint p1 = plist.Points[i - 1];
+                        ClothPoint p2 = plist.Points[i];
+
+                        var constraint = new ClothConstraint(p1, p2);
+                        Constraints.Add(constraint);
+                    }
+                }
             }
+
+            if (clothType == EnumClothType.Cloth)
+            {
+                double hlen = (end - start).HorLength();
+                double vlen = Math.Abs(end.Y - start.Y);
+
+                int hleni = (int)(hlen * Resolution);
+                int vleni = (int)(vlen * Resolution);
+                int totalPoints = hleni * vleni;
+
+                int index = 0;
+
+                for (int a = 0; a < hleni; a++)
+                {
+                    Points2d.Add(new PointList());
+
+                    for (int y = 0; y < vleni; y++)
+                    {
+                        var th = a / hlen;
+                        var tv = y / vlen;
+
+                        Points2d[a].Points.Add(new ClothPoint(this, index++, start.X + dir.X * th, start.Y + dir.Y * tv, start.Z + dir.Z * th));
+
+                        // add a vertical constraint
+                        if (a > 0)
+                        {
+                            ClothPoint p1 = Points2d[a - 1].Points[y];
+                            ClothPoint p2 = Points2d[a].Points[y];
+
+                            var constraint = new ClothConstraint(p1, p2);
+                            Constraints.Add(constraint);
+                        }
+
+                        // add a new horizontal constraints
+                        if (y > 0)
+                        {
+                            ClothPoint p1 = Points2d[a].Points[y - 1];
+                            ClothPoint p2 = Points2d[a].Points[y];
+
+                            var constraint = new ClothConstraint(p1, p2);
+                            Constraints.Add(constraint);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void genDebugMesh()
+        {
+            if (capi == null) return;
+
+            debugMeshRef?.Dispose();
+            debugUpdateMesh = new MeshData(20, 15, false, false, true, true);
+
+            int vertexIndex = 0;
+
+            for (int i = 0; i < Constraints.Count; i++)
+            {
+                var c = Constraints[i];
+                int color = (i % 2) > 0 ? ColorUtil.WhiteArgb : ColorUtil.BlackArgb;
+
+                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
+                debugUpdateMesh.AddVertexSkipTex(0, 0, 0, color);
+
+                debugUpdateMesh.AddIndex(vertexIndex++);
+                debugUpdateMesh.AddIndex(vertexIndex++);
+            }
+
+
+            debugUpdateMesh.mode = EnumDrawMode.Lines;
+            debugMeshRef = capi.Render.UploadMesh(debugUpdateMesh);
+
+            debugUpdateMesh.Indices = null;
+            debugUpdateMesh.Rgba = null;
         }
 
         
@@ -254,11 +318,6 @@ namespace Vintagestory.GameContent
             pp = cm.partPhysics;
 
             noiseGen = NormalizedSimplexNoise.FromDefaultOctaves(4, 100, 0.9, api.World.Seed + CenterPosition.GetHashCode());
-
-            if (capi != null && LineDebug)
-            {
-                debugUpdateMesh = new MeshData(20, 15, false, false, true, true);
-            }
         }
 
 
@@ -283,63 +342,57 @@ namespace Vintagestory.GameContent
 
             Vec4f lightRgba = api.World.BlockAccessor.GetLightRGBs(Constraints[Constraints.Count / 2].Point1.Pos.AsBlockPos);
 
-            if (clothType == EnumClothType.Rope)
+            for (int i = 0; i < Constraints.Count; i++)
             {
-                for (int i = 0; i < Constraints.Count; i++)
+                ClothConstraint cc = Constraints[i];
+                Vec3d p1 = cc.Point1.Pos;
+                Vec3d p2 = cc.Point2.Pos;
+
+                double dX = p1.X - p2.X;
+                double dY = p1.Y - p2.Y;
+                double dZ = p1.Z - p2.Z;
+
+
+                float yaw = (float)Math.Atan2(dX, dZ) + GameMath.PIHALF;
+                float pitch = (float)Math.Atan2(Math.Sqrt(dZ * dZ + dX * dX), dY) + GameMath.PIHALF;
+
+                double nowx = p1.X + (p1.X - p2.X) / 2;
+                double nowy = p1.Y + (p1.Y - p2.Y) / 2;
+                double nowz = p1.Z + (p1.Z - p2.Z) / 2;
+
+                distToCam.Set(
+                    (float)(nowx - campos.X),
+                    (float)(nowy - campos.Y),
+                    (float)(nowz - campos.Z)
+                );
+
+                Mat4f.Identity(tmpMat);
+
+                Mat4f.Translate(tmpMat, tmpMat, 0, 1 / 32f, 0);
+
+                Mat4f.Translate(tmpMat, tmpMat, distToCam.X, distToCam.Y, distToCam.Z);
+                Mat4f.RotateY(tmpMat, tmpMat, yaw);
+                Mat4f.RotateZ(tmpMat, tmpMat, pitch);
+
+                float roll = i / 5f;
+                Mat4f.RotateX(tmpMat, tmpMat, roll);
+
+                float length = GameMath.Sqrt(dX*dX+dY*dY+dZ*dZ);
+
+                Mat4f.Scale(tmpMat, tmpMat, new float[] { length, 1, 1 }); // + (float)Math.Sin(api.World.ElapsedMilliseconds / 1000f) * 0.1f
+                Mat4f.Translate(tmpMat, tmpMat, -1.5f, -1 / 32f, -0.5f); // not sure why the -1.5 here instead of -0.5
+
+
+
+                int j = basep + i * 20;
+                cfloats.Values[j++] = lightRgba.R;
+                cfloats.Values[j++] = lightRgba.G;
+                cfloats.Values[j++] = lightRgba.B;
+                cfloats.Values[j++] = lightRgba.A;
+
+                for (int k = 0; k < 16; k++)
                 {
-                    ClothConstraint cc = Constraints[i];
-
-                    Vec3d start = cc.Point1.Pos;
-                    Vec3d end = cc.Point2.Pos;
-
-                    double dX = start.X - end.X;
-                    double dY = start.Y - end.Y;
-                    double dZ = start.Z - end.Z;
-
-
-                    float yaw = (float)Math.Atan2(dX, dZ) + GameMath.PIHALF;
-                    float pitch = (float)Math.Atan2(Math.Sqrt(dZ * dZ + dX * dX), dY) + GameMath.PIHALF;
-
-                    double nowx = start.X + (start.X - end.X) / 2;
-                    double nowy = start.Y + (start.Y - end.Y) / 2;
-                    double nowz = start.Z + (start.Z - end.Z) / 2;
-
-                    cc.renderCenterPos.X += (nowx - cc.renderCenterPos.X) * dt * 20;
-                    cc.renderCenterPos.Y += (nowy - cc.renderCenterPos.Y) * dt * 20;
-                    cc.renderCenterPos.Z += (nowz - cc.renderCenterPos.Z) * dt * 20;
-
-                    distToCam.Set(
-                        (float)(cc.renderCenterPos.X - campos.X),
-                        (float)(cc.renderCenterPos.Y - campos.Y),
-                        (float)(cc.renderCenterPos.Z - campos.Z)
-                    );
-
-                    Mat4f.Identity(tmpMat);
-
-                    Mat4f.Translate(tmpMat, tmpMat, 0, 1 / 32f, 0);
-
-                    Mat4f.Translate(tmpMat, tmpMat, distToCam.X, distToCam.Y, distToCam.Z);
-                    Mat4f.RotateY(tmpMat, tmpMat, yaw);
-                    Mat4f.RotateZ(tmpMat, tmpMat, pitch);
-
-                    float roll = i / 5f;
-                    Mat4f.RotateX(tmpMat, tmpMat, roll);
-
-                    Mat4f.Scale(tmpMat, tmpMat, new float[] { (float)cc.SpringLength, 1, 1 }); // + (float)Math.Sin(api.World.ElapsedMilliseconds / 1000f) * 0.1f
-                    Mat4f.Translate(tmpMat, tmpMat, -1.5f, -1 / 32f, -0.5f); // not sure why the -1.5 here instead of -0.5
-
-
-
-                    int j = basep + i * 20;
-                    cfloats.Values[j++] = lightRgba.R;
-                    cfloats.Values[j++] = lightRgba.G;
-                    cfloats.Values[j++] = lightRgba.B;
-                    cfloats.Values[j++] = lightRgba.A;
-
-                    for (int k = 0; k < 16; k++)
-                    {
-                        cfloats.Values[j + k] = tmpMat[k];
-                    }
+                    cfloats.Values[j + k] = tmpMat[k];
                 }
             }
 
@@ -376,20 +429,23 @@ namespace Vintagestory.GameContent
         {
             if (LineDebug && capi != null)
             {
+                if (debugMeshRef == null) genDebugMesh();
+
                 BlockPos originPos = CenterPosition.AsBlockPos;
 
                 for (int i = 0; i < Constraints.Count; i++)
                 {
-                    ClothPoint p1 = Constraints[i].Point1;
-                    ClothPoint p2 = Constraints[i].Point2;
+                    ClothConstraint cc = Constraints[i];
+                    Vec3d p1 = cc.Point1.Pos;
+                    Vec3d p2 = cc.Point2.Pos;
 
-                    debugUpdateMesh.xyz[i * 6 + 0] = (float)(p1.Pos.X - originPos.X);
-                    debugUpdateMesh.xyz[i * 6 + 1] = (float)(p1.Pos.Y - originPos.Y) + 0.005f;
-                    debugUpdateMesh.xyz[i * 6 + 2] = (float)(p1.Pos.Z - originPos.Z);
+                    debugUpdateMesh.xyz[i * 6 + 0] = (float)(p1.X - originPos.X);
+                    debugUpdateMesh.xyz[i * 6 + 1] = (float)(p1.Y - originPos.Y) + 0.005f;
+                    debugUpdateMesh.xyz[i * 6 + 2] = (float)(p1.Z - originPos.Z);
 
-                    debugUpdateMesh.xyz[i * 6 + 3] = (float)(p2.Pos.X - originPos.X);
-                    debugUpdateMesh.xyz[i * 6 + 4] = (float)(p2.Pos.Y - originPos.Y) + 0.005f;
-                    debugUpdateMesh.xyz[i * 6 + 5] = (float)(p2.Pos.Z - originPos.Z);
+                    debugUpdateMesh.xyz[i * 6 + 3] = (float)(p2.X - originPos.X);
+                    debugUpdateMesh.xyz[i * 6 + 4] = (float)(p2.Y - originPos.Y) + 0.005f;
+                    debugUpdateMesh.xyz[i * 6 + 5] = (float)(p2.Z - originPos.Z);
                 }
 
 
@@ -440,21 +496,19 @@ namespace Vintagestory.GameContent
             }
         }
 
-        void tickNow(float pdt) { 
-            int numc = Constraints.Count;
-            
+        void tickNow(float pdt) {
             // make sure all the constraints are satisfied.
-            for (int i = 0; i < numc; i++)
+            for (int i = Constraints.Count - 1; i >= 0; i--)
             {
                 Constraints[i].satisfy(pdt);
             }
 
             // move each point with a pull from gravity
-            for (int i = 0; i < Points2d.Count; i++)
+            for (int i = Points2d.Count-1; i >= 0; i--)
             {
-                for (int j = 0; j < Points2d[i].Points.Count; j++)
+                for (int j = Points2d[i].Points.Count-1; j >= 0; j--)
                 {
-                    Points2d[i].Points[j].update(pdt);
+                    Points2d[i].Points[j].update(pdt, api.World);
                 }
             }
         }
@@ -462,6 +516,8 @@ namespace Vintagestory.GameContent
 
         public void slowTick3s()
         {
+            if (double.IsNaN(CenterPosition.X)) return;
+
             windSpeed = api.World.BlockAccessor.GetWindSpeedAt(CenterPosition) * (0.2 + noiseGen.Noise(0, (api.World.Calendar.TotalHours * 50) % 2000) * 0.8);
         }
 
@@ -519,6 +575,13 @@ namespace Vintagestory.GameContent
         {
             ClothPoint point = Points2d[msg.PointX].Points[msg.PointY];
             point.updateFromPoint(msg.Point, api.World);
+        }
+
+        public void OnPinnnedEntityLoaded(Entity entity)
+        {
+            if (FirstPoint.pinnedToEntityId == entity.EntityId) FirstPoint.restoreReferences(entity);
+            if (LastPoint.pinnedToEntityId == entity.EntityId) LastPoint.restoreReferences(entity);
+
         }
     }
 

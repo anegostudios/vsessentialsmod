@@ -306,6 +306,9 @@ namespace Vintagestory.GameContent
 
         private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest, EnumEntitySearchType searchType)
         {
+            int dimension = (int)centerPos.Y / BlockPos.DimensionBoundary;
+            double trueY = centerPos.Y - dimension * BlockPos.DimensionBoundary;
+
             int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks - 1;
             int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize - 1;
             int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks - 1;
@@ -313,8 +316,8 @@ namespace Vintagestory.GameContent
             int mingx = (int)GameMath.Clamp((centerPos.X - radius) / gridSizeInBlocks, 0, gridXMax);
             int maxgx = (int)GameMath.Clamp((centerPos.X + radius) / gridSizeInBlocks, 0, gridXMax);
 
-            int mincy = (int)GameMath.Clamp((centerPos.Y - radius) / chunkSize, 0, cyTop);
-            int maxcy = (int)GameMath.Clamp((centerPos.Y + radius) / chunkSize, 0, cyTop);
+            int mincy = (int)GameMath.Clamp((trueY - radius) / chunkSize, 0, cyTop);
+            int maxcy = (int)GameMath.Clamp((trueY + radius) / chunkSize, 0, cyTop);
 
             int mingz = (int)GameMath.Clamp((centerPos.Z - radius) / gridSizeInBlocks, 0, gridZMax);
             int maxgz = (int)GameMath.Clamp((centerPos.Z + radius) / gridSizeInBlocks, 0, gridZMax);
@@ -350,6 +353,7 @@ namespace Vintagestory.GameContent
 
                         foreach (Entity entity in entities)
                         {
+                            if (entity.Pos.Dimension != dimension) continue;
                             if (onRangeTest(entity, centerPos, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
                             {
                                 return;
@@ -359,6 +363,5 @@ namespace Vintagestory.GameContent
                 }
             }
         }
-
     }
 }

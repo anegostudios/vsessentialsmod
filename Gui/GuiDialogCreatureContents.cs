@@ -1,8 +1,10 @@
 ﻿using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using static Vintagestory.API.Client.GuiDialogGeneric;
 
 namespace Vintagestory.GameContent
 {
@@ -11,16 +13,21 @@ namespace Vintagestory.GameContent
         public override string ToggleKeyCombinationCode => null;
 
         InventoryGeneric inv;
-        EntityAgent owningEntity;
+        Entity owningEntity;
+        public int packetIdOffset;
 
         protected double FloatyDialogPosition => 0.6;
         protected double FloatyDialogAlign => 0.8;
 
         public override bool UnregisterOnClose => true;
 
-        public GuiDialogCreatureContents(InventoryGeneric inv, EntityAgent owningEntity, ICoreClientAPI capi, string code) : base(capi)
+        EnumPosFlag screenPos;
+        string title;
+
+        public GuiDialogCreatureContents(InventoryGeneric inv, Entity owningEntity, ICoreClientAPI capi, string code, string title = null) : base(capi)
         {
             this.inv = inv;
+            this.title = title;
             this.owningEntity = owningEntity;
 
             Compose(code);
@@ -34,29 +41,46 @@ namespace Vintagestory.GameContent
 
             ElementBounds slotBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, pad, 40 + pad, 4, rows).FixedGrow(2 * pad, 2 * pad);
 
-            ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
-            bgBounds.BothSizing = ElementSizing.FitToChildren;
+            //ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
+            //bgBounds.BothSizing = ElementSizing.FitToChildren;
 
-            ElementBounds dialogBounds = ElementStdBounds
+            /*ElementBounds dialogBounds = ElementStdBounds
                 .AutosizedMainDialog.WithAlignment(EnumDialogArea.RightMiddle)
-                .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0);
+                .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0);*/
+
+            screenPos = GetFreePos("smallblockgui");
+            float elemToDlgPad = 10;
+
+            // 3. Around all that is the dialog centered to screen middle, with some extra spacing right for the scrollbar
+            ElementBounds dialogBounds = slotBounds // insetBounds
+                .ForkBoundingParent(elemToDlgPad, elemToDlgPad + 30, elemToDlgPad, elemToDlgPad)
+                //.AutosizedMainDialog.WithAlignment(EnumDialogArea.RightMiddle)
+                .WithFixedAlignmentOffset(IsRight(screenPos) ? -GuiStyle.DialogToScreenPadding : GuiStyle.DialogToScreenPadding, 0)
+                .WithAlignment(IsRight(screenPos) ? EnumDialogArea.RightMiddle : EnumDialogArea.LeftMiddle)
+            ;
+
+            if (!capi.Settings.Bool["immersiveMouseMode"])
+            {
+                dialogBounds.fixedOffsetY += (dialogBounds.fixedHeight + 10) * YOffsetMul(screenPos);
+                dialogBounds.fixedOffsetX += (dialogBounds.fixedWidth + 10) * XOffsetMul(screenPos);
+            }
 
 
             SingleComposer =
                 capi.Gui
                 .CreateCompo(code + owningEntity.EntityId, dialogBounds)
-                .AddShadedDialogBG(bgBounds, true)
-                .AddDialogTitleBar(Lang.Get(code), OnTitleBarClose)
-                .BeginChildElements(bgBounds)
+                .AddShadedDialogBG(ElementBounds.Fill, true)
+                .AddDialogTitleBar(Lang.Get(title ?? code), OnTitleBarClose)
+                //.BeginChildElements(bgBounds)
                     .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
-                .EndChildElements()
+                //.EndChildElements()
                 .Compose()
             ;
         }
 
         private void DoSendPacket(object p)
         {
-            capi.Network.SendEntityPacket(owningEntity.EntityId, p);
+             capi.Network.SendEntityPacketWithOffset(owningEntity.EntityId, packetIdOffset, p);
         }
 
         private void OnTitleBarClose()
@@ -67,6 +91,11 @@ namespace Vintagestory.GameContent
         public override void OnGuiOpened()
         {
             base.OnGuiOpened();
+
+            if (capi.Gui.GetDialogPosition(SingleComposer.DialogName) == null)
+            {
+                OccupyPos("smallblockgui", screenPos);
+            }
         }
 
         public override void OnGuiClosed()
@@ -75,9 +104,11 @@ namespace Vintagestory.GameContent
 
             capi.Network.SendPacketClient(capi.World.Player.InventoryManager.CloseInventory(inv));
             SingleComposer.GetSlotGrid("slots").OnGuiClosed(capi);
+
+            FreePos("smallblockgui", screenPos);
         }
 
-        // TODO: Fix code duplication from GuiDialogBlockEntity
+
         /// <summary>
         /// Render's the object in Orthographic mode.
         /// </summary>

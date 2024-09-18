@@ -80,7 +80,7 @@ namespace Vintagestory.GameContent
 
             float size = targetEntity.SelectionBox.XSize;
 
-            pathTraverser.NavigateTo_Async(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, null, 1000, 1);
+            pathTraverser.NavigateTo_Async(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, OnNoPath, 1000, 1);
 
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
 
@@ -180,7 +180,7 @@ namespace Vintagestory.GameContent
             tryTeleport();
         }
 
-        public override void OnNoPath(Vec3d target)
+        public void OnNoPath()
         {
             tryTeleport();
         }

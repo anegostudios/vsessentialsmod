@@ -41,6 +41,8 @@ namespace Vintagestory.GameContent
         protected EntityPartitioning partitionUtil;
         protected EntityBehaviorControlledPhysics bhPhysics;
 
+        protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < 30000;
+
         protected AiTaskBaseTargetable(EntityAgent entity) : base(entity)
         {
         }
@@ -125,12 +127,17 @@ namespace Vintagestory.GameContent
 
         public override void StartExecute()
         {
-            stepHeight = bhPhysics?.stepHeight ?? 0.6f;
+            stepHeight = bhPhysics?.StepHeight ?? 0.6f;
             base.StartExecute();
 
             if (triggerEmotionState != null)
             {
                 entity.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState(triggerEmotionState, 1, targetEntity?.EntityId ?? 0);
+            }
+            var physics = entity.GetBehavior<EntityBehaviorControlledPhysics>();
+            if (physics != null)
+            {
+                stepHeight = physics.StepHeight;
             }
         }
 
@@ -248,43 +255,41 @@ namespace Vintagestory.GameContent
 
 
         Vec3d tmpVec = new Vec3d();
-        protected void updateTargetPosFleeMode(Vec3d targetPos)
+        protected void updateTargetPosFleeMode(Vec3d targetPos, float yaw)
         {
-            float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
-
             // Simple steering behavior
             tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI / 2);
-
-            // Running into wall?
-            if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI / 2);
-                return;
-            }
-
-            // Try 90 degrees left
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, yaw - GameMath.PI);
-            if (traversable(tmpVec))
-            {
-                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PI);
-                return;
-            }
-
-            // Try 90 degrees right
-            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
             tmpVec.Ahead(0.9, 0, yaw);
+
+            // Try straight
             if (traversable(tmpVec))
             {
                 targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw);
                 return;
             }
 
-            // Run towards target o.O
+            // Try 90 degrees left
             tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            tmpVec.Ahead(0.9, 0, -yaw);
-            targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, -yaw);
+            tmpVec.Ahead(0.9, 0, yaw - GameMath.PIHALF);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw - GameMath.PIHALF);
+                return;
+            }
+
+            // Try 90 degrees right
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw + GameMath.PIHALF);
+            if (traversable(tmpVec))
+            {
+                targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw + GameMath.PIHALF);
+                return;
+            }
+
+            // Try backwards
+            tmpVec = tmpVec.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            tmpVec.Ahead(0.9, 0, yaw + GameMath.PI);
+            targetPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z).Ahead(10, 0, yaw + GameMath.PI);
         }
 
 

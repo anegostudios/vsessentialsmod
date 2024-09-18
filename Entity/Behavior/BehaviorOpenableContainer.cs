@@ -11,7 +11,6 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorOpenableContainer : EntityBehavior
     {
-
         protected InventoryGeneric inv;
         protected GuiDialogCreatureContents dlg;
 
@@ -65,7 +64,7 @@ namespace Vintagestory.GameContent
 
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
-                dlg = new GuiDialogCreatureContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI, "invcontents");
+                dlg = new GuiDialogCreatureContents(inv, entity, entity.Api as ICoreClientAPI, "invcontents");
                 if (dlg.TryOpen())
                 {
                     (entity.World.Api as ICoreClientAPI).Network.SendPacketClient(inv.Open(player));

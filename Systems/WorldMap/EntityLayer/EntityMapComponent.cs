@@ -60,14 +60,12 @@ namespace Vintagestory.GameContent
             prog.Uniform("noTexture", 0f);
             prog.BindTexture2D("tex2d", Texture.TextureId, 0);
 
-            float yawoffset = player != null ? 90 : 180; // whyyyy
-
             mvMat
                 .Set(api.Render.CurrentModelviewMatrix)
                 .Translate(x, y, 60)
                 .Scale(Texture.Width, Texture.Height, 0)
                 .Scale(0.5f, 0.5f, 0)
-                .RotateZ(-entity.Pos.Yaw + yawoffset * GameMath.DEG2RAD)
+                .RotateZ(-entity.Pos.Yaw + 180 * GameMath.DEG2RAD)
             ;
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);

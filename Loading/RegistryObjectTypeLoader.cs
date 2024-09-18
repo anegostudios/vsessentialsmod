@@ -89,7 +89,7 @@ namespace Vintagestory.ServerMods.NoObf
                 try
                 {
                     ItemType et = new ItemType();
-                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    et.CreateBasetype(api, entry.Key.Path, entry.Key.Domain, entry.Value);
                     itemTypes.Add(entry.Key, et);
                 }
                 catch (Exception e)
@@ -110,7 +110,7 @@ namespace Vintagestory.ServerMods.NoObf
                 try
                 {
                     EntityType et = new EntityType();
-                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    et.CreateBasetype(api, entry.Key.Path, entry.Key.Domain, entry.Value);
                     entityTypes.Add(entry.Key, et);
                 }
                 catch (Exception e)
@@ -129,7 +129,7 @@ namespace Vintagestory.ServerMods.NoObf
                 try
                 {
                     BlockType et = new BlockType();
-                    et.CreateBasetype(entry.Key.Domain, entry.Value);
+                    et.CreateBasetype(api, entry.Key.Path, entry.Key.Domain, entry.Value);
                     blockTypes.Add(entry.Key, et);
                 }
                 catch (Exception e)

@@ -76,7 +76,7 @@ namespace Vintagestory.GameContent
 
         public int ActiveFallingBlocks => fallingBlocks.Count;
 
-        
+
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
         {
             int alive = manager.ParticlesAlive(EnumParticleModel.Quad);
@@ -156,7 +156,7 @@ namespace Vintagestory.GameContent
 
 
     /// <summary>
-    /// Entity that represents a falling block like sand. When spawned it sets an air block at the initial 
+    /// Entity that represents a falling block like sand. When spawned it sets an air block at the initial
     /// position. When it hits the ground it despawns and sets the original block back at that location.
     /// </summary>
     public class EntityBlockFalling : Entity
@@ -165,7 +165,7 @@ namespace Vintagestory.GameContent
         int lingerTicks;
 
         public bool InitialBlockRemoved;
-        
+
 
         private AssetLocation blockCode;
         public BlockPos initialPos;
@@ -204,7 +204,7 @@ namespace Vintagestory.GameContent
         public EntityBlockFalling() { }
 
         public override float MaterialDensity => 99999;
-        
+
         public override byte[] LightHsv
         {
             get
@@ -270,7 +270,7 @@ namespace Vintagestory.GameContent
             {
                 stackForParticleColor = new ItemStack(Block);
             }
-            
+
             if (api.Side == EnumAppSide.Client && fallSound != null && fallingNow.Count < 100)
             {
                 fallingNow.Add(EntityId);
@@ -317,10 +317,10 @@ namespace Vintagestory.GameContent
 
             // (1 - 0.95^(x/100)) / 2
             // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIoMS0wLjk1Xih4LzEwMCkpLzIiLCJjb2xvciI6IiMwMDAwMDAifSx7InR5cGUiOjEwMDAsIndpbmRvdyI6WyIwIiwiMzAwMCIsIjAiLCIxIl19XQ--
-            if (physicsBh != null)
-            {
-                physicsBh.clientPhysicsTickTimeThreshold = (float)((1 - Math.Pow(0.95, particleSys.ActiveFallingBlocks / 100.0)) / 4.0);
-            }
+            // if (physicsBh != null)
+            // {
+            //     physicsBh.clientPhysicsTickTimeThreshold = (float)((1 - Math.Pow(0.95, particleSys.ActiveFallingBlocks / 100.0)) / 4.0);
+            // }
 
             if (soundStartDelay > 0)
             {
@@ -433,7 +433,7 @@ namespace Vintagestory.GameContent
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             base.OnEntityDespawn(despawn);
-            
+
             if (Api.World.Side == EnumAppSide.Client)
             {
                 fallingNow.Remove(EntityId);
@@ -479,7 +479,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        
+
 
 
         private void OnChunkRetesselated(bool on)
@@ -537,8 +537,8 @@ namespace Vintagestory.GameContent
             }
 
             nowImpacted = true;
-            
-            
+
+
             if (Api.Side == EnumAppSide.Server)
             {
                 if (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow)
@@ -564,7 +564,7 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-                
+
                 if (impactDamageMul > 0)
                 {
                     Entity[] entities = World.GetEntitiesInsideCuboid(finalPos, finalPos.AddCopy(1, 1, 1), (e) => !(e is EntityBlockFalling));
@@ -616,7 +616,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        
+
 
         private void DropItems(BlockPos pos)
         {
@@ -701,6 +701,6 @@ namespace Vintagestory.GameContent
         {
             get { return false; }
         }
-        
+
     }
 }

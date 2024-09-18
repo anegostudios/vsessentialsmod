@@ -10,9 +10,9 @@ namespace Vintagestory.GameContent
     public enum EnumAttackPattern
     {
         DirectAttack,
-        BesiegeTarget,
+        //BesiegeTarget, - whats the point of this
         CircleTarget,
-        TacticalRetreat  // ( ͡° ͜ʖ ͡°)
+        TacticalRetreat
     }
 
     public class AiTaskSeekEntity : AiTaskBaseTargetable
@@ -52,17 +52,20 @@ namespace Vintagestory.GameContent
         protected bool lowTempMode;
         protected bool lastPathfindOk;
 
+        /// <summary>
+        /// Amount of ms to wait between searches. This value exists so as to not overload the server with searches.
+        /// </summary>
         protected int searchWaitMs = 4000;
 
         public float NowSeekRange => lowTempMode? belowTempSeekingRange : seekingRange;
 
         protected bool RecentlyHurt => entity.World.ElapsedMilliseconds - lastHurtByTargetTotalMs < 10000;
-        protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < 30000;
         protected bool RemainInTacticalRetreat => entity.World.ElapsedMilliseconds - tacticalRetreatBeginTotalMs < 20000;
         protected bool RemainInOffensiveMode => entity.World.ElapsedMilliseconds - attackModeBeginTotalMs < 20000;
 
         protected Vec3d lastGoalReachedPos;
         protected Dictionary<long, int> futilityCounters;
+        float executionChance;
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
@@ -84,6 +87,8 @@ namespace Vintagestory.GameContent
             alarmHerd = taskConfig["alarmHerd"].AsBool(false);
             leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
             retaliateAttacks = taskConfig["retaliateAttacks"].AsBool(true);
+            executionChance = taskConfig["executionChance"].AsFloat(0.1f);
+            searchWaitMs = taskConfig["searchWaitMs"].AsInt(4000);
         }
 
 
@@ -92,17 +97,21 @@ namespace Vintagestory.GameContent
             if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
 
             // React immediately on hurt, otherwise only 1/10 chance of execution
-            if (rand.NextDouble() > 0.1f && (whenInEmotionState == null || IsInEmotionState(whenInEmotionState) != true) && !RecentlyAttacked) return false;
+            if (rand.NextDouble() > executionChance && (whenInEmotionState == null || IsInEmotionState(whenInEmotionState) != true) && !RecentlyAttacked) return false;
 
-            if (!EmotionStatesSatisifed()) return false;
-            if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
+            if (!PreconditionsSatisifed()) return false;
+
             if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
+            if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
+
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
                 entity.AnimManager.StopAnimation("jump");
             }
 
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds && !RecentlyAttacked) return false;
+            
+
 
             if (belowTempThreshold > -99)
             {
@@ -127,7 +136,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                ownPos.Set(entity.ServerPos);
+                ownPos.SetWithDimension(entity.ServerPos);
                 targetEntity = partitionUtil.GetNearestEntity(ownPos, range, (e) => IsTargetableEntity(e, range), EnumEntitySearchType.Creatures);
 
                 if (targetEntity != null)
@@ -186,16 +195,15 @@ namespace Vintagestory.GameContent
             }
 
             pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSeekUnable, searchDepth, 1);
-
-            
         }
 
         private void OnSeekUnable()
         {
-            //Console.WriteLine("unable to seek");
+            //attackPattern = EnumAttackPattern.BesiegeTarget; - whats the point of this?
 
-            attackPattern = EnumAttackPattern.BesiegeTarget;
-            pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSiegeUnable, 3500, 3);
+            // how the eff does this make any sense. A 3 block pillar makes them again just hug the pillar wall and wait to be killed
+            //pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSiegeUnable, 3500, 3);
+            OnSiegeUnable();
         }
 
         private void OnSiegeUnable()
@@ -283,9 +291,10 @@ namespace Vintagestory.GameContent
             // Found no circling path, let's run away then
             if (RecentlyHurt || RemainInTacticalRetreat)
             {
-               // Console.WriteLine("tactical retreat!");
+                // Console.WriteLine("tactical retreat!");
 
-                updateTargetPosFleeMode(targetPos);
+                float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
+                updateTargetPosFleeMode(targetPos, yaw);
                 float size = targetEntity.SelectionBox.XSize;
                 pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
                 if (attackPattern != EnumAttackPattern.TacticalRetreat) tacticalRetreatBeginTotalMs = entity.World.ElapsedMilliseconds;
@@ -327,7 +336,8 @@ namespace Vintagestory.GameContent
 
             if (attackPattern == EnumAttackPattern.TacticalRetreat && world.Rand.NextDouble() < 0.2)
             {
-                updateTargetPosFleeMode(targetPos);
+                float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
+                updateTargetPosFleeMode(targetPos, yaw);
                 pathTraverser.CurrentTarget.X = targetPos.X;
                 pathTraverser.CurrentTarget.Y = targetPos.Y;
                 pathTraverser.CurrentTarget.Z = targetPos.Z;
@@ -344,7 +354,7 @@ namespace Vintagestory.GameContent
                 {
                     targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
 
-                    pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, false, 2000, 1);
+                    pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, null, false, 2000, 1);
                     lastPathUpdateSeconds = 0;
                 }
 
@@ -363,7 +373,7 @@ namespace Vintagestory.GameContent
                     entity.AnimManager.StartAnimation(animMeta);
                 }
 
-                if (attackPattern == EnumAttackPattern.DirectAttack || attackPattern == EnumAttackPattern.BesiegeTarget)
+                if (attackPattern == EnumAttackPattern.DirectAttack/* || attackPattern == EnumAttackPattern.BesiegeTarget*/)
                 {
                     pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
                     pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
@@ -464,7 +474,6 @@ namespace Vintagestory.GameContent
             {
                 lastHurtByTargetTotalMs = entity.World.ElapsedMilliseconds;
                 float dist = targetEntity == null ? 0 : (float)targetEntity.ServerPos.DistanceTo(entity.ServerPos);
-                //Console.WriteLine("max of {0} and {1}", tacticalRetreatRange, (int)dist + 15);
                 tacticalRetreatRange = Math.Max(tacticalRetreatRange, dist + 15);
             }
         }
@@ -477,7 +486,7 @@ namespace Vintagestory.GameContent
 
         private void OnGoalReached()
         {
-            if (attackPattern == EnumAttackPattern.DirectAttack || attackPattern == EnumAttackPattern.BesiegeTarget)
+            if (attackPattern == EnumAttackPattern.DirectAttack /*|| attackPattern == EnumAttackPattern.BesiegeTarget*/)
             {
                 if (lastGoalReachedPos != null && lastGoalReachedPos.SquareDistanceTo(entity.Pos) < 0.001)   // Basically we haven't moved since last time, so we are stuck somehow: e.g. bears chasing small creatures into a hole or crevice
                 {

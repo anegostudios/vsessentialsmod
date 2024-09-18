@@ -14,21 +14,21 @@ namespace Vintagestory.GameContent
         public override bool ShouldLoad(EnumAppSide forSide) => true;
         public override void Start(ICoreAPI api)
         {
-            api.Event.RegisterGameTickListener(on1stick, 1000);
+            //api.Event.RegisterGameTickListener(on1stick, 1000);
 
             this.api = api;
         }
 
         private void on1stick(float dt)
         {
-            if (api.Side == EnumAppSide.Client)
-            {
-                EntityBehaviorPassivePhysics.UsePhysicsDormancyStateClient = (api as ICoreClientAPI).World.LoadedEntities.Count > 1500;
-            }
-            else
-            {
-                EntityBehaviorPassivePhysics.UsePhysicsDormancyStateServer = (api as ICoreServerAPI).World.LoadedEntities.Count > 1500;
-            }
+            // if (api.Side == EnumAppSide.Client)
+            // {
+            //     EntityBehaviorPassivePhysics.UsePhysicsDormancyStateClient = (api as ICoreClientAPI).World.LoadedEntities.Count > 1500;
+            // }
+            // else
+            // {
+            //     EntityBehaviorPassivePhysics.UsePhysicsDormancyStateServer = (api as ICoreServerAPI).World.LoadedEntities.Count > 1500;
+            // }
         }
     }
 
@@ -140,7 +140,7 @@ namespace Vintagestory.GameContent
             // the value 22 is just trial&error, should probably be something proportial to the
             // 13ms game ticks (which is the physics frame rate)
             lerpedPos.X += (entity.Pos.X - lerpedPos.X) * 22 * dt;
-            lerpedPos.Y += (entity.Pos.Y - lerpedPos.Y) * 22 * dt;
+            lerpedPos.Y += (entity.Pos.InternalY - lerpedPos.Y) * 22 * dt;
             lerpedPos.Z += (entity.Pos.Z - lerpedPos.Z) * 22 * dt;
 
             ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(inslot, EnumItemRenderTarget.Ground, dt);
@@ -191,7 +191,7 @@ namespace Vintagestory.GameContent
 
 
                 BlockPos pos = entityitem.Pos.AsBlockPos;
-                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.Y, pos.Z);
+                Vec4f lightrgbs = capi.World.BlockAccessor.GetLightRGBs(pos.X, pos.InternalY, pos.Z);
                 int temp = (int)entityitem.Itemstack.Collectible.GetTemperature(capi.World, entityitem.Itemstack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
                 int extraGlow = GameMath.Clamp((temp - 550) / 2, 0, 255);
@@ -231,7 +231,7 @@ namespace Vintagestory.GameContent
                         {
                             AdvancedParticleProperties bps = ParticleProperties[i];
                             bps.basePos.X = particleOutTransform.X + entity.Pos.X;
-                            bps.basePos.Y = particleOutTransform.Y + entity.Pos.Y;
+                            bps.basePos.Y = particleOutTransform.Y + entity.Pos.InternalY;
                             bps.basePos.Z = particleOutTransform.Z + entity.Pos.Z;
 
                             entityitem.World.SpawnParticles(bps);
@@ -253,13 +253,14 @@ namespace Vintagestory.GameContent
                 rapi.GlEnableCullFace();
             }
 
-            
+
             if (!isShadowPass)
             {
+                prog.AddRenderFlags = 0; // Lets be nice and reset this to default value
                 prog.DamageEffect = 0;
                 prog.Stop();
             }
-            
+
         }
 
 
@@ -271,9 +272,9 @@ namespace Vintagestory.GameContent
             EntityPlayer entityPlayer = capi.World.Player.Entity;
 
             Mat4f.Identity(ModelMat);
-            Mat4f.Translate(ModelMat, ModelMat, 
-                (float)(lerpedPos.X - entityPlayer.CameraPos.X), 
-                (float)(lerpedPos.Y - entityPlayer.CameraPos.Y), 
+            Mat4f.Translate(ModelMat, ModelMat,
+                (float)(lerpedPos.X - entityPlayer.CameraPos.X),
+                (float)(lerpedPos.Y - entityPlayer.CameraPos.Y),
                 (float)(lerpedPos.Z - entityPlayer.CameraPos.Z)
             );
 

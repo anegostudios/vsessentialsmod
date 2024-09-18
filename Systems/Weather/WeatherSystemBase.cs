@@ -41,7 +41,6 @@ namespace Vintagestory.GameContent
         public event LightningImpactDelegate OnLightningImpactEnd;
 
 
-
         public override void Start(ICoreAPI api)
         {
             this.api = api;
@@ -87,6 +86,36 @@ namespace Vintagestory.GameContent
             rainOverlaySnap = new WeatherDataSnapshot();
         }
 
+
+
+        /// <summary>
+        /// Rain wetness over a given amount of days
+        /// 0 = no rain in given days
+        /// 1 = max rain in all those given days
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="days">Amount of days to scan, higher value means more CPU time spent calculating</param>
+        /// <param name="hourResolution">The interval step. E.g. 2 hour resolution means the value is checked 12 times a day</param>
+        /// <returns></returns>
+        public double GetEnvironmentWetness(BlockPos pos, double days, double hourResolution = 2)
+        {
+            double startDays = api.World.Calendar.TotalDays - days;
+            double endDays = api.World.Calendar.TotalDays;
+            double rainSum = 0;
+            double nowDay = startDays;
+
+            double hpd = api.World.Calendar.HoursPerDay;
+
+            double weight = 1.0 / (12 * 7);
+
+            while (nowDay < endDays)
+            {
+                rainSum += weight * api.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.ForSuppliedDateValues, nowDay).Rainfall;
+                nowDay += hourResolution / hpd;
+            }
+
+            return GameMath.Clamp(rainSum, 0, 1);
+        }
 
 
         public PrecipitationState GetPrecipitationState(Vec3d pos)

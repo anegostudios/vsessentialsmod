@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
@@ -10,6 +11,39 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
+    /// <summary>
+    /// Defines an in-game item using a json file. Note that all json properties for items come from the base <see cref="CollectibleType"/> and <see cref="RegistryObjectType"/> classes.
+    /// Any json file inside the "assets/itemtypes" folder will be loaded as an itemtype in the game.
+    /// </summary>
+    /// <example>
+    /// <code language="json">
+    ///{
+    ///  "code": "strawdummy",
+    ///  "class": "ItemStrawDummy",
+    ///  "shape": {
+    ///    "base": "entity/land/strawdummy"
+    ///  },
+    ///  "creativeinventory": {
+    ///    ...
+    ///  },
+    ///  "heldTpIdleAnimation": "holdunderarm",
+    ///  "maxstacksize": 1,
+    ///  "combustibleProps": {
+    ///    ...
+    ///  },
+    ///  "guiTransform": {
+    ///    ...
+    ///  },
+    ///  "fpHandTransform": {
+    ///    ...
+    ///  },
+    ///  "tpHandTransform": {
+    ///    ...
+    ///  }
+    ///}
+    /// </code>
+    /// </example>
+    [DocumentAsJson]
     [JsonObject(MemberSerialization.OptIn)]
     public class ItemType : CollectibleType
     {

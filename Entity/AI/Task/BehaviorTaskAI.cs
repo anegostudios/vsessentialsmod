@@ -133,11 +133,6 @@ namespace Vintagestory.GameContent
             base.GetInfoText(infotext);
         }
 
-        public override void OnNoPath(Vec3d target)
-        {
-            TaskManager.OnNoPath(target);
-        }
-
         public override string PropertyName()
         {
             return "taskai";

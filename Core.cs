@@ -36,7 +36,6 @@ namespace Vintagestory.ServerMods
 
             api.RegisterEntityRendererClass("BlockFalling", typeof(EntityBlockFallingRenderer));
             api.RegisterEntityRendererClass("Shape", typeof(EntityShapeRenderer));
-            api.RegisterEntityRendererClass("SkinnableShape", typeof(EntitySkinnableShapeRenderer));
             api.RegisterEntityRendererClass("PlayerShape", typeof(EntityPlayerShapeRenderer));
             
 
@@ -80,6 +79,7 @@ namespace Vintagestory.ServerMods
             RegisterDefaultBlockEntities();
 
             api.RegisterCollectibleBehaviorClass("AnimationAuthoritative", typeof(CollectibleBehaviorAnimationAuthoritative));
+            api.RegisterCollectibleBehaviorClass("HeldBag", typeof(CollectibleBehaviorHeldBag));
         }
 
 
@@ -92,6 +92,7 @@ namespace Vintagestory.ServerMods
         {
             api.RegisterBlockBehaviorClass("Decor", typeof(BlockBehaviorDecor));
             api.RegisterBlockBehaviorClass("Multiblock", typeof(BlockBehaviorMultiblock));
+            api.RegisterBlockBehaviorClass("TransformBreak", typeof(BlockBehaviorTransformBreak));
         }
 
 
@@ -160,6 +161,8 @@ namespace Vintagestory.ServerMods
 
             api.RegisterEntityBehaviorClass("mouthinventory", typeof(EntityBehaviorMouthInventory));
             api.RegisterEntityBehaviorClass("openablecontainer", typeof(EntityBehaviorOpenableContainer));
+
+            api.RegisterEntityBehaviorClass("playerinventory", typeof(EntityBehaviorPlayerInventory));
         }
 
 

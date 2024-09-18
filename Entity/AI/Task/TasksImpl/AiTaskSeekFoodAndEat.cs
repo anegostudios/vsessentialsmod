@@ -102,7 +102,7 @@ namespace Vintagestory.GameContent
             if (lastPOISearchTotalMs + 15000 > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilTotalHours > entity.World.Calendar.TotalHours) return false;
-            if (!EmotionStatesSatisifed()) return false;
+            if (!PreconditionsSatisifed()) return false;
 
             if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
             if (Diet == null) return false;   // Deals with mods which have not properly updated for 1.19, check this condition last because always passes in vanilla
@@ -264,7 +264,7 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, minDist - 0.15f, OnGoalReached, OnStuck, false, 500, 1))
+                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, minDist - 0.15f, OnGoalReached, OnStuck, null, false, 500, 1))
                     {
                         return false;
                     }

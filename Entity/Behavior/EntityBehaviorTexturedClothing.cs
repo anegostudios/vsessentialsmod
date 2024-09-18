@@ -2,44 +2,54 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-
-    public class EntitySkinnableShapeRenderer : EntityShapeRenderer
+    public abstract class EntityBehaviorTexturedClothing : EntityBehaviorContainer
     {
         public event Action<LoadedTexture, TextureAtlasPosition, int> OnReloadSkin;
         protected int skinTextureSubId;
-        protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
-        public double RenderOrder => 1;
-        public int RenderRange => 1;
+        
 
-
-        public EntitySkinnableShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
+        ICoreClientAPI capi;
+        protected TextureAtlasPosition skinTexPos
         {
-            api.Event.ReloadTextures += MarkShapeModified;
-        }
-
-
-
-        public override void TesselateShape()
-        {
-            // Need to call this before tesselate or we will reference the wrong texture
-            defaultTexSource = GetTextureSource();
-
-            if (eagent.GearInventory != null)
-            {
-                reloadSkin();
+            get {
+                return (entity.Properties.Client.Renderer as EntityShapeRenderer).skinTexPos; 
             }
-
-            base.TesselateShape();
+            set { 
+                (entity.Properties.Client.Renderer as EntityShapeRenderer).skinTexPos = value; 
+            }
         }
 
+        public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
 
+        public EntityBehaviorTexturedClothing(Entity entity) : base(entity)
+        {
+        }
+
+        public override void Initialize(EntityProperties properties, JsonObject attributes)
+        {
+            base.Initialize(properties, attributes);
+
+            capi = Api as ICoreClientAPI;
+        }
+
+        public override void OnTesselation(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements)
+        {
+            base.OnTesselation(ref entityShape, shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
+
+            reloadSkin();
+        }
 
         bool textureSpaceAllocated = false;
-        protected override ITexPositionSource GetTextureSource()
+
+        public override ITexPositionSource GetTextureSource(ref EnumHandling handling)
         {
+            handling = EnumHandling.PassThrough;
+
             if (!textureSpaceAllocated)
             {
                 TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
@@ -49,22 +59,21 @@ namespace Vintagestory.GameContent
                 int width = (int)((origTexPos.x2 - origTexPos.x1) * AtlasSize.Width);
                 int height = (int)((origTexPos.y2 - origTexPos.y1) * AtlasSize.Height);
 
-                capi.EntityTextureAtlas.AllocateTextureSpace(width, height, out skinTextureSubId, out skinTexPos);
+                capi.EntityTextureAtlas.AllocateTextureSpace(width, height, out skinTextureSubId, out var skinTexPos);
+                this.skinTexPos = skinTexPos;
 
                 textureSpaceAllocated = true;
             }
 
-            return base.GetTextureSource();
+            return null;
         }
 
         public bool doReloadShapeAndSkin = true;
 
 
-
-
-        public override void reloadSkin()
+        public void reloadSkin()
         {
-            if (!doReloadShapeAndSkin) return;
+            if (capi == null || !doReloadShapeAndSkin || skinTexPos == null) return;
 
             TextureAtlasPosition origTexPos = capi.EntityTextureAtlas.Positions[entity.Properties.Client.FirstTexture.Baked.TextureSubId];
             string skinBaseTextureKey = entity.Properties.Attributes?["skinBaseTextureKey"].AsString();
@@ -110,18 +119,14 @@ namespace Vintagestory.GameContent
                 (int)EnumCharacterDressType.Face
             };
 
-            if (gearInv == null && eagent?.GearInventory != null)
-            {
-                registerSlotModified(false);
-            }
 
             for (int i = 0; i < renderOrder.Length; i++)
             {
                 int slotid = renderOrder[i];
 
-                ItemStack stack = gearInv[slotid]?.Itemstack;
+                ItemStack stack = Inventory[slotid]?.Itemstack;
                 if (stack == null) continue;
-                if (eagent.hideClothing) continue;
+                if (hideClothing) continue;
                 if (stack.Item.FirstTexture == null) continue; // Invalid/Unknown/Corrupted item
 
                 int itemTextureSubId = stack.Item.FirstTexture.Baked.TextureSubId;
@@ -152,18 +157,13 @@ namespace Vintagestory.GameContent
             capi.Render.GlGenerateTex2DMipmaps();
         }
 
-
-        public override void Dispose()
+        public override void OnEntityDespawn(EntityDespawnData despawn)
         {
-            base.Dispose();
+            base.OnEntityDespawn(despawn);
 
-            capi.Event.ReloadTextures -= MarkShapeModified;
-            if (eagent?.GearInventory != null)
-            {
-                eagent.GearInventory.SlotModified -= gearSlotModified;
-            }
-
-            capi.EntityTextureAtlas.FreeTextureSpace(skinTextureSubId);
+            capi?.EntityTextureAtlas.FreeTextureSpace(skinTextureSubId);
         }
+
+        public override string PropertyName() => "clothing";
     }
 }

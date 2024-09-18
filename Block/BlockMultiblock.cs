@@ -22,7 +22,7 @@ namespace Vintagestory.GameContent
 
         ItemStack MBOnPickBlock(IWorldAccessor world, BlockPos pos, Vec3i offset); 
         WorldInteraction[] MBGetPlacedBlockInteractionHelp(IWorldAccessor world, BlockSelection blockSel, IPlayer forPlayer, Vec3i offset);
-        BlockSounds GetSounds(IBlockAccessor blockAccessor, BlockPos pos, ItemStack stack, Vec3i offset);
+        BlockSounds GetSounds(IBlockAccessor blockAccessor, BlockSelection blockSel, ItemStack stack, Vec3i offset);
     }
 
     public interface IMultiBlockBlockBreaking
@@ -108,14 +108,14 @@ namespace Vintagestory.GameContent
 
 
 
-        public override BlockSounds GetSounds(IBlockAccessor ba, BlockPos pos, ItemStack stack = null)
+        public override BlockSounds GetSounds(IBlockAccessor ba, BlockSelection blockSel, ItemStack stack = null)
         {
             return Handle<BlockSounds, IMultiBlockInteract>(
                 ba,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
-                (inf) => inf.GetSounds(ba, pos, stack, OffsetInv),
-                (block) => base.GetSounds(ba, pos.AddCopy(OffsetInv), stack),
-                (block) => block.GetSounds(ba, pos.AddCopy(OffsetInv), stack)
+                blockSel.Position.X + OffsetInv.X, blockSel.Position.Y + OffsetInv.Y, blockSel.Position.Z + OffsetInv.Z,
+                (inf) => inf.GetSounds(ba, blockSel, stack, OffsetInv),
+                (block) => base.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack),
+                (block) => block.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack)
             );
         }
 

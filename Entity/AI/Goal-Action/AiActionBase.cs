@@ -81,7 +81,7 @@ namespace Vintagestory.GameContent
                 {
                     if (soundStartMs == 0)
                     {
-                        entity.World.PlaySoundAt(new AssetLocation("sounds/" + sound), entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                        entity.World.PlaySoundAt(new AssetLocation("sounds/" + sound), entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z, null, true, soundRange);
                     }
                 } else
                 {
@@ -100,7 +100,7 @@ namespace Vintagestory.GameContent
 
             if (soundStartMs > 0 && secondsActive > soundStartMs * 1000)
             {
-                entity.World.PlaySoundAt(new AssetLocation("sounds/" + sound), entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                entity.World.PlaySoundAt(new AssetLocation("sounds/" + sound), entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z, null, true, soundRange);
             }
 
             return ContinueExecute(dt);

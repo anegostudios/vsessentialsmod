@@ -85,13 +85,6 @@ namespace Vintagestory.GameContent
                     if (canDecay(block))
                     {
                         checkDecayQueue.Add(pos.AddCopy(vec));
-
-                     //   sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 0, 255, 0), pos.AddCopy(vec).ToVec3d().Add(0.3, 0.3, 0.3), pos.AddCopy(vec).ToVec3d().Add(0.3, 0.35, 0.3), new Vec3f(), new Vec3f(), 1f, 0f, 1, EnumParticleModel.Cube);
-
-                        //Console.WriteLine("added " + vec);
-                    } else
-                    {
-                     //   sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 255, 0, 0), pos.AddCopy(vec).ToVec3d().Add(0.3, 0.3, 0.3), pos.AddCopy(vec).ToVec3d().Add(0.3, 0.35, 0.3), new Vec3f(), new Vec3f(), 1f, 0f, 1, EnumParticleModel.Cube);
                     }
                 }
             }
@@ -112,8 +105,6 @@ namespace Vintagestory.GameContent
                 }
 
                 queueNeighborsForCheckDecay(pos);
-
-         //       sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 255, 255, 0), pos.ToVec3d().Add(0.7, 0.3, 0.3), pos.ToVec3d().Add(0.7, 0.35, 0.3), new Vec3f(), new Vec3f(), 1f, 0f, 1, EnumParticleModel.Cube);
             }
         }
 
@@ -253,8 +244,6 @@ namespace Vintagestory.GameContent
                     checkedPositions.Add(startPos);
                 } else
                 {
-          //         sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 128, 128, 0), startPos.ToVec3d().Add(0.7, 0.3, 0.3), startPos.ToVec3d().Add(0.7, 0.35, 0.3), new Vec3f(), new Vec3f(), 1f, 0f, 2, EnumParticleModel.Cube);
-
                     return false;
                 }
                 
@@ -294,7 +283,6 @@ namespace Vintagestory.GameContent
                         {
                             if (block.Id != 0)
                             {
-                        //        sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 50, 0, 0), curPos.ToVec3d().Add(0.3, 0.3, 0.6), curPos.ToVec3d().Add(0.3, 0.35, 0.6), new Vec3f(), new Vec3f(), 1f, 0f, 1, EnumParticleModel.Cube);
                                 return false;
                             }
                             continue;
@@ -302,8 +290,6 @@ namespace Vintagestory.GameContent
                         
                         if (canDecay(block))
                         {
-                   //         sapi.World.SpawnParticles(10, ColorUtil.ToRgba(255, 255, 255, 255), curPos.ToVec3d().Add(0.5, 0, 0.5), curPos.ToVec3d().Add(0.5, 0.05, 0.5), new Vec3f(), new Vec3f(), 1f, 0f, 0.33f, EnumParticleModel.Cube);
-
                             bfsQueue.Enqueue(new Vec4i(curPos.X, curPos.Y, curPos.Z, 0));
                         }
                     }
@@ -316,7 +302,4 @@ namespace Vintagestory.GameContent
         }
 
     }
-
-
-
 }

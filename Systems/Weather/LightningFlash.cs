@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
@@ -189,6 +190,8 @@ namespace Vintagestory.GameContent
                             return true;
                         }, EnumEntitySearchType.Creatures);
                     }
+
+
                 }
 
             }
@@ -231,10 +234,11 @@ namespace Vintagestory.GameContent
 
                     int sub = Math.Max(0, (int)dist - 5) * 3;
 
-                    int color = ColorUtil.ToRgba(255, 255, 255, 200);
+                    int color = ColorUtil.ToRgba(255, 255, 255, 255);
 
                     SimpleParticleProperties props = new SimpleParticleProperties(500/2 - sub, 600/2 - sub, color, pos.AddCopy(-0.5f, 0, -0.5f), pos.AddCopy(0.5f, 1f, 0.5f), new Vec3f(-5, 0, -5), new Vec3f(5, 10, 5), 3, 0.3f, 0.4f, 2f);
                     props.VertexFlags = 255;
+                    props.LightEmission = int.MaxValue;
                     props.ShouldDieInLiquid = true;
                     props.SizeEvolve = EvolvingNatFloat.create(EnumTransformFunction.LINEARREDUCE, 1f);
 

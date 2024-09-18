@@ -1,20 +1,20 @@
 ﻿using System;
+using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorFloatUpWhenStuck : EntityBehavior
     {
         bool onlyWhenDead;
-
         int counter = 0;
         bool stuckInBlock;
         float pushVelocityMul = 1f;
         Vec3d tmpPos = new Vec3d();
-
 
         public EntityBehaviorFloatUpWhenStuck(Entity entity) : base(entity)
         {
@@ -30,10 +30,32 @@ namespace Vintagestory.GameContent
             counter = ((int)entity.EntityId / 10) % 10;   // slightly randomise the counter to prevent one big tick after a chunk with many entities is loaded
         }
 
+        public override void OnTesselated()
+        {
+            base.OnTesselated();
+            ensureCenterAPExists();
+        }
+
+        private void ensureCenterAPExists()
+        {
+            if (entity.AnimManager != null && entity.World.Side == EnumAppSide.Client)
+            {
+                AttachmentPointAndPose apap = entity.AnimManager.Animator?.GetAttachmentPointPose("Center");
+                if (apap == null)
+                {
+                    var hashse = ObjectCacheUtil.GetOrCreate(entity.Api, "missingCenterApEntityCodes", () => new HashSet<AssetLocation>());
+                    if (!hashse.Contains(entity.Code)) // Log the error only once per entity type
+                    {
+                        hashse.Add(entity.Code);
+                        entity.World.Logger.Warning("Entity " + entity.Code + " with shape " + entity.Properties.Client.Shape + " seems to be missing attachment point center but also has the FloatUpWhenStuck behavior - it might not work correctly with the center point lacking");
+                    }
+                }
+            }
+        }
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.World.ElapsedMilliseconds < 2000) return;
+            if (entity.World.ElapsedMilliseconds < 2000 || entity.World.Side == EnumAppSide.Client) return;
 
             if (counter++ > 10 || (stuckInBlock && counter > 1))
             {

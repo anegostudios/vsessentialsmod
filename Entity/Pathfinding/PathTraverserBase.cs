@@ -1,4 +1,5 @@
 ﻿using System;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.API.Common
@@ -34,12 +35,12 @@ namespace Vintagestory.API.Common
             this.entity = entity;
         }
 
-        public bool NavigateTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck, int mhdistanceTolerance = 0)
+        public bool NavigateTo(Vec3d target, float movingSpeed, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int mhdistanceTolerance = 0)
         {
-            return NavigateTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck, false, 10000, mhdistanceTolerance);
+            return NavigateTo(target, movingSpeed, 0.12f, OnGoalReached, OnStuck, onNoPath, false, 10000, mhdistanceTolerance);
         }
 
-        public virtual bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, bool giveUpWhenNoPath = false, int searchDepth = 10000, int mhdistanceTolerance = 0)
+        public virtual bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 10000, int mhdistanceTolerance = 0)
         {
             return WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
         }

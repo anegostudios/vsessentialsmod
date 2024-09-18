@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
                 int posx = blockFallingEntity.blockEntityAttributes?.GetInt("posx", blockFallingEntity.initialPos.X) ?? blockFallingEntity.initialPos.X;
                 int posy = blockFallingEntity.blockEntityAttributes?.GetInt("posy", blockFallingEntity.initialPos.Y) ?? blockFallingEntity.initialPos.Y;
                 int posz = blockFallingEntity.blockEntityAttributes?.GetInt("posz", blockFallingEntity.initialPos.Z) ?? blockFallingEntity.initialPos.Z;
-                
+
                 BlockEntity be = api.World.BlockAccessor.GetBlockEntity(new BlockPos(posx, posy, posz));
                 be?.OnTesselation(this, capi.Tesselator);
 
@@ -55,7 +55,7 @@ namespace Vintagestory.GameContent
                 MeshData mesh = api.TesselatorManager.GetDefaultBlockMesh(block);
                 this.meshRef = api.Render.UploadMesh(mesh);
             }
-            
+
             int textureSubId = block.FirstTextureInventory.Baked.TextureSubId;
             this.atlasTextureId = api.BlockTextureAtlas.Positions[textureSubId].atlasTextureId;
 
@@ -106,10 +106,8 @@ namespace Vintagestory.GameContent
             IRenderAPI rapi = capi.Render;
 
             rapi.GlDisableCullFace();
-            
+
             rapi.GlToggleBlend(true, EnumBlendMode.Standard);
-            
-            double alpha = accum / GlobalConstants.PhysicsFrameTime;
 
             float div = entity.Collided ? 4f : 1.5f;
 
@@ -117,16 +115,16 @@ namespace Vintagestory.GameContent
             Vec3d camPos = capi.World.Player.Entity.CameraPos;
             prog.Tex2D = atlasTextureId;
             prog.ModelMatrix = ModelMat
-                .Identity()
-                .Translate(
-                    prevPos.X * (1 - alpha) + curPos.X * alpha - camPos.X + GameMath.Sin(capi.InWorldEllapsedMilliseconds / 120f + 30) / 20f / div,
-                    prevPos.Y * (1 - alpha) + curPos.Y * alpha - camPos.Y,
-                    prevPos.Z * (1 - alpha) + curPos.Z * alpha - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
-                )
-                .RotateX((float)(Math.Sin(rotaccum * 10) / 10.0 / div))
-                .RotateZ((float)(Math.Cos(10 + rotaccum * 9.0) / 10.0 / div))
-               .Values
-            ;
+                    .Identity()
+                    .Translate(
+                        curPos.X - camPos.X + GameMath.Sin(capi.InWorldEllapsedMilliseconds / 120f + 30) / 20f / div,
+                        curPos.Y - camPos.Y,
+                        curPos.Z - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
+                    )
+                    .RotateX((float)(Math.Sin(rotaccum * 10) / 10.0 / div))
+                    .RotateZ((float)(Math.Cos(10 + rotaccum * 9.0) / 10.0 / div))
+                    .Values
+                ;
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
             prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;
             rapi.RenderMesh(meshRef);

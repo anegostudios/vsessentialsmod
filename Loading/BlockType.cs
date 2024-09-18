@@ -9,9 +9,45 @@ using Vintagestory.API.Config;
 using Newtonsoft.Json.Linq;
 using Vintagestory.API.Util;
 using Vintagestory.API.Server;
+using Vintagestory.API;
 
 namespace Vintagestory.ServerMods.NoObf
 {
+    /// <summary>
+    /// Defines an in-game block using a json file. BlockTypes use all properties from <see cref="CollectibleType"/> and <see cref="RegistryObjectType"/>, but also contain some unique properties.
+    /// Any json file placed in your "assets/blocktypes" folder will be loaded as a blocktype in the game.
+    /// </summary>
+    /// <example>
+    /// <code language="json">
+    ///{
+    ///  "code": "leather",
+    ///  "class": "Block",
+    ///  "shape": { "base": "block/basic/cube" },
+    ///  "drawtype": "Cube",
+    ///  "attributes": {
+    ///    ...
+    ///  },
+    ///  "blockmaterial": "Cloth",
+    ///  "creativeinventory": {
+    ///    ...
+    ///  },
+    ///  "replaceable": 700,
+    ///  "resistance": 1.5,
+    ///  "lightAbsorption": 99,
+    ///  "textures": {
+    ///    ...
+    ///  },
+    ///  "combustibleProps": {
+    ///    ...
+    ///  },
+    ///  "sounds": {
+    ///    ...
+    ///  },
+    ///  "materialDensity": 400
+    ///}
+    /// </code>
+    /// </example>
+    [DocumentAsJson]
     [JsonObject(MemberSerialization.OptIn)]
     public class BlockType : CollectibleType
     {
@@ -35,90 +71,294 @@ namespace Vintagestory.ServerMods.NoObf
             return CreateResolvedType<BlockType>(api, fullcode, jobject, deserializer, variant);
         }
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A 'block entity' is stored per specific instance of a block in the world.
+        /// To attach a block entity to a block, add the block entity code here..
+        /// </summary>
         [JsonProperty]
         public string EntityClass;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// This array adds modifiers that can alter the behavior of a block entity defined in <see cref="EntityClass"/>.
+        /// </summary>
         [JsonProperty]
         public BlockEntityBehaviorType[] EntityBehaviors = new BlockEntityBehaviorType[0];
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>JSON</jsondefault>-->
+        /// If not set to JSON it will use an efficient hardcoded model
+        /// </summary>
         [JsonProperty]
         public EnumDrawType DrawType = EnumDrawType.JSON;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>XYZ</jsondefault>-->
+        /// Whether or not to use the Y axis when picking a random value based on the block's position.
+        /// If placing an instance of this block on top of one another, setting this to XZ will ensure that all vertical instances have the same random size, offset, and rotations if used.
+        /// </summary>
         [JsonProperty]
         public EnumRandomizeAxes RandomizeAxes = EnumRandomizeAxes.XYZ;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// If true then the block will be randomly offseted by 1/3 of a block when placed
+        /// </summary>
         [JsonProperty]
         public bool RandomDrawOffset;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// If true, the block will have a random rotation apploed to it.
+        /// </summary>
         [JsonProperty]
         public bool RandomizeRotations;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// If set, the block will have a random size between 1 and 1+RandomSizeAdjust.
+        /// </summary>
         [JsonProperty]
         public float RandomSizeAdjust;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Opaque</jsondefault>-->
+        /// During which render pass this block should be rendered.
+        /// </summary>
         [JsonProperty]
         public EnumChunkRenderPass RenderPass = EnumChunkRenderPass.Opaque;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default</jsondefault>-->
+        /// Determines which sides of the blocks should be rendered
+        /// </summary>
         [JsonProperty]
         public EnumFaceCullMode FaceCullMode = EnumFaceCullMode.Default;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// The block shape to be used when displayed in the inventory gui, held in hand or dropped on the ground.
+        /// </summary>
         [JsonProperty]
         public CompositeShape ShapeInventory = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A specific shape to use when this block is near the camera. Used to add more detail to closer objects.
+        /// </summary>
         [JsonProperty]
         public CompositeShape Lod0Shape = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A specific shape to use when this block is far away from the camera. Used to lower detail from further away objects.
+        /// </summary>
         [JsonProperty]
         public CompositeShape Lod2Shape = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// If set to true, this block will not be rendered if it is too far away from the camera.
+        /// </summary>
         [JsonProperty]
         public bool DoNotRenderAtLod2 = false;
+
+        /// <summary>
+        /// <!--<jsonoptional>Unused</jsonoptional>-->
+        /// Currently not used. Maybe you're looking for <see cref="SideAo"/> or <see cref="SideSolidOpaqueAo"/>?
+        /// </summary>
         [JsonProperty]
         public bool Ambientocclusion = true;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// The sounds played for this block during step, break, build and walk. Use GetSounds() to query if not performance critical.
+        /// </summary>
         [JsonProperty]
         public BlockSounds Sounds;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// Textures to be used for this block in the inventory gui, held in hand or dropped on the ground
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, CompositeTexture> TexturesInventory;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>All true</jsondefault>-->
+        /// Defines which of the 6 block sides are completely opaque. Used to determine which block faces can be culled during tesselation.
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, bool> SideOpaque;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>All true</jsondefault>-->
+        /// Defines which of the 6 block side should be shaded with ambient occlusion
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, bool> SideAo;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>See desc.</jsondefault>-->
+        /// Defines which of the 6 block neighbours should receive AO if this block is in front of them. If this block's <see cref="LightAbsorption"/> > 0, default is all true. Otherwise, all false..
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, bool> EmitSideAo;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>All true</jsondefault>-->
+        /// Defines which of the 6 block side are solid. Used to determine if attachable blocks can be attached to this block. Also used to determine if snow can rest on top of this block.
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, bool> SideSolid;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional>-->
+        /// Quick way of defining <see cref="SideSolid"/>, <see cref="SideOpaque"/>, and <see cref="SideAo"/>. Using this property overrides any values to those.
+        /// </summary>
         [JsonProperty]
         public Dictionary<string, bool> SideSolidOpaqueAo;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// The color map for climate color mapping. Leave null for no coloring by climate
+        /// </summary>
         [JsonProperty]
         public string ClimateColorMap = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// The color map for season color mapping. Leave null for no coloring by season
+        /// </summary>
         [JsonProperty]
         public string SeasonColorMap = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>0</jsondefault>-->
+        /// A value usually between 0-9999 that indicates which blocks may be replaced with others.
+        /// - Any block with replaceable value above 5000 will be washed away by water
+        /// - Any block with replaceable value above 6000 will replaced when the player tries to place a block
+        /// Examples:
+        /// 0 = Bedrock
+        /// 6000 = Tallgrass
+        /// 9000 = Lava
+        /// 9500 = Water
+        /// 9999 = Air
+        /// </summary>
         [JsonProperty]
         public int Replaceable;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>0</jsondefault>-->
+        /// 0 = nothing can grow, 10 = some tallgrass and small trees can be grow on it, 100 = all grass and trees can grow on it
+        /// </summary>
         [JsonProperty]
         public int Fertility;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// Data thats passed on to the graphics card for every vertex of the blocks model
+        /// </summary>
         [JsonProperty]
         public VertexFlags VertexFlags;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// A bit uploaded to the shader to add a frost overlay below freezing temperature
+        /// </summary>
         [JsonProperty]
         public bool Frostable;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>99</jsondefault>-->
+        /// For light blocking blocks. Any value above 32 will completely block all light.
+        /// </summary>
         [JsonProperty]
         public ushort LightAbsorption = 99;
+
+        /// <summary>
+        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>6</jsondefault>-->
+        /// How long it takes to break this block in seconds.
+        /// </summary>
         [JsonProperty]
-        public Dictionary<string, bool> LightTraversable;
+        public float Resistance = 6f;
+
+		/// <summary>
+        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>Stone</jsondefault>-->
+        /// A way to categorize blocks. Used for getting the mining speed for each tool type, amongst other things.
+        /// </summary>
         [JsonProperty]
-        public float Resistance = 6f; // How long it takes to break this block in seconds
-        [JsonProperty]
-        public EnumBlockMaterial BlockMaterial = EnumBlockMaterial.Stone; // Helps with finding out mining speed for each tool type
+        public EnumBlockMaterial BlockMaterial = EnumBlockMaterial.Stone;
+
+        /// <summary>
+        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>0</jsondefault>-->
+        /// The mining tier required to break this block.
+        /// </summary>
         [JsonProperty]
         public int RequiredMiningTier;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>CollisionBox</jsonalias>
+        /// Defines the area with which the player character collides with.
+        /// </summary>
         [JsonProperty("CollisionBox")]
         private RotatableCube CollisionBoxR = DefaultCollisionBoxR.Clone();
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>SelectionBox</jsonalias>
+        /// Defines the area which the players mouse pointer collides with for selection.
+        /// </summary>
         [JsonProperty("SelectionBox")]
         private RotatableCube SelectionBoxR = DefaultCollisionBoxR.Clone();
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>CollisionSelectionBox</jsonalias>
+        /// Shorthand way of setting <see cref="CollisionBoxR"/> and <see cref="SelectionBoxR"/> at the same time.
+        /// </summary>
         [JsonProperty("CollisionSelectionBox")]
         private RotatableCube CollisionSelectionBoxR = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>ParticleCollisionBox</jsonalias>
+        /// Defines the area with which particles collide with. If not provided, will use <see cref="CollisionBoxR"/> or <see cref="CollisionBoxesR"/>.
+        /// </summary>
         [JsonProperty("ParticleCollisionBox")]
         private RotatableCube ParticleCollisionBoxR = null;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>CollisionBoxes</jsonalias>
+        /// Defines multiple areas with which the player character collides with.
+        /// </summary>
         [JsonProperty("CollisionBoxes")]
         private RotatableCube[] CollisionBoxesR = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>SelectionBoxes</jsonalias>
+        /// Defines multiple areas which the players mouse pointer collides with for selection.
+        /// </summary>
         [JsonProperty("SelectionBoxes")]
         private RotatableCube[] SelectionBoxesR = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>CollisionSelectionBoxes</jsonalias>
+        /// Shorthand way of setting <see cref="CollisionBoxesR"/> and <see cref="SelectionBoxesR"/> at the same time.
+        /// </summary>
         [JsonProperty("CollisionSelectionBoxes")]
         private RotatableCube[] CollisionSelectionBoxesR = null;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
+        /// <jsonalias>ParticleCollisionBoxes</jsonalias>
+        /// Defines multiple areas with which particles collide with. If not provided, will use <see cref="CollisionBoxR"/> or <see cref="CollisionBoxesR"/>.
+        /// </summary>
         [JsonProperty("ParticleCollisionBoxes")]
         private RotatableCube[] ParticleCollisionBoxesR = null;
 
@@ -126,24 +366,66 @@ namespace Vintagestory.ServerMods.NoObf
         public Cuboidf[] SelectionBoxes = null;
         public Cuboidf[] ParticleCollisionBoxes = null;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// Used for ladders. If true, walking against this blocks collisionbox will make the player climb.
+        /// </summary>
         [JsonProperty]
         public bool Climbable = false;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>false</jsondefault>-->
+        /// Will be used for not rendering rain below this block.
+        /// </summary>
         [JsonProperty]
         public bool RainPermeable = false;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>0</jsondefault>-->
+        /// Value between 0 to 7. Determines the height of the liquid, if <see cref="LiquidCode"/> is set.
+        /// </summary>
         [JsonProperty]
         public int LiquidLevel;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// If this block is or contains a liquid, this should be the code (or "identifier") of the liquid.
+        /// </summary>
         [JsonProperty]
         public string LiquidCode;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>1</jsondefault>-->
+        /// Walk speed when standing or inside this block.
+        /// </summary>
         [JsonProperty]
         public float WalkspeedMultiplier = 1f;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>1</jsondefault>-->
+        /// Drag multiplier applied to entities standing on it.
+        /// </summary>
         [JsonProperty]
         public float DragMultiplier = 1f;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// The items that should drop from breaking this block.
+        /// </summary>
         [JsonProperty]
         public BlockDropItemStack[] Drops;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// Information about the blocks as a crop.
+        /// </summary>
         [JsonProperty]
         public BlockCropPropertiesType CropProps = null;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>All ( ["*"] )</jsondefault>-->
+        /// Defines what creature groups may spawn on this block.
+        /// </summary>
         [JsonProperty]
         public string[] AllowSpawnCreatureGroups = new string[] { "*" };
 
@@ -199,17 +481,6 @@ namespace Vintagestory.ServerMods.NoObf
             block.Replaceable = this.Replaceable;
             block.Fertility = this.Fertility;
             block.LightAbsorption = this.LightAbsorption;
-
-            block.LightTraversable = new bool[] { this.LightAbsorption < 2, this.LightAbsorption < 2, this.LightAbsorption < 2 };
-            if (this.LightTraversable != null)
-            {
-                foreach (var val in this.LightTraversable)
-                {
-                    if (val.Key == "ns") block.LightTraversable[2] = val.Value;
-                    if (val.Key == "ud") block.LightTraversable[1] = val.Value;
-                    if (val.Key == "we") block.LightTraversable[0] = val.Value;
-                }
-            }
             block.LightHsv = this.LightHsv;
             block.VertexFlags = this.VertexFlags?.Clone() ?? new VertexFlags(0);
             block.Frostable = this.Frostable;

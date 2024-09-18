@@ -83,8 +83,7 @@ namespace Vintagestory.API.Common
         void OnEntitySpawn();
         void OnEntityDespawn(EntityDespawnData reason);
         void OnEntityHurt(DamageSource source, float damage);
-        void OnNoPath(Vec3d target);
-
+        
         /// <summary>
         /// Checks whether there is any reason why the AITask cannot move on to the ContinueExecute() method, for example if there is a path traverser and it is waiting for an asynchronous operation to complete
         /// </summary>

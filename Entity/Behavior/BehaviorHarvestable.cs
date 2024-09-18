@@ -39,7 +39,7 @@ namespace Vintagestory.GameContent
 
     }
 
-    public class EntityBehaviorHarvestable : EntityBehavior
+    public class EntityBehaviorHarvestable : EntityBehaviorContainer
     {
         const float minimumWeight = 0.5f;
         protected BlockDropItemStack[] jsonDrops;
@@ -133,6 +133,9 @@ namespace Vintagestory.GameContent
                 return entity.WatchedAttributes.GetBool("harvested", false);
             }
         }
+
+        public override InventoryBase Inventory => this.inv;
+        public override string InventoryClassName => "harvestableInv";
 
         public EntityBehaviorHarvestable(Entity entity) : base(entity)
         {
@@ -322,7 +325,7 @@ namespace Vintagestory.GameContent
             
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
-                dlg = new GuiDialogCreatureContents(inv, entity as EntityAgent, entity.Api as ICoreClientAPI, "carcasscontents");
+                dlg = new GuiDialogCreatureContents(inv, entity, entity.Api as ICoreClientAPI, "carcasscontents");
                 if (dlg.TryOpen())
                 {
                     (entity.World.Api as ICoreClientAPI).Network.SendPacketClient(inv.Open(player));
@@ -339,14 +342,15 @@ namespace Vintagestory.GameContent
 
         public override void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled)
         {
-            if (packetid < 1000)
+            if (packetid < 1000 && inv.HasOpened(player))
             {
                 inv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
                 handled = EnumHandling.PreventSubsequent;
                 return;
             }
 
-            if (packetid == 1012)
+            // This seems useless? I cant find any place in the code that would generate a packed of id 1012
+            /*if (packetid == 1012)
             {
                 if (!IsHarvested)
                 {
@@ -355,8 +359,8 @@ namespace Vintagestory.GameContent
                 {
                     player.InventoryManager.OpenInventory(inv);
                 }
-                
-            }
+
+            }*/
         }
 
 
@@ -418,7 +422,7 @@ namespace Vintagestory.GameContent
                 if (dstack.LastDrop) break;
             }
 
-            var eagent = entity as EntityAgent;
+            /*var eagent = entity as EntityAgent;
             if (eagent.GearInventory != null)
             {
                 foreach (var slot in eagent.GearInventory)
@@ -426,6 +430,11 @@ namespace Vintagestory.GameContent
                     if (slot.Empty) continue;
                     todrop.Add(slot.Itemstack);
                 }
+            }*/
+
+            foreach (var stack in entity.GetDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer))
+            {
+                todrop.Add(stack);
             }
 
             inv.AddSlots(todrop.Count - inv.Count);

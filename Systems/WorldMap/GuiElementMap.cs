@@ -320,6 +320,15 @@ namespace Vintagestory.GameContent
             {
                 args.Handled = true;
             }
+
+            if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Plus] || api.Input.KeyboardKeyStateRaw[(int)GlKeys.KeypadPlus])
+            {
+                ZoomAdd(0.25f, 0.5f, 0.5f);
+            }
+            if (api.Input.KeyboardKeyStateRaw[(int)GlKeys.Minus] || api.Input.KeyboardKeyStateRaw[(int)GlKeys.KeypadMinus])
+            {
+                ZoomAdd(-0.25f, 0.5f, 0.5f);
+            }
         }
 
         public override void OnKeyUp(ICoreClientAPI api, KeyEvent args)

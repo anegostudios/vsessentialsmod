@@ -35,6 +35,7 @@ namespace Vintagestory.GameContent
         float curHailVolume = 0f;
         float curHailPitch = 1f;
         float curTrembleVolume = 0f;
+        float curTremblePitch = 0f;
 
         float quarterSecAccum;
 
@@ -161,6 +162,7 @@ namespace Vintagestory.GameContent
             float targetHailVolume=0;
             float targetTrembleVolume=0;
 
+            float targetTremblePitch = 0;
             float targetRainPitch=1;
             float targetHailPitch=1;
 
@@ -205,6 +207,7 @@ namespace Vintagestory.GameContent
                     targetRainPitch = Math.Max(0, targetRainPitch - roomVolumePitchLoss/4f);
 
                     targetTrembleVolume = GameMath.Clamp(conds.Rainfall * 1.6f - 0.8f - roomVolumePitchLoss*0.25f, 0, 1);
+                    targetTremblePitch = GameMath.Clamp(1 - roomVolumePitchLoss*0.65f, 0, 1);
 
                     if (!rainSoundsOn && (targetRainVolumeLeafy > 0.01 || targetRainVolumeLeafless > 0.01))
                     {
@@ -248,13 +251,15 @@ namespace Vintagestory.GameContent
             curRainVolumeLeafless += (targetRainVolumeLeafless - curRainVolumeLeafless) * dt / 2;
 
             curTrembleVolume += (targetTrembleVolume - curTrembleVolume) * dt;
+
             curHailVolume += (targetHailVolume - curHailVolume) * dt;
 
             curHailPitch += (targetHailPitch - curHailPitch) * dt;
             curRainPitch += (targetRainPitch - curRainPitch) * dt;
+            curTremblePitch += (targetTremblePitch - curTremblePitch) * dt;
 
 
-            
+
 
 
             if (rainSoundsOn)
@@ -269,9 +274,12 @@ namespace Vintagestory.GameContent
                     rainSoundsLeafy[i]?.SetVolume(curRainVolumeLeafy);
                     rainSoundsLeafy[i]?.SetPitch(curRainPitch);
                 }
-
-                lowTrembleSound?.SetVolume(curTrembleVolume);
             }
+
+            lowTrembleSound?.SetVolume(curTrembleVolume);
+            lowTrembleSound?.SetPitch(curTremblePitch);
+
+
             if (hailSoundsOn)
             {
                 hailSound?.SetVolume(curHailVolume);

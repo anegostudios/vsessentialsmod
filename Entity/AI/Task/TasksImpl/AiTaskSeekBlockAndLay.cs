@@ -98,7 +98,7 @@ namespace Vintagestory.GameContent
             if (lastPOISearchTotalMs + 15000 > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds) return false;
             if (cooldownUntilTotalHours > entity.World.Calendar.TotalHours) return false;
-            if (!EmotionStatesSatisifed()) return false;
+            if (!PreconditionsSatisifed()) return false;
 
 
             PortionsEatenForLay = 3;
@@ -248,7 +248,7 @@ namespace Vintagestory.GameContent
                 {
                     float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
                     float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, false, 500);
+                    pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, MinDistanceToTarget() - 0.15f, OnGoalReached, OnStuck, null, false, 500);
                 }
             }
 
@@ -448,13 +448,13 @@ namespace Vintagestory.GameContent
             {
                 entity.World.RegisterCallback((dt) =>
                 {
-                    entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                    entity.World.PlaySoundAt(sound, entity, null, true, soundRange);
                     lastSoundTotalMs = entity.World.ElapsedMilliseconds;
                 }, soundStartMs);
             }
             else
             {
-                entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z, null, true, soundRange);
+                entity.World.PlaySoundAt(sound, entity, null, true, soundRange);
                 lastSoundTotalMs = entity.World.ElapsedMilliseconds;
             }
         }

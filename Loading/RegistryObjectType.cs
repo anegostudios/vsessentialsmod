@@ -3,14 +3,43 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.ServerMods.NoObf
 {
+
+    /// <summary>
+    /// The very base class for an in-game object. Extended by blocktypes, itemtypes, and entitytypes.
+    /// Controls the object's code, variant types, allowed/disallowed variants, world interactions, and a class for extra functionality.
+    /// </summary>
+    /// <example>
+    /// <code language="json">
+    ///"code": "cheese",
+    ///"class": "ItemCheese",
+    ///"variantgroups": [
+    ///	{
+    ///		"code": "type",
+    ///		"states": [ "cheddar", "blue", "waxedcheddar" ]
+    ///	},
+    ///	{
+    ///		"code": "part",
+    ///		"states": [ "1slice", "2slice", "3slice", "4slice" ]
+    ///	}
+    ///],
+    ///"skipVariants": [
+    ///	"cheese-waxedcheddar-1slice",
+    ///	"cheese-waxedcheddar-2slice",
+    ///	"cheese-waxedcheddar-3slice"
+    ///],
+    /// </code>
+    /// </example>
+    [DocumentAsJson]
     [JsonObject(MemberSerialization.OptIn)]
     public abstract class RegistryObjectType
     {
@@ -19,9 +48,27 @@ namespace Vintagestory.ServerMods.NoObf
         /// </summary>
         volatile internal int parseStarted;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>true</jsondefault>-->
+        /// If set to false, this object will not be loaded.
+        /// </summary>
+        [DocumentAsJson]
         public bool Enabled = true;
+
         public JObject jsonObject;
+
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// The unique code for this object. Used as the prefix for any variant codes.
+        /// </summary>
+        [DocumentAsJson]
         public AssetLocation Code;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// All available variants for this object.
+        /// </summary>
+        [DocumentAsJson]
         public RegistryObjectVariantGroup[] VariantGroups;
 
         /// <summary>
@@ -29,17 +76,33 @@ namespace Vintagestory.ServerMods.NoObf
         /// </summary>
         public OrderedDictionary<string, string> Variant = new OrderedDictionary<string, string>();
 
+        /// <summary>
+        /// <!--<jsonoptional>Unused</jsonoptional><jsondefault>None</jsondefault>-->
+        /// (Currently unused) A set of potential world interactions for this object. Used to display what the object is used for - e.g. Shift + Right Click to Knap Stones.
+        /// </summary>
         [JsonProperty]
         public WorldInteraction[] Interactions;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A set of resolved code-variants that will not be loaded by the game.
+        /// </summary>
         [JsonProperty]
         public AssetLocation[] SkipVariants;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// If set, only resolved code-variants in this list will be loaded by the game.
+        /// </summary>
         [JsonProperty]
         public AssetLocation[] AllowedVariants;
 
         public HashSet<AssetLocation> AllowedVariantsQuickLookup = new HashSet<AssetLocation>();
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A reference to the registered C# class of the object. Can be used to add extra functionality to objects.
+        /// </summary>
         [JsonProperty]
         public string Class;
 
@@ -122,8 +185,34 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
         #region loading
-        internal virtual void CreateBasetype(string entryDomain, JObject entityTypeObject)
+        internal virtual void CreateBasetype(ICoreAPI api, string filepathForLogging, string entryDomain, JObject entityTypeObject)
         {
+            if (entityTypeObject.TryGetValue("inheritFrom", StringComparison.InvariantCultureIgnoreCase, out var iftok))
+            {
+                AssetLocation inheritFrom = iftok.ToObject<AssetLocation>(entryDomain).WithPathAppendixOnce(".json");
+
+                var asset = api.Assets.TryGet(inheritFrom);
+                if (asset != null) 
+                {
+                    try
+                    {
+                        var inheritedObj = JObject.Parse(asset.ToText());
+                        inheritedObj.Merge(entityTypeObject, new JsonMergeSettings() { 
+                            MergeArrayHandling = MergeArrayHandling.Replace, 
+                            PropertyNameComparison = StringComparison.InvariantCultureIgnoreCase 
+                        });
+                        entityTypeObject = inheritedObj;
+                        entityTypeObject.Remove("inheritFrom");
+                    } catch (Exception e)
+                    {
+                        api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this is not valid json. Exception: {2}.", filepathForLogging, inheritFrom, e));
+                    }
+                } else
+                {
+                    api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this file does not exist. Will ignore.", filepathForLogging, inheritFrom));
+                }
+            }
+
             AssetLocation location;
             try
             {

@@ -1,21 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    public interface ICanHealCreature
+    {
+        bool CanHeal(Entity eagent);
+
+        WorldInteraction[] GetHealInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player);
+    }
+
     public delegate float OnDamagedDelegate(float damage, DamageSource dmgSource);
     public class EntityBehaviorHealth : EntityBehavior
     {
-        ITreeAttribute healthTree;
         float secondsSinceLastUpdate;
 
         public event OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
+
+        ITreeAttribute healthTree => entity.WatchedAttributes.GetTreeAttribute("health");
 
         public float Health
         {
@@ -43,8 +53,13 @@ namespace Vintagestory.GameContent
         }
 
         public Dictionary<string, float> MaxHealthModifiers = new Dictionary<string, float>();
-        
-        public float _playerHealthRegenSpeed { get; set; }
+
+
+        /// <summary>
+        /// Color used when the entity is being attacked
+        /// </summary>
+        protected int HurtColor = ColorUtil.ToRgba(255, 255, 100, 100);
+
 
         public void MarkDirty()
         {
@@ -66,14 +81,11 @@ namespace Vintagestory.GameContent
             if (wasFullHealth) Health = MaxHealth;
         }
 
-        public EntityBehaviorHealth(Entity entity) : base(entity)
-        {
-        }
+        public EntityBehaviorHealth(Entity entity) : base(entity) { }
 
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
-            healthTree = entity.WatchedAttributes.GetTreeAttribute("health");
-            _playerHealthRegenSpeed = entity.Api.World.Config.GetString("playerHealthRegenSpeed", "1").ToFloat();
+            var healthTree = entity.WatchedAttributes.GetTreeAttribute("health");
 
             if (healthTree == null)
             {
@@ -96,6 +108,13 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
+            int val = entity.RemainingActivityTime("invulnerable");
+            if (val > 0) {
+                entity.RenderColor = ColorUtil.ColorOverlay(HurtColor, ColorUtil.WhiteArgb, 1f - val / 500f);
+            }
+
+            if (entity.World.Side == EnumAppSide.Client) return;
+
             if (entity.Pos.Y < -30)
             {
                 entity.ReceiveDamage(new DamageSource()
@@ -104,6 +123,7 @@ namespace Vintagestory.GameContent
                     Type = EnumDamageType.Gravity
                 }, 4);
             }
+
 
             secondsSinceLastUpdate += deltaTime;
 
@@ -115,8 +135,10 @@ namespace Vintagestory.GameContent
                     var maxHealth = MaxHealth;
                     if (health < maxHealth)
                     {
+                        var healthRegenSpeed = entity is EntityPlayer ? entity.Api.World.Config.GetString("playerHealthRegenSpeed", "1").ToFloat() : entity.WatchedAttributes.GetFloat("regenSpeed", 1);
+
                         // previous value = 0.01 , -> 0.01 / 30 = 0.000333333f (60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul))
-                        var healthRegenPerGameSecond = 0.000333333f * _playerHealthRegenSpeed; 
+                        var healthRegenPerGameSecond = 0.000333333f * healthRegenSpeed;
                         var multiplierPerGameSec = secondsSinceLastUpdate * entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul;
 
                         // Only players have the hunger behavior, and the different nutrient saturations
@@ -166,6 +188,9 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
+            if (entity.World.Side == EnumAppSide.Client) return;
+            var damageBeforeArmor = damage;
+
             if (onDamaged != null)
             {
                 foreach (OnDamagedDelegate dele in onDamaged.GetInvocationList())
@@ -194,7 +219,22 @@ namespace Vintagestory.GameContent
 
             if (!entity.Alive) return;
             if (damage <= 0) return;
-            
+
+            if (entity is EntityPlayer player && damageSource.GetCauseEntity() is EntityPlayer otherPlayer)
+            {
+                string weapon;
+                if (damageSource.SourceEntity != otherPlayer)
+                {
+                    weapon = damageSource.SourceEntity.Code.ToString();
+                }
+                else
+                {
+                    weapon = otherPlayer.Player.InventoryManager.ActiveHotbarSlot.Itemstack?.Collectible.Code.ToString() ?? "hands";
+                }
+
+                entity.Api.Logger.Audit("{0} at {1} got {2}/{3} damage {4} {5} by {6}",
+                    player.Player.PlayerName, entity.Pos.AsBlockPos, damage, damageBeforeArmor, damageSource.Type.ToString().ToLowerInvariant(), weapon, otherPlayer.GetName());
+            }
 
             Health -= damage;
             entity.OnHurt(damageSource, damage);
@@ -205,7 +245,7 @@ namespace Vintagestory.GameContent
                 Health = 0;
 
                 entity.Die(
-                    EnumDespawnReason.Death, 
+                    EnumDespawnReason.Death,
                     damageSource
                 );
             } else
@@ -277,7 +317,28 @@ namespace Vintagestory.GameContent
 
         public override void GetInfoText(StringBuilder infotext)
         {
-           
+            var capi = entity.Api as ICoreClientAPI;
+            if (capi?.World.Player?.WorldData?.CurrentGameMode == EnumGameMode.Creative)
+            {
+                infotext.AppendLine(Lang.Get("Health: {0}/{1}", Health, MaxHealth));
+            }
+        }
+
+        public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player, ref EnumHandling handled)
+        {
+            if (IsHealable(player.Entity))
+            {
+                var ichc = player.InventoryManager.ActiveHotbarSlot?.Itemstack.Collectible as ICanHealCreature;
+                return ichc.GetHealInteractionHelp(world, es, player).Append(base.GetInteractionHelp(world, es, player, ref handled));
+            }
+
+            return base.GetInteractionHelp(world, es, player, ref handled);
+        }
+
+        public bool IsHealable(EntityAgent eagent)
+        {
+            var ichc = eagent.RightHandItemSlot?.Itemstack?.Collectible as ICanHealCreature;
+            return Health < MaxHealth && ichc?.CanHeal(this.entity) == true;
         }
 
         public override string PropertyName()

@@ -1,179 +1,324 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
-namespace Vintagestory.GameContent
+public struct PositionSnapshot
 {
-    public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
+    public double x;
+    public double y;
+    public double z;
+
+    public float interval;
+
+    public bool isTeleport;
+
+    public PositionSnapshot(Vec3d pos, float interval, bool isTeleport)
     {
-        public double RenderOrder => 0;
-        public int RenderRange => 9999;
-        
+        x = pos.X;
+        y = pos.Y;
+        z = pos.Z;
 
-        double posDiffX, posDiffY, posDiffZ;
-        double rollDiff, pitchDiff;
-        double headpitchDiff;
+        this.interval = interval;
+        this.isTeleport = isTeleport;
+    }
 
+    public PositionSnapshot(EntityPos pos, float interval, bool isTeleport)
+    {
+        x = pos.X;
+        y = pos.Y;
+        z = pos.Z;
 
+        this.interval = interval;
+        this.isTeleport = isTeleport;
+    }
+}
 
-        float accum;
-        bool serverposApplied;
+public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
+{
+    public ICoreClientAPI capi;
+    public EntityAgent agent;
+    public IMountable mountableSupplier;
 
-        ICoreClientAPI capi;
-        
-        
-        public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
+    public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
+    {
+        if (entity.World.Side == EnumAppSide.Server) throw new Exception($"Remove server interpolation behavior from {entity.Code.Path}.");
+
+        capi = entity.Api as ICoreClientAPI;
+        capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "interpolateposition");
+        agent = entity as EntityAgent;
+    }
+
+    public override void AfterInitialized(bool onFirstSpawn)
+    {
+        mountableSupplier = entity.GetInterface<IMountable>();
+    }
+
+    public float dtAccum = 0;
+
+    // Will lerp from pL to pN.
+    public PositionSnapshot pL;
+    public PositionSnapshot pN;
+
+    public Queue<PositionSnapshot> positionQueue = new();
+
+    public float currentYaw;
+    public float targetYaw;
+
+    public float currentPitch;
+    public float targetPitch;
+
+    public float currentRoll;
+    public float targetRoll;
+
+    public float currentHeadYaw;
+    public float targetHeadYaw;
+
+    public float currentHeadPitch;
+    public float targetHeadPitch;
+
+    public float currentBodyYaw;
+    public float targetBodyYaw;
+
+    public void PushQueue(PositionSnapshot snapshot)
+    {
+        positionQueue.Enqueue(snapshot);
+        queueCount++;
+    }
+
+    // Interval at what things should be received.
+    public float interval = 1 / 15f;
+    public int queueCount;
+
+    public void PopQueue(bool clear)
+    {
+        dtAccum -= pN.interval;
+
+        if (dtAccum < 0) dtAccum = 0;
+        if (dtAccum > 1) dtAccum = 0;
+
+        pL = pN;
+        pN = positionQueue.Dequeue();
+        queueCount--;
+
+        // Clear flooded queue.
+        if (clear && queueCount > 1) PopQueue(true);
+
+        if (mountableSupplier?.IsBeingControlled() == true) return;
+
+        entity.ServerPos.SetPos(pN.x, pN.y, pN.z);
+        physics?.HandleRemotePhysics(Math.Max(pN.interval, interval), pN.isTeleport);
+    }
+
+    public IRemotePhysics physics;
+
+    public override void Initialize(EntityProperties properties, JsonObject attributes)
+    {
+        currentYaw = entity.ServerPos.Yaw;
+        targetYaw = entity.ServerPos.Yaw;
+
+        PushQueue(new PositionSnapshot(entity.ServerPos, 0, false));
+
+        targetYaw = entity.ServerPos.Yaw;
+        targetPitch = entity.ServerPos.Pitch;
+        targetRoll = entity.ServerPos.Roll;
+
+        currentYaw = entity.ServerPos.Yaw;
+        currentPitch = entity.ServerPos.Pitch;
+        currentRoll = entity.ServerPos.Roll;
+
+        if (agent != null)
         {
-            if (entity.World.Side == EnumAppSide.Server) throw new Exception("Not made for server side!");
+            targetHeadYaw = entity.ServerPos.HeadYaw;
+            targetHeadPitch = entity.ServerPos.HeadPitch;
+            targetBodyYaw = agent.BodyYawServer;
 
-            capi = entity.Api as ICoreClientAPI;
-            capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "interpolateposition");
+            currentHeadYaw = entity.ServerPos.HeadYaw;
+            currentHeadPitch = entity.ServerPos.HeadPitch;
+            currentBodyYaw = agent.BodyYawServer;
         }
 
-
-        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        foreach (EntityBehavior behavior in entity.SidedProperties.Behaviors)
         {
-            // Don't interpolate for ourselves
-            if (entity == capi.World.Player.Entity) return;
-            if (capi.IsGamePaused) return;
-
-            bool isMounted = (entity as EntityAgent)?.MountedOn != null;
-
-            // If the client player is currently mounted on this entity and controlling it we don't interpolate the position
-            // as the physics sim of this entity is now determined by the client
-            if (entity is IMountableSupplier ims)
+            if (behavior is IRemotePhysics)
             {
-                foreach (var seat in ims.MountPoints)
+                physics = behavior as IRemotePhysics;
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when the client receives a new position.
+    /// Move the positions forward and reset the accumulation.
+    /// </summary>
+    public override void OnReceivedServerPos(bool isTeleport, ref EnumHandling handled)
+    {
+        float tickInterval = entity.Attributes.GetInt("tickDiff", 1) * interval;
+
+        PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, isTeleport));
+
+        if (isTeleport)
+        {
+            dtAccum = 0;
+            positionQueue.Clear();
+            queueCount = 0;
+
+            PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, false));
+            PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, false));
+
+            PopQueue(false);
+            PopQueue(false);
+        }
+
+        targetYaw = entity.ServerPos.Yaw;
+        targetPitch = entity.ServerPos.Pitch;
+        targetRoll = entity.ServerPos.Roll;
+
+        if (agent != null)
+        {
+            targetHeadYaw = entity.ServerPos.HeadYaw;
+            targetHeadPitch = entity.ServerPos.HeadPitch;
+            targetBodyYaw = agent.BodyYawServer;
+        }
+
+        if (queueCount > 20)
+        {
+            PopQueue(true);
+        }
+    }
+
+    public int wait = 0;
+    public float targetSpeed = 0.6f;
+
+
+    public void OnRenderFrame(float dt, EnumRenderStage stage)
+    {
+        if (capi.IsGamePaused) return;
+
+        if (queueCount < wait)
+        {
+            if (mountableSupplier == null)
+            {
+                entity.Pos.Yaw = LerpRotation(ref currentYaw, targetYaw, dt);
+                entity.Pos.Pitch = LerpRotation(ref currentPitch, targetPitch, dt);
+                entity.Pos.Roll = LerpRotation(ref currentRoll, targetRoll, dt);
+
+                if (agent != null)
                 {
-                    if (seat.MountedBy == capi.World.Player.Entity && seat.CanControl)
+                    entity.Pos.HeadYaw = LerpRotation(ref currentHeadYaw, targetHeadYaw, dt);
+                    entity.Pos.HeadPitch = LerpRotation(ref currentHeadPitch, targetHeadPitch, dt);
+                    agent.BodyYaw = LerpRotation(ref currentBodyYaw, targetBodyYaw, dt);
+                }
+            }
+
+            return;
+        }
+
+        dtAccum += dt * targetSpeed;
+
+        while (dtAccum > pN.interval)
+        {
+            if (queueCount > 0)
+            {
+                // This is the most convenient place to check this.
+                // It should be done when the client creates it's own player somewhere.
+                if (entity == capi.World.Player.Entity)
+                {
+                    capi.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+                    return;
+                }
+
+                PopQueue(false);
+                wait = 0;
+            }
+            else
+            {
+                wait = 1;
+
+                break;
+            }
+        }
+
+        float speed = (queueCount * 0.2f) + 0.8f;
+        targetSpeed = GameMath.Lerp(targetSpeed, speed, dt * 4);
+
+        // Don't set position if the player is controlling the mount.
+        if (mountableSupplier != null)
+        {
+            foreach (IMountableSeat seat in mountableSupplier.Seats)
+            {
+                // Set position of other entities.
+                if (seat.Passenger != capi.World.Player.Entity)
+                {
+                    seat.Passenger?.Pos.SetFrom(seat.SeatPosition);
+                }
+                else
+                {
+                    if (mountableSupplier.Controller == capi.World.Player.Entity)
                     {
+                        currentYaw = entity.Pos.Yaw;
+                        currentPitch = entity.Pos.Pitch;
+                        currentRoll = entity.Pos.Roll;
                         return;
                     }
                 }
             }
-
-            float interval = 0.2f;
-            accum += deltaTime;
-
-            if (accum > interval * 2 || !(entity is EntityAgent))
-            {
-                posDiffX = entity.ServerPos.X - entity.Pos.X;
-                posDiffY = entity.ServerPos.Y - entity.Pos.Y;
-                posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
-                rollDiff = entity.ServerPos.Roll - entity.Pos.Roll;
-                //yawDiff = entity.ServerPos.Yaw - entity.Pos.Yaw;
-                pitchDiff = entity.ServerPos.Pitch - entity.Pos.Pitch;
-
-                double posDiffSq = posDiffX * posDiffX + posDiffY * posDiffY + posDiffZ * posDiffZ;
-
-                // "|| accum > 1" mitigates items at the edge of block constantly jumping up and down
-                if (entity.ServerPos.BasicallySameAsIgnoreMotion(entity.Pos, 0.05) || (accum > 1 && posDiffSq < 0.1 * 0.1))
-                {
-                    if (!serverposApplied && !isMounted)
-                    {
-                        entity.Pos.SetPos(entity.ServerPos);
-                    }
-
-                    serverposApplied = true;
-
-                    return;
-                }
-            }
-
-            
-
-            double percentPosx = Math.Abs(posDiffX) * deltaTime / interval;
-            double percentPosy = Math.Abs(posDiffY) * deltaTime / interval;
-            double percentPosz = Math.Abs(posDiffZ) * deltaTime / interval;
-
-            double percentyawdiff = Math.Abs(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw)) * deltaTime / interval;
-            double percentheadyawdiff = Math.Abs(GameMath.AngleRadDistance(entity.Pos.HeadYaw, entity.ServerPos.HeadYaw)) * deltaTime / interval;
-
-            double percentrolldiff = Math.Abs(rollDiff) * deltaTime / interval;
-            double percentpitchdiff = Math.Abs(pitchDiff) * deltaTime / interval;
-            double percentheadpitchdiff = Math.Abs(headpitchDiff) * deltaTime / interval;
-
-
-            int signPX = Math.Sign(percentPosx);
-            int signPY = Math.Sign(percentPosy);
-            int signPZ = Math.Sign(percentPosz);
-
-            if (!isMounted)
-            {
-                entity.Pos.X += GameMath.Clamp(posDiffX, -signPX * percentPosx, signPX * percentPosx);
-                entity.Pos.Y += GameMath.Clamp(posDiffY, -signPY * percentPosy, signPY * percentPosy);
-                entity.Pos.Z += GameMath.Clamp(posDiffZ, -signPZ * percentPosz, signPZ * percentPosz);
-            }
-
-            int signR = Math.Sign(percentrolldiff); 
-            int signY = Math.Sign(percentyawdiff);
-            int signP = Math.Sign(percentpitchdiff);
-
-            int signHY = Math.Sign(percentheadyawdiff);
-            int signHP = Math.Sign(percentheadpitchdiff);
-
-            // Dunno why the 0.7, but it's too fast otherwise
-            entity.Pos.Roll += 0.7f * (float)GameMath.Clamp(rollDiff, -signR * percentrolldiff, signR * percentrolldiff);
-            entity.Pos.Yaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Yaw, entity.ServerPos.Yaw), -signY * percentyawdiff, signY * percentyawdiff);
-            entity.Pos.Yaw = entity.Pos.Yaw % GameMath.TWOPI;
-
-            entity.Pos.Pitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch), -signP * percentpitchdiff, signP * percentpitchdiff);
-            entity.Pos.Pitch = entity.Pos.Pitch % GameMath.TWOPI;
-
-            entity.Pos.HeadYaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadYaw, entity.ServerPos.HeadYaw), -signHY * percentheadyawdiff, signHY * percentheadyawdiff);
-            entity.Pos.HeadYaw = entity.Pos.HeadYaw % GameMath.TWOPI;
-
-            entity.Pos.HeadPitch += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(entity.Pos.HeadPitch, entity.ServerPos.HeadPitch), -signHP * percentheadpitchdiff, signHP * percentheadpitchdiff);
-            entity.Pos.HeadPitch = entity.Pos.HeadPitch % GameMath.TWOPI;
-
-            if (entity is EntityAgent eagent)
-            {
-                double percentbodyyawdiff = Math.Abs(GameMath.AngleRadDistance(eagent.BodyYaw, eagent.BodyYawServer)) * deltaTime / interval;
-                int signBY = Math.Sign(percentbodyyawdiff);
-                eagent.BodyYaw += 0.7f * (float)GameMath.Clamp(GameMath.AngleRadDistance(eagent.BodyYaw, eagent.BodyYawServer), -signBY * percentbodyyawdiff, signBY * percentbodyyawdiff);
-                eagent.BodyYaw = eagent.BodyYaw % GameMath.TWOPI;
-            }
         }
 
+        float delta = dtAccum / pN.interval;
+        if (wait != 0) delta = 1;
 
-        
-        public override void OnReceivedServerPos(bool isTeleport, ref EnumHandling handled)
+        entity.Pos.Yaw = LerpRotation(ref currentYaw, targetYaw, dt);
+        entity.Pos.Pitch = LerpRotation(ref currentPitch, targetPitch, dt);
+        entity.Pos.Roll = LerpRotation(ref currentRoll, targetRoll, dt);
+
+        if (agent != null)
         {
-            // Don't interpolate for ourselves
-            if (entity == capi.World.Player.Entity) return;
-            
-            handled = EnumHandling.PreventDefault;
-
-            posDiffX = entity.ServerPos.X - entity.Pos.X;      // radfast 5.3.24:  isTeleport is ignored because, if teleporting, entityPos will already have been set to match ServerPos
-            posDiffY = entity.ServerPos.Y - entity.Pos.Y;
-            posDiffZ = entity.ServerPos.Z - entity.Pos.Z;
-            rollDiff = GameMath.AngleRadDistance(entity.Pos.Roll, entity.ServerPos.Roll);
-            pitchDiff = GameMath.AngleRadDistance(entity.Pos.Pitch, entity.ServerPos.Pitch);
-            headpitchDiff = GameMath.AngleRadDistance(entity.Pos.HeadPitch, entity.ServerPos.HeadPitch);
-
-            serverposApplied = false;
-
-            accum = 0;
+            entity.Pos.HeadYaw = LerpRotation(ref currentHeadYaw, targetHeadYaw, dt);
+            entity.Pos.HeadPitch = LerpRotation(ref currentHeadPitch, targetHeadPitch, dt);
+            agent.BodyYaw = LerpRotation(ref currentBodyYaw, targetBodyYaw, dt);
         }
 
-
-        public override void OnEntityDespawn(EntityDespawnData despawn)
+        // Only set position if not mounted.
+        if (agent == null || agent.MountedOn == null)
         {
-            base.OnEntityDespawn(despawn);
-            (entity.Api as ICoreClientAPI).Event.UnregisterRenderer(this, EnumRenderStage.Before);
-            Dispose();
-        }
-
-        public override string PropertyName()
-        {
-            return "lerppos";
-        }
-
-        public void Dispose()
-        {
-            
+            entity.Pos.X = GameMath.Lerp(pL.x, pN.x, delta);
+            entity.Pos.Y = GameMath.Lerp(pL.y, pN.y, delta);
+            entity.Pos.Z = GameMath.Lerp(pL.z, pN.z, delta);
         }
     }
+
+    // I don't like doing it like this but AI turns instantly so using the actual lerp is bad.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float LerpRotation(ref float current, float target, float dt)
+    {
+        float pDiff = Math.Abs(GameMath.AngleRadDistance(current, target)) * dt / 0.1f;
+        int signY = Math.Sign(pDiff);
+        current += 0.6f * Math.Clamp(GameMath.AngleRadDistance(current, target), -signY * pDiff, signY * pDiff);
+        current %= GameMath.TWOPI;
+        return current;
+    }
+
+    public override string PropertyName()
+    {
+        return "entityinterpolation";
+    }
+
+    public override void OnEntityDespawn(EntityDespawnData despawn)
+    {
+        capi.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+    }
+
+    public void Dispose()
+    {
+
+    }
+
+    public double RenderOrder => 0;
+    public int RenderRange => 9999;
 }

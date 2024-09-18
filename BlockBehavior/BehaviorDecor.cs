@@ -4,11 +4,6 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public interface IAcceptsDecor
-    {
-        void SetDecor(Block blockToPlace, BlockPos pos, BlockFacing face);
-    }
-
     public class BlockBehaviorDecor : BlockBehavior
     {
         BlockFacing[] sides;
@@ -81,9 +76,19 @@ namespace Vintagestory.GameContent
                     Block attachingBlock = world.BlockAccessor.GetBlock(pos);
 
                     var iad = attachingBlock.GetInterface<IAcceptsDecor>(world, pos);
-                    if (iad != null)
+                    if (iad != null && iad.CanAccept(blockToPlace))
                     {
-                        iad.SetDecor(blockToPlace, pos, blockSel.Face);
+                        if (byPlayer.WorldData.CurrentGameMode == EnumGameMode.Survival)
+                        {
+                            var decorId = iad.GetDecor(blockSel.Face);
+                            if (decorId > 0)
+                            {
+                                var decor = world.BlockAccessor.GetBlock(decorId);
+                                var itemStack = new ItemStack(decor.Id, decor.ItemClass, 1, new TreeAttribute(), world);
+                                world.SpawnItemEntity(itemStack, pos.AddCopy(blockSel.Face).ToVec3d());
+                            }
+                        }
+                        iad.SetDecor(blockToPlace, blockSel.Face);
                         return true;
                     }
 
@@ -94,10 +99,14 @@ namespace Vintagestory.GameContent
                         return false;
                     }
                     
-
-                    
+                    var decorBlock = world.BlockAccessor.GetDecor(pos, BlockSelection.GetDecorIndex(blockSel.Face));
                     if (world.BlockAccessor.SetDecor(blockToPlace, pos, blockSel.Face))
                     {
+                        if (byPlayer.WorldData.CurrentGameMode == EnumGameMode.Survival && decorBlock != null)
+                        {
+                            var itemStack = new ItemStack(decorBlock.Id, decorBlock.ItemClass, 1, new TreeAttribute(), world);
+                            world.SpawnItemEntity(itemStack, pos.AddCopy(blockSel.Face).ToVec3d());
+                        }
                         return true;
                     }
                     

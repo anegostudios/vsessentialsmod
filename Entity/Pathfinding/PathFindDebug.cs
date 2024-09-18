@@ -9,7 +9,7 @@ using Vintagestory.API.Server;
 namespace Vintagestory.Essentials
 {
     public class PathFindDebug : ModSystem
-    {   
+    {
         BlockPos start;
         BlockPos end;
         ICoreServerAPI sapi;
@@ -79,12 +79,12 @@ namespace Vintagestory.Essentials
                     float timeMs = (float)sw.ElapsedMilliseconds / 15f;
 
                     return TextCommandResult.Success(string.Format("15 searches average: {0} ms", (int)timeMs));
-                    
+
                 case "clear":
                     start = null;
                     end = null;
 
-                    sapi.World.HighlightBlocks(player, 2, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                    sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.Spawner, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     sapi.World.HighlightBlocks(player, 26, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     sapi.World.HighlightBlocks(player, 27, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     break;
@@ -92,7 +92,7 @@ namespace Vintagestory.Essentials
 
             if (start == null || end == null)
             {
-                sapi.World.HighlightBlocks(player, 2, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.Spawner, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
             }
             if (start != null && end != null)
             {
@@ -107,8 +107,8 @@ namespace Vintagestory.Essentials
 
                 if (nodes == null)
                 {
-                    sapi.World.HighlightBlocks(player, 2, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
-                    sapi.World.HighlightBlocks(player, 3, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                    sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.Spawner, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                    sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.LandClaim, new List<BlockPos>(), EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
                     return TextCommandResult.Success(message + "\n" + "No path found");
                 }
 
@@ -118,7 +118,7 @@ namespace Vintagestory.Essentials
                     poses.Add(node);
                 }
 
-                sapi.World.HighlightBlocks(player, 2, poses, new List<int>() { ColorUtil.ColorFromRgba(128, 128, 128, 30) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.Spawner, poses, new List<int>() { ColorUtil.ColorFromRgba(128, 128, 128, 30) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
 
 
                 List<Vec3d> wps = pfs.ToWaypoints(nodes);
@@ -128,7 +128,7 @@ namespace Vintagestory.Essentials
                     poses.Add(node.AsBlockPos);
                 }
 
-                sapi.World.HighlightBlocks(player, 3, poses, new List<int>() { ColorUtil.ColorFromRgba(128, 0, 0, 100) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
+                sapi.World.HighlightBlocks(player, (int)EnumHighlightSlot.LandClaim, poses, new List<int>() { ColorUtil.ColorFromRgba(128, 0, 0, 100) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);
 
                 return TextCommandResult.Success(message);
             }

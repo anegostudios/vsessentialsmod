@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SQLitePCL;
+using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -10,12 +11,15 @@ namespace Vintagestory.GameContent
     public class AiTaskFleeEntity : AiTaskBaseTargetable
     {
         Vec3d targetPos = new Vec3d();
+        float targetYaw = 0f;
+
         float moveSpeed = 0.02f;
         float seekingRange = 25f;
         float executionChance = 0.1f;
         float fleeingDistance = 31f;
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
+        float instafleeOnDamageChance = 0;
         bool cancelOnHurt = false;
 
         long fleeStartMs;
@@ -25,6 +29,10 @@ namespace Vintagestory.GameContent
         bool ignoreDeepDayLight;
         float tamingGenerations = 10f;
 		bool cancelNow;
+
+        float nowFleeingDistance;
+        bool instafleenow=false;
+
         public override bool AggressiveTargeting => false;
 
 
@@ -45,6 +53,7 @@ namespace Vintagestory.GameContent
             ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
             fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 15);
             fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
+            instafleeOnDamageChance = taskConfig["instafleeOnDamageChance"].AsFloat(0f);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
         }
 
@@ -55,14 +64,11 @@ namespace Vintagestory.GameContent
         {
             soundChance = Math.Min(1.01f, soundChance + 1 / 500f);
 
-            // If this flee behavior is due to the 'fleeondamage' condition, then lets make it react 4 times quicker
-            double chanceMod = 4;
-            if (rand.NextDouble() > 3 * executionChance) return false;
-            if (whenInEmotionState == null && rand.NextDouble() > 1/chanceMod) return false;
+            if (instafleenow) return TryInstaFlee();
 
+            if (rand.NextDouble() > executionChance) return false;
             if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
-            if (!EmotionStatesSatisifed()) return false;
-
+            if (!PreconditionsSatisifed()) return false;
 
             // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
             // Has to be checked every tick because the drifter attributes change during temporal storms  (grrr, this is a slow way to do it)
@@ -77,7 +83,7 @@ namespace Vintagestory.GameContent
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = (whenInEmotionState != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
 
-            ownPos.Set(entity.ServerPos);
+            ownPos.SetWithDimension(entity.ServerPos);
             float hereRange = fearReductionFactor * seekingRange;
 
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-init");
@@ -95,18 +101,44 @@ namespace Vintagestory.GameContent
             {
                 targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange), EnumEntitySearchType.Creatures);
             }
-            entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 
+            nowFleeingDistance = (float)fleeingDistance;
+
+            entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 
             if (targetEntity != null)
             {
-                updateTargetPosFleeMode(targetPos);
+                float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
+                updateTargetPosFleeMode(targetPos, yaw);
                 return true;
             }
 
             return false;
         }
 
+        private bool TryInstaFlee()
+        {
+            // Beyond visual range: Run in looking direction
+            if (targetEntity == null || entity.ServerPos.DistanceTo(targetEntity.ServerPos) > seekingRange)
+            {
+                float cosYaw = GameMath.Cos(entity.ServerPos.Yaw);
+                float sinYaw = GameMath.Sin(entity.ServerPos.Yaw);
+                double offset = 200;
+                targetPos = new Vec3d(entity.ServerPos.X + sinYaw * offset, entity.ServerPos.Y, entity.ServerPos.Z + cosYaw * offset);
+                targetYaw = entity.ServerPos.Yaw;
+                targetEntity = null;
+            }
+            else
+            {
+                nowFleeingDistance = (float)entity.ServerPos.DistanceTo(targetEntity.ServerPos) + 15;
+                updateTargetPosFleeMode(targetPos, entity.ServerPos.Yaw);
+            }
+
+            
+            instafleenow = false;
+
+            return true;
+        }
 
         public override void StartExecute()
         {
@@ -116,7 +148,7 @@ namespace Vintagestory.GameContent
 
             soundChance = Math.Max(0.025f, soundChance - 0.2f);
 
-            float size = targetEntity.SelectionBox.XSize;
+            float size = targetEntity?.SelectionBox.XSize ?? 0;
 
             pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
 
@@ -125,18 +157,27 @@ namespace Vintagestory.GameContent
         }
 
 
+        Vec3d tmpTargetPos = new Vec3d();
         public override bool ContinueExecute(float dt)
         {
             if (world.Rand.NextDouble() < 0.2)
             {
-                updateTargetPosFleeMode(targetPos);
-                pathTraverser.CurrentTarget.X = targetPos.X;
-                pathTraverser.CurrentTarget.Y = targetPos.Y;
-                pathTraverser.CurrentTarget.Z = targetPos.Z;
+                float yaw = targetEntity == null ? -targetYaw : (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
+
+                updateTargetPosFleeMode(tmpTargetPos.Set(targetPos), yaw);
+                pathTraverser.CurrentTarget.X = tmpTargetPos.X;
+                pathTraverser.CurrentTarget.Y = tmpTargetPos.Y;
+                pathTraverser.CurrentTarget.Z = tmpTargetPos.Z;
                 pathTraverser.Retarget();
             }
 
-            if (entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos) > fleeingDistance * fleeingDistance)
+            //entity.World.SpawnParticles(1, ColorUtil.WhiteArgb, tmpTargetPos, tmpTargetPos, new Vec3f(), new Vec3f(), 1, 0, 2, EnumParticleModel.Quad);
+
+            if (targetEntity != null && entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos) > nowFleeingDistance * nowFleeingDistance)
+            {
+                return false;
+            }
+            if (targetEntity == null && entity.World.ElapsedMilliseconds - fleeStartMs > 5000)
             {
                 return false;
             }
@@ -153,11 +194,8 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            return !stuck && targetEntity.Alive && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs) && !cancelNow && pathTraverser.Active;
-        }
-
-
-        
+            return !stuck && (targetEntity == null || targetEntity.Alive) && (entity.World.ElapsedMilliseconds - fleeStartMs < fleeDurationMs) && !cancelNow && pathTraverser.Active;
+        }       
 
         
 
@@ -167,6 +205,12 @@ namespace Vintagestory.GameContent
             base.OnEntityHurt(source, damage);
 
             if (cancelOnHurt) cancelNow = true;
+
+            if (entity.World.Rand.NextDouble() < instafleeOnDamageChance)
+            {
+                instafleenow = true;
+                targetEntity = source.CauseEntity;
+            }
         }
 
 

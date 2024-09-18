@@ -62,6 +62,9 @@ namespace Vintagestory.GameContent
 
             Register("gotoentity", typeof(AiTaskGotoEntity));
             Register("lookatentity", typeof(AiTaskLookAtEntity));
+
+            Register("flycircle", typeof(AiTaskFlyCircle));
+            Register("flyswoopattack", typeof(AiTaskFlySwoopAttack));
         }
     }
 
@@ -69,6 +72,7 @@ namespace Vintagestory.GameContent
     public class AiTaskManager
     {
         public event Action<IAiTask> OnTaskStarted;
+        public event Action<IAiTask> OnTaskStopped;
         /// <summary>
         /// All delegates must return true to execute the task
         /// </summary>
@@ -141,8 +145,12 @@ namespace Vintagestory.GameContent
                 if (task is T)
                 {
                     int slot = task.Slot;
-
-                    activeTasksBySlot[slot]?.FinishExecute(true);
+                    var activeTask = activeTasksBySlot[slot];
+                    if (activeTask != null)
+                    {
+                        activeTask.FinishExecute(true);
+                        OnTaskStopped?.Invoke(activeTask);
+                    }
 
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
@@ -162,11 +170,23 @@ namespace Vintagestory.GameContent
                 if (task?.GetType() == taskType)
                 {
                     task.FinishExecute(true);
+                    OnTaskStopped?.Invoke(task);
                     activeTasksBySlot[task.Slot] = null;
                 }
             }
 
             entity.World.FrameProfiler.Mark("finishexecute");
+        }
+
+        public void StopTasks()
+        {
+            foreach (IAiTask task in activeTasksBySlot)
+            {
+                if (task == null) continue;
+                task.FinishExecute(true);
+                OnTaskStopped?.Invoke(task);
+                activeTasksBySlot[task.Slot] = null;
+            }
         }
 
         public void OnGameTick(float dt)
@@ -180,6 +200,7 @@ namespace Vintagestory.GameContent
                 if ((oldTask == null || task.Priority > oldTask.PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
                 {
                     oldTask?.FinishExecute(true);
+                    if (oldTask != null) OnTaskStopped?.Invoke(oldTask);
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
@@ -201,6 +222,7 @@ namespace Vintagestory.GameContent
                 if (!task.ContinueExecute(dt))
                 {
                     task.FinishExecute(false);
+                    OnTaskStopped?.Invoke(task);
                     activeTasksBySlot[i] = null;
                 }
 
@@ -266,7 +288,12 @@ namespace Vintagestory.GameContent
             {
                 if (activeTasksBySlot.FirstOrDefault(t => t?.Id == (string)data) != null) return;
                 var task = GetTask((string)data);
-                activeTasksBySlot[task.Slot]?.FinishExecute(true);
+                var activeTask = activeTasksBySlot[task.Slot];
+                if (activeTask != null)
+                {
+                    activeTask.FinishExecute(true);
+                    OnTaskStopped?.Invoke(activeTask);
+                }
                 activeTasksBySlot[task.Slot] = null;
                 ExecuteTask(task, task.Slot);
                 return;
@@ -278,6 +305,7 @@ namespace Vintagestory.GameContent
                 if (task == null) return;
 
                 task.FinishExecute(true);
+                OnTaskStopped?.Invoke(task);
                 activeTasksBySlot[task.Slot] = null;
                 return;
             }
@@ -295,6 +323,7 @@ namespace Vintagestory.GameContent
                         if (activeTasksBySlot[slot] != null)
                         {
                             activeTasksBySlot[slot].FinishExecute(true);
+                            OnTaskStopped.Invoke(activeTasksBySlot[slot]);
                         }
 
                         activeTasksBySlot[slot] = task;
@@ -346,12 +375,5 @@ namespace Vintagestory.GameContent
             }
         }
 
-        internal void OnNoPath(Vec3d target)
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnNoPath(target);
-            }
-        }
     }
 }

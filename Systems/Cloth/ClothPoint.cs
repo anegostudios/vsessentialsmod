@@ -11,6 +11,8 @@ namespace Vintagestory.GameContent
     [ProtoContract]
     public class ClothPoint
     {
+        public static bool PushingPhysics = false;
+
         [ProtoMember(1)]
         public int PointIndex;
         [ProtoMember(2)]
@@ -23,19 +25,20 @@ namespace Vintagestory.GameContent
         public Vec3f Velocity = new Vec3f();
         [ProtoMember(6)]
         public Vec3f Tension = new Vec3f();
-
         [ProtoMember(7)]
         float GravityStrength = 1;
         [ProtoMember(8)]
         bool pinned;
         [ProtoMember(9)]
-        long pinnedToEntityId;
+        public long pinnedToEntityId;
         [ProtoMember(10)]
         BlockPos pinnedToBlockPos;
         [ProtoMember(11)]
-        Vec3f pinnedToOffset;
+        public Vec3f pinnedToOffset;
         [ProtoMember(12)]
         float pinnedToOffsetStartYaw;
+        [ProtoMember(13)]
+        string pinnedToPlayerUid; // player entity ids change over time >.<
 
 
         public bool Dirty { get; internal set; }
@@ -103,6 +106,8 @@ namespace Vintagestory.GameContent
             pinnedToOffsetStartYaw = toEntity.SidedPos.Yaw;
             pinOffsetTransform = Matrixf.Create();
             pinnedToBlockPos = null;
+            if (toEntity is EntityPlayer eplr) pinnedToPlayerUid = eplr.PlayerUID;
+
             MarkDirty();
         }
 
@@ -110,6 +115,7 @@ namespace Vintagestory.GameContent
         {
             this.pinnedToBlockPos = blockPos;
             pinnedToOffset = offset;
+            pinnedToPlayerUid = null;
             pinned = true;
             Pos.Set(pinnedToBlockPos).Add(pinnedToOffset);
             pinnedTo = null;
@@ -121,6 +127,7 @@ namespace Vintagestory.GameContent
         {
             pinned = false;
             pinnedTo = null;
+            pinnedToPlayerUid = null;
             pinnedToEntityId = 0;
             MarkDirty();
         }
@@ -130,9 +137,15 @@ namespace Vintagestory.GameContent
             Dirty = true;
         }
 
-        public void update(float dt)
+        public void update(float dt, IWorldAccessor world)
         {
-            if (pinned)
+            if (pinnedTo == null && pinnedToPlayerUid != null)
+            {
+                var eplr = world.PlayerByUid(pinnedToPlayerUid)?.Entity;
+                if (eplr?.World != null) PinTo(eplr, pinnedToOffset);
+            }
+
+            if (pinned) 
             {
                 if (pinnedTo != null)
                 {
@@ -147,24 +160,46 @@ namespace Vintagestory.GameContent
                     // apply huge forces onto the player on strong extension (to prevent massive stretching) (just set player motion to 0 or so. or we add a new countermotion field thats used in EntityControlledPhysics?) 
 
                     float weight = pinnedTo.Properties.Weight;
+                    
                     float counterTensionStrength = GameMath.Clamp(50f / weight, 0.1f, 2f);
 
-                    bool extraResist = (pinnedTo as EntityAgent)?.Controls.Sneak == true || pinnedTo.AnimManager?.IsAnimationActive("sit") == true || pinnedTo.AnimManager?.IsAnimationActive("sleep") == true;
-                    float tensionResistStrength = weight / 10f * (extraResist ? 200 : 0);
+                    bool extraResist = (pinnedTo as EntityAgent)?.Controls.Sneak == true || (pinnedTo is EntityPlayer && (pinnedTo.AnimManager?.IsAnimationActive("sit") == true || pinnedTo.AnimManager?.IsAnimationActive("sleep") == true));
+                    float tensionResistStrength = weight / 10f * (extraResist ? 200 : 1);
 
-                    pinOffsetTransform.Identity();
-                    pinOffsetTransform.RotateY(pinnedTo.SidedPos.Yaw - pinnedToOffsetStartYaw);
-                    tmpvec.Set(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1);
-                    Vec4f outvec = pinOffsetTransform.TransformVector(tmpvec);
+                    var eplr = pinnedTo as EntityPlayer;
+                    var eagent = pinnedTo as EntityAgent;
+                    Vec4f outvec;
+
+                    AttachmentPointAndPose apap = eplr?.AnimManager?.Animator?.GetAttachmentPointPose("RightHand");
+                    if (apap == null) apap = pinnedTo?.AnimManager?.Animator?.GetAttachmentPointPose("rope");
+
+                    if (apap != null)
+                    {
+                        Matrixf modelmat = new Matrixf();
+                        if (eplr != null) modelmat.RotateY(eagent.BodyYaw + GameMath.PIHALF);
+                        else modelmat.RotateY(pinnedTo.SidedPos.Yaw + GameMath.PIHALF);
+
+                        modelmat.Translate(-0.5, 0, -0.5);
+
+                        apap.MulUncentered(modelmat);
+                        outvec = modelmat.TransformVector(new Vec4f(0,0,0,1));
+                    }
+                    else
+                    {
+                        pinOffsetTransform.Identity();
+                        pinOffsetTransform.RotateY(pinnedTo.SidedPos.Yaw - pinnedToOffsetStartYaw);
+                        tmpvec.Set(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1);
+                        outvec = pinOffsetTransform.TransformVector(tmpvec);
+                    }
 
                     EntityPos pos = pinnedTo.SidedPos;
                     Pos.Set(pos.X + outvec.X, pos.Y + outvec.Y, pos.Z + outvec.Z);
 
-                    bool pushable = !(pinnedTo is EntityPlayer eplr && eplr.Player.WorldData.CurrentGameMode == EnumGameMode.Creative);
-
+                    bool pushable = true;// PushingPhysics && (eplr == null || eplr.Player.WorldData.CurrentGameMode != EnumGameMode.Creative);
+                    
                     if (pushable && extension > 0) // Do not act on compressive force
                     {
-                        float f = counterTensionStrength * dt * 0.003f;
+                        float f = counterTensionStrength * dt * 0.006f;
                         pos.Motion.Add(
                             GameMath.Clamp(Math.Abs(TensionDirection.X) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.X),
                             GameMath.Clamp(Math.Abs(TensionDirection.Y) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.Y),
@@ -177,15 +212,18 @@ namespace Vintagestory.GameContent
                 {
                     Velocity.Set(0, 0, 0);
 
-                    accum1s += dt;
-
-                    if (accum1s >= 1)
+                    if (pinnedToBlockPos != null)
                     {
-                        accum1s = 0;
-                        Block block = cs.api.World.BlockAccessor.GetBlock(PinnedToBlockPos);
-                        if (!block.HasBehavior<BlockBehaviorRopeTieable>())
+                        accum1s += dt;
+
+                        if (accum1s >= 1)
                         {
-                            UnPin();
+                            accum1s = 0;
+                            Block block = cs.api.World.BlockAccessor.GetBlock(PinnedToBlockPos);
+                            if (!block.HasBehavior<BlockBehaviorRopeTieable>())
+                            {
+                                UnPin();
+                            }
                         }
                     }
                 }
@@ -193,7 +231,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            // Calculate the force on this ball
+            // Calculate the force on this point
             Vec3f force = Tension.Clone();
             force.Y -= GravityStrength * 10;
 
@@ -235,12 +273,24 @@ namespace Vintagestory.GameContent
                 pinnedTo = world.GetEntityById(pinnedToEntityId);
                 if (pinnedTo == null)
                 {
-                    UnPin();
+                   // UnPin();
                 }
                 else
                 {
                     PinTo(pinnedTo, pinnedToOffset);
                 }
+            }
+
+            if (pinnedToBlockPos != null)
+            {
+                PinTo(pinnedToBlockPos, pinnedToOffset);
+            }
+        }
+        public void restoreReferences(Entity entity)
+        {
+            if (pinnedToEntityId == entity.EntityId)
+            {
+                PinTo(entity, pinnedToOffset);
             }
         }
 
@@ -255,6 +305,7 @@ namespace Vintagestory.GameContent
             GravityStrength = point.GravityStrength;
             pinned = point.pinned;
             pinnedToEntityId = point.pinnedToEntityId;
+            pinnedToPlayerUid = point.pinnedToPlayerUid;
             if (pinnedToEntityId != 0)
             {
                 pinnedTo = world.GetEntityById(pinnedToEntityId);

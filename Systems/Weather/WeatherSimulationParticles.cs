@@ -308,7 +308,7 @@ namespace Vintagestory.GameContent
 
             float dtf = dt / 3f;
 
-            targetFogDensity = Math.Max(0, targetFogDensity - 2*WeatherSystemClient.CurrentEnvironmentWetness);
+            targetFogDensity = Math.Max(0, targetFogDensity - 2*WeatherSystemClient.CurrentEnvironmentWetness4h);
 
             desertStormAmbient.FogColor.Value[0] += (targetFogColor[0] - desertStormAmbient.FogColor.Value[0]) * dtf;
             desertStormAmbient.FogColor.Value[1] += (targetFogColor[1] - desertStormAmbient.FogColor.Value[1]) * dtf;
@@ -368,7 +368,7 @@ namespace Vintagestory.GameContent
             
             
 
-            parentVeloSnow.X = -Math.Max(0, weatherData.curWindSpeed.X / 2 - 0.15f);
+            parentVeloSnow.X = -Math.Max(0, weatherData.curWindSpeed.X / 2 - 0.15f)*2;
             parentVeloSnow.Y = 0;
 
             parentVeloSnow.Z = 0;
@@ -615,8 +615,8 @@ namespace Vintagestory.GameContent
 
             
 
-            snowParticle.MinVelocity.Set(-0.5f + 5 * weatherData.curWindSpeed.X, -1f, -0.5f);
-            snowParticle.AddVelocity.Set(1f + 5 * weatherData.curWindSpeed.X, 0.05f, 1f);
+            snowParticle.MinVelocity.Set(-0.5f + 10 * weatherData.curWindSpeed.X, -1f, -0.5f);
+            snowParticle.AddVelocity.Set(1f + 10 * weatherData.curWindSpeed.X, 0.05f, 1f);
             snowParticle.Color = ColorUtil.ToRgba(255, 255, 255, 255);
 
             snowParticle.MinQuantity = 100 * plevel * (1 + wetness / 3);
@@ -624,7 +624,7 @@ namespace Vintagestory.GameContent
             snowParticle.ParentVelocity = parentVeloSnow;
             snowParticle.ShouldDieInLiquid = true;
 
-            snowParticle.LifeLength = Math.Max(1f, 4f - wetness);
+            snowParticle.LifeLength = Math.Max(1f, 4f - wetness - weatherData.curWindSpeed.X);
             snowParticle.Color = ColorUtil.ColorOverlay(ColorUtil.ToRgba(255, 255, 255, 255), rainParticle.Color, wetness / 4f);
             snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
             snowParticle.MinSize = 0.1f * conds.Rainfall;
@@ -632,8 +632,8 @@ namespace Vintagestory.GameContent
 
 
             float hrange = 40;
-            float vrange = 23;
-            dy -= Math.Min(10, horSpeedSqrt);
+            float vrange = 23 + weatherData.curWindSpeed.X * 5;
+            dy -= Math.Min(10, horSpeedSqrt) + weatherData.curWindSpeed.X*5;
 
             hrange = 20;
             //snowParticle.GravityEffect *= 3f;

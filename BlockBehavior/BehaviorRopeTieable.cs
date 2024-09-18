@@ -17,8 +17,6 @@ namespace Vintagestory.GameContent
         public override void Initialize(JsonObject properties)
         {
             base.Initialize(properties);
-
-            
         }
 
         public override void OnLoaded(ICoreAPI api)
@@ -28,20 +26,19 @@ namespace Vintagestory.GameContent
             cm = api.ModLoader.GetModSystem<ClothManager>();
         }
 
-
         public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling)
         {
+            ItemSlot hotbarslot = byPlayer.InventoryManager.ActiveHotbarSlot;
             ClothSystem cs = cm.GetClothSystemAttachedToBlock(blockSel.Position);
             if (cs != null)
             {
                 Entity byEntity = byPlayer.Entity;
-                ItemSlot slot = byPlayer.InventoryManager.ActiveHotbarSlot;
 
                 Vec3d lpos = new Vec3d(0, byEntity.LocalEyePos.Y - 0.25f, 0);
                 Vec3d aheadPos = lpos.AheadCopy(0.25f, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw);
 
                 // Already handled by ItemRope
-                if (!slot.Empty && slot.Itemstack.Collectible.Code.Path=="rope" && (cs.FirstPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId || cs.LastPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId))
+                if (!hotbarslot.Empty && hotbarslot.Itemstack.Collectible.Code.Path=="rope" && (cs.FirstPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId || cs.LastPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId))
                 {
                     return base.OnBlockInteractStart(world, byPlayer, blockSel, ref handling);
                 }
@@ -52,13 +49,59 @@ namespace Vintagestory.GameContent
                 stack.Attributes.SetInt("clothId", cs.ClothId);
                 stack.Attributes.SetLong("ropeHeldByEntityId", byEntity.EntityId);
 
-                if (byPlayer.InventoryManager.TryGiveItemstack(stack, true))
+                ItemStack ropestack = null;
+
+                // Already pinned to player
+                if (cs.FirstPoint.PinnedToEntity == byEntity || cs.LastPoint.PinnedToEntity == byEntity)
                 {
-                    targetPoint.PinTo(byPlayer.Entity, aheadPos.ToVec3f());
-                } else
-                {
-                    Entity ei = world.SpawnItemEntity(stack, blockSel.Position.ToVec3d().Add(0.5, 0.5, 0.5));
-                    targetPoint.PinTo(ei, new Vec3f(0, 0.1f, 0));
+                    byPlayer.Entity.WalkInventory(slot =>
+                    {
+                        if (!slot.Empty && slot.Itemstack.Attributes != null) {
+                            if (slot.Itemstack.Attributes.GetInt("clothId") == cs.ClothId)
+                            {
+                                ropestack = slot.Itemstack;
+                                return false;
+                            }
+                        }
+                        return true;
+                    });
+
+                    cs.WalkPoints(point => {
+                        if (point.PinnedToBlockPos != null || point.PinnedToEntity?.EntityId == byEntity.EntityId)
+                        {
+                            point.UnPin();
+                        }
+                    });
+
+                    if (!cs.PinnedAnywhere)
+                    {
+                        cm.UnregisterCloth(cs.ClothId);
+
+                        if (ropestack != null)
+                        {
+                            ropestack.Attributes.RemoveAttribute("clothId");
+                            ropestack.Attributes.RemoveAttribute("ropeHeldByEntityId");
+                        }
+                    }
+                }
+
+                if (ropestack == null)
+                {                    
+                    if (hotbarslot.Empty)
+                    {
+                        hotbarslot.Itemstack = stack;
+                        hotbarslot.MarkDirty();
+                        targetPoint.PinTo(byEntity, aheadPos.ToVec3f());
+                    } 
+                    else if (byPlayer.InventoryManager.TryGiveItemstack(stack, true))
+                    {
+                        targetPoint.PinTo(byEntity, aheadPos.ToVec3f());
+                    }
+                    else
+                    {
+                        Entity ei = world.SpawnItemEntity(stack, blockSel.Position);
+                        if (ei != null) targetPoint.PinTo(ei, new Vec3f(0, 0.1f, 0));
+                    }
                 }
 
                 handling = EnumHandling.PreventDefault;

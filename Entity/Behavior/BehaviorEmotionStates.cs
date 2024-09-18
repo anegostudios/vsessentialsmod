@@ -5,6 +5,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
+using Vintagestory.Essentials;
 using VSEssentialsMod.Entity.AI.Task;
 
 namespace Vintagestory.GameContent
@@ -26,6 +28,7 @@ namespace Vintagestory.GameContent
         public EnumAccumType AccumType = EnumAccumType.Max;  // sum, max or noaccum
 
         public float whenHealthRelBelow = 999f;
+        public bool whenSourceUntargetable = false;
 
 
         public string[] NotifyEntityCodes = new string[0];
@@ -142,11 +145,6 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void OnNoPath(Vec3d target)
-        {
-            TryTriggerState("nopathfrustrated", 0);
-        }
-
 
         public bool IsInEmotionState(string statecode)
         {
@@ -164,7 +162,7 @@ namespace Vintagestory.GameContent
             return TryTriggerState(statecode, entity.World.Rand.NextDouble(), sourceEntityId);
         }
 
-        public bool TryTriggerState(string statecode, double chance, long sourceEntityId)
+        public bool TryTriggerState(string statecode, double rndValue, long sourceEntityId)
         {
             bool triggered=false;
 
@@ -172,79 +170,132 @@ namespace Vintagestory.GameContent
             {
                 EmotionState newstate = availableStates[stateid];
 
-                if (newstate.Code != statecode || chance > newstate.Chance) continue;
+                if (newstate.Code != statecode || rndValue > newstate.Chance) continue;
 
-                if (newstate.whenHealthRelBelow < healthRel)
+                if (newstate.whenSourceUntargetable)
                 {
+                    TryTarget(stateid, sourceEntityId);
                     continue;
                 }
 
-                ActiveEmoState activeState = null;
-
-                foreach (var val in ActiveStatesByCode)
+                if (tryActivateState(stateid, sourceEntityId))
                 {
-                    if (val.Key == newstate.Code)
-                    {
-                        activeState = val.Value;
-                        continue;
-                    }
-
-                    int activestateid = val.Value.StateId;
-                    EmotionState activestate = availableStates[activestateid];
-                    if (activestate.Slot == newstate.Slot)
-                    {
-                        // Active state has priority over this one
-                        if (activestate.Priority > newstate.Priority) return false;
-                        else
-                        {
-                            // New state has priority
-                            ActiveStatesByCode.Remove(val.Key);
-
-                            entityAttr.RemoveAttribute(newstate.Code);
-                            break;
-                        }
-                    }
+                    triggered = true;
                 }
-
-                if (newstate.MaxGeneration < entity.WatchedAttributes.GetInt("generation"))
-                {
-                    continue;
-                }
-
-                if (statecode == "aggressivearoundentities" && (activeState != null || !entitiesNearby(newstate))) continue;
-
-                float duration = newstate.Duration;
-                if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature < newstate.BelowTempThreshold)
-                {
-                    duration = newstate.BelowTempDuration;
-                }
-
-                float newDuration = 0;
-                if (newstate.AccumType == EnumAccumType.Sum) newDuration = activeState?.Duration ?? 0 + duration;
-                if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activeState?.Duration ?? 0, duration);
-                if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activeState?.Duration > 0 ? activeState?.Duration ?? 0 : duration;
-
-                if (activeState == null)
-                {
-                    ActiveStatesByCode[newstate.Code] = new ActiveEmoState() { Duration = newDuration, SourceEntityId = sourceEntityId, StateId = stateid };
-                } else
-                {
-                    activeState.SourceEntityId = sourceEntityId;
-                }
-
-                entityAttr.SetFloat(newstate.Code, newDuration);
-                triggered = true;
             }
 
             return triggered;
         }
 
 
+        PathfinderTask pathtask = null;
+        int nopathEmoStateid;
+        long sourceEntityId;
+        private void TryTarget(int emostateid, long sourceEntityId)
+        {
+            if (pathtask != null) return;
+
+            var api = entity.World.Api;
+            var asyncPathfinder = api.ModLoader.GetModSystem<PathfindingAsync>();
+
+            var wptrav = entity.GetBehavior<EntityBehaviorTaskAI>()?.PathTraverser as WaypointsTraverser;
+            if (wptrav != null)
+            {
+                pathtask = wptrav.PreparePathfinderTask(entity.ServerPos.AsBlockPos, api.World.GetEntityById(sourceEntityId).ServerPos.AsBlockPos);
+                asyncPathfinder.EnqueuePathfinderTask(pathtask);
+
+                nopathEmoStateid = emostateid;
+                this.sourceEntityId= sourceEntityId;
+            }
+        }
+
+        private bool tryActivateState(int stateid, long sourceEntityId)
+        {
+            EmotionState newstate = availableStates[stateid];
+            string statecode = newstate.Code;
+            ActiveEmoState activeState = null;
+
+            if (newstate.whenHealthRelBelow < healthRel)
+            {
+                return false;
+            }
+
+            foreach (var val in ActiveStatesByCode)
+            {
+                if (val.Key == newstate.Code)
+                {
+                    activeState = val.Value;
+                    continue;
+                }
+
+                int activestateid = val.Value.StateId;
+                EmotionState activestate = availableStates[activestateid];
+                if (activestate.Slot == newstate.Slot)
+                {
+                    // Active state has priority over this one
+                    if (activestate.Priority > newstate.Priority) return false;
+                    else
+                    {
+                        // New state has priority
+                        ActiveStatesByCode.Remove(val.Key);
+
+                        entityAttr.RemoveAttribute(newstate.Code);
+                        break;
+                    }
+                }
+            }
+
+            if (newstate.MaxGeneration < entity.WatchedAttributes.GetInt("generation"))
+            {
+                return false;
+            }
+
+            if (statecode == "aggressivearoundentities" && (activeState != null || !entitiesNearby(newstate))) return false;
+
+            float duration = newstate.Duration;
+            if (newstate.BelowTempThreshold > -99 && entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature < newstate.BelowTempThreshold)
+            {
+                duration = newstate.BelowTempDuration;
+            }
+
+            float newDuration = 0;
+            if (newstate.AccumType == EnumAccumType.Sum) newDuration = activeState?.Duration ?? 0 + duration;
+            if (newstate.AccumType == EnumAccumType.Max) newDuration = Math.Max(activeState?.Duration ?? 0, duration);
+            if (newstate.AccumType == EnumAccumType.NoAccum) newDuration = activeState?.Duration > 0 ? activeState?.Duration ?? 0 : duration;
+
+            if (activeState == null)
+            {
+                ActiveStatesByCode[newstate.Code] = new ActiveEmoState() { Duration = newDuration, SourceEntityId = sourceEntityId, StateId = stateid };
+            }
+            else
+            {
+                activeState.SourceEntityId = sourceEntityId;
+            }
+
+            entityAttr.SetFloat(newstate.Code, newDuration);
+
+            return true;
+        }
+
+
+
+
         public override void OnGameTick(float deltaTime)
         {
+            if (pathtask != null && pathtask.Finished)
+            {
+                if (pathtask.waypoints == null)
+                {
+                    tryActivateState(nopathEmoStateid, sourceEntityId);
+                }
+
+                pathtask = null;
+                nopathEmoStateid = 0;
+                sourceEntityId = 0;
+            }
+
             if ((tickAccum += deltaTime) < 0.33f) return;
             tickAccum = 0;
-
 
             if (_enumCreatureHostility == EnumCreatureHostility.Aggressive)
             {

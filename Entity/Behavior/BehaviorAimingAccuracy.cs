@@ -133,27 +133,23 @@ namespace Vintagestory.GameContent
         {
         }
 
+        // 0 Accuracy = +/- 0.25*0.75 radians spread in yaw and pitch
+        // 1 Accuracy = Zero spread
         public override void Update(float dt, ref float accuracy)
         {
             float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
             float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed");
 
-            float modacc = 0.93f * rangedAcc;
-            if (rangedAcc >= 1)
-            {
-                // Asymptomatically reach 100% accuracy
-                modacc = 0.93f + ((1 - 1 / (1 + 3 * rangedAcc)) - 0.5f) * 0.07f;
-            }
+            // https://pfortuny.net/fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIwLjkzKygxLTEveCkqMC4wNyIsImNvbG9yIjoiIzAwMDAwMCJ9LHsidHlwZSI6MTAwMCwid2luZG93IjpbIjAiLCIxMCIsIjAiLCIyIl0sInNpemUiOls2NDksMzk5XX1d
+            float maxAccuracy = Math.Min(0.93f + (1 - 1 / rangedAcc) * 0.1f, 1);
 
-            accuracy = GameMath.Clamp((float)Math.Pow(SecondsSinceAimStart * modspeed * 1.7, 1.5), 0, modacc);
-            accuracy *= Math.Max(0.1f, modacc);
-
-            accuracy -= GameMath.Clamp((SecondsSinceAimStart - 3f) / 3, 0, 0.25f);
+            accuracy = GameMath.Clamp(SecondsSinceAimStart * modspeed * 1.7f, 0, maxAccuracy);
 
             if (SecondsSinceAimStart >= 0.75f)
             {
-                accuracy += GameMath.Sin(SecondsSinceAimStart * 8) / 80f;
+                accuracy += GameMath.Sin(SecondsSinceAimStart * 8) / 80f / Math.Max(1, rangedAcc);
             }
+
         }
     }
 
@@ -170,7 +166,7 @@ namespace Vintagestory.GameContent
 
         public override void Update(float dt, ref float accuracy)
         {
-            bool sprint = entity.Controls.Sprint;
+            float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
 
             if (entity.Controls.TriesToMove)
             {
@@ -180,7 +176,7 @@ namespace Vintagestory.GameContent
                 accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 2f, 0, 0.2f);
             }
 
-            accuracy -= accuracyPenalty;
+            accuracy -= accuracyPenalty / Math.Max(1, rangedAcc);
         }
     }
 
@@ -198,7 +194,7 @@ namespace Vintagestory.GameContent
 
         public override void Update(float dt, ref float accuracy)
         {
-            bool sprint = entity.Controls.Sprint;
+            float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
 
             if (entity.Controls.TriesToMove && entity.Controls.Sprint)
             {
@@ -209,7 +205,7 @@ namespace Vintagestory.GameContent
                 accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 2f, 0, 0.3f);
             }
 
-            accuracy -= accuracyPenalty;
+            accuracy -= accuracyPenalty / Math.Max(1, rangedAcc);
         }
     }
 
@@ -224,15 +220,16 @@ namespace Vintagestory.GameContent
         public override void Update(float dt, ref float accuracy)
         {
             accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 3, 0, 0.4f);
-
-            //accuracy -= accuracyPenalty;
         }
 
         public override void OnHurt(float damage)
         {
+
             if (damage > 3)
             {
-                accuracyPenalty = -0.4f;
+                float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
+
+                accuracyPenalty = -0.4f / Math.Max(1, rangedAcc);
             }
         }
     }

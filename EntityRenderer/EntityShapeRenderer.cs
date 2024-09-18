@@ -18,8 +18,9 @@ namespace Vintagestory.GameContent
         public long receivedTime;
     }
 
-    public delegate void OnEntityShapeTesselationDelegate(ref Shape entityShape, string shapePathForLogging);
+    public delegate void OnEntityShapeTesselationDelegate(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned);
     public delegate float OnGetFrostAlpha();
+
 
     public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
@@ -64,27 +65,20 @@ namespace Vintagestory.GameContent
 
         public CompositeShape OverrideCompositeShape;
         public Shape OverrideEntityShape;
+        public string[] OverrideSelectiveElements = null;
 
         public bool glitchAffected;
         protected IInventory gearInv;
 
         protected ITexPositionSource defaultTexSource;
 
-        protected bool shapeFresh;
         protected Vec4f lightrgbs;
         protected float intoxIntensity;
 
 
-        /// <summary>
-        /// This is called before entity.OnTesselation()
-        /// </summary>
-        public event OnEntityShapeTesselationDelegate OnTesselation;
-
-
-
 
         public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
-        protected TextureAtlasPosition skinTexPos;
+        public TextureAtlasPosition skinTexPos;
         public virtual TextureAtlasPosition this[string textureCode]
         {
             get
@@ -109,6 +103,7 @@ namespace Vintagestory.GameContent
             glitchAffected = true;
             glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
             frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
+            shouldSwivelFromMotion = entity.Properties.Attributes?["shouldSwivelFromMotion"].AsBool(true) ?? true;
             frostAlphaAccum = (float)api.World.Rand.NextDouble();
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
@@ -122,7 +117,7 @@ namespace Vintagestory.GameContent
                 api.Event.ChatMessage += OnChatMessage;
             }
 
-            api.Event.ReloadShapes += MarkShapeModified;
+            api.Event.ReloadShapes += entity.MarkShapeModified;
 
 
             // Called every 5 seconds
@@ -146,10 +141,6 @@ namespace Vintagestory.GameContent
             };
         }
 
-        public virtual void MarkShapeModified()
-        {
-            shapeFresh = false;
-        }
 
 
         protected bool loaded = false;
@@ -157,7 +148,9 @@ namespace Vintagestory.GameContent
         {
             loaded = true;
             prevY = entity.Pos.Y;
-            MarkShapeModified();
+            prevPosXSwing = entity.Pos.X;
+            prevPosZSwing = entity.Pos.Z;
+
         }
 
         protected void OnChatMessage(int groupId, string message, EnumChatType chattype, string data)
@@ -206,7 +199,9 @@ namespace Vintagestory.GameContent
         public virtual void TesselateShape()
         {
             if (!loaded) return;
-            shapeFresh = true;
+
+            ims = entity.GetInterface<IMountable>();
+
             TesselateShape(onMeshReady);
         }
 
@@ -243,9 +238,9 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            OnTesselation?.Invoke(ref entityShape, compositeShape.Base.ToString());
             entity.OnTesselation(ref entityShape, compositeShape.Base.ToString());
             defaultTexSource = GetTextureSource();
+            var ovse = overrideSelectiveElements ?? this.OverrideSelectiveElements;
 
             TyronThreadPool.QueueTask(() =>
             {
@@ -274,7 +269,8 @@ namespace Vintagestory.GameContent
                         TesselationMetaData meta = new TesselationMetaData()
                         {
                             QuantityElements = compositeShape.QuantityElements,
-                            SelectiveElements = overrideSelectiveElements != null ? overrideSelectiveElements : compositeShape.SelectiveElements,
+                            SelectiveElements = ovse ?? compositeShape.SelectiveElements,
+                            IgnoreElements = compositeShape.IgnoreElements,
                             TexSource = this,
                             WithJointIds = true,
                             WithDamageEffect = true,
@@ -285,7 +281,6 @@ namespace Vintagestory.GameContent
                         capi.Tesselator.TesselateShape(meta, entityShape, out meshdata);
 
                         meshdata.Translate(compositeShape.offsetX, compositeShape.offsetY, compositeShape.offsetZ);
-
                     }
                     catch (Exception e)
                     {
@@ -298,6 +293,7 @@ namespace Vintagestory.GameContent
                 capi.Event.EnqueueMainThreadTask(() =>
                 {
                     onMeshDataReady(meshdata);
+                    entity.OnTesselated();
                 }, "uploadentitymesh");
 
                 capi.TesselatorManager.ThreadDispose();
@@ -307,9 +303,7 @@ namespace Vintagestory.GameContent
 
         protected virtual ITexPositionSource GetTextureSource()
         {
-            int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
-
-            return capi.Tesselator.GetTextureSource(entity, null, altTexNumber);
+            return entity.GetTextureSource();
         }
 
         protected void UpdateDebugInfo(float dt)
@@ -376,7 +370,7 @@ namespace Vintagestory.GameContent
 
         public override void BeforeRender(float dt)
         {
-            if (!shapeFresh)
+            if (!entity.ShapeFresh)
             {
                 TesselateShape();
             }
@@ -390,12 +384,6 @@ namespace Vintagestory.GameContent
             }
 
             if (meshRefOpaque == null) return;
-
-            if (gearInv == null && eagent?.GearInventory != null)
-            {
-                registerSlotModified();
-                shapeFresh = true;
-            }
 
             if (player == null && entity is EntityPlayer)
             {
@@ -441,7 +429,7 @@ namespace Vintagestory.GameContent
 
             loadModelMatrix(entity, dt, isShadowPass);
             Vec3d camPos = capi.World.Player.Entity.CameraPos;
-            OriginPos.Set((float)(entity.Pos.X - camPos.X), (float)(entity.Pos.Y - camPos.Y), (float)(entity.Pos.Z - camPos.Z));
+            OriginPos.Set((float)(entity.Pos.X - camPos.X), (float)(entity.Pos.InternalY - camPos.Y), (float)(entity.Pos.Z - camPos.Z));
 
             if (isShadowPass)
             {
@@ -464,10 +452,10 @@ namespace Vintagestory.GameContent
         protected float[] pMatrixHandFov = null;
         protected float[] pMatrixNormalFov = null;
 
-        protected virtual IShaderProgram getReadyShader() { 
-            var prog = capi.Render.StandardShader; 
-            prog.Use(); 
-            return prog; 
+        protected virtual IShaderProgram getReadyShader() {
+            var prog = capi.Render.StandardShader;
+            prog.Use();
+            return prog;
         }
 
         protected virtual void RenderHeldItem(float dt, bool isShadowPass, bool right)
@@ -479,9 +467,15 @@ namespace Vintagestory.GameContent
             AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
             if (apap == null) return;
 
+            ItemRenderInfo renderInfo = capi.Render.GetItemStackRenderInfo(slot, right ? EnumItemRenderTarget.HandTp : EnumItemRenderTarget.HandTpOff, dt);
+
+            RenderItem(dt, isShadowPass, stack, apap, renderInfo);
+        }
+
+        protected virtual void RenderItem(float dt, bool isShadowPass, ItemStack stack, AttachmentPointAndPose apap, ItemRenderInfo renderInfo)
+        {
             IRenderAPI rapi = capi.Render;
             AttachmentPoint ap = apap.AttachPoint;
-            ItemRenderInfo renderInfo = rapi.GetItemStackRenderInfo(slot, right ? EnumItemRenderTarget.HandTp : EnumItemRenderTarget.HandTpOff, dt);
             IShaderProgram prog = null;
 
             if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
@@ -495,7 +489,7 @@ namespace Vintagestory.GameContent
                 .RotateX((float)(ap.RotationX + renderInfo.Transform.Rotation.X) * GameMath.DEG2RAD)
                 .RotateY((float)(ap.RotationY + renderInfo.Transform.Rotation.Y) * GameMath.DEG2RAD)
                 .RotateZ((float)(ap.RotationZ + renderInfo.Transform.Rotation.Z) * GameMath.DEG2RAD)
-                .Translate(-(renderInfo.Transform.Origin.X), -(renderInfo.Transform.Origin.Y), -(renderInfo.Transform.Origin.Z))
+                .Translate(-renderInfo.Transform.Origin.X, -renderInfo.Transform.Origin.Y, -renderInfo.Transform.Origin.Z)
             ;
 
             string samplername = "tex";
@@ -512,10 +506,11 @@ namespace Vintagestory.GameContent
             else
             {
                 prog = getReadyShader();
-                
+
                 prog.Uniform("dontWarpVertices", (int)0);
                 prog.Uniform("addRenderFlags", (int)0);
                 prog.Uniform("normalShaded", (int)1);
+                prog.Uniform("tempGlowMode", stack.ItemAttributes?["tempGlowMode"].AsInt() ?? 0);
                 prog.Uniform("rgbaTint", ColorUtil.WhiteArgbVec);
                 prog.Uniform("alphaTest", renderInfo.AlphaTest);
                 prog.Uniform("damageEffect", renderInfo.DamageEffect);
@@ -533,8 +528,8 @@ namespace Vintagestory.GameContent
 
                 int temp = (int)stack.Collectible.GetTemperature(capi.World, stack);
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
-
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
+
                 prog.Uniform("extraGlow", (int)gi);
                 prog.Uniform("rgbaAmbientIn", rapi.AmbientColor);
                 prog.Uniform("rgbaLightIn", lightrgbs);
@@ -557,6 +552,7 @@ namespace Vintagestory.GameContent
 
             rapi.RenderMultiTextureMesh(renderInfo.ModelRef, samplername);
 
+            if (!isShadowPass) prog.Uniform("tempGlowMode", 0);
             if (!renderInfo.CullFaces)
             {
                 rapi.GlEnableCullFace();
@@ -595,9 +591,9 @@ namespace Vintagestory.GameContent
                             bps.WindAffectednesAtPos = windAffectednessAtPos;
                             bps.WindAffectednes = windAffectednessAtPos;
 
-                            bps.basePos.X = pos.X + entity.Pos.X + -(entity.Pos.X - entityPlayer.CameraPos.X);
-                            bps.basePos.Y = pos.Y + entity.Pos.Y + -(entity.Pos.Y - entityPlayer.CameraPos.Y);
-                            bps.basePos.Z = pos.Z + entity.Pos.Z + -(entity.Pos.Z - entityPlayer.CameraPos.Z);
+                            bps.basePos.X = pos.X + entityPlayer.CameraPos.X;
+                            bps.basePos.Y = pos.Y + entityPlayer.CameraPos.Y;
+                            bps.basePos.Z = pos.Z + entityPlayer.CameraPos.Z;
 
                             eagent.World.SpawnParticles(bps);
                         }
@@ -610,11 +606,6 @@ namespace Vintagestory.GameContent
 
         public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
-            if (gearInv == null && eagent?.GearInventory != null)
-            {
-                registerSlotModified();
-            }
-
             loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
 
             if (meshRefOpaque != null)
@@ -624,43 +615,12 @@ namespace Vintagestory.GameContent
                 capi.Render.RenderMultiTextureMesh(meshRefOpaque, "tex2d");
             }
 
-            if (!shapeFresh)
+            if (!entity.ShapeFresh)
             {
                 TesselateShape();
             }
         }
 
-        protected void registerSlotModified(bool callModified = true)
-        {
-            eagent.GearInventory.SlotModified += gearSlotModified;
-            gearInv = eagent.GearInventory;
-
-            if (entity is EntityPlayer eplr)
-            {
-                IInventory inv = eplr.Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-                if (inv != null) inv.SlotModified += backPackSlotModified;
-            }
-
-            if (callModified)
-            {
-                MarkShapeModified();
-            }
-        }
-
-        protected void backPackSlotModified(int slotId)
-        {
-            MarkShapeModified();
-        }
-
-        protected void gearSlotModified(int slotid)
-        {
-            MarkShapeModified();
-        }
-
-        public virtual void reloadSkin()
-        {
-
-        }
 
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
@@ -690,10 +650,10 @@ namespace Vintagestory.GameContent
                 prog.Uniform("frostAlpha", fa);
                 prog.Uniform("waterWaveCounter", capi.Render.ShaderUniforms.WaterWaveCounter);
 
-                color[0] = (entity.RenderColor >> 16 & 0xff) / 255f;
-                color[1] = ((entity.RenderColor >> 8) & 0xff) / 255f;
-                color[2] = ((entity.RenderColor >> 0) & 0xff) / 255f;
-                color[3] = ((entity.RenderColor >> 24) & 0xff) / 255f;
+                color.R = (entity.RenderColor >> 16 & 0xff) / 255f;
+                color.G = ((entity.RenderColor >> 8) & 0xff) / 255f;
+                color.B = ((entity.RenderColor >> 0) & 0xff) / 255f;
+                color.A = ((entity.RenderColor >> 24) & 0xff) / 255f;
 
                 prog.Uniform("renderColor", color);
 
@@ -705,12 +665,7 @@ namespace Vintagestory.GameContent
                 prog.Uniform("glitchEffectStrength", strength);
             }
 
-
-            prog.UniformMatrices4x3(
-                "elementTransforms",
-                GlobalConstants.MaxAnimatedElements,
-                entity.AnimManager.Animator.Matrices4x3
-            );
+            prog.UBOs["Animation"].Update(entity.AnimManager.Animator.Matrices, 0, entity.AnimManager.Animator.MaxJointId * 16 * 4);
 
             if (meshRefOpaque != null)
             {
@@ -725,36 +680,7 @@ namespace Vintagestory.GameContent
 
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
-            Vec3d aboveHeadPos;
-
-            if (capi.World.Player.Entity.EntityId == entity.EntityId)
-            {
-                if (rapi.CameraType == EnumCameraMode.FirstPerson) return;
-                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
-            }
-            else
-            {
-                var thisMount = (entity as EntityAgent)?.MountedOn;
-                var selfMount = entityPlayer.MountedOn;
-
-                if (thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
-                {
-                    var mpos = thisMount.MountSupplier.GetMountOffset(entity);
-
-                    aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
-                    aboveHeadPos.Add(mpos);
-                }
-                else
-                {
-                    aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.Y + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
-                }
-
-            }
-
-            double offX = entity.SelectionBox.X2 - entity.OriginSelectionBox.X2;
-            double offZ = entity.SelectionBox.Z2 - entity.OriginSelectionBox.Z2;
-            aboveHeadPos.Add(offX, 0, offZ);
-
+            Vec3d aboveHeadPos = getAboveHeadPosition(entityPlayer);
 
             Vec3d pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
 
@@ -810,11 +736,39 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected virtual Vec3d getAboveHeadPosition(EntityPlayer entityPlayer)
+        {
+            Vec3d aboveHeadPos;
+
+            var thisMount = (entity as EntityAgent)?.MountedOn;
+            var selfMount = entityPlayer.MountedOn;
+
+            // If this entity is mounted on the same mount as the client player, render as offset from mount. Prevents jitter
+            if (ims != null && thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
+            {
+                var mpos = selfMount.SeatPosition.XYZ - ims.Position.XYZ;
+
+                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
+                aboveHeadPos.Add(mpos);
+            }
+            else
+            {
+                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.InternalY + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+            }
+
+            double offX = entity.SelectionBox.X2 - entity.OriginSelectionBox.X2;
+            double offZ = entity.SelectionBox.Z2 - entity.OriginSelectionBox.Z2;
+            aboveHeadPos.Add(offX, 0, offZ);
+            return aboveHeadPos;
+        }
+
+
 
         double stepPitch;
         double prevY;
         double prevYAccum;
         public float xangle = 0, yangle = 0, zangle = 0;
+        IMountable ims;
 
         public void loadModelMatrix(Entity entity, float dt, bool isShadowPass)
         {
@@ -822,14 +776,32 @@ namespace Vintagestory.GameContent
 
             Mat4f.Identity(ModelMat);
 
-            if (entity is IMountableSupplier ims && ims.IsMountedBy(entityPlayer))
+            // If the player is sitting on this entity, simply render it at the offset of the seat to the entity, this prevents jitter.
+            IMountableSeat seat;
+            if (ims != null && (seat = ims.GetSeatOfMountedEntity(entityPlayer)) != null)
             {
-                var mountoffset = ims.GetMountOffset(entityPlayer);
-                Mat4f.Translate(ModelMat, ModelMat, -mountoffset.X, -mountoffset.Y, -mountoffset.Z);
+                var offset = seat.SeatPosition.XYZ - seat.MountSupplier.Position.XYZ;
+                ModelMat = Mat4f.Translate(ModelMat, ModelMat, -(float)offset.X, -(float)offset.Y, -(float)offset.Z);
             }
             else
             {
-                Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.Y - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
+                seat = eagent?.MountedOn;
+                // If this entity itself is riding something, render it as offset of that entity
+                if (ims != null && seat != null)
+                {
+                    if (entityPlayer.MountedOn?.Entity == eagent.MountedOn.Entity)
+                    {
+                        var selfMountPos = entityPlayer.MountedOn.SeatPosition;
+                        Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - selfMountPos.X), (float)(seat.SeatPosition.InternalY - selfMountPos.Y), (float)(seat.SeatPosition.Z - selfMountPos.Z));
+                    } else
+                    {
+                        Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - entityPlayer.CameraPos.X), (float)(seat.SeatPosition.InternalY - entityPlayer.CameraPos.Y), (float)(seat.SeatPosition.Z - entityPlayer.CameraPos.Z));
+                    }
+                }
+                else
+                {
+                    Mat4f.Translate(ModelMat, ModelMat, (float)(entity.Pos.X - entityPlayer.CameraPos.X), (float)(entity.Pos.InternalY - entityPlayer.CameraPos.Y), (float)(entity.Pos.Z - entityPlayer.CameraPos.Z));
+                }
             }
 
             float rotX = entity.Properties.Client.Shape?.rotateX ?? 0;
@@ -847,20 +819,30 @@ namespace Vintagestory.GameContent
             float bodyPitch = entity is EntityPlayer ? 0 : entity.Pos.Pitch;
             float yaw = entity.Pos.Yaw + (rotY + 90) * GameMath.DEG2RAD;
 
+
             BlockFacing climbonfacing = entity.ClimbingOnFace;
 
             // To fix climbing locust rotation weirdnes on east and west faces. Brute forced fix. There's probably a correct solution to this.
             bool fuglyHack = entity.Properties.RotateModelOnClimb && entity.ClimbingOnFace?.Axis == EnumAxis.X;
             float sign = -1;
 
-            Quaterniond.RotateX(quat, quat, bodyPitch + rotX * GameMath.DEG2RAD + (fuglyHack ? yaw * sign : 0) + xangle);
-            Quaterniond.RotateY(quat, quat, (fuglyHack ? 0 : yaw) + yangle);
-            Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + stepPitch + rotZ * GameMath.DEG2RAD + (fuglyHack ? GameMath.PIHALF * (climbonfacing == BlockFacing.WEST ? -1 : 1) : 0) + zangle);
+
+            Quaterniond.RotateX(quat, quat, bodyPitch + rotX * GameMath.DEG2RAD + (fuglyHack ? yaw * sign : 0));
+            Quaterniond.RotateY(quat, quat, (fuglyHack ? 0 : yaw));
+            Quaterniond.RotateZ(quat, quat, entity.Pos.Roll + stepPitch + rotZ * GameMath.DEG2RAD + (fuglyHack ? GameMath.PIHALF * (climbonfacing == BlockFacing.WEST ? -1 : 1) : 0));
+
+            Quaterniond.RotateX(quat, quat, xangle);
+            Quaterniond.RotateY(quat, quat, yangle);
+            Quaterniond.RotateZ(quat, quat, zangle);
+
 
             float[] qf = new float[quat.Length];
             for (int i = 0; i < quat.Length; i++) qf[i] = (float)quat[i];
             Mat4f.Mul(ModelMat, ModelMat, Mat4f.FromQuat(Mat4f.Create(), qf));
-            Mat4f.RotateX(ModelMat, ModelMat, sidewaysSwivelAngle);
+            if (shouldSwivelFromMotion)
+            {
+                Mat4f.RotateX(ModelMat, ModelMat, nowSwivelRad);
+            }
 
             float scale = entity.Properties.Client.Size;
             Mat4f.Translate(ModelMat, ModelMat, 0, -entity.SelectionBox.Y2 / 2, 0f);
@@ -901,71 +883,140 @@ namespace Vintagestory.GameContent
 
         private void updateStepPitch(float dt)
         {
-            prevYAccum += dt;
-            if (prevYAccum > 1f / 5f)
+            if (entity.Properties.Habitat == EnumHabitat.Air)
             {
-                prevYAccum = 0;
-                prevY = entity.Pos.Y;
-            }
-
-            if (eagent?.Alive == false)
-            {
-                stepPitch = Math.Max(0, stepPitch - 2 * dt);
-            }
-
-            if (eagent == null || entity.Properties.CanClimbAnywhere || !eagent.Alive || entity.Attributes.GetInt("dmgkb", 0) != 0 || !entity.Properties.Client.PitchStep) return;
-
-
-            if (entity.Properties.Habitat == EnumHabitat.Air || eagent.Controls.IsClimbing)
-            {
-                stepPitch = GameMath.Clamp(entity.Pos.Y - prevY + 0.1, 0, 0.3) - GameMath.Clamp(prevY - entity.Pos.Y - 0.1, 0, 0.3);
+                stepPitch = 0;
                 return;
             }
 
-            double deltaY = entity.Pos.Y - prevY;
-
-            bool steppingUp = deltaY > 0.02 && !entity.FeetInLiquid && !entity.Swimming && !entity.OnGround;
-            bool falling = deltaY < 0 && !entity.OnGround && !entity.FeetInLiquid && !entity.Swimming;
+            if (eagent?.MountedOn != null)
+            {
+                stepPitch = 0;
+                return;
+            }
 
             double targetPitch = 0;
 
-            stepingAccum = Math.Max(0f, stepingAccum - dt);
-            fallingAccum = Math.Max(0f, fallingAccum - dt);
+            if (LastJumpMs > 0)
+            {
+                targetPitch = 0;
+                if (capi.InWorldEllapsedMilliseconds - LastJumpMs > 500 && entity.OnGround) LastJumpMs = -1;
+            }
+            else
+            {
+                prevYAccum += dt;
+                if (prevYAccum > 1f / 5f)
+                {
+                    prevYAccum = 0;
+                    prevY = entity.Pos.Y;
+                }
 
-            if (steppingUp) stepingAccum = 0.2f;
-            if (falling) fallingAccum = 0.2f;
+                if (eagent?.Alive == false)
+                {
+                    stepPitch = Math.Max(0, stepPitch - 2 * dt);
+                }
 
-            if (stepingAccum > 0) targetPitch = -0.5;
-            else if (fallingAccum > 0) targetPitch = 0.5;
+                if (eagent == null || entity.Properties.CanClimbAnywhere || !eagent.Alive || entity.Attributes.GetInt("dmgkb", 0) != 0 || !entity.Properties.Client.PitchStep) return;
+
+
+                if (entity.Properties.Habitat == EnumHabitat.Air || eagent.Controls.IsClimbing)
+                {
+                    stepPitch = GameMath.Clamp(entity.Pos.Y - prevY + 0.1, 0, 0.3) - GameMath.Clamp(prevY - entity.Pos.Y - 0.1, 0, 0.3);
+                    return;
+                }
+
+                double deltaY = entity.Pos.Y - prevY;
+
+                bool steppingUp = deltaY > 0.02 && !entity.FeetInLiquid && !entity.Swimming && !entity.OnGround;
+                bool falling = deltaY < 0 && !entity.OnGround && !entity.FeetInLiquid && !entity.Swimming;
+
+
+                stepingAccum = Math.Max(0f, stepingAccum - dt);
+                fallingAccum = Math.Max(0f, fallingAccum - dt);
+
+                if (steppingUp) stepingAccum = 0.2f;
+                if (falling) fallingAccum = 0.2f;
+
+                if (stepingAccum > 0) targetPitch = -0.5;
+                else if (fallingAccum > 0) targetPitch = 0.5;
+            }
 
             stepPitch += (targetPitch - stepPitch) * dt * 5;
         }
 
 
-        public float sidewaysSwivelAngle = 0;
+        public float targetSwivelRad = 0;
+        public float nowSwivelRad = 0;
         protected double prevAngleSwing;
         protected double prevPosXSwing;
         protected double prevPosZSwing;
 
+        float swivelaccum = 0f;
+        public long LastJumpMs;
+
+        public bool shouldSwivelFromMotion=true;
+
         protected virtual void determineSidewaysSwivel(float dt)
         {
-            double dx = entity.Pos.X - prevPosXSwing;
-            double dz = entity.Pos.Z - prevPosZSwing;
-            double nowAngle = Math.Atan2(dz, dx);
-
-            if (dx * dx + dz * dz > 0.001 && entity.OnGround)
+            if (!shouldSwivelFromMotion)
             {
-                float angledist = GameMath.AngleRadDistance((float)prevAngleSwing, (float)nowAngle);
-                sidewaysSwivelAngle -= GameMath.Clamp(angledist, -0.05f, 0.05f) * dt * 40; // * (eagent?.Controls.Backward == true ? 1 : -1);
-                sidewaysSwivelAngle = GameMath.Clamp(sidewaysSwivelAngle, -0.3f, 0.3f);
+                if (eagent != null) eagent.sidewaysSwivelAngle = 0;
+                return;
+            }
+            if (eagent?.MountedOn != null || entity.Properties.Habitat == EnumHabitat.Air)
+            {
+                eagent.sidewaysSwivelAngle = 0;
+                return;
             }
 
-            sidewaysSwivelAngle *= Math.Min(0.99f, 1 - 0.1f * dt * 60f);
+            swivelaccum += dt;
 
-            prevAngleSwing = nowAngle;
+            if (swivelaccum > 0.1 && (entity.OnGround || eagent?.MountedOn != null))
+            {
+                double dx = entity.Pos.X - prevPosXSwing;
+                double dz = entity.Pos.Z - prevPosZSwing;
 
-            prevPosXSwing = entity.Pos.X;
-            prevPosZSwing = entity.Pos.Z;
+                var im = eagent?.GetInterface<IMountable>();
+                if (im?.Controller != null)
+                {
+                    var seat = im.GetSeatOfMountedEntity(im.Controller);
+                    if (!seat.Controls.Left && !seat.Controls.Right)
+                    {
+                        dx = 0;
+                        dz = 0;
+                    }
+                }
+
+                double nowAngle = Math.Atan2(dz, dx);
+                double speed = Math.Sqrt(dx * dx + dz * dz);
+                swivelaccum = 0;
+
+                float anglechange = GameMath.AngleRadDistance((float)nowAngle, (float)prevAngleSwing);
+
+                if (Math.Abs(anglechange) < GameMath.PIHALF)
+                {
+                    targetSwivelRad = GameMath.Clamp((float)speed * anglechange * 3f, -0.4f, 0.4f);
+                } else
+                {
+                    targetSwivelRad = 0;
+                }
+
+                prevAngleSwing = nowAngle;
+                prevPosXSwing = entity.Pos.X;
+                prevPosZSwing = entity.Pos.Z;
+            }
+
+
+            float diff = GameMath.AngleRadDistance(nowSwivelRad, targetSwivelRad);
+
+            nowSwivelRad += GameMath.Clamp(diff * dt * 10, -0.15f, 0.15f);
+
+            if (eagent != null)
+            {
+                eagent.sidewaysSwivelAngle = nowSwivelRad;
+            }
+
+
         }
 
         #endregion
@@ -994,16 +1045,11 @@ namespace Vintagestory.GameContent
                 debugTagTexture = null;
             }
 
-            capi.Event.ReloadShapes -= MarkShapeModified;
+            capi.Event.ReloadShapes -= entity.MarkShapeModified;
 
             if (DisplayChatMessages)
             {
                 capi.Event.ChatMessage -= OnChatMessage;
-            }
-
-            if (eagent?.GearInventory != null)
-            {
-                eagent.GearInventory.SlotModified -= gearSlotModified;
             }
         }
     }

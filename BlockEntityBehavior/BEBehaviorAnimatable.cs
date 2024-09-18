@@ -121,13 +121,14 @@ namespace Vintagestory.GameContent
             }
 
             shape.ResolveReferences(api.World.Logger, nameForLogging);
-            CacheInvTransforms(shape.Elements);
+            shape.CacheInvTransforms();
             shape.ResolveAndFindJoints(api.World.Logger, nameForLogging);
 
             TesselationMetaData meta = new TesselationMetaData()
             {
                 QuantityElements = block.Shape.QuantityElements,
                 SelectiveElements = block.Shape.SelectiveElements,
+                IgnoreElements = block.Shape.IgnoreElements,
                 TexSource = texSource,
                 WithJointIds = true,
                 WithDamageEffect = true,

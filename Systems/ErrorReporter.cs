@@ -1,10 +1,10 @@
 ﻿using System;
 using ProtoBuf;
-using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 
 namespace Vintagestory.GameContent
@@ -26,9 +26,10 @@ namespace Vintagestory.GameContent
 
         IServerNetworkChannel serverChannel;
 
-        object logEntiresLock = new object();
-        List<string> logEntries = new List<string>();
+        private const int maxLogEntries = 180;
 
+        object logEntiresLock = new();
+        LimitedList<string> logEntries = new(maxLogEntries);
 
         public override double ExecuteOrder()
         {
@@ -46,9 +47,21 @@ namespace Vintagestory.GameContent
             api.World.Logger.EntryAdded += Logger_EntryAdded;
         }
 
-        public override void Start(ICoreAPI api)
+        public override void StartServerSide(ICoreServerAPI api)
         {
-            this.api = api;
+            api.ChatCommands.Create("errorreporter")
+                .WithDescription("Toggles on/off the error reporting dialog on startup")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .WithArgs(api.ChatCommands.Parsers.Bool("activate"))
+                .HandleWith(OnCmdErrRep);
+
+            serverChannel =
+                api.Network.RegisterChannel("errorreporter")
+                    .RegisterMessageType(typeof(ServerLogEntries))
+                ;
+
+            api.Event.PlayerJoin += OnPlrJoin;
         }
 
         public override void StartClientSide(ICoreClientAPI api)
@@ -58,7 +71,7 @@ namespace Vintagestory.GameContent
             api.ChatCommands.Create("errorreporter")
                 .WithDescription("Reopens the error reporting dialog")
                 .HandleWith(ClientCmdErrorRep);
-                
+
 
             api.Event.LevelFinalize += OnClientReady;
             api.Network.RegisterChannel("errorreporter")
@@ -93,7 +106,10 @@ namespace Vintagestory.GameContent
             readyFlags++;
             lock (logEntiresLock)
             {
-                logEntries.AddRange(msg.LogEntries);
+                foreach (var entry in msg.LogEntries)
+                {
+                    logEntries.Add(entry);
+                }
             }
 
             if (readyFlags == 2 && logEntries.Count > 0) ShowDialog();
@@ -109,10 +125,10 @@ namespace Vintagestory.GameContent
                     return;
                 }
 
-                List<string> printedEntries = logEntries;
-                if (logEntries.Count > 180)
+                var printedEntries = logEntries.ToList();
+                if (logEntries.Count > maxLogEntries)
                 {
-                    printedEntries = logEntries.Take(140).ToList();
+                    printedEntries = logEntries.Take(maxLogEntries).ToList();
                     printedEntries.Add(string.Format("...{0} more", logEntries.Count - 0));
                 }
 
@@ -120,24 +136,6 @@ namespace Vintagestory.GameContent
             }
 
             dialog.TryOpen();
-        }
-
-
-        public override void StartServerSide(ICoreServerAPI api)
-        {
-            api.ChatCommands.Create("errorreporter")
-                .WithDescription("Toggles on/off the error reporting dialog on startup")
-                .RequiresPrivilege(Privilege.controlserver)
-                .RequiresPlayer()
-                .WithArgs(api.ChatCommands.Parsers.Bool("activate"))
-                .HandleWith(OnCmdErrRep);
-
-            serverChannel =
-               api.Network.RegisterChannel("errorreporter")
-               .RegisterMessageType(typeof(ServerLogEntries))
-            ;
-
-            api.Event.PlayerJoin += OnPlrJoin;
         }
 
         private void OnPlrJoin(IServerPlayer byPlayer)
@@ -156,15 +154,17 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdErrRep(TextCommandCallingArgs args)
         {
             var on = (bool)args.Parsers[0].GetValue();
-            var player = args.Caller.Player as IServerPlayer;            
+            var player = args.Caller.Player as IServerPlayer;
             player.ServerData.CustomPlayerData["errorReporting"] = on ? "1" : "0";
             return TextCommandResult.Success(Lang.Get("Error reporting now {0}", on ? "on" : "off"));
         }
-        
+
 
         private void Logger_EntryAdded(EnumLogType logType, string message, params object[] args)
         {
-            if (logType == EnumLogType.Error || logType == EnumLogType.Fatal || logType == EnumLogType.Warning || logType == EnumLogType.Notification)
+            if (logType == EnumLogType.Error ||
+                logType == EnumLogType.Fatal ||
+                logType == EnumLogType.Warning)
             {
                 string log;
                 try
@@ -175,7 +175,7 @@ namespace Vintagestory.GameContent
                 {
                     log = string.Format("[{0} {1}] {2}", api.Side, logType, "Error reporter failed formatting for \"" + message + "\"");
                 }
-                
+
                 lock (logEntiresLock)
                 {
                     logEntries.Add(log);

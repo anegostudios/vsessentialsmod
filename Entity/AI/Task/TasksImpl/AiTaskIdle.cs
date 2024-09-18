@@ -117,7 +117,7 @@ namespace Vintagestory.GameContent
             {
                 if (entity.Properties.Habitat == EnumHabitat.Land && entity.FeetInLiquid) return false;
 
-                if (!EmotionStatesSatisifed()) return false;
+                if (!PreconditionsSatisifed()) return false;
 
                 // The entityInRange test is expensive. So we only test for it every 4 seconds
                 // which should have zero impact on the behavior. It'll merely execute this task 4 seconds later

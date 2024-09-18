@@ -42,10 +42,9 @@ namespace Vintagestory.Essentials
         {
             if (!Active) return;
 
-
             // For land dwellers only check horizontal distance
-            double sqDistToTarget = 
-                entity.Properties.Habitat == API.Common.EnumHabitat.Land ?
+            double sqDistToTarget =
+                entity.Properties.Habitat == EnumHabitat.Land ?
                     target.SquareDistanceTo(entity.ServerPos.X, target.Y, entity.ServerPos.Z) :
                     target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z)
                 ;
@@ -67,7 +66,7 @@ namespace Vintagestory.Essentials
             prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
-            
+
             if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 20 / GlobalConstants.OverallSpeedMultiplier)
             {
                 //entity.World.SpawnParticles(10, ColorUtil.WhiteArgb, prevPos, prevPos, new Vec3f(0, 0, 0), new Vec3f(0, -1, 0), 1, 1);
@@ -87,7 +86,7 @@ namespace Vintagestory.Essentials
             );
 
             float desiredYaw = 0;
-            
+
             if (sqDistToTarget >= 0.01)
             {
                 desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
@@ -100,13 +99,15 @@ namespace Vintagestory.Essentials
                 nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max((float)sqDistToTarget, 0.2f));
             }
 
+            yawToMotion(dt, controls, desiredYaw, nowMoveSpeed);
+        }
 
+        private void yawToMotion(float dt, EntityControls controls, float desiredYaw, float nowMoveSpeed)
+        {
             float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
             float turnSpeed = curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier * movingSpeed;
             entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
             entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
-
-            
 
             double cosYaw = Math.Cos(entity.ServerPos.Yaw);
             double sinYaw = Math.Sin(entity.ServerPos.Yaw);
@@ -128,9 +129,6 @@ namespace Vintagestory.Essentials
                 }
             }
 
-         //   entity.World.SpawnParticles(0.3f, ColorUtil.WhiteAhsl, target, target, new Vec3f(), new Vec3f(), 0.1f, 0.1f, 3f, EnumParticleModel.Cube);
-
-
             if (entity.Swimming)
             {
                 controls.FlyVector.Set(controls.WalkVector);
@@ -147,14 +145,12 @@ namespace Vintagestory.Essentials
                 swimlineSubmergedness = Math.Min(1, swimlineSubmergedness + 0.075f);
                 controls.FlyVector.Y = GameMath.Clamp(controls.FlyVector.Y, 0.002f, 0.004f) * swimlineSubmergedness;
 
-
                 if (entity.CollidedHorizontally)
                 {
                     controls.FlyVector.Y = 0.05f;
                 }
             }
         }
-
 
         public override void Stop()
         {

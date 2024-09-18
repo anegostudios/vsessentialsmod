@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -50,7 +51,7 @@ namespace Vintagestory.GameContent
         MeshRef ropeMeshRef;
         MeshData updateMesh;
         IShaderProgram prog;
-
+        ILoadedSound stretchSound;
 
         public float accum3s;
         public float accum100ms;
@@ -59,6 +60,57 @@ namespace Vintagestory.GameContent
         {
             return 0.4;
         }
+
+
+        public override void Start(ICoreAPI api)
+        {
+            base.Start(api);
+
+            this.api = api;
+
+            partPhysics = new ParticlePhysics(api.World.GetLockFreeBlockAccessor());
+            partPhysics.PhysicsTickTime = 1 / 60f;
+            partPhysics.MotionCap = 10f;
+
+            api.Network
+                .RegisterChannel("clothphysics")
+                .RegisterMessageType<UnregisterClothSystemPacket>()
+                .RegisterMessageType<ClothSystemPacket>()
+                .RegisterMessageType<ClothPointPacket>()
+            ;
+        }
+
+
+        public override void StartClientSide(ICoreClientAPI api)
+        {
+            capi = api;
+
+
+            api.ChatCommands.GetOrCreate("debug")
+                .BeginSubCommand("clothtest")
+                    .WithDescription("Commands to test the cloth system")
+
+                    .BeginSubCommand("clear")
+                        .WithDescription("clears")
+                        .HandleWith(onClothTestClear)
+                    .EndSubCommand()
+
+                .EndSubCommand();
+
+            api.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "clothsimu");
+
+            api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
+
+            api.Network.GetChannel("clothphysics")
+                .SetMessageHandler<UnregisterClothSystemPacket>(onUnregPacketClient)
+                .SetMessageHandler<ClothSystemPacket>(onRegPacketClient)
+                .SetMessageHandler<ClothPointPacket>(onPointPacketClient)
+            ;
+
+            api.Event.LeaveWorld += Event_LeaveWorld;
+
+        }
+
 
         public ClothSystem GetClothSystem(int clothid)
         {
@@ -85,10 +137,66 @@ namespace Vintagestory.GameContent
             return null;
         }
 
+        
+
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (updateMesh == null) return;
-            tickPhysics(dt);
+
+            dt = System.Math.Min(dt, 0.5f);
+            if (!capi.IsGamePaused)
+            {
+                tickPhysics(dt);
+            }
+
+            accum100ms += dt;
+            if (accum100ms > 0.1)
+            {
+                accum100ms = 0;
+
+                if (clothSystems.Count > 0)
+                {
+                    float maxext = -1;
+                    ClothSystem maxcs = null;
+                    float stretchWarn =0.4f;
+
+                    foreach (var val in clothSystems)
+                    {
+                        var cs = val.Value;
+                        if (cs.MaxExtension > cs.StretchWarn)
+                        {
+                            cs.secondsOverStretched += dt;
+                        } else
+                        {
+                            cs.secondsOverStretched = 0;
+                        }
+
+                        if (cs.MaxExtension > maxext)
+                        {
+                            maxext = (float)cs.MaxExtension;
+                            maxcs = cs;
+                            stretchWarn = cs.StretchWarn;
+                        }  
+                    }
+
+                    if (maxext > stretchWarn && maxcs.secondsOverStretched > 0.2)
+                    {
+                        float intensity = 10 * (float)(maxext - stretchWarn);
+
+                        if (!stretchSound.IsPlaying) stretchSound.Start();
+                        stretchSound.SetPosition((float)maxcs.CenterPosition.X, (float)maxcs.CenterPosition.Y, (float)maxcs.CenterPosition.Z);
+                        stretchSound.SetVolume(GameMath.Clamp((float)intensity, 0.5f, 1f));
+                        stretchSound.SetPitch((float)GameMath.Clamp(intensity + 0.7f, 0.7f, 1.2f));
+                    }
+                    else
+                    {
+                        stretchSound.Stop();
+                    }
+                } else
+                {
+                    stretchSound.Stop();
+                }
+            }
 
             int count = 0;
             updateMesh.CustomFloats.Count = 0;
@@ -142,11 +250,63 @@ namespace Vintagestory.GameContent
 
             if (sapi != null)
             {
+                List<int> toRemove = new List<int>();
+
+                accum100ms += dt;
+                if (accum100ms > 0.1f)
+                {
+                    accum100ms = 0;
+                    List<ClothPointPacket> packets = new List<ClothPointPacket>();
+
+                    foreach (var val in clothSystems)
+                    {
+                        var cs = val.Value;
+                        cs.CollectDirtyPoints(packets);
+
+                        // Overextended -> Rip it apart
+                        if (cs.MaxExtension > cs.StretchRip)
+                        {
+                            cs.secondsOverStretched += 0.1f;
+
+                            if (cs.secondsOverStretched > 4 - cs.MaxExtension*2)
+                            {
+                                Vec3d soundPos = cs.CenterPosition;
+
+                                if (cs.FirstPoint.PinnedToEntity != null) soundPos = cs.FirstPoint.PinnedToEntity.Pos.XYZ;
+                                sapi.World.PlaySoundAt(new AssetLocation("sounds/effect/roperip"), soundPos.X, soundPos.Y, soundPos.Z);
+
+                                var fp = cs.FirstPoint;
+                                var lp = cs.LastPoint;
+                                var dir = lp.Pos - fp.Pos;
+                                var len = dir.Length();
+                                //var stack = new ItemStack(sapi.World.GetItem(new AssetLocation("rope")));
+                                for (float i = 0; i < len; i += 0.15f)
+                                {
+                                    Vec3d pos = new Vec3d(fp.Pos.X + dir.X * i / len, fp.Pos.Y + dir.Y * i / len, fp.Pos.Z + dir.Z * i / len);
+
+                                    sapi.World.SpawnParticles(2, ColorUtil.ColorFromRgba(60, 97, 115, 255), pos, pos, new Vec3f(-4f, -1f, -4f), new Vec3f(4, 2, 4), 2, 1, 0.5f, EnumParticleModel.Cube);
+                                }
+
+                                toRemove.Add(val.Key);
+                                continue;
+                            }
+                        } else
+                        {
+                            cs.secondsOverStretched = 0;
+                        }
+
+                    }
+
+                    foreach (var p in packets)
+                    {
+                        sapi.Network.GetChannel("clothphysics").BroadcastPacket(p);
+                    }
+                }
+
                 accum3s += dt;
                 if (accum3s > 3)
                 {
                     accum3s = 0;
-                    List<int> toRemove = new List<int>();
 
                     foreach (var val in clothSystems)
                     {
@@ -158,30 +318,53 @@ namespace Vintagestory.GameContent
                             val.Value.slowTick3s();
                         }
                     }
-
-                    foreach (int id in toRemove)
-                    {
-                        sapi.World.SpawnItemEntity(new ItemStack(sapi.World.GetItem(new AssetLocation("rope"))), clothSystems[id].CenterPosition);
-                        UnregisterCloth(id);
-                    }
                 }
 
-                accum100ms += dt;
-                if (accum100ms > 0.1f)
+
+
+                foreach (int id in toRemove)
                 {
-                    accum100ms = 0;
-                    List<ClothPointPacket> packets = new List<ClothPointPacket>();
-
-                    foreach (var val in clothSystems)
+                    bool spawnitem = true;
+                    if (clothSystems[id].FirstPoint.PinnedToEntity is EntityAgent eagentn)
                     {
-                        val.Value.CollectDirtyPoints(packets);
+                        eagentn.WalkInventory((slot) =>
+                        {
+                            if (slot.Empty) return true;
+                            int clothId = slot.Itemstack.Attributes?.GetInt("clothId") ?? 0;
+                            if (clothId == id)
+                            {
+                                spawnitem = false;
+                                slot.Itemstack.Attributes.RemoveAttribute("clothId");
+                                slot.Itemstack.Attributes.RemoveAttribute("ropeHeldByEntityId");
+                                return false;
+                            }
+
+                            return true;
+                        });
                     }
 
-                    foreach (var p in packets)
+                    if (clothSystems[id].LastPoint.PinnedToEntity is EntityAgent eagentn2)
                     {
-                        sapi.Network.GetChannel("clothphysics").BroadcastPacket(p);
+                        eagentn2.WalkInventory((slot) =>
+                        {
+                            if (slot.Empty) return true;
+                            int clothId = slot.Itemstack.Attributes?.GetInt("clothId") ?? 0;
+                            if (clothId == id)
+                            {
+                                spawnitem = false;
+                                slot.Itemstack.Attributes.RemoveAttribute("clothId");
+                                slot.Itemstack.Attributes.RemoveAttribute("ropeHeldByEntityId");
+                                return false;
+                            }
+
+                            return true;
+                        });
                     }
+
+                    if (spawnitem) sapi.World.SpawnItemEntity(new ItemStack(sapi.World.GetItem(new AssetLocation("rope"))), clothSystems[id].CenterPosition);
+                    UnregisterCloth(id);
                 }
+
             }
         }
 
@@ -189,63 +372,6 @@ namespace Vintagestory.GameContent
         public override bool ShouldLoad(EnumAppSide side)
         {   
             return true;
-        }
-
-        public override void Start(ICoreAPI api)
-        {
-            base.Start(api);
-
-            this.api = api;
-
-            partPhysics = new ParticlePhysics(api.World.GetLockFreeBlockAccessor());
-            partPhysics.PhysicsTickTime = 1 / 60f;
-            partPhysics.MotionCap = 10f;
-
-            api.Network
-                .RegisterChannel("clothphysics")
-                .RegisterMessageType<UnregisterClothSystemPacket>()
-                .RegisterMessageType<ClothSystemPacket>()
-                .RegisterMessageType<ClothPointPacket>()
-            ;
-        }
-
-
-        public override void StartClientSide(ICoreClientAPI api)
-        {
-            capi = api;
-            
-            api.ChatCommands.GetOrCreate("debug")
-                .BeginSubCommand("clothtest")
-                    .WithDescription("Commands to test the cloth system")
-
-                    .BeginSubCommand("clear")
-                        .WithDescription("clears")
-                        .HandleWith(onClothTestClear)
-                    .EndSubCommand()
-
-                    .BeginSubCommand("cloth")
-                        .WithDescription("cloth")
-                        .HandleWith(onClothTestCloth)
-                    .EndSubCommand()
-
-                    .BeginSubCommand("rope")
-                        .WithDescription("rope")
-                        .HandleWith(onClothTestRope)
-                    .EndSubCommand()
-                .EndSubCommand();
-
-            api.Event.RegisterRenderer(this, EnumRenderStage.Opaque, "clothsimu");
-
-            api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
-
-            api.Network.GetChannel("clothphysics")
-                .SetMessageHandler<UnregisterClothSystemPacket>(onUnregPacketClient)
-                .SetMessageHandler<ClothSystemPacket>(onRegPacketClient)
-                .SetMessageHandler<ClothPointPacket>(onPointPacketClient)
-            ;
-
-            api.Event.LeaveWorld += Event_LeaveWorld;
-
         }
 
         private void Event_LeaveWorld()
@@ -267,7 +393,6 @@ namespace Vintagestory.GameContent
             {
                 system.Init(capi, this);
                 system.restoreReferences();
-                //RegisterCloth(system);
                 clothSystems[system.ClothId] = system;
             }
         }
@@ -282,6 +407,19 @@ namespace Vintagestory.GameContent
 
         private void Event_BlockTexturesLoaded()
         {
+            if (stretchSound == null)
+            {
+                stretchSound = capi.World.LoadSound(new SoundParams()
+                {
+                    Location = new AssetLocation("sounds/effect/ropestretch"),
+                    DisposeOnFinish = false,
+                    ShouldLoop = true,
+                    SoundType = EnumSoundType.Sound,
+                    Volume = 0.5f,
+                    ReferenceDistance = 5
+                });
+            }
+
             // This shader is created by the essentials mod in Core.cs
             prog = capi.Shader.GetProgramByName("instanced");
 
@@ -331,6 +469,16 @@ namespace Vintagestory.GameContent
             api.ChatCommands.GetOrCreate("debug")
                 .BeginSubCommand("clothtest")
                     .WithDescription("Commands to test the cloth system")
+
+                     .BeginSubCommand("cloth")
+                        .WithDescription("cloth")
+                        .HandleWith(onClothTestCloth)
+                    .EndSubCommand()
+
+                    .BeginSubCommand("rope")
+                        .WithDescription("rope")
+                        .HandleWith(onClothTestRope)
+                    .EndSubCommand()
 
                     .BeginSubCommand("clear")
                         .WithDescription("clears")
@@ -475,13 +623,14 @@ namespace Vintagestory.GameContent
 
         private TextCommandResult onClothTestClearServer(TextCommandCallingArgs args)
         {
+            int cnt = clothSystems.Count;
             int[] clothids = clothSystems.Select(s => s.Value.ClothId).ToArray();
             if (clothids.Length > 0)
                 sapi.Network.GetChannel("clothphysics").BroadcastPacket(new UnregisterClothSystemPacket()
                     { ClothIds = clothids });
             clothSystems.Clear();
             nextClothId = 1;
-            return TextCommandResult.Success("cleared");
+            return TextCommandResult.Success(cnt + " cloth sims removed");
         }
         
         private TextCommandResult onClothTestDeleteloaded(TextCommandCallingArgs args)
@@ -522,47 +671,36 @@ namespace Vintagestory.GameContent
 
         private TextCommandResult onClothTestClear(TextCommandCallingArgs textCommandCallingArgs)
         {
+            int cnt = clothSystems.Count;
             clothSystems.Clear();
             nextClothId = 1;
-            return TextCommandResult.Success();
+            return TextCommandResult.Success(cnt + " cloth sims removed");
         }
-        private TextCommandResult onClothTestCloth(TextCommandCallingArgs textCommandCallingArgs)
+        private TextCommandResult onClothTestCloth(TextCommandCallingArgs args)
         {
-            float xsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
-            float zsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
-            
-            ClothSystem sys = ClothSystem.CreateCloth(capi, this, capi.World.Player.Entity.Pos.AsBlockPos.Add(-1, 2, -1), xsize, zsize);
+            float xsize = 0.5f + (float)api.World.Rand.NextDouble() * 3;
+            float ysize = 0.5f + (float)api.World.Rand.NextDouble() * 3;
+            float zsize = 0.5f + (float)api.World.Rand.NextDouble() * 3;
+            var pos = args.Caller.Entity.Pos.AheadCopy(2).XYZ.Add(0, 1f, 0);
+
+            ClothSystem sys = ClothSystem.CreateCloth(api, this, pos, pos.AddCopy(xsize, ysize, zsize));
             RegisterCloth(sys);
-
-            
-
-            EntityAgent byEntity = capi.World.Player.Entity;
-            Vec3d pos = byEntity.ServerPos.XYZ.Add(0, byEntity.LocalEyePos.Y, 0);
-            Vec3f leftPos = pos.AheadCopy(0.5, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw + GameMath.PIHALF).ToVec3f();
-            Vec3f rightPos = pos.AheadCopy(0.5, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw + GameMath.PIHALF).ToVec3f();
-
-            // pin the top right and top left.
-            //sys.Points[0][0].PinTo(byEntity, leftPos);
-            //sys.Points[0][numxpoints - 1].PinTo(byEntity, rightPos);
+            sys.FirstPoint.PinTo(args.Caller.Entity, new Vec3f(0, 0.5f, 0));
 
             return TextCommandResult.Success();
         }
-        private TextCommandResult onClothTestRope(TextCommandCallingArgs textCommandCallingArgs)
+        private TextCommandResult onClothTestRope(TextCommandCallingArgs args)
         {
-            float xsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
-            float zsize = 0.5f + (float)capi.World.Rand.NextDouble() * 3;
+            float xsize = 0.5f + (float)api.World.Rand.NextDouble() * 3;
+            float zsize = 0.5f + (float)api.World.Rand.NextDouble() * 3;
             xsize = 5;
-            ClothSystem sys = ClothSystem.CreateRope(capi, this, capi.World.Player.Entity.Pos.AsBlockPos.Add(-1, 2, -1), xsize, null);
+
+            var rpos = args.Caller.Entity.Pos.AheadCopy(2).XYZ.Add(0, 1f, 0);
+
+            ClothSystem sys = ClothSystem.CreateRope(api, this, rpos, rpos.AddCopy(xsize, zsize, xsize), null);
+            sys.FirstPoint.PinTo(args.Caller.Entity, new Vec3f(0, 0.5f, 0));
             RegisterCloth(sys);
 
-
-            EntityAgent byEntity = capi.World.Player.Entity;
-            Vec3d pos = new Vec3d(0, byEntity.LocalEyePos.Y, 0);
-            Vec3d aheadPos = pos.AheadCopy(1, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw);
-
-            sys.WalkPoints(p => p.Pos.Add(pos.X, pos.Y + p.PointIndex / 100f, pos.Z));
-
-            sys.FirstPoint.PinTo(byEntity, aheadPos.ToVec3f());
             return TextCommandResult.Success();
         }
     }

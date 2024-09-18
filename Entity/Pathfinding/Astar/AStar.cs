@@ -60,12 +60,15 @@ namespace Vintagestory.Essentials
             
             while (openSet.Count > 0)
             {
-                if (NodesChecked++ > searchDepth) return null;
+                if (NodesChecked++ > searchDepth)
+                {
+                    return null;
+                }
 
                 PathNode nearestNode = openSet.RemoveNearest();
                 closedSet.Add(nearestNode);
 
-                if (nearestNode == targetNode || (mhdistanceTolerance>0 && Math.Abs(nearestNode.X - targetNode.X) <= mhdistanceTolerance && Math.Abs(nearestNode.Z - targetNode.Z) <= mhdistanceTolerance && (Math.Abs(nearestNode.Y - targetNode.Y) <= mhdistanceTolerance || (targetNode.Y > nearestNode.Y && targetNode.Y - nearestNode.Y < 4 + mhdistanceTolerance))))
+                if (nearestNode == targetNode || (mhdistanceTolerance>0 && Math.Abs(nearestNode.X - targetNode.X) <= mhdistanceTolerance && Math.Abs(nearestNode.Z - targetNode.Z) <= mhdistanceTolerance && (Math.Abs(nearestNode.Y - targetNode.Y) <= mhdistanceTolerance /*|| (targetNode.Y > nearestNode.Y && targetNode.Y - nearestNode.Y < 4 + mhdistanceTolerance)* - why TF is this here? It makes path finds to pillard up players successfull! */)))
                 {
                     return retracePath(startNode, nearestNode);
                 }
@@ -139,7 +142,7 @@ namespace Vintagestory.Essentials
             {
                 int descended = 0;
 
-                // Down ok?
+                // Can I stand or jump down here?
                 while (true)
                 {
                     tmpPos.Set(node.X, node.Y - 1, node.Z);
@@ -196,8 +199,9 @@ namespace Vintagestory.Essentials
                     }
                 }
 
+                
                 // Up ok?
-                float height = entityCollBox.Height - descended;
+                /*float height = entityCollBox.Height - descended;
                 tmpVec.Y += descended;   // Do not re-check height in blocks we've already descended through
                 while (--height > 0)
                 {
@@ -206,7 +210,7 @@ namespace Vintagestory.Essentials
                     {
                         return false;
                     }
-                }
+                }*/
 
                 // If diagonal, make sure we can squeeze through
                 if (fromDir.IsDiagnoal)

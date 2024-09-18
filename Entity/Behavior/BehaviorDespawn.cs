@@ -14,13 +14,30 @@ namespace Vintagestory.GameContent
         float accumSeconds;
         float accumOffset = 2.5f;
 
-        EnumDespawnMode despawnMode = EnumDespawnMode.Normal;
+        EnumDespawnMode despawnMode = EnumDespawnMode.AfterSeconds;
         float deathTimeLocal;   // local copy of the attribute
 
         public float DeathTime
         {
-            get { float? time = entity.Attributes.TryGetFloat("deathTime"); return deathTimeLocal = (time == null ? 0 : (float)time); }
-            set { if (value != deathTimeLocal) { entity.Attributes.SetFloat("deathTime", value);  deathTimeLocal = value; } }      // Note: the SetFloat() is costly and creates a new FloatAttribute object every time, is there a better way?
+            get
+            {
+                float? time = entity.Attributes.TryGetFloat("deathTime");
+                return deathTimeLocal = (time == null ? 0 : (float)time);
+            }
+            set
+            {
+                if (value != deathTimeLocal)
+                {
+                    entity.Attributes.SetFloat("deathTime", value);
+                    deathTimeLocal = value;
+                }
+            } 
+        }
+
+        public float DespawnSeconds
+        {
+            get { return minSeconds; }
+            set { minSeconds = value; }
         }
 
         public EntityBehaviorDespawn(Entity entity) : base(entity)
@@ -45,17 +62,18 @@ namespace Vintagestory.GameContent
             var obj = typeAttributes["afterDays"];
             if (entity.WatchedAttributes.HasAttribute("despawnTotalDays"))
             {
-                despawnMode = obj.Exists ? EnumDespawnMode.NormalAfterDays : EnumDespawnMode.ForceAfterDays;
+                despawnMode = obj.Exists ? EnumDespawnMode.AfterSecondsOrAfterDays : EnumDespawnMode.AfterSecondsOrAfterDaysIgnorePlayer;
             }
             else if (obj.Exists)
             {
-                despawnMode = EnumDespawnMode.NormalAfterDays;
+                despawnMode = EnumDespawnMode.AfterSecondsOrAfterDays;
                 entity.WatchedAttributes.SetDouble("despawnTotalDays", entity.World.Calendar.TotalDays + obj.AsFloat(14));
             }
 
             // Reduce chance of many entities running the light check at the same time
-            accumOffset += (float)((entity.EntityId / 1000.0) % 1);
-            float dummy = DeathTime;   // set up the local value of deathTime
+            accumOffset += (float)((entity.EntityId / 200.0) % 1);
+
+            deathTimeLocal = DeathTime;
         }
 
 
@@ -65,7 +83,7 @@ namespace Vintagestory.GameContent
 
             if ((accumSeconds += deltaTime) > accumOffset)
             {
-                if (despawnMode == EnumDespawnMode.ForceAfterDays)
+                if (despawnMode == EnumDespawnMode.AfterSecondsOrAfterDaysIgnorePlayer)
                 {
                     if (entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
                     {
@@ -79,11 +97,11 @@ namespace Vintagestory.GameContent
                 if (playerInRange || LightLevelOk())
                 {
                     accumSeconds = 0;
-                    DeathTime = 0;   // costly operation, cost of repeated operations mitigated through comparison with the local copy deathTimeLocal
+                    DeathTime = 0;
                     return;
                 }
 
-                if (despawnMode == EnumDespawnMode.NormalAfterDays && !playerInRange)
+                if (despawnMode == EnumDespawnMode.AfterSecondsOrAfterDays && !playerInRange)
                 {
                     if (entity.World.Calendar.TotalDays > entity.WatchedAttributes.GetDouble("despawnTotalDays"))
                     {
@@ -109,11 +127,6 @@ namespace Vintagestory.GameContent
         {
             if (minPlayerDistance < 0f) return false;
 
-            /*EntityPos pos = entity.ServerPos;
-            EntityPlayer player = entity.World.NearestPlayer(pos.X, pos.Y, pos.Z)?.Entity;
-
-            return player != null && player.ServerPos.SquareDistanceTo(pos.X, pos.Y, pos.Z) < minPlayerDistanceSquared;*/
-
             return entity.minRangeToClient < minPlayerDistance;
         }
 
@@ -127,10 +140,7 @@ namespace Vintagestory.GameContent
             return level >= belowLightLevel;
         }
 
-        public override string PropertyName()
-        {
-            return "timeddespawn";
-        }
+        public override string PropertyName() => "timeddespawn";
 
         public override void GetInfoText(StringBuilder infotext)
         {
@@ -139,19 +149,14 @@ namespace Vintagestory.GameContent
                 infotext.AppendLine(Lang.Get("Deprived of light, might die soon"));
             }
 
-
             base.GetInfoText(infotext);
         }
 
-        public void SetTimer(int value)
-        {
-            minSeconds = value;
-        }
 
-        public void SetForcedCalendarDespawn(double value)
+        public void SetDespawnByCalendarDate(double totaldays)
         {
-            entity.WatchedAttributes.SetDouble("despawnTotalDays", value);
-            despawnMode = EnumDespawnMode.ForceAfterDays;
+            entity.WatchedAttributes.SetDouble("despawnTotalDays", totaldays);
+            despawnMode = EnumDespawnMode.AfterSecondsOrAfterDaysIgnorePlayer;
         }
     }
 
@@ -159,8 +164,8 @@ namespace Vintagestory.GameContent
 
     enum EnumDespawnMode
     {
-        Normal = 0,
-        NormalAfterDays = 1,
-        ForceAfterDays = 2
+        AfterSeconds = 0,
+        AfterSecondsOrAfterDays = 1,
+        AfterSecondsOrAfterDaysIgnorePlayer = 2
     }
 }

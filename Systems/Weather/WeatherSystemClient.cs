@@ -12,8 +12,7 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Set by the WeatherSimulation System in the survival mod. Value is client side at the players position. Has values in the 0..1 range. 1 being it just rained. Used by leaf blocks to spawn rain drop particles. 0 meaning it hasn't rained in 4+ hours.
         /// </summary>
-        public static float CurrentEnvironmentWetness;
-
+        public static float CurrentEnvironmentWetness4h;
 
         public ICoreClientAPI capi;
         public IClientNetworkChannel clientChannel;
@@ -117,7 +116,10 @@ namespace Vintagestory.GameContent
         Vec3f windSpeedSmoothed = new Vec3f();
         double windRandCounter;
 
-        float wetnessScanAccum = 0;
+        Vec3f surfaceWindSpeedSmoothed = new Vec3f();
+        double surfaceWindRandCounter;
+
+        float wetnessScanAccum2s = 0;
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
@@ -141,29 +143,28 @@ namespace Vintagestory.GameContent
                 WeatherDataAtPlayer.UpdateAdjacentAndBlendWeatherData();
 
 
-                /*WeatherDataAtPlayer.BlendedWeatherData.Ambient.FlatFogDensity.Weight *= fogMultiplier;
-                WeatherDataAtPlayer.BlendedWeatherData.Ambient.FogDensity.Weight *= fogMultiplier;*/
-
-                
                 dt = Math.Min(0.5f, dt);
 
                 // Windspeed should be stored inside ClimateConditions and not be a global constant
                 double windspeed = WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
-
-
                 windSpeedSmoothed.X += ((float)windspeed - windSpeedSmoothed.X) * dt;
-
                 windRandCounter = (windRandCounter + dt) % (2000 * Math.PI);
                 double rndx = (2 * Math.Sin(windRandCounter / 8) + Math.Sin(windRandCounter / 2) + Math.Sin(0.5 + 2 * windRandCounter)) / 10.0;
-
                 GlobalConstants.CurrentWindSpeedClient.Set(windSpeedSmoothed.X, windSpeedSmoothed.Y, windSpeedSmoothed.Z + (float)rndx * windSpeedSmoothed.X);
+
+                double surfwindspeed = WeatherDataAtPlayer.GetWindSpeed(capi.World.BlockAccessor.GetRainMapHeightAt(plrPos.X, plrPos.Z));
+                surfaceWindSpeedSmoothed.X += ((float)surfwindspeed - surfaceWindSpeedSmoothed.X) * dt;
+                surfaceWindRandCounter = (surfaceWindRandCounter + dt) % (2000 * Math.PI);
+                rndx = (2 * Math.Sin(surfaceWindRandCounter / 8) + Math.Sin(surfaceWindRandCounter / 2) + Math.Sin(0.5 + 2 * surfaceWindRandCounter)) / 10.0;
+                GlobalConstants.CurrentSurfaceWindSpeedClient.Set(surfaceWindSpeedSmoothed.X, surfaceWindSpeedSmoothed.Y, surfaceWindSpeedSmoothed.Z + (float)rndx * surfaceWindSpeedSmoothed.X);
+
 
                 capi.Ambient.CurrentModifiers["weather"] = WeatherDataAtPlayer.BlendedWeatherData.Ambient;
 
-                wetnessScanAccum += dt;
-                if (wetnessScanAccum > 2)
+                wetnessScanAccum2s += dt;
+                if (wetnessScanAccum2s > 2)
                 {
-                    wetnessScanAccum = 0;
+                    wetnessScanAccum2s = 0;
                     double totalDays = capi.World.Calendar.TotalDays;
                     float rainSum = 0;
 
@@ -174,7 +175,7 @@ namespace Vintagestory.GameContent
                         rainSum += weight * capi.World.BlockAccessor.GetClimateAt(plrPos, EnumGetClimateMode.ForSuppliedDateValues, totalDays - i / 24.0 / 4).Rainfall;
                     }
 
-                    CurrentEnvironmentWetness = GameMath.Clamp(rainSum, 0, 1);
+                    CurrentEnvironmentWetness4h = GameMath.Clamp(rainSum, 0, 1);
                 }
             }
         }

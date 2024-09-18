@@ -7,12 +7,17 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    public interface IMeleeAttackListener
+    {
+        void DidAttack(Entity targetEntity);
+    }
+
     public class AiTaskMeleeAttack : AiTaskBaseTargetable
     {
         protected long lastCheckOrAttackMs;
-
         protected float damage = 2f;
         protected float knockbackStrength = 1f;
+
         protected float minDist = 1.5f;
         protected float minVerDist = 1f;
         protected float attackAngleRangeDeg = 20f;
@@ -39,13 +44,11 @@ namespace Vintagestory.GameContent
             base.LoadConfig(taskConfig, aiConfig);
 
             this.tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
-
             this.damage = taskConfig["damage"].AsFloat(2);
             this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 2f));
             this.attackAngleRangeDeg = taskConfig["attackAngleRangeDeg"].AsFloat(20);
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
-
             this.minDist = taskConfig["minDist"].AsFloat(2f);
             this.minVerDist = taskConfig["minVerDist"].AsFloat(1f);
 
@@ -68,7 +71,7 @@ namespace Vintagestory.GameContent
                 return false;
             }
 
-            if (!EmotionStatesSatisifed()) return false;
+            if (!PreconditionsSatisifed()) return false;
 
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
@@ -164,6 +167,11 @@ namespace Vintagestory.GameContent
                 },
                 damage * GlobalConstants.CreatureDamageModifier
             );
+
+            if (entity is IMeleeAttackListener imal)
+            {
+                imal.DidAttack(targetEntity);
+            }
 
             if (alive && !targetEntity.Alive)
             {
