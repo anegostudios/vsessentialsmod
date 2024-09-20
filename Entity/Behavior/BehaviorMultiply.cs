@@ -57,19 +57,19 @@ namespace Vintagestory.GameContent
         public double TotalDaysLastBirth
         {
             get { return multiplyTree.GetDouble("totalDaysLastBirth", -9999); }
-            set { multiplyTree.SetDouble("totalDaysLastBirth", value); }
+            set { multiplyTree.SetDouble("totalDaysLastBirth", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
         public double TotalDaysPregnancyStart
         {
             get { return multiplyTree.GetDouble("totalDaysPregnancyStart"); }
-            set { multiplyTree.SetDouble("totalDaysPregnancyStart", value); }
+            set { multiplyTree.SetDouble("totalDaysPregnancyStart", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
         public bool IsPregnant
         {
             get { return multiplyTree.GetBool("isPregnant"); }
-            set { multiplyTree.SetBool("isPregnant", value); }
+            set { multiplyTree.SetBool("isPregnant", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
         bool eatAnyway = false;
