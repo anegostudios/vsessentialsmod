@@ -482,22 +482,22 @@ namespace Vintagestory.GameContent
                     switch (facing.Index)
                     {
                         case 0: // North
-                            if (dz < minz) outsideCube = dz < 0 || maxz - minz >= MAXROOMSIZE;
+                            if (dz < minz) outsideCube = dz < 0 || maxz - minz - 1 >= MAXROOMSIZE;
                             break;
                         case 1: // East
-                            if (dx > maxx) outsideCube = dx > maxSize || maxx - minx >= MAXROOMSIZE;
+                            if (dx > maxx) outsideCube = dx > maxSize || maxx - minx - 1 >= MAXROOMSIZE;
                             break;
                         case 2: // South
-                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz >= MAXROOMSIZE;
+                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz - 1 >= MAXROOMSIZE;
                             break;
                         case 3: // West
-                            if (dx < minx) outsideCube = dx < 0 || maxx - minx >= MAXROOMSIZE;
+                            if (dx < minx) outsideCube = dx < 0 || maxx - minx - 1 >= MAXROOMSIZE;
                             break;
                         case 4: // Up
-                            if (dy > maxy) outsideCube = dy > maxSize || maxy - miny >= MAXROOMSIZE;
+                            if (dy > maxy) outsideCube = dy > maxSize || maxy - miny - 1 >= MAXROOMSIZE;
                             break;
                         case 5: // Down
-                            if (dy < miny) outsideCube = dy < 0 || maxy - miny >= MAXROOMSIZE;
+                            if (dy < miny) outsideCube = dy < 0 || maxy - miny - 1 >= MAXROOMSIZE;
                             break;
                     }
                     if (outsideCube)
