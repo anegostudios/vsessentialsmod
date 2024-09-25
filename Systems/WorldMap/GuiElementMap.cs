@@ -40,8 +40,21 @@ namespace Vintagestory.GameContent
 
             prevPlayerPos.X = api.World.Player.Entity.Pos.X;
             prevPlayerPos.Z = api.World.Player.Entity.Pos.Z;
+
+            capi.Input.RegisterHotKey(Lang.Get("mapzoom-add"), "mapzoom-add", GlKeys.Plus, HotkeyType.GUIOrOtherControls);
+            capi.Input.SetHotKeyHandler("mapzoom-add", (args) => OnZoomMap(args, add: true));
+
+            capi.Input.RegisterHotKey(Lang.Get("mapzoom-subtract"), "mapzoom-subtract", GlKeys.Minus, HotkeyType.GUIOrOtherControls);
+            capi.Input.SetHotKeyHandler("mapzoom-subtract", (args) => OnZoomMap(args, add: false));
         }
-        
+
+        private bool OnZoomMap(KeyCombination args, bool add)
+        {
+            ZoomAdd(zoomDiff: add ? 0.25f : -0.25f, 
+                px: (float)((api.Input.MouseX - Bounds.absX) / Bounds.InnerWidth), 
+                pz: (float)((api.Input.MouseY - Bounds.absY) / Bounds.InnerHeight));
+            return true;
+        }
 
         public override void ComposeElements(Context ctxStatic, ImageSurface surface)
         {
