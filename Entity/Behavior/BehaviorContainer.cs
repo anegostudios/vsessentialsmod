@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
@@ -8,7 +7,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
-using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 namespace Vintagestory.GameContent
 {
@@ -20,6 +18,7 @@ namespace Vintagestory.GameContent
 
     public interface IAttachableToEntity
     {
+        bool IsAttachable(ItemStack itemStack);
         void CollectTextures(ItemStack stack, Shape shape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict);
         string GetCategoryCode(ItemStack stack);
         CompositeShape GetAttachedShape(ItemStack stack, string slotCode);
@@ -100,6 +99,7 @@ namespace Vintagestory.GameContent
         public string GetCategoryCode(ItemStack stack) => CategoryCode;
         public string[] GetDisableElements(ItemStack stack) => DisableElements;
         public string[] GetKeepElements(ItemStack stack) => KeepElements;
+        public bool IsAttachable(ItemStack itemStack) => true;
     }
 
     public abstract class EntityBehaviorContainer : EntityBehavior

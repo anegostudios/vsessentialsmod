@@ -151,6 +151,10 @@ namespace Vintagestory.GameContent
             return ActiveStatesByCode.ContainsKey(statecode);
         }
 
+        public void ClearStates()
+        {
+            ActiveStatesByCode.Clear();
+        }
         public ActiveEmoState GetActiveEmotionState(string statecode)
         {
             ActiveStatesByCode.TryGetValue(statecode, out var state);

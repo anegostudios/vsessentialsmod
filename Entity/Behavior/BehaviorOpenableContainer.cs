@@ -53,7 +53,7 @@ namespace Vintagestory.GameContent
         {
             bool inRange = (byEntity.World.Side == EnumAppSide.Client && byEntity.Pos.SquareDistanceTo(entity.Pos) <= 5) || (byEntity.World.Side == EnumAppSide.Server && byEntity.Pos.SquareDistanceTo(entity.Pos) <= 14);
 
-            if (!inRange || !byEntity.Controls.Sneak)
+            if (!inRange || !byEntity.Controls.ShiftKey)
             {
                 return;
             }

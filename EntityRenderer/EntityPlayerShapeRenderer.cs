@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Transactions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -242,6 +243,14 @@ namespace Vintagestory.GameContent
             return base.getReadyShader();
         }
 
+        static ModelTransform DefaultTongTransform = new ModelTransform()
+        {
+            Translation = new Vec3f(-0.68f, -0.52f, -0.6f),
+            Rotation = new Vec3f(-26, -13, -88),
+            Origin = new Vec3f(0.5f, 0, 0.5f),
+            Scale = 0.7f
+        };
+
         protected override void RenderHeldItem(float dt, bool isShadowPass, bool right)
         {
             if (IsSelf) entityPlayer.selfNowShadowPass = isShadowPass;
@@ -255,17 +264,14 @@ namespace Vintagestory.GameContent
                 {
                     AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose("LeftHand");
                     ItemRenderInfo renderInfo = capi.Render.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTpOff, dt);
-                    if (stack.ItemAttributes != null)
-                    {
-                        renderInfo.Transform = stack.ItemAttributes["onTongTransform"].AsObject<ModelTransform>(renderInfo.Transform);
-                    }
+                    renderInfo.Transform = stack.ItemAttributes?["onTongTransform"].AsObject(DefaultTongTransform) ?? DefaultTongTransform;
                     RenderItem(dt, isShadowPass, stack, apap, renderInfo);
                     return;
                 }
             }
 
             var ishandrender = HandRenderMode;
-            if ((ishandrender && !isShadowPass && !capi.Settings.Bool["hideFpHands"]) || !ishandrender)
+            if ((ishandrender && /*!isShadowPass &&*/ !capi.Settings.Bool["hideFpHands"]) || !ishandrender)
             {
                 base.RenderHeldItem(dt, isShadowPass, right);
             }
@@ -332,11 +338,13 @@ namespace Vintagestory.GameContent
             {
                 bodyYaw = capi.World.Player.ImmersiveFpMode || HandRenderMode /* <- will this break something? It's needed to prevent hand rotation when mounted on elk */ ? eagent.BodyYaw : eagent.Pos.Yaw;
 
-                float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
-                smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
-                yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
-
-                smoothedBodyYaw += yawDist * Math.Min(0.1f, dt) * 11f;
+                if (!isShadowPass)
+                {
+                    float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
+                    smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
+                    yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
+                    smoothedBodyYaw += yawDist * Math.Min(0.1f, dt) * 25f;
+                }
             }
 
 

@@ -402,7 +402,7 @@ namespace Vintagestory.ServerMods.NoObf
                 {
                     Thread.Sleep(10);   // If necessary, wait for all threads to finish
                     variants = variantLists[i];
-                    if (variants != null && variants.Count > 0) api.Logger.VerboseDebug("Took time to parse " + variants.Count + " variants of " + variants[0].Code.FirstCodePart());
+                    //if (variants != null && variants.Count > 0) api.Logger.VerboseDebug("Took time to parse " + variants.Count + " variants of " + variants[0].Code.FirstCodePart());
                 }
 
                 count += variants.Count;

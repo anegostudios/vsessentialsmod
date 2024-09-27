@@ -352,5 +352,11 @@ namespace Vintagestory.GameContent
             base.OnEntityHurt(source, damage);
         }
 
+        public void ClearAttacker()
+        {
+            attackedByEntity = null;
+            attackedByEntityMs = -9999;
+        }
+
     }
 }

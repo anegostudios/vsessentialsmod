@@ -68,14 +68,14 @@ namespace Vintagestory.GameContent
 
 
         /// <summary>
-        /// List 
+        /// List
         /// </summary>
         public OrderedDictionary<string, CreateIconTextureDelegate> WaypointIcons { get; set; } = new OrderedDictionary<string, CreateIconTextureDelegate>();
 
-        static string[] hexcolors = new string[] { 
-            "#F9D0DC", "#F179AF", "#F15A4A", "#ED272A", "#A30A35", "#FFDE98", "#EFFD5F", "#F6EA5E", "#FDBB3A", "#C8772E", "#F47832", 
+        static string[] hexcolors = new string[] {
+            "#F9D0DC", "#F179AF", "#F15A4A", "#ED272A", "#A30A35", "#FFDE98", "#EFFD5F", "#F6EA5E", "#FDBB3A", "#C8772E", "#F47832",
             "C3D941", "#9FAB3A", "#94C948", "#47B749", "#366E4F", "#516D66", "93D7E3", "#7698CF", "#20909E", "#14A4DD", "#204EA2",
-            "#28417A", "#C395C4", "#92479B", "#8E007E", "#5E3896", "D9D4CE", "#AFAAA8", "#706D64", "#4F4C2B", "#BF9C86", "#9885530", "#5D3D21", "#FFFFFF", "#080504" 
+            "#28417A", "#C395C4", "#92479B", "#8E007E", "#5E3896", "D9D4CE", "#AFAAA8", "#706D64", "#4F4C2B", "#BF9C86", "#9885530", "#5D3D21", "#FFFFFF", "#080504"
         };
 
         public List<int> WaypointColors { get; set; } = new List<int>()
@@ -137,52 +137,53 @@ namespace Vintagestory.GameContent
                         .RequiresPlayer()
                         .HandleWith(OnCmdWayPointDeathWp)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("add")
                         .WithDescription("Add a waypoint to the map")
                         .RequiresPlayer()
                         .WithArgs(parsers.Color("color"), parsers.All("title"))
                         .HandleWith(OnCmdWayPointAdd)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("addp")
                         .RequiresPlayer()
                         .WithDescription("Add a waypoint to the map")
                         .WithArgs(parsers.Color("color"), parsers.All("title"))
                         .HandleWith(OnCmdWayPointAddp)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("addat")
                         .WithDescription("Add a waypoint to the map")
                         .RequiresPlayer()
                         .WithArgs(parsers.WorldPosition("position"), parsers.Bool("pinned"), parsers.Color("color"), parsers.All("title"))
                         .HandleWith(OnCmdWayPointAddat)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("addati")
                         .WithDescription("Add a waypoint to the map")
                         .RequiresPlayer()
                         .WithArgs(parsers.Word("icon"),parsers.WorldPosition("position"), parsers.Bool("pinned"), parsers.Color("color"), parsers.All("title"))
                         .HandleWith(OnCmdWayPointAddati)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("modify")
                         .WithDescription("")
                         .RequiresPlayer()
                         .WithArgs(parsers.Int("waypoint_id"), parsers.Color("color"),parsers.Word("icon"), parsers.Bool("pinned"), parsers.All("title"))
                         .HandleWith(OnCmdWayPointModify)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("remove")
                         .WithDescription("Remove a waypoint by its id. Get a lost of ids using /waypoint list")
                         .RequiresPlayer()
                         .WithArgs(parsers.Int("waypoint_id"))
                         .HandleWith(OnCmdWayPointRemove)
                     .EndSubCommand()
-                    
+
                     .BeginSubCommand("list")
                         .WithDescription("List your own waypoints")
                         .RequiresPlayer()
+                        .WithArgs(parsers.OptionalWordRange("details","details", "d"))
                         .HandleWith(OnCmdWayPointList)
                     .EndSubCommand()
                     ;
@@ -202,7 +203,7 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdWayPointList(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+            var detailed = args[0] as string == "details" || args[0] as string == "d";
             var wps = new StringBuilder();
             var i = 0;
             foreach (var p in Waypoints.Where((p) => p.OwningPlayerUid == args.Caller.Player.PlayerUID).ToArray())
@@ -210,7 +211,14 @@ namespace Vintagestory.GameContent
                 var pos = p.Position.Clone();
                 pos.X -= api.World.DefaultSpawnPosition.X;
                 pos.Z -= api.World.DefaultSpawnPosition.Z;
-                wps.AppendLine(string.Format("{0}: {1} at {2}", i, p.Title, pos.AsBlockPos));
+                if (detailed)
+                {
+                    wps.AppendLine(string.Format("{0}: {1} at {2} {3} {4}", i, p.Title, pos.AsBlockPos, ColorUtil.Int2Hex(p.Color), p.Icon));
+                }
+                else
+                {
+                    wps.AppendLine(string.Format("{0}: {1} at {2}", i, p.Title, pos.AsBlockPos));
+                }
                 i++;
             }
 
@@ -237,7 +245,7 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdWayPointRemove(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var player = args.Caller.Player as IServerPlayer;
             var id = (int)args.Parsers[0].GetValue();
             Waypoint[] ownwpaypoints = Waypoints.Where((p) => p.OwningPlayerUid == player.PlayerUID).ToArray();
@@ -261,7 +269,7 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdWayPointDeathWp(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             if (!api.World.Config.GetBool("allowDeathwaypointing", true))
             {
                 return TextCommandResult.Success(Lang.Get("Death waypointing is disabled on this server"));
@@ -329,47 +337,47 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdWayPointAdd(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var parsedColor = (System.Drawing.Color)args.Parsers[0].GetValue();
             var title = args.Parsers[1].GetValue() as string;
             var player = args.Caller.Player as IServerPlayer;
             return AddWp(player, player.Entity.Pos.XYZ, title, parsedColor,"circle", false);
         }
-        
+
         private TextCommandResult OnCmdWayPointAddp(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var parsedColor = (System.Drawing.Color)args.Parsers[0].GetValue();
             var title = args.Parsers[1].GetValue() as string;
             var player = args.Caller.Player as IServerPlayer;
             return AddWp(player, player.Entity.Pos.XYZ, title, parsedColor,"circle", true);
         }
-        
+
         private TextCommandResult OnCmdWayPointAddat(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var pos = args.Parsers[0].GetValue() as Vec3d;
             var pinned = (bool)args.Parsers[1].GetValue();
             var parsedColor = (System.Drawing.Color)args.Parsers[2].GetValue();
             var title = args.Parsers[3].GetValue() as string;
-            
-            
+
+
             var player = args.Caller.Player as IServerPlayer;
             return AddWp(player, pos, title, parsedColor,"circle", pinned);
         }
-        
+
         private TextCommandResult OnCmdWayPointAddati(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var icon = args.Parsers[0].GetValue() as string;
             var pos = args.Parsers[1].GetValue() as Vec3d;
             var pinned = (bool)args.Parsers[2].GetValue();
             var parsedColor = (System.Drawing.Color)args.Parsers[3].GetValue();
             var title = args.Parsers[4].GetValue() as string;
-            
+
             var player = args.Caller.Player as IServerPlayer;
             return AddWp(player, pos, title, parsedColor,icon, pinned);
         }
@@ -377,14 +385,14 @@ namespace Vintagestory.GameContent
         private TextCommandResult OnCmdWayPointModify(TextCommandCallingArgs args)
         {
             if (IsMapDisallowed(out var textCommandResult)) return textCommandResult;
-            
+
             var wpIndex = (int)args.Parsers[0].GetValue();
-            
+
             var parsedColor = (System.Drawing.Color)args.Parsers[1].GetValue();
             var icon = args.Parsers[2].GetValue() as string;
             var pinned = (bool)args.Parsers[3].GetValue();
             var title = args.Parsers[4].GetValue() as string;
-            
+
             var player = args.Caller.Player as IServerPlayer;
 
             var playerWaypoints = Waypoints.Where(p => p.OwningPlayerUid == player.PlayerUID).ToArray();
@@ -449,14 +457,14 @@ namespace Vintagestory.GameContent
         {
             sapi.WorldManager.SaveGame.StoreData("playerMapMarkers_v2", SerializerUtil.Serialize(Waypoints));
         }
-        
+
 
         public override void OnViewChangedServer(IServerPlayer fromPlayer, List<Vec2i> nowVisible, List<Vec2i> nowHidden)
         {
             ResendWaypoints(fromPlayer);
         }
 
-        
+
         public override void OnMapOpenedClient()
         {
             reloadIconTextures();
@@ -483,7 +491,7 @@ namespace Vintagestory.GameContent
         protected void ensureIconTexturesLoaded()
         {
             if (texturesByIcon != null) return;
-            
+
             texturesByIcon = new Dictionary<string, LoadedTexture>();
 
             foreach (var val in WaypointIcons)
@@ -558,7 +566,7 @@ namespace Vintagestory.GameContent
                     if (wp.Guid == null) wp.Guid = Guid.NewGuid().ToString();
                 }
             }
-            
+
         }
 
         public override void OnDataFromServer(byte[] data)
@@ -595,7 +603,7 @@ namespace Vintagestory.GameContent
 
             for (int i = 0; i < ownWaypoints.Count; i++)
             {
-                WaypointMapComponent comp = new WaypointMapComponent(i, ownWaypoints[i], this, api as ICoreClientAPI);  
+                WaypointMapComponent comp = new WaypointMapComponent(i, ownWaypoints[i], this, api as ICoreClientAPI);
 
                 wayPointComponents.Add(comp);
             }

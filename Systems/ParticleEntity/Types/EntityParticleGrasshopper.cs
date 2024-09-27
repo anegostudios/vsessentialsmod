@@ -30,7 +30,7 @@ namespace Vintagestory.GameContent
 
         protected override bool shouldPlaySound()
         {
-            if (rand.NextDouble() < 0.015 && capi.World.BlockAccessor.GetLightLevel(Position.AsBlockPos, EnumLightLevelType.TimeOfDaySunLight) > 7)
+            if (rand.NextDouble() < 0.01 && capi.World.BlockAccessor.GetLightLevel(Position.AsBlockPos, EnumLightLevelType.TimeOfDaySunLight) > 7)
             {
                 var season = capi.World.Calendar.GetSeasonRel(Position.AsBlockPos);
 

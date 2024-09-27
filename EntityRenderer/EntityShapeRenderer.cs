@@ -980,7 +980,7 @@ namespace Vintagestory.GameContent
                 if (im?.Controller != null)
                 {
                     var seat = im.GetSeatOfMountedEntity(im.Controller);
-                    if (!seat.Controls.Left && !seat.Controls.Right)
+                    if (seat != null && (!seat.Controls.Left && !seat.Controls.Right))
                     {
                         dx = 0;
                         dz = 0;

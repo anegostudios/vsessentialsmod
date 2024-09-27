@@ -64,6 +64,5 @@ namespace Vintagestory.GameContent
                 return entity.World.GetEntityById(id);
             }
         }
-
     }
 }

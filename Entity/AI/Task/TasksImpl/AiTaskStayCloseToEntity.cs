@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -18,8 +19,12 @@ namespace Vintagestory.GameContent
         protected bool onlyIfLowerId = false;
         protected bool allowTeleport;
         protected float teleportAfterRange;
+        protected int teleportToRange;
+        public int TeleportMaxRange;
 
         protected Vec3d targetOffset = new Vec3d();
+
+        protected Vec3d initialTargetPos;
 
         public AiTaskStayCloseToEntity(EntityAgent entity) : base(entity)
         {
@@ -36,8 +41,9 @@ namespace Vintagestory.GameContent
             entityCode = taskConfig["entityCode"].AsString();
             allowTeleport = taskConfig["allowTeleport"].AsBool();
             teleportAfterRange = taskConfig["teleportAfterRange"].AsFloat(30f);
+            teleportToRange = taskConfig["teleportToRange"].AsInt(1);
+            TeleportMaxRange = taskConfig["teleportMaxRange"].AsInt(int.MaxValue);
         }
-
 
         public override bool ShouldExecute()
         {
@@ -78,12 +84,17 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
+            initialTargetPos = targetEntity.ServerPos.XYZ;
+
+            if (targetEntity.ServerPos.DistanceTo(entity.ServerPos) > TeleportMaxRange)
+            {
+                stuck = true;
+                return;
+            }
+
             float size = targetEntity.SelectionBox.XSize;
-
             pathTraverser.NavigateTo_Async(targetEntity.ServerPos.XYZ, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, OnNoPath, 1000, 1);
-
             targetOffset.Set(entity.World.Rand.NextDouble() * 2 - 1, 0, entity.World.Rand.NextDouble() * 2 - 1);
-
             stuck = false;
         }
 
@@ -94,6 +105,12 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
+            if (initialTargetPos.DistanceTo(targetEntity.ServerPos.XYZ) > 3)
+            {
+                initialTargetPos = targetEntity.ServerPos.XYZ;
+                pathTraverser.Retarget();
+            }
+
             double x = targetEntity.ServerPos.X + targetOffset.X;
             double y = targetEntity.ServerPos.Y;
             double z = targetEntity.ServerPos.Z + targetOffset.Z;
@@ -125,9 +142,9 @@ namespace Vintagestory.GameContent
 
             Vec3d pos = new Vec3d();
             BlockPos bpos = new BlockPos();
-            for (int i = 0; i < 30; i++)
+            for (int i = teleportToRange; i < teleportToRange+30; i++)
             {
-                float range = GameMath.Clamp(i / 4f, 2, 4.5f);
+                float range = GameMath.Clamp(i / 5f, 2, 4.5f);
 
                 double rndx = rnd.NextDouble() * 2 * range - range;
                 double rndz = rnd.NextDouble() * 2 * range - range;

@@ -465,9 +465,10 @@ namespace Vintagestory.Essentials
 
             double curPosY = entity.ServerPos.Y;
             sqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
-            sqDistToTarget += Math.Min(Math.Min(DiffSquared(target.Y, curPosY), DiffSquared(target.Y, curPosY - 1)),       // One block above is also ok
-                DiffSquared(target.Y, curPosY + 0.5f) // Half a block below is also okay
-            );
+
+            var vdistsq = (target.Y - curPosY) * (target.Y - curPosY);
+            bool above = curPosY > target.Y;
+            sqDistToTarget += (float)Math.Max(0, vdistsq - (above ? 1 : 0.5)); // Ok to be up to 1 block above or 0.5 blocks below
 
             if (!nearHorizontally)
             {

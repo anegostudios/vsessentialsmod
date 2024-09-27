@@ -265,7 +265,7 @@ namespace Vintagestory.GameContent
             if (climate.Temperature >= 30 || climate.Temperature < 18 || climate.Rainfall > 0.1f || climate.WorldgenRainfall < 0.5) return;
 
             var noise = grasshopperNoise.Noise(pos.X, pos.Z);
-            if (noise < 0.65) return;
+            if (noise < 0.7) return;
 
             if (sys.Count["grassHopper"] > 40) return;
 
@@ -292,7 +292,7 @@ namespace Vintagestory.GameContent
             if (climate.Temperature > 33 || climate.Temperature < 22 || climate.WorldGenTemperature < 10 || climate.Rainfall > 0.1f || climate.WorldgenRainfall < 0.5) return;
 
             var noise = cicadaNoise.Noise(pos.X, pos.Z, (int)capi.World.Calendar.Year); // Change the location of the cicadas every year
-            if (noise < 0.65) return;
+            if (noise < 0.7) return;
             if (sys.Count["cicada"] > 40) return;
 
             for (int i = 0; i < 400; i++)

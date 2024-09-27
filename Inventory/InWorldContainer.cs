@@ -35,9 +35,11 @@ namespace Vintagestory.GameContent
 
         string treeAttrKey;
 
-        public InWorldContainer(InventorySupplierDelegate invnentorySupplier, string treeAttrKey)
+        InventoryBase prevInventory;
+
+        public InWorldContainer(InventorySupplierDelegate inventorySupplier, string treeAttrKey)
         {
-            this.inventorySupplier = invnentorySupplier;
+            this.inventorySupplier = inventorySupplier;
             this.treeAttrKey = treeAttrKey;
         }
 
@@ -52,9 +54,23 @@ namespace Vintagestory.GameContent
         }
 
         bool didInit = false;
+
+        public void Reset()
+        {
+            didInit = false;
+        }
         public void LateInit()
         {
             if (Inventory == null || didInit) return;
+
+            if (prevInventory != null && Inventory != prevInventory) // New inventory instance? Do remove the events
+            {
+                prevInventory.OnAcquireTransitionSpeed -= Inventory_OnAcquireTransitionSpeed;
+                if (Api.Side == EnumAppSide.Client)
+                {
+                    prevInventory.OnInventoryOpened -= Inventory_OnInventoryOpenedClient;
+                }
+            }
 
             didInit = true;
             Inventory.ResolveBlocksOrItems();
@@ -63,6 +79,8 @@ namespace Vintagestory.GameContent
             {
                 Inventory.OnInventoryOpened += Inventory_OnInventoryOpenedClient;
             }
+
+            prevInventory = Inventory;
         }
 
         private void Inventory_OnInventoryOpenedClient(IPlayer player)

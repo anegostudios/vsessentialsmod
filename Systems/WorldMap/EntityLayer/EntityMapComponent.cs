@@ -89,8 +89,9 @@ namespace Vintagestory.GameContent
 
             double mouseX = args.X - mapElem.Bounds.renderX;
             double mouseY = args.Y - mapElem.Bounds.renderY;
+            double sc = GuiElement.scaled(5);
 
-            if (Math.Abs(viewPos.X - mouseX) < 5 && Math.Abs(viewPos.Y - mouseY) < 5)
+            if (Math.Abs(viewPos.X - mouseX) < sc && Math.Abs(viewPos.Y - mouseY) < sc)
             {
                 EntityPlayer eplr = entity as EntityPlayer;
                 if (eplr != null)

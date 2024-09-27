@@ -11,11 +11,15 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
-    public interface IAttachedInteractions
+
+    public interface IAttachedListener
+    {
+        void OnAttached(ItemSlot itemslot, int slotIndex, Entity toEntity, EntityAgent byEntity);
+        void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity);
+    }
+    public interface IAttachedInteractions : IAttachedListener
     {
         bool OnTryAttach(ItemSlot itemslot, int slotIndex, Entity toEntity);
-        void OnAttached(ItemSlot itemslot, int slotIndex, Entity toEntity);
-        void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity);
         void OnInteract(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled, Action onRequireSave);
         void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn);
         void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave);
@@ -157,7 +161,7 @@ namespace Vintagestory.GameContent
 
 
 
-        public void OnAttached(ItemSlot itemslot, int slotIndex, Entity toEntity)
+        public void OnAttached(ItemSlot itemslot, int slotIndex, Entity toEntity, EntityAgent byEntity)
         {
 
         }
@@ -170,12 +174,12 @@ namespace Vintagestory.GameContent
 
         public AttachedContainerWorkspace getOrCreateContainerWorkspace(int slotIndex, Entity onEntity, Action onRequireSave)
         {
-            return ObjectCacheUtil.GetOrCreate(onEntity.Api, "att-cont-workspace-" + slotIndex + "-" + onEntity.EntityId, () => new AttachedContainerWorkspace(onEntity, onRequireSave));
+            return ObjectCacheUtil.GetOrCreate(onEntity.Api, "att-cont-workspace-" + slotIndex + "-" + onEntity.EntityId + "-" + collObj.Id, () => new AttachedContainerWorkspace(onEntity, onRequireSave));
         }
 
         public AttachedContainerWorkspace getContainerWorkspace(int slotIndex, Entity onEntity)
         {
-            return ObjectCacheUtil.TryGet<AttachedContainerWorkspace>(onEntity.Api, "att-cont-workspace-" + slotIndex + "-" + onEntity.EntityId);
+            return ObjectCacheUtil.TryGet<AttachedContainerWorkspace>(onEntity.Api, "att-cont-workspace-" + slotIndex + "-" + onEntity.EntityId + "-" + collObj.Id);
         }
 
 

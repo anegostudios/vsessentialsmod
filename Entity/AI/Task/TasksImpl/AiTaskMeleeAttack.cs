@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
 
             this.tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
             this.damage = taskConfig["damage"].AsFloat(2);
-            this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 2f));
+            this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 4f));
             this.attackAngleRangeDeg = taskConfig["attackAngleRangeDeg"].AsFloat(20);
             this.attackDurationMs = taskConfig["attackDurationMs"].AsInt(1500);
             this.damagePlayerAtMs = taskConfig["damagePlayerAtMs"].AsInt(1000);
