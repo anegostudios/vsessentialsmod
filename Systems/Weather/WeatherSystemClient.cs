@@ -89,7 +89,7 @@ namespace Vintagestory.GameContent
             simParticles = new WeatherSimulationParticles(capi, this);
             auroraRenderer = new AuroraRenderer(capi, this);
 
-            capi.Logger.Notification("Initialised WeatherSystemClient.  simLightning is " + (simLightning == null ? "null." : "good."));
+            capi.Logger.Notification("Initialised WeatherSystemClient. simLightning is " + (simLightning == null ? "null." : "loaded."));
         }
 
         private void OnCloudLevelRelPacket(WeatherCloudYposPacket msg)

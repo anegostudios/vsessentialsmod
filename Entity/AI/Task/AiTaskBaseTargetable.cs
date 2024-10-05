@@ -293,9 +293,9 @@ namespace Vintagestory.GameContent
         }
 
 
-        Vec3d collTmpVec = new Vec3d();
-        float stepHeight;
-        bool traversable(Vec3d pos)
+        protected Vec3d collTmpVec = new Vec3d();
+        protected float stepHeight;
+        protected bool traversable(Vec3d pos)
         {
             return
                 !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, pos, false) ||

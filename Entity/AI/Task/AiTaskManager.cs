@@ -323,7 +323,7 @@ namespace Vintagestory.GameContent
                         if (activeTasksBySlot[slot] != null)
                         {
                             activeTasksBySlot[slot].FinishExecute(true);
-                            OnTaskStopped.Invoke(activeTasksBySlot[slot]);
+                            OnTaskStopped?.Invoke(activeTasksBySlot[slot]);
                         }
 
                         activeTasksBySlot[slot] = task;

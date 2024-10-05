@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -25,7 +26,7 @@ namespace Vintagestory.GameContent
         bool rainSoundsOn;
         bool hailSoundsOn;
 
-        
+
         float curWindVolumeLeafy = 0f;
         float curWindVolumeLeafless = 0f;
         float curRainVolumeLeafy = 0f;
@@ -41,6 +42,7 @@ namespace Vintagestory.GameContent
 
         bool searchComplete = true;
         public static float roomVolumePitchLoss;
+        private bool soundsReady;
 
 
         BlockPos plrPos = new BlockPos();
@@ -154,9 +156,24 @@ namespace Vintagestory.GameContent
             }*/
         }
 
-
         private void updateSounds(float dt)
         {
+            if (!soundsReady)
+            {
+                if (lowTrembleSound.IsReady && hailSound.IsReady &&
+                    rainSoundsLeafless.All(s => s.IsReady) &&
+                    rainSoundsLeafy.All(s => s.IsReady) &&
+                    windSoundLeafy.IsReady &&
+                    windSoundLeafless.IsReady)
+                {
+                    soundsReady = true;
+                }
+                else
+                {
+                    return;
+                }
+            }
+
             float targetRainVolumeLeafy=0;
             float targetRainVolumeLeafless = 0;
             float targetHailVolume=0;
@@ -220,7 +237,7 @@ namespace Vintagestory.GameContent
                         curRainPitch = targetRainPitch;
                     }
 
-                    if (capi.World.Player.Entity.IsEyesSubmerged()) { 
+                    if (capi.World.Player.Entity.IsEyesSubmerged()) {
                         curRainPitch = targetRainPitch / 2;
                         targetRainVolumeLeafy *= 0.75f;
                         targetRainVolumeLeafless *= 0.75f;
@@ -246,7 +263,6 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            
             curRainVolumeLeafy += (targetRainVolumeLeafy - curRainVolumeLeafy) * dt / 2;
             curRainVolumeLeafless += (targetRainVolumeLeafless - curRainVolumeLeafless) * dt / 2;
 
@@ -257,10 +273,6 @@ namespace Vintagestory.GameContent
             curHailPitch += (targetHailPitch - curHailPitch) * dt;
             curRainPitch += (targetRainPitch - curRainPitch) * dt;
             curTremblePitch += (targetTremblePitch - curTremblePitch) * dt;
-
-
-
-
 
             if (rainSoundsOn)
             {
@@ -319,8 +331,8 @@ namespace Vintagestory.GameContent
                 curWindVolumeLeafy += (targetVolumeLeafy - curWindVolumeLeafy) * dt;
                 curWindVolumeLeafless += (targetVolumeLeafless - curWindVolumeLeafless) * dt;
 
-                windSoundLeafy?.SetVolume(curWindVolumeLeafy);
-                windSoundLeafless?.SetVolume(curWindVolumeLeafless);
+                windSoundLeafy?.SetVolume(Math.Max(0, curWindVolumeLeafy));
+                windSoundLeafless?.SetVolume(Math.Max(0, curWindVolumeLeafless));
 
             }
             else

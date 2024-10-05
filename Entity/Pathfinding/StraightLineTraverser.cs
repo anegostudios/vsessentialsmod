@@ -112,7 +112,7 @@ namespace Vintagestory.Essentials
             double cosYaw = Math.Cos(entity.ServerPos.Yaw);
             double sinYaw = Math.Sin(entity.ServerPos.Yaw);
             controls.WalkVector.Set(sinYaw, GameMath.Clamp(targetVec.Y, -1, 1), cosYaw);
-            controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier);
+            controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier / Math.Max(1, yawDist * 3));
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
             if (entity.Properties.RotateModelOnClimb && entity.Controls.IsClimbing && entity.ClimbingOnFace != null && entity.Alive)

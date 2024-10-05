@@ -530,6 +530,8 @@ namespace Vintagestory.GameContent
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
 
+                var vec = ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor((stack.Item?.FirstTexture ?? stack.Block.FirstTextureInventory).Baked.TextureSubId));
+                prog.Uniform("averageColor", vec);
                 prog.Uniform("extraGlow", (int)gi);
                 prog.Uniform("rgbaAmbientIn", rapi.AmbientColor);
                 prog.Uniform("rgbaLightIn", lightrgbs);
@@ -965,7 +967,16 @@ namespace Vintagestory.GameContent
             }
             if (eagent?.MountedOn != null || entity.Properties.Habitat == EnumHabitat.Air)
             {
-                eagent.sidewaysSwivelAngle = 0;
+                nowSwivelRad = 0;
+                targetSwivelRad = 0;
+                if (eagent != null) eagent.sidewaysSwivelAngle = 0;
+                return;
+            }
+            if (entity.Properties.Habitat == EnumHabitat.Land && entity.Swimming)
+            {
+                nowSwivelRad = 0;
+                targetSwivelRad = 0;
+                if (eagent != null) eagent.sidewaysSwivelAngle = 0;
                 return;
             }
 
@@ -1015,8 +1026,6 @@ namespace Vintagestory.GameContent
             {
                 eagent.sidewaysSwivelAngle = nowSwivelRad;
             }
-
-
         }
 
         #endregion

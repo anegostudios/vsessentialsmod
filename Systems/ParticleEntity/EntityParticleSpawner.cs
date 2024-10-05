@@ -216,8 +216,9 @@ namespace Vintagestory.GameContent
                 if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 3) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
-                var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y-1, (int)z);
-                if (block.LiquidCode == "water" && block.PushVector == null && belowblock.Replaceable < 6000)
+                var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y - 1, (int)z);
+                var aboveblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
+                if (block.LiquidCode == "water" && block.PushVector == null && belowblock.Replaceable < 6000 && aboveblock.Id == 0)
                 {
                     var ws = new EntityParticleWaterStrider(capi, x, y + block.LiquidLevel / 8f, z);
                     sys.SpawnParticle(ws);

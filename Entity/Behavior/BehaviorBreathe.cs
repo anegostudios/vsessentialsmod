@@ -78,11 +78,6 @@ namespace Vintagestory.GameContent
             breathAccum = (float)entity.World.Rand.NextDouble();
         }
 
-        protected virtual void OnTreeModified()
-        {
-            ;
-        }
-
         public override void OnEntityRevive()
         {
             Oxygen = MaxOxygen;

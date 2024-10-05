@@ -426,12 +426,14 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             entity.Swimming = false;
             entity.OnGround = false;
-
-            pos.SetPos(agent.MountedOn.SeatPosition);
+            var seatPos = agent.MountedOn.SeatPosition;
             
             if (!(agent is EntityPlayer))
             {
                 pos.SetFrom(agent.MountedOn.SeatPosition);
+            } else
+            {
+                pos.SetPos(agent.MountedOn.SeatPosition);
             }
 
             pos.Motion.X = 0;
