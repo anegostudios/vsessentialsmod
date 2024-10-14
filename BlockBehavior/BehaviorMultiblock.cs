@@ -84,7 +84,7 @@ namespace Vintagestory.GameContent
             int x = controllerPos.X - ControllerPositionRel.X;
             int y = controllerPos.Y - ControllerPositionRel.Y;
             int z = controllerPos.Z - ControllerPositionRel.Z;
-            BlockPos tmpPos = new BlockPos();
+            BlockPos tmpPos = new BlockPos(controllerPos.dimension);
 
             for (int dx = 0; dx < SizeX; dx++)
             {

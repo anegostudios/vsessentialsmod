@@ -213,6 +213,7 @@ namespace Vintagestory.GameContent
         {
             getContainerWorkspace(slotIndex, onEntity)?.OnDespawn();
         }
+
     }
 
 

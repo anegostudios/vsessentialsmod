@@ -237,6 +237,7 @@ namespace Vintagestory.GameContent
 
             ServerPos.SetPos(initialPos);
             ServerPos.X += 0.5;
+            ServerPos.Y += 0.01;
             ServerPos.Z += 0.5;
 
             Pos.SetFrom(ServerPos);
@@ -260,7 +261,7 @@ namespace Vintagestory.GameContent
 
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
 
-			SidedPos.Motion.Y = -0.02;
+			//SidedPos.Motion.Y = -0.02;
 
             if (drops != null && drops.Length > 0)
             {

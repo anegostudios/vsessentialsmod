@@ -146,14 +146,24 @@ namespace Vintagestory.GameContent
                 dt = Math.Min(0.5f, dt);
 
                 // Windspeed should be stored inside ClimateConditions and not be a global constant
-                double windspeed = WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
-                windSpeedSmoothed.X += ((float)windspeed - windSpeedSmoothed.X) * dt;
+                var windspeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd); // WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
+                windSpeedSmoothed.X += ((float)windspeed.X - windSpeedSmoothed.X) * dt;
+                windSpeedSmoothed.Y += ((float)windspeed.Y - windSpeedSmoothed.Y) * dt;
+                windSpeedSmoothed.Z += ((float)windspeed.Z - windSpeedSmoothed.Z) * dt;
+
                 windRandCounter = (windRandCounter + dt) % (2000 * Math.PI);
                 double rndx = (2 * Math.Sin(windRandCounter / 8) + Math.Sin(windRandCounter / 2) + Math.Sin(0.5 + 2 * windRandCounter)) / 10.0;
                 GlobalConstants.CurrentWindSpeedClient.Set(windSpeedSmoothed.X, windSpeedSmoothed.Y, windSpeedSmoothed.Z + (float)rndx * windSpeedSmoothed.X);
 
-                double surfwindspeed = WeatherDataAtPlayer.GetWindSpeed(capi.World.BlockAccessor.GetRainMapHeightAt(plrPos.X, plrPos.Z));
-                surfaceWindSpeedSmoothed.X += ((float)surfwindspeed - surfaceWindSpeedSmoothed.X) * dt;
+                var rainy = capi.World.BlockAccessor.GetRainMapHeightAt(plrPos.X, plrPos.Z);
+                plrPosd.Y = rainy;
+                
+
+                var surfacewindspeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd); // WeatherDataAtPlayer.GetWindSpeed(plrPos);
+                surfaceWindSpeedSmoothed.X += ((float)surfacewindspeed.X - surfaceWindSpeedSmoothed.X) * dt;
+                surfaceWindSpeedSmoothed.Y += ((float)surfacewindspeed.Y - surfaceWindSpeedSmoothed.Y) * dt;
+                surfaceWindSpeedSmoothed.Z += ((float)surfacewindspeed.Z - surfaceWindSpeedSmoothed.Z) * dt;
+
                 surfaceWindRandCounter = (surfaceWindRandCounter + dt) % (2000 * Math.PI);
                 rndx = (2 * Math.Sin(surfaceWindRandCounter / 8) + Math.Sin(surfaceWindRandCounter / 2) + Math.Sin(0.5 + 2 * surfaceWindRandCounter)) / 10.0;
                 GlobalConstants.CurrentSurfaceWindSpeedClient.Set(surfaceWindSpeedSmoothed.X, surfaceWindSpeedSmoothed.Y, surfaceWindSpeedSmoothed.Z + (float)rndx * surfaceWindSpeedSmoothed.X);

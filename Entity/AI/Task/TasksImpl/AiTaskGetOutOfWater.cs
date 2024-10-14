@@ -12,6 +12,7 @@ namespace Vintagestory.GameContent
 
         bool done;
         float moveSpeed = 0.03f;
+        int searchattempts = 0;
 
         public AiTaskGetOutOfWater(EntityAgent entity) : base(entity)
         {
@@ -30,32 +31,36 @@ namespace Vintagestory.GameContent
             if (!entity.Swimming) return false;
             if (rand.NextDouble() > 0.04f) return false;
 
+            int range = GameMath.Min(50, 30 + searchattempts*2);
 
             target.Y = entity.ServerPos.Y;
-            int tries = 6;
+            int tries = 10;
             int px = (int) entity.ServerPos.X;
             int pz = (int)entity.ServerPos.Z;
             IBlockAccessor blockAccessor = entity.World.BlockAccessor;
+            Vec3d tmpPos = new Vec3d();
             while (tries-- > 0)
             {
-                pos.X = px + rand.Next(21) - 10;
-                pos.Z = pz + rand.Next(21) - 10;
-                pos.Y = blockAccessor.GetTerrainMapheightAt(pos);
+                pos.X = px + rand.Next(range+1) - range / 2;
+                pos.Z = pz + rand.Next(range+1) - range / 2;
+                pos.Y = blockAccessor.GetTerrainMapheightAt(pos)+1;
+                
+                var fblock = blockAccessor.GetBlock(pos, BlockLayersAccess.Fluid);
+                if (fblock.IsLiquid()) continue;
 
-                Cuboidf[] blockBoxes = blockAccessor.GetBlock(pos).GetCollisionBoxes(blockAccessor, pos);
-                pos.Y--;
-                Cuboidf[] belowBoxes = blockAccessor.GetBlock(pos).GetCollisionBoxes(blockAccessor, pos);
+                var block = blockAccessor.GetBlock(pos);
 
-                bool canStep = blockBoxes == null || blockBoxes.Max((cuboid) => cuboid.Y2) <= 1f;
-                bool canStand = belowBoxes != null && belowBoxes.Length > 0;
-
-                if (canStand && canStep)
+                if (!entity.World.CollisionTester.IsColliding(blockAccessor, entity.CollisionBox, tmpPos.Set(pos.X + 0.5, pos.Y + 0.1f, pos.Z + 0.5)))
                 {
-                    target.Set(pos.X + 0.5, pos.Y + 1, pos.Z + 0.5);
-                    return true;
+                    if (entity.World.CollisionTester.IsColliding(blockAccessor, entity.CollisionBox, tmpPos.Set(pos.X + 0.5, pos.Y - 0.1f, pos.Z + 0.5)))
+                    {
+                        target.Set(pos.X + 0.5, pos.Y + 1, pos.Z + 0.5);
+                        return true;
+                    }
                 }
             }
 
+            searchattempts++;
             return false;
         }
 
@@ -63,6 +68,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
+            searchattempts = 0;
             done = false;
             pathTraverser.WalkTowards(target, moveSpeed, 0.5f, OnGoalReached, OnStuck);
 

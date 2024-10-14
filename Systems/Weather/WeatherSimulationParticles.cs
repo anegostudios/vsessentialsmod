@@ -278,12 +278,12 @@ namespace Vintagestory.GameContent
 
 
                     WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
-                    float windIntensity = weatherData.curWindSpeed.Length();
+                    
                     var bpos = capi.World.Player.Entity.Pos.AsBlockPos;
                     var climate = capi.World.BlockAccessor.GetClimateAt(bpos, EnumGetClimateMode.NowValues);
                     var sunlightrel = capi.World.BlockAccessor.GetLightLevel(bpos, EnumLightLevelType.OnlySunLight) / 22f;
 
-                    float climateWeight = 2f * Math.Max(0, windIntensity - 0.65f) * (1 - climate.WorldgenRainfall) * (1 - climate.Rainfall);
+                    float climateWeight = 2f * Math.Max(0, windSpeedIntensity - 0.65f) * (1 - climate.WorldgenRainfall) * (1 - climate.Rainfall);
 
                     var pos = capi.World.Player.Entity.Pos.AsBlockPos;
                     targetFogColor[0] = targetFogColor[1] = targetFogColor[2] = 0;
@@ -321,6 +321,9 @@ namespace Vintagestory.GameContent
             desertStormAmbient.FogColor.Weight += (Math.Min(1, 2*targetFogDensity) - desertStormAmbient.FogColor.Weight) * dtf;
         }
 
+
+        Vec3f windSpeed;
+        float windSpeedIntensity;
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
         {
             WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
@@ -367,17 +370,16 @@ namespace Vintagestory.GameContent
             }
 
 
-            
-            
+            windSpeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPos.XYZ).ToVec3f();
+            windSpeedIntensity = (float)windSpeed.Length();
 
-            parentVeloSnow.X = -Math.Max(0, weatherData.curWindSpeed.X / 2 - 0.15f) * 2;
+            parentVeloSnow.X = -Math.Max(0, (float)windSpeed.X / 2f - 0.15f) * 2f;
             parentVeloSnow.Y = 0;
-            parentVeloSnow.Z = -Math.Max(0, weatherData.curWindSpeed.Z / 2 - 0.15f) * 2;
+            parentVeloSnow.Z = -Math.Max(0, (float)windSpeed.Z / 2f - 0.15f) * 2f;
 
-            float windIntensity = weatherData.curWindSpeed.Length();
-
+            
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
-            if (windIntensity > 0.5f) // && particlePos.Y - rainYPos < 10
+            if (windSpeedIntensity > 0.5f) // && particlePos.Y - rainYPos < 10
             {
                 SpawnDustParticles(manager, weatherData, plrPos, dryness, onwaterSplashParticleColor);
             }
@@ -410,16 +412,16 @@ namespace Vintagestory.GameContent
 
         private void SpawnDustParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, EntityPos plrPos, float dryness, int onwaterSplashParticleColor)
         {
-            float dx = (float)(plrPos.Motion.X * 40) - 50 * weatherData.curWindSpeed.X;
+            float dx = (float)(plrPos.Motion.X * 40) - 50 * windSpeed.X;
             float dy = (float)(plrPos.Motion.Y * 40);
-            float dz = (float)(plrPos.Motion.Z * 40) - 50 * weatherData.curWindSpeed.Z;
+            float dz = (float)(plrPos.Motion.Z * 40) - 50 * windSpeed.Z;
 
             double range = 40;
             // Particles are less visible during fog so we can abuse the situation to make it more particle rich
             float rangReduction = 1 - targetFogDensity;
             range *= rangReduction;
 
-            float intensity = weatherData.curWindSpeed.Length();
+            float intensity = windSpeed.Length();
 
             stormDustParticles.MinPos.Set(particlePos.X - range + dx, particlePos.Y + 20 + 5 * intensity + dy, particlePos.Z - range + dz);
             stormDustParticles.AddPos.Set(2*range, -30, 2*range);
@@ -434,10 +436,10 @@ namespace Vintagestory.GameContent
             stormDustParticles.MinSize = 0.2f;
             stormDustParticles.MaxSize = 0.7f;
 
-            stormDustParticles.MinVelocity.Set(-0.025f + 12 * weatherData.curWindSpeed.X, 0f, -0.025f + 12 * weatherData.curWindSpeed.Z).Mul(3);
-            stormDustParticles.AddVelocity.Set(0.05f + 6 * weatherData.curWindSpeed.X, -0.25f, 0.05f + 6 * weatherData.curWindSpeed.Z).Mul(3);
+            stormDustParticles.MinVelocity.Set(-0.025f + 12 * windSpeed.X, 0f, -0.025f + 12 * windSpeed.Z).Mul(3);
+            stormDustParticles.AddVelocity.Set(0.05f + 6 * windSpeed.X, -0.25f, 0.05f + 6 * windSpeed.Z).Mul(3);
 
-            float extra = Math.Max(1, intensity * 8);
+            float extra = Math.Max(1, intensity * 3);
             int cnt = (int)(dustParticlesPerTick * extra);
 
             for (int i = 0; i < cnt; i++)
@@ -472,14 +474,14 @@ namespace Vintagestory.GameContent
 
             spawnCount++;
 
-            if (weatherData.curWindSpeed.Length() > 0.85f)
+            if (intensity > 0.85f)
             {
                 stormWaterParticles.AddVelocity.Y = 1.5f;
                 stormWaterParticles.LifeLength = 0.17f;
                 stormWaterParticles.WindAffected = true;
                 stormWaterParticles.WindAffectednes = 1f;
                 stormWaterParticles.GravityEffect = 0.4f;
-                stormWaterParticles.MinVelocity.Set(-0.025f + 4 * weatherData.curWindSpeed.X, 1.5f, -0.025f + 4 * weatherData.curWindSpeed.Z);
+                stormWaterParticles.MinVelocity.Set(-0.025f + 4 * windSpeed.X, 1.5f, -0.025f + 4 * windSpeed.Z);
                 stormWaterParticles.Color = onwaterSplashParticleColor;
                 //stormWaterParticles.Color |= 140 << 24;
                 stormWaterParticles.MinQuantity = 1;
@@ -507,9 +509,9 @@ namespace Vintagestory.GameContent
 
 
                     splashParticles.MinPos.Set(px, py + block.TopMiddlePos.Y - 1 / 8f, pz);
-                    splashParticles.MinVelocity.X = weatherData.curWindSpeed.X * 1.5f;
+                    splashParticles.MinVelocity.X = windSpeed.X * 1.5f;
                     splashParticles.AddVelocity.Y = 1.5f;
-                    splashParticles.MinVelocity.Z = weatherData.curWindSpeed.Z * 1.5f;
+                    splashParticles.MinVelocity.Z = windSpeed.Z * 1.5f;
                     splashParticles.LifeLength = 0.17f;
 
                     splashParticles.Color = onwaterSplashParticleColor;
@@ -520,9 +522,9 @@ namespace Vintagestory.GameContent
 
         private void SpawnHailParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, ClimateCondition conds, EntityPos plrPos, float plevel)
         {
-            float dx = (float)(plrPos.Motion.X * 40) - 4 * weatherData.curWindSpeed.X;
+            float dx = (float)(plrPos.Motion.X * 40) - 4 * windSpeed.X;
             float dy = (float)(plrPos.Motion.Y * 40);
-            float dz = (float)(plrPos.Motion.Z * 40) - 4 * weatherData.curWindSpeed.Z;
+            float dz = (float)(plrPos.Motion.Z * 40) - 4 * windSpeed.Z;
 
             hailParticle.MinPos.Set(particlePos.X + dx, particlePos.Y + 15 + dy, particlePos.Z + dz);
 
@@ -534,8 +536,8 @@ namespace Vintagestory.GameContent
 
             hailParticle.MinQuantity = 100 * plevel;
             hailParticle.AddQuantity = 25 * plevel;
-            hailParticle.MinVelocity.Set(-0.025f + 7.5f * weatherData.curWindSpeed.X, -5f, -0.025f + 7.5f * weatherData.curWindSpeed.Z);
-            hailParticle.AddVelocity.Set(0.05f + 7.5f * weatherData.curWindSpeed.X, 0.05f, 0.05f + 7.5f * weatherData.curWindSpeed.Z);
+            hailParticle.MinVelocity.Set(-0.025f + 7.5f * windSpeed.X, -5f, -0.025f + 7.5f * windSpeed.Z);
+            hailParticle.AddVelocity.Set(0.05f + 7.5f * windSpeed.X, 0.05f, 0.05f + 7.5f * windSpeed.Z);
 
             manager.Spawn(hailParticle);
         }
@@ -555,8 +557,8 @@ namespace Vintagestory.GameContent
             rainParticle.MaxSize = 0.22f * (0.5f + conds.Rainfall); // weatherData.PrecParticleSize;
             rainParticle.Color = rainParticleColor;
 
-            rainParticle.MinVelocity.Set(-0.025f + 8 * weatherData.curWindSpeed.X, -10f, -0.025f + 8 * weatherData.curWindSpeed.Z);
-            rainParticle.AddVelocity.Set(0.05f + 8 * weatherData.curWindSpeed.X, 0.05f, 0.05f + 8 * weatherData.curWindSpeed.Z);
+            rainParticle.MinVelocity.Set(-0.025f + 8 * windSpeed.X, -10f, -0.025f + 8 * windSpeed.Z);
+            rainParticle.AddVelocity.Set(0.05f + 8 * windSpeed.X, 0.05f, 0.05f + 8 * windSpeed.Z);
 
             manager.Spawn(rainParticle);
 
@@ -619,16 +621,15 @@ namespace Vintagestory.GameContent
 
             float horSpeedSqrt = (float)Math.Pow(mx * mx + mz * mz, 0.25f);
 
-            float dx = (float)(mx) - Math.Max(0, (30 - 9 * wetness) * weatherData.curWindSpeed.X - 5 * horSpeedSqrt);
+            float dx = (float)(mx) - Math.Max(0, (30 - 9 * wetness) * windSpeed.X - 5 * horSpeedSqrt);
             float dy = (float)(plrPos.Motion.Y * 60);
-            float dz = (float)(mz) - Math.Max(0, (30 - 9 * wetness) * weatherData.curWindSpeed.Z - 5 * horSpeedSqrt);
-
-            float windintensity = weatherData.curWindSpeed.Length();
+            float dz = (float)(mz) - Math.Max(0, (30 - 9 * wetness) * windSpeed.Z - 5 * horSpeedSqrt);
 
 
 
-            snowParticle.MinVelocity.Set(-0.5f + 10 * weatherData.curWindSpeed.X, -1f, -0.5f + 10 * weatherData.curWindSpeed.Z);
-            snowParticle.AddVelocity.Set(1f + 10 * weatherData.curWindSpeed.X, 0.05f, 1f + 10 * weatherData.curWindSpeed.Z);
+
+            snowParticle.MinVelocity.Set(-0.5f + 10 * windSpeed.X, -1f, -0.5f + 10 * windSpeed.Z);
+            snowParticle.AddVelocity.Set(1f + 10 * windSpeed.X, 0.05f, 1f + 10 * windSpeed.Z);
             snowParticle.Color = ColorUtil.ToRgba(255, 255, 255, 255);
 
             snowParticle.MinQuantity = 100 * plevel * (1 + wetness / 3);
@@ -636,7 +637,7 @@ namespace Vintagestory.GameContent
             snowParticle.ParentVelocity = parentVeloSnow;
             snowParticle.ShouldDieInLiquid = true;
 
-            snowParticle.LifeLength = Math.Max(1f, 4f - wetness - windintensity);
+            snowParticle.LifeLength = Math.Max(1f, 4f - wetness - windSpeedIntensity);
             snowParticle.Color = ColorUtil.ColorOverlay(ColorUtil.ToRgba(255, 255, 255, 255), rainParticle.Color, wetness / 4f);
             snowParticle.GravityEffect = 0.005f * (1 + 20 * wetness);
             snowParticle.MinSize = 0.1f * conds.Rainfall;
@@ -644,8 +645,8 @@ namespace Vintagestory.GameContent
 
 
             float hrange = 20;
-            float vrange = 23 + windintensity * 5;
-            dy -= Math.Min(10, horSpeedSqrt) + windintensity * 5;
+            float vrange = 23 + windSpeedIntensity * 5;
+            dy -= Math.Min(10, horSpeedSqrt) + windSpeedIntensity * 5;
 
             snowParticle.MinVelocity.Y = -2f;
 

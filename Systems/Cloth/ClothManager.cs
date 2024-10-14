@@ -547,9 +547,9 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            region.SetModdata("clothSystems", SerializerUtil.Serialize(systems));
             if (systems.Count == 0) return;
 
-            region.SetModdata("clothSystems", SerializerUtil.Serialize(systems));
             int[] clothIds = new int[systems.Count];
 
 

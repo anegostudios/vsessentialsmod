@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -31,7 +32,7 @@ namespace Vintagestory.Essentials
                     .WithDesc("A* path finding debug testing tool")
                     .RequiresPrivilege(Privilege.controlserver)
                     .RequiresPlayer()
-                    .WithArgs(api.ChatCommands.Parsers.WordRange("command", "start", "end", "bench", "clear"))
+                    .WithArgs(api.ChatCommands.Parsers.WordRange("command", "start", "end", "bench", "clear", "ct"), api.ChatCommands.Parsers.OptionalWord("creature type"))
                     .HandleWith(onAstarCmd)
                 .EndSub()
             ;
@@ -44,7 +45,7 @@ namespace Vintagestory.Essentials
 
             BlockPos plrPos = player.Entity.ServerPos.XYZ.AsBlockPos;
             PathfindSystem pfs = sapi.ModLoader.GetModSystem<PathfindSystem>();
-
+            
             Cuboidf narrow = new Cuboidf(-0.4f, 0, -0.4f, 0.4f, 1.5f, 0.4f);
             Cuboidf narrower = new Cuboidf(-0.2f, 0, -0.2f, 0.2f, 1.5f, 0.2f);
             Cuboidf wide = new Cuboidf(-0.6f, 0, -0.6f, 0.6f, 1.5f, 0.6f);
@@ -56,6 +57,20 @@ namespace Vintagestory.Essentials
 
             switch (subcmd)
             {
+                case "ct":
+                    string ct = (string)args[1];
+                    if (ct == null)
+                    {
+                        return TextCommandResult.Success(string.Format("Current creature type is {0}", pfs.astar.creatureType));
+                    } else
+                    {
+                        if (Enum.TryParse(ct, out EnumAICreatureType ect))
+                        {
+                            pfs.astar.creatureType = ect;
+                            return TextCommandResult.Success(string.Format("Creature type set to {0}", pfs.astar.creatureType));
+                        }
+                        return TextCommandResult.Error(string.Format("Not a vaild enum type"));
+                    }
                 case "start":
                     start = plrPos.Copy();
                     sapi.World.HighlightBlocks(player, 26, new List<BlockPos>() { start }, new List<int>() { ColorUtil.ColorFromRgba(255, 255, 0, 128) }, EnumHighlightBlocksMode.Absolute, EnumHighlightShape.Arbitrary);

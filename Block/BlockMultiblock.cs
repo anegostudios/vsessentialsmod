@@ -12,6 +12,11 @@ namespace Vintagestory.GameContent
         Cuboidf[] MBGetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos, Vec3i offset);
     }
 
+    public interface IMultiBlockActivate
+    {
+        void MBActivate(IWorldAccessor world, Caller caller, BlockSelection blockSel, ITreeAttribute activationArgs, Vec3i offset);
+    }
+
     public interface IMultiBlockInteract
     {
         bool MBDoParticalSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
@@ -107,12 +112,25 @@ namespace Vintagestory.GameContent
         }
 
 
+        public override void Activate(IWorldAccessor world, Caller caller, BlockSelection blockSel, ITreeAttribute activationArgs = null)
+        {
+            var bsOffseted = blockSel.Clone();
+            bsOffseted.Position.Add(OffsetInv);
+
+            Handle<IMultiBlockActivate>(
+                world.BlockAccessor,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
+                (inf) => inf.MBActivate(world, caller, bsOffseted, activationArgs, OffsetInv),
+                (block) => base.Activate(world, caller, bsOffseted, activationArgs),
+                (block) => block.Activate(world, caller, bsOffseted, activationArgs)
+            );
+        }
 
         public override BlockSounds GetSounds(IBlockAccessor ba, BlockSelection blockSel, ItemStack stack = null)
         {
             return Handle<BlockSounds, IMultiBlockInteract>(
                 ba,
-                blockSel.Position.X + OffsetInv.X, blockSel.Position.Y + OffsetInv.Y, blockSel.Position.Z + OffsetInv.Z,
+                blockSel.Position.X + OffsetInv.X, blockSel.Position.InternalY + OffsetInv.Y, blockSel.Position.Z + OffsetInv.Z,
                 (inf) => inf.GetSounds(ba, blockSel, stack, OffsetInv),
                 (block) => base.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack),
                 (block) => block.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack)
@@ -123,7 +141,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
-               pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+               pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                (inf) => inf.MBGetSelectionBoxes(ba, pos, OffsetInv),
                (block) => new Cuboidf[] { Cuboidf.Default() },
                (block) => block.Id == 0 ? new Cuboidf[] { Cuboidf.Default() } : block.GetSelectionBoxes(ba, pos.AddCopy(OffsetInv))
@@ -134,7 +152,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
-               pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+               pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
                (block) => new Cuboidf[] { Cuboidf.Default() },
                (block) => block.GetCollisionBoxes(ba, pos.AddCopy(OffsetInv))
@@ -145,7 +163,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBDoParticalSelection(world, pos, OffsetInv),
                 (block) => base.DoParticalSelection(world, pos.AddCopy(OffsetInv)),
                 (block) => block.DoParticalSelection(world, pos.AddCopy(OffsetInv))
@@ -159,7 +177,7 @@ namespace Vintagestory.GameContent
 
             return Handle<float, IMultiBlockBlockBreaking>(
                   api.World.BlockAccessor,
-                  bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                  bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                   (inf) => inf.MBOnGettingBroken(player, blockSel, itemslot, remainingResistance, dt, counter, OffsetInv),
                   (block) => base.OnGettingBroken(player, bsOffseted, itemslot, remainingResistance, dt, counter),
                   (block) => {
@@ -217,7 +235,7 @@ namespace Vintagestory.GameContent
 
             return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
-                bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStart(world, byPlayer, blockSel, OffsetInv),
                 (block) => base.OnBlockInteractStart(world, byPlayer, bsOffseted),
                 (block) => block.OnBlockInteractStart(world, byPlayer, bsOffseted)
@@ -231,7 +249,7 @@ namespace Vintagestory.GameContent
 
             return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
-                bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, OffsetInv),
                 (block) => base.OnBlockInteractStep(secondsUsed, world, byPlayer, bsOffseted),
                 (block) => block.OnBlockInteractStep(secondsUsed, world, byPlayer, bsOffseted)
@@ -245,7 +263,7 @@ namespace Vintagestory.GameContent
 
             Handle<IMultiBlockInteract>(
                 world.BlockAccessor,
-                bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractStop(secondsUsed, world, byPlayer, blockSel, OffsetInv),
                 (block) => base.OnBlockInteractStop(secondsUsed, world, byPlayer, bsOffseted),
                 (block) => block.OnBlockInteractStop(secondsUsed, world, byPlayer, bsOffseted)
@@ -259,7 +277,7 @@ namespace Vintagestory.GameContent
 
             return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
-                bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                 (inf) => inf.MBOnBlockInteractCancel(secondsUsed, world, byPlayer, blockSel, cancelReason, OffsetInv),
                 (block) => base.OnBlockInteractCancel(secondsUsed, world, byPlayer, bsOffseted, cancelReason),
                 (block) => block.OnBlockInteractCancel(secondsUsed, world, byPlayer, bsOffseted, cancelReason)
@@ -274,7 +292,7 @@ namespace Vintagestory.GameContent
 
             return Handle<WorldInteraction[], IMultiBlockInteract>(
                 world.BlockAccessor,
-                bsOffseted.Position.X, bsOffseted.Position.Y, bsOffseted.Position.Z,
+                bsOffseted.Position.X, bsOffseted.Position.InternalY, bsOffseted.Position.Z,
                 (inf) => inf.MBGetPlacedBlockInteractionHelp(world, blockSel, forPlayer, OffsetInv),
                 (block) => base.GetPlacedBlockInteractionHelp(world, bsOffseted, forPlayer),
                 (block) => block.GetPlacedBlockInteractionHelp(world, bsOffseted, forPlayer)
@@ -296,7 +314,7 @@ namespace Vintagestory.GameContent
             var world = capi.World;
             return Handle<int, IMultiBlockBlockBreaking>(
                 world.BlockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetRandomColor(capi, pos, facing, rndIndex, OffsetInv),
                 (block) => base.GetRandomColor(capi, pos, facing, rndIndex),
                 (block) => block.GetRandomColor(capi, pos, facing, rndIndex)
@@ -308,7 +326,7 @@ namespace Vintagestory.GameContent
             var world = capi.World;
             return Handle<int, IMultiBlockBlockBreaking>(
                 world.BlockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetColorWithoutTint(capi, pos, OffsetInv),
                 (block) => base.GetColorWithoutTint(capi, pos),
                 (block) => block.GetColorWithoutTint(capi, pos)
@@ -320,7 +338,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<bool, IMultiBlockBlockProperties>(
                 blockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBCanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea, OffsetInv),
                 (nblock) => base.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea),
                 (nblock) => nblock.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea)
@@ -332,7 +350,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<JsonObject, IMultiBlockBlockProperties>(
                 blockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetAttributes(blockAccessor, pos),
                 (nblock) => base.GetAttributes(blockAccessor, pos),
                 (nblock) => nblock.GetAttributes(blockAccessor, pos)
@@ -346,7 +364,7 @@ namespace Vintagestory.GameContent
 
             return Handle<int, IMultiBlockBlockProperties>(
                 blockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetRetention(pos, facing, type, OffsetInv),
                 (nblock) => base.GetRetention(pos, facing, EnumRetentionType.Heat),
                 (nblock) => nblock.GetRetention(pos, facing, EnumRetentionType.Heat)
@@ -359,7 +377,7 @@ namespace Vintagestory.GameContent
 
             return Handle<float, IMultiBlockBlockProperties>(
                 blockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBGetLiquidBarrierHeightOnSide(face, pos, OffsetInv),
                 (nblock) => base.GetLiquidBarrierHeightOnSide(face, pos),
                 (nblock) => nblock.GetLiquidBarrierHeightOnSide(face, pos)

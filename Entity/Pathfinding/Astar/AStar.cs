@@ -16,6 +16,7 @@ namespace Vintagestory.Essentials
 
         public double centerOffsetX = 0.5;
         public double centerOffsetZ = 0.5;
+        public EnumAICreatureType creatureType;
 
         protected CollisionTester collTester;
 
@@ -29,13 +30,13 @@ namespace Vintagestory.Essentials
         public PathNodeSet openSet = new PathNodeSet();
         public HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
-        public virtual List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
+        public virtual List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
-            List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance);
+            List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance, creatureType);
             return nodes == null ? null : ToWaypoints(nodes);
         }
 
-        public virtual List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
+        public virtual List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             if (entityCollBox.XSize > 100 || entityCollBox.YSize > 100 || entityCollBox.ZSize > 100)
             {
@@ -43,6 +44,7 @@ namespace Vintagestory.Essentials
                 return null;
             }
 
+            this.creatureType = creatureType;
             blockAccess.Begin();
 
             centerOffsetX = 0.3 + api.World.Rand.NextDouble() * 0.4;
@@ -151,11 +153,12 @@ namespace Vintagestory.Essentials
                     if (!block.CanStep) return false;
 
                     Block fluidLayerBlock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                    
                     if (fluidLayerBlock.IsLiquid())
                     {
-                        if (fluidLayerBlock.LiquidCode == "lava") return false;
-
-                        extraCost = fluidLayerBlock.LiquidCode == "boilingwater" ? 500 : 5;
+                        var cost = fluidLayerBlock.GetTraversalCost(tmpPos, creatureType);             
+                        if (cost > 10000) return false;
+                        extraCost += cost;
                         //node.Y--; - we swim on top
                         break;
                     }
@@ -172,12 +175,9 @@ namespace Vintagestory.Essentials
                     Cuboidf[] hitboxBelow = block.GetCollisionBoxes(blockAccess, tmpPos);
                     if (hitboxBelow != null && hitboxBelow.Length > 0)
                     {
-                        // Cheap exit from the while() loop in the most common case: there is a block below
-
-                        // Adds a bit of extracost if there is a snowlayer (walkspeedmultiplier will be less than 1)
-                        extraCost -= (block.WalkSpeedMultiplier - 1) * 8;
-                        if (extraCost < 0) extraCost = 0;
-                        extraCost -= 0.3f;   //reduce the extraCost if descending one block, because the entity will glide out a bit while descending - similar to a diagonal move downwards and along, I guess?
+                        var cost = block.GetTraversalCost(tmpPos, creatureType);
+                        if (cost > 10000) return false;
+                        extraCost += cost;
                         break;
                     }
 
@@ -222,6 +222,26 @@ namespace Vintagestory.Essentials
                     }
                 }
 
+                // Don't walk into lava at the same height
+                tmpPos.Set(node.X, node.Y, node.Z);
+                var fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                var ucost = fblock.GetTraversalCost(tmpPos, creatureType);
+                if (ucost > 10000) return false;
+                extraCost += ucost;
+
+                // Humans: Don't walk diagonally right besides lava
+                if (fromDir.IsDiagnoal && creatureType == EnumAICreatureType.Humanoid)
+                {
+                    tmpPos.Set(node.X - fromDir.Normali.X, node.Y, node.Z);
+                    fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                    ucost = fblock.GetTraversalCost(tmpPos, creatureType);
+                    if (ucost > 10000) return false;
+
+                    tmpPos.Set(node.X, node.Y, node.Z - fromDir.Normali.Z);
+                    fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+                    ucost = fblock.GetTraversalCost(tmpPos, creatureType);
+                    if (ucost > 10000) return false;
+                }
 
                 return true;
             }
@@ -229,6 +249,7 @@ namespace Vintagestory.Essentials
             tmpPos.Set(node.X, node.Y, node.Z);
             block = blockAccess.GetBlock(tmpPos, BlockLayersAccess.MostSolid);
             if (!block.CanStep) return false;
+
 
             // Adjust "step on" height because not all blocks we are stepping onto are a full block high
             float steponHeightAdjust = -1f;

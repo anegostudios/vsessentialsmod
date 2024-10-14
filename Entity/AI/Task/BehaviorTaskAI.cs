@@ -54,7 +54,16 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            PathTraverser = new WaypointsTraverser(entity as EntityAgent);
+            EnumAICreatureType ect = EnumAICreatureType.Default;
+            var typestr = aiconfig["aiCreatureType"].AsString("Default");
+            if (!Enum.TryParse(typestr, out ect))
+            {
+                ect = EnumAICreatureType.Default;
+                entity.World.Logger.Warning("Entity {0} Task AI, invalid aiCreatureType {1}. Will default to 'Default'", entity.Code, typestr);
+            }
+
+            PathTraverser = new WaypointsTraverser(entity as EntityAgent, ect);
+
 
             JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
             if (tasks == null) return;

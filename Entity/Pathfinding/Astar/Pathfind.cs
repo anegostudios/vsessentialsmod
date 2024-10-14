@@ -22,14 +22,14 @@ namespace Vintagestory.Essentials
         }
 
 
-        public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox)
+        public List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
-            return astar.FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, 9999, 1);
+            return astar.FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, 9999, 1, creatureType);
         }
 
-        public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0)
+        public List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
-            return astar.FindPathAsWaypoints(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance);
+            return astar.FindPathAsWaypoints(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance, creatureType);
         }
 
         public List<Vec3d> FindPathAsWaypoints(PathfinderTask task)

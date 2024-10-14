@@ -146,7 +146,7 @@ namespace Vintagestory.GameContent
                 if (!belowBlock.SideSolid[API.MathTools.BlockFacing.UP.Index]) return false;
 
                 if (onBlockBelowCode == null) return true;
-                Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z);
+                Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY, (int)entity.ServerPos.Z);
 
                 return block.WildCardMatch(onBlockBelowCode) || (block.Replaceable >= 6000 && belowBlock.WildCardMatch(onBlockBelowCode));
             }

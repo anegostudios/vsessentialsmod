@@ -18,7 +18,7 @@ namespace Vintagestory.GameContent
 
     public interface IAttachableToEntity
     {
-        bool IsAttachable(ItemStack itemStack);
+        bool IsAttachable(Entity toEntity, ItemStack itemStack);
         void CollectTextures(ItemStack stack, Shape shape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict);
         string GetCategoryCode(ItemStack stack);
         CompositeShape GetAttachedShape(ItemStack stack, string slotCode);
@@ -99,7 +99,7 @@ namespace Vintagestory.GameContent
         public string GetCategoryCode(ItemStack stack) => CategoryCode;
         public string[] GetDisableElements(ItemStack stack) => DisableElements;
         public string[] GetKeepElements(ItemStack stack) => KeepElements;
-        public bool IsAttachable(ItemStack itemStack) => true;
+        public bool IsAttachable(Entity toEntity, ItemStack itemStack) => true;
     }
 
     public abstract class EntityBehaviorContainer : EntityBehavior
@@ -111,6 +111,7 @@ namespace Vintagestory.GameContent
         InWorldContainer container;
         public bool hideClothing;
         bool eventRegistered;
+        bool dropContentsOnDeath;
 
         protected EntityBehaviorContainer(Entity entity) : base(entity)
         {
@@ -127,6 +128,8 @@ namespace Vintagestory.GameContent
             {
                 entity.WatchedAttributes.RegisterModifiedListener(InventoryClassName, inventoryModified);
             }
+
+            dropContentsOnDeath = attributes?.IsTrue("dropContentsOnDeath") == true;
         }
 
         private void inventoryModified()
@@ -219,7 +222,7 @@ namespace Vintagestory.GameContent
         {
             if (gearslot.Empty) return entityShape;
             var iatta = IAttachableToEntity.FromCollectible(gearslot.Itemstack.Collectible, entity.World.Logger);
-            if (iatta == null) return entityShape;
+            if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack)) return entityShape;
 
             if (!shapeIsCloned)
             {
@@ -320,7 +323,7 @@ namespace Vintagestory.GameContent
             {
                 foreach (var val in intoDict)
                 {
-                    var cmpt = textures[val.Key] = val.Value;
+                    var cmpt = textures[val.Key] = val.Value.Clone();
                     capi.EntityTextureAtlas.GetOrInsertTexture(cmpt, out int textureSubid, out _);
                     cmpt.Baked.TextureSubId = textureSubid;
                 }
@@ -437,6 +440,16 @@ namespace Vintagestory.GameContent
             }
 
             return false;
+        }
+
+        public override void OnEntityDeath(DamageSource damageSourceForDeath)
+        {
+            base.OnEntityDeath(damageSourceForDeath);
+
+            if (dropContentsOnDeath)
+            {
+                Inventory.DropAll(entity.ServerPos.XYZ);
+            }
         }
 
     }

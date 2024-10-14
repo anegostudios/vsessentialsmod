@@ -46,7 +46,8 @@ namespace Vintagestory.GameContent
             { "plant", "#808650" },
             { "lake", "#CCC890" },
             { "ocean", "#CCC890" },
-            { "glacier", "#E0E0C0" }
+            { "glacier", "#E0E0C0" },
+            { "devastation", "#755c3c" }
         };
 
         public OrderedDictionary<string, int> colorsByCode = new OrderedDictionary<string, int>() {};

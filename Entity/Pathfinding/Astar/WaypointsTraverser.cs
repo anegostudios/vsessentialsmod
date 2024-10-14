@@ -25,6 +25,7 @@ namespace Vintagestory.Essentials
 
         PathfindSystem psys;
         private PathfindingAsync asyncPathfinder;
+        protected EnumAICreatureType creatureType;
 
         public bool PathFindDebug = false;
 
@@ -50,7 +51,7 @@ namespace Vintagestory.Essentials
         private float movingSpeed_New;
         private float targetDistance_New;
 
-        public WaypointsTraverser(EntityAgent entity) : base(entity)
+        public WaypointsTraverser(EntityAgent entity, EnumAICreatureType creatureType = EnumAICreatureType.Default) : base(entity)
         {
             if (entity?.Properties.Server?.Attributes?.GetTreeAttribute("pathfinder") != null)
             {
@@ -64,10 +65,11 @@ namespace Vintagestory.Essentials
 
             psys = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>();
             asyncPathfinder = entity.World.Api.ModLoader.GetModSystem<PathfindingAsync>();
+            this.creatureType = creatureType;
         }
 
 
-        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0)
+        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             this.desiredTarget = target;
             this.OnNoPath = onNoPath;
@@ -75,6 +77,7 @@ namespace Vintagestory.Essentials
             this.OnGoalReached_New = OnGoalReached;
             this.movingSpeed_New = movingSpeed;
             this.targetDistance_New = targetDistance;
+            this.creatureType = creatureType;
 
             BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
             if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
@@ -89,11 +92,12 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0)
+        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             if (this.asyncSearchObject != null) return false;  //Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
 
             this.desiredTarget = target;
+            this.creatureType = creatureType;
 
             // these all have to be saved because they are local parameters, but not used until we call AfterFoundPath()
             this.OnNoPath = onNoPath;
@@ -123,25 +127,25 @@ namespace Vintagestory.Essentials
             float stepHeight = bh == null ? 0.6f : bh.StepHeight;
             int maxFallHeight = entity.Properties.FallDamage ? Math.Min(8, (int)Math.Round(3.51 / Math.Max(0.01, entity.Properties.FallDamageMultiplier))) - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance);
+            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType);
         }
 
 
-        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth = 999, int mhdistanceTolerance = 0)
+        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.StepHeight;
             bool avoidFall = entity.Properties.FallDamage && entity.Properties.Attributes?["reckless"].AsBool(false) != true;
             int maxFallHeight = avoidFall ? 4 - (int)(movingSpeed * 30) : 12;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            return new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance);
+            return new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType);
         }
 
 
         private void FindPath_Async(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth, int mhdistanceTolerance = 0)
         {
             waypointToReachIndex = 0;
-            asyncSearchObject = PreparePathfinderTask(startBlockPos, targetBlockPos, searchDepth, mhdistanceTolerance);
+            asyncSearchObject = PreparePathfinderTask(startBlockPos, targetBlockPos, searchDepth, mhdistanceTolerance, creatureType);
             asyncPathfinder.EnqueuePathfinderTask(asyncSearchObject);
         }
 
@@ -229,12 +233,12 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
+        public override bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             waypoints = new List<Vec3d>();
             waypoints.Add(target);
 
-            return base.WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck);
+            return base.WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck, creatureType);
         }
 
 
