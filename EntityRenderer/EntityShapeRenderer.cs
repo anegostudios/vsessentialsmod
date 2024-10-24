@@ -530,7 +530,8 @@ namespace Vintagestory.GameContent
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
 
-                var vec = ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor((stack.Item?.FirstTexture ?? stack.Block.FirstTextureInventory).Baked.TextureSubId));
+                var baked = (stack.Item?.FirstTexture ?? stack.Block?.FirstTextureInventory).Baked;
+                Vec4f vec = baked == null ? new Vec4f(1,1,1,1) : ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
                 prog.Uniform("averageColor", vec);
                 prog.Uniform("extraGlow", (int)gi);
                 prog.Uniform("rgbaAmbientIn", rapi.AmbientColor);
@@ -1020,7 +1021,7 @@ namespace Vintagestory.GameContent
 
             float diff = GameMath.AngleRadDistance(nowSwivelRad, targetSwivelRad);
 
-            nowSwivelRad += GameMath.Clamp(diff * dt * 10, -0.15f, 0.15f);
+            nowSwivelRad += GameMath.Clamp(diff * dt * 2, -0.15f, 0.15f);
 
             if (eagent != null)
             {

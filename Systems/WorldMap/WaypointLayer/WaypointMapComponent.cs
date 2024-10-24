@@ -28,7 +28,7 @@ namespace Vintagestory.GameContent
             this.waypointIndex = waypointIndex;
             this.waypoint = waypoint;
             this.wpLayer = wpLayer;
-            
+
             ColorUtil.ToRGBAVec4f(waypoint.Color, ref color);
         }
 
@@ -58,7 +58,7 @@ namespace Vintagestory.GameContent
             LoadedTexture tex;
 
             float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ZoomLevel);
-            
+
             if (!wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out tex))
             {
                 wpLayer.texturesByIcon.TryGetValue("circle", out tex);
@@ -107,7 +107,7 @@ namespace Vintagestory.GameContent
             Vec2f viewPos = new Vec2f();
             mapElem.TranslateWorldPosToViewPos(waypoint.Position, ref viewPos);
 
-            
+
             double x = viewPos.X + mapElem.Bounds.renderX;
             double y = viewPos.Y + mapElem.Bounds.renderY;
 
@@ -164,11 +164,21 @@ namespace Vintagestory.GameContent
                         editWpDlg.Dispose();
                     }
 
-                    var mapdlg = capi.ModLoader.GetModSystem<WorldMapManager>().worldMapDlg;
+                    if (capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Creative && capi.World.Player.Entity.Controls.ShiftKey)
+                    {
+                        var pos = waypoint.Position.AsBlockPos;
+                        capi.SendChatMessage(string.Format("/tp ={0} {1} ={2}", pos.X, pos.Y, pos.Z));
+                        mapElem.prevPlayerPos.Set(pos);
+                        mapElem.CenterMapTo(pos);
+                    }
+                    else
+                    {
+                        var mapdlg = capi.ModLoader.GetModSystem<WorldMapManager>().worldMapDlg;
 
-                    editWpDlg = new GuiDialogEditWayPoint(capi, mapdlg.MapLayers.FirstOrDefault(l => l is WaypointMapLayer) as WaypointMapLayer, waypoint, waypointIndex);
-                    editWpDlg.TryOpen();
-                    editWpDlg.OnClosed += () => capi.Gui.RequestFocus(mapdlg);
+                        editWpDlg = new GuiDialogEditWayPoint(capi, mapdlg.MapLayers.FirstOrDefault(l => l is WaypointMapLayer) as WaypointMapLayer, waypoint, waypointIndex);
+                        editWpDlg.TryOpen();
+                        editWpDlg.OnClosed += () => capi.Gui.RequestFocus(mapdlg);
+                    }
 
                     args.Handled = true;
                 }

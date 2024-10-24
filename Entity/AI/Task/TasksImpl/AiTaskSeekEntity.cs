@@ -38,6 +38,7 @@ namespace Vintagestory.GameContent
         protected float leapChance = 1f;
 
         protected EnumAttackPattern attackPattern;
+        protected EnumAICreatureType? creatureType=null;
 
         protected long finishedMs;
         protected bool jumpAnimOn;
@@ -89,6 +90,10 @@ namespace Vintagestory.GameContent
             retaliateAttacks = taskConfig["retaliateAttacks"].AsBool(true);
             executionChance = taskConfig["executionChance"].AsFloat(0.1f);
             searchWaitMs = taskConfig["searchWaitMs"].AsInt(4000);
+            if (taskConfig["aiCreatureType"].Exists)
+            {
+                creatureType = (EnumAICreatureType)taskConfig["aiCreatureType"].AsInt(0);
+            }
         }
 
 
@@ -194,7 +199,7 @@ namespace Vintagestory.GameContent
                 searchDepth = 10000;
             }
 
-            pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSeekUnable, searchDepth, 1);
+            pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSeekUnable, searchDepth, 1, creatureType);
         }
 
         private void OnSeekUnable()

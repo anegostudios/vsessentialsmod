@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using Vintagestory.API.Config;
 using Vintagestory.API.Common.Entities;
 using System.Text;
+using Vintagestory.API.Util;
+using System.Linq;
 
 namespace Vintagestory.GameContent
 {
@@ -26,6 +28,8 @@ namespace Vintagestory.GameContent
 
         Queue<Action> SimTickExecQueue = new Queue<Action>();
 
+        public HashSet<string> disabledInsects;
+
         public override void StartClientSide(ICoreClientAPI api)
         {
             this.capi = api;
@@ -38,6 +42,16 @@ namespace Vintagestory.GameContent
 
             sys = api.ModLoader.GetModSystem<EntityParticleSystem>();
             sys.OnSimTick += Sys_OnSimTick;
+
+            disabledInsects = new HashSet<string>();
+            var dis = capi.Settings.Strings["disabledInsects"];
+            if (dis != null) disabledInsects.AddRange(dis);
+
+            api.ChatCommands
+                .GetOrCreate("insectconfig")
+                .WithArgs(api.ChatCommands.Parsers.WordRange("type", "grasshopper", "cicada", "gnats", "coqui", "waterstrider"), api.ChatCommands.Parsers.OptionalBool("enable/disable"))
+                .HandleWith(onCmdInsectConfig)
+            ;
 
             api.ChatCommands
                 .GetOrCreate("debug")
@@ -56,9 +70,26 @@ namespace Vintagestory.GameContent
                         .HandleWith(handleTestnoise)
                         .WithArgs(api.ChatCommands.Parsers.OptionalWordRange("clear", "clear"))
                     .EndSub()
-
                 .EndSub()
             ;
+        }
+
+        private TextCommandResult onCmdInsectConfig(TextCommandCallingArgs args)
+        {
+            string type = (string)args[0];
+            if (args.Parsers[1].IsMissing)
+            {
+                return TextCommandResult.Success(Lang.Get("{0} are currently {1}", type, disabledInsects.Contains(type) ? Lang.Get("disabled") : Lang.Get("enabled")));
+            }
+
+            bool disabled = !(bool)args[1];
+
+            if (disabled) disabledInsects.Add(type);
+            else disabledInsects.Remove(type);
+
+            capi.Settings.Strings["disabledInsects"] = disabledInsects.ToList();
+
+            return TextCommandResult.Success(Lang.Get("{0} are now {1}", type, disabled ? Lang.Get("disabled") : Lang.Get("enabled")));
         }
 
         private TextCommandResult handleCount(TextCommandCallingArgs args)
@@ -188,11 +219,11 @@ namespace Vintagestory.GameContent
                 var pos = capi.World.Player.Entity.Pos;
                 var climate = capi.World.BlockAccessor.GetClimateAt(pos.AsBlockPos);
 
-                spawnGrasshoppers(pos, climate);
-                spawnWaterStriders(pos, climate);
-                spawnCoquis(pos, climate);
-                spawnMatingGnatsSwarm(pos, climate);
-                spawnCicadas(pos, climate);
+                if (!disabledInsects.Contains("grasshopper")) spawnGrasshoppers(pos, climate);
+                if (!disabledInsects.Contains("cicada")) spawnCicadas(pos, climate);
+                if (!disabledInsects.Contains("gnats")) spawnMatingGnatsSwarm(pos, climate);
+                if (!disabledInsects.Contains("coqui")) spawnCoquis(pos, climate);
+                if (!disabledInsects.Contains("waterstrider")) spawnWaterStriders(pos, climate);
                 //spawnFish(pos, climate);
             }
         }

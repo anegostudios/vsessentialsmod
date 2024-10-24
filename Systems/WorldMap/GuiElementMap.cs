@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
         public float ZoomLevel = 1;
 
 
-        Vec3d prevPlayerPos = new Vec3d();
+        internal Vec3d prevPlayerPos = new Vec3d();
         public Cuboidi chunkViewBoundsBefore = new Cuboidi();
 
         public OnViewChangedDelegate viewChanged;
@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
             prevPlayerPos.X = api.World.Player.Entity.Pos.X;
             prevPlayerPos.Z = api.World.Player.Entity.Pos.Z;
         }
-        
+
 
         public override void ComposeElements(Context ctxStatic, ImageSurface surface)
         {
@@ -50,7 +50,7 @@ namespace Vintagestory.GameContent
 
             BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
             CurrentBlockViewBounds = new Cuboidd(
-                start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel, 
+                start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel,
                 start.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ZoomLevel
             );
         }
@@ -89,7 +89,7 @@ namespace Vintagestory.GameContent
                     CurrentBlockViewBounds.X1 = start.X - Bounds.InnerWidth / 2 / ZoomLevel;
                     CurrentBlockViewBounds.Z1 = start.Z - Bounds.InnerHeight / 2 / ZoomLevel;
                     CurrentBlockViewBounds.X2 = start.X + Bounds.InnerWidth / 2 / ZoomLevel;
-                    CurrentBlockViewBounds.Z2 = start.Z + Bounds.InnerHeight / 2 / ZoomLevel; 
+                    CurrentBlockViewBounds.Z2 = start.Z + Bounds.InnerHeight / 2 / ZoomLevel;
                 } else
                 {
                     CurrentBlockViewBounds.Translate(diffx, 0, diffz);
@@ -130,7 +130,7 @@ namespace Vintagestory.GameContent
                 }
             }
         }
-        
+
         public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
         {
             base.OnMouseDownOnElement(api, args);
@@ -191,7 +191,7 @@ namespace Vintagestory.GameContent
             CurrentBlockViewBounds.Z2 += diffZ;
 
             CurrentBlockViewBounds.Translate(-diffX * px, 0, -diffZ * pz);
-            
+
 
             EnsureMapFullyLoaded();
         }
@@ -245,7 +245,7 @@ namespace Vintagestory.GameContent
         public void EnsureMapFullyLoaded()
         {
             const int chunksize = GlobalConstants.ChunkSize;
-            
+
             nowVisible.Clear();
             nowHidden.Clear();
 
@@ -271,8 +271,8 @@ namespace Vintagestory.GameContent
 
                 cur.X++;
             }
-            
-            
+
+
             cur.Set(chunkViewBoundsBefore.X1, 0, chunkViewBoundsBefore.Z1);
 
             while (cur.X <= chunkViewBoundsBefore.X2)
@@ -305,7 +305,7 @@ namespace Vintagestory.GameContent
         {
             base.OnKeyDown(api, args);
 
-            // Centers the map around the players position  
+            // Centers the map around the players position
             if (args.KeyCode == (int)GlKeys.Space)
             {
                 CenterMapTo(api.World.Player.Entity.Pos.AsBlockPos);

@@ -100,6 +100,7 @@ namespace Vintagestory.Essentials
                         if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost))
                         {
                             UpdateNode(nearestNode, neighbourNode, extraCost);
+                            
                             neighbourNode.hCost = neighbourNode.distanceTo(targetNode);
                             openSet.Add(neighbourNode);
                         }
@@ -235,11 +236,13 @@ namespace Vintagestory.Essentials
                     tmpPos.Set(node.X - fromDir.Normali.X, node.Y, node.Z);
                     fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
                     ucost = fblock.GetTraversalCost(tmpPos, creatureType);
+                    extraCost += ucost-1;
                     if (ucost > 10000) return false;
 
                     tmpPos.Set(node.X, node.Y, node.Z - fromDir.Normali.Z);
                     fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
                     ucost = fblock.GetTraversalCost(tmpPos, creatureType);
+                    extraCost += ucost-1;
                     if (ucost > 10000) return false;
                 }
 
@@ -249,7 +252,14 @@ namespace Vintagestory.Essentials
             tmpPos.Set(node.X, node.Y, node.Z);
             block = blockAccess.GetBlock(tmpPos, BlockLayersAccess.MostSolid);
             if (!block.CanStep) return false;
+            float upcost = block.GetTraversalCost(tmpPos, creatureType);
+            if (upcost > 10000) return false;
+            if (block.Id != 0) extraCost += upcost;
 
+            var lblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
+            upcost = lblock.GetTraversalCost(tmpPos, creatureType);
+            if (upcost > 10000) return false;
+            if (lblock.Id != 0) extraCost += upcost;
 
             // Adjust "step on" height because not all blocks we are stepping onto are a full block high
             float steponHeightAdjust = -1f;
@@ -300,6 +310,9 @@ namespace Vintagestory.Essentials
             {
                 path[i] = currentNode;
                 currentNode = currentNode.Parent;
+
+                //var block = blockAccess.GetBlock(currentNode);
+                //System.Diagnostics.Debug.WriteLine(block.Code + " - " + currentNode.gCost);
             }
 
             return path;

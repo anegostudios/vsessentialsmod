@@ -121,7 +121,7 @@ namespace Vintagestory.GameContent
 
 
         float baseHarvestDuration;
-        public float GetHarvestDuration(Entity forEntity) 
+        public float GetHarvestDuration(Entity forEntity)
         {
             return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingTime");
         }
@@ -322,7 +322,7 @@ namespace Vintagestory.GameContent
             EntityPlayer entityplr = byEntity as EntityPlayer;
             IPlayer player = entity.World.PlayerByUid(entityplr.PlayerUID);
             player.InventoryManager.OpenInventory(inv);
-            
+
             if (entity.World.Side == EnumAppSide.Client && dlg == null)
             {
                 dlg = new GuiDialogCreatureContents(inv, entity, entity.Api as ICoreClientAPI, "carcasscontents");
@@ -503,7 +503,7 @@ namespace Vintagestory.GameContent
                 {
                     infotext.AppendLine(Lang.Get("Looks partially charred, perhaps due to a lightning strike."));
                 }
-                
+
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");
 
                 if (deathByEntityCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer")) {
@@ -544,12 +544,12 @@ namespace Vintagestory.GameContent
         }
 
 
-        
+
 
         public override string PropertyName()
         {
             return "harvestable";
         }
-        
+
     }
 }

@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
         {
             ITreeAttribute backPackTree = bagstack.Attributes.GetTreeAttribute("backpack");
             if (backPackTree == null) return null;
-            
+
             List<ItemStack> contents = new List<ItemStack>();
             ITreeAttribute slotsTree = backPackTree.GetTreeAttribute("slots");
 
@@ -63,7 +63,7 @@ namespace Vintagestory.GameContent
                 contents.Add(cstack);
             }
 
-            return contents.ToArray();           
+            return contents.ToArray();
         }
 
         public virtual bool IsEmpty(ItemStack bagstack)

@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
 
         public void Init(ICoreAPI Api, PositionProviderDelegate positionProvider, Action onRequireSyncToClient)
         {
-            this.Api = Api;            
+            this.Api = Api;
             this.positionProvider = positionProvider;
             this.onRequireSyncToClient = onRequireSyncToClient;
 

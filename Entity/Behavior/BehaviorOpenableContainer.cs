@@ -118,7 +118,7 @@ namespace Vintagestory.GameContent
 
         public override void GetInfoText(StringBuilder infotext)
         {
-            
+
 
             base.GetInfoText(infotext);
         }

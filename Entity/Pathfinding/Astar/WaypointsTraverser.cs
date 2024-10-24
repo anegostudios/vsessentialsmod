@@ -69,7 +69,7 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
             this.desiredTarget = target;
             this.OnNoPath = onNoPath;
@@ -77,7 +77,7 @@ namespace Vintagestory.Essentials
             this.OnGoalReached_New = OnGoalReached;
             this.movingSpeed_New = movingSpeed;
             this.targetDistance_New = targetDistance;
-            this.creatureType = creatureType;
+            if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
 
             BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
             if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
@@ -92,12 +92,12 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
             if (this.asyncSearchObject != null) return false;  //Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
 
             this.desiredTarget = target;
-            this.creatureType = creatureType;
+            if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
 
             // these all have to be saved because they are local parameters, but not used until we call AfterFoundPath()
             this.OnNoPath = onNoPath;
@@ -131,14 +131,14 @@ namespace Vintagestory.Essentials
         }
 
 
-        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.StepHeight;
             bool avoidFall = entity.Properties.FallDamage && entity.Properties.Attributes?["reckless"].AsBool(false) != true;
             int maxFallHeight = avoidFall ? 4 - (int)(movingSpeed * 30) : 12;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            return new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType);
+            return new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType ?? this.creatureType);
         }
 
 

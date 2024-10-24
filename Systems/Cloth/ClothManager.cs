@@ -211,7 +211,6 @@ namespace Vintagestory.GameContent
 
             if (count > 0)
             {
-                //float dt = 1.5f * deltaTime;
                 if (prog.Disposed) prog = capi.Shader.GetProgramByName("instanced");
 
                 capi.Render.GlToggleBlend(false); // Seems to break SSAO without
@@ -279,7 +278,7 @@ namespace Vintagestory.GameContent
                                 var lp = cs.LastPoint;
                                 var dir = lp.Pos - fp.Pos;
                                 var len = dir.Length();
-                                //var stack = new ItemStack(sapi.World.GetItem(new AssetLocation("rope")));
+
                                 for (float i = 0; i < len; i += 0.15f)
                                 {
                                     Vec3d pos = new Vec3d(fp.Pos.X + dir.X * i / len, fp.Pos.Y + dir.Y * i / len, fp.Pos.Z + dir.Z * i / len);
@@ -294,7 +293,6 @@ namespace Vintagestory.GameContent
                         {
                             cs.secondsOverStretched = 0;
                         }
-
                     }
 
                     foreach (var p in packets)
@@ -364,7 +362,6 @@ namespace Vintagestory.GameContent
                     if (spawnitem) sapi.World.SpawnItemEntity(new ItemStack(sapi.World.GetItem(new AssetLocation("rope"))), clothSystems[id].CenterPosition);
                     UnregisterCloth(id);
                 }
-
             }
         }
 

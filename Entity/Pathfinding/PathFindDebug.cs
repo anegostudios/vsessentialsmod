@@ -38,6 +38,8 @@ namespace Vintagestory.Essentials
             ;
         }
 
+        EnumAICreatureType ct = EnumAICreatureType.Default;
+
         private TextCommandResult onAstarCmd(TextCommandCallingArgs args)
         {
             string subcmd = (string)args[0];
@@ -61,13 +63,13 @@ namespace Vintagestory.Essentials
                     string ct = (string)args[1];
                     if (ct == null)
                     {
-                        return TextCommandResult.Success(string.Format("Current creature type is {0}", pfs.astar.creatureType));
+                        return TextCommandResult.Success(string.Format("Current creature type is {0}", ct));
                     } else
                     {
                         if (Enum.TryParse(ct, out EnumAICreatureType ect))
                         {
-                            pfs.astar.creatureType = ect;
-                            return TextCommandResult.Success(string.Format("Creature type set to {0}", pfs.astar.creatureType));
+                            this.ct = ect;
+                            return TextCommandResult.Success(string.Format("Creature type set to {0}", ct));
                         }
                         return TextCommandResult.Error(string.Format("Not a vaild enum type"));
                     }
@@ -114,7 +116,7 @@ namespace Vintagestory.Essentials
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
 
-                List<PathNode> nodes = pfs.FindPath(start, end, maxFallHeight, stepHeight, collbox);
+                List<PathNode> nodes = pfs.FindPath(start, end, maxFallHeight, stepHeight, collbox, ct);
                 sw.Stop();
                 int timeMs = (int)sw.ElapsedMilliseconds;
 

@@ -205,8 +205,13 @@ namespace Vintagestory.GameContent
 
             return
                 (rangeMul == 1 || entity.ServerPos.DistanceTo(eplr.Pos) < range * rangeMul) &&
-                (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing))
+                targetablePlayerMode(player)
             ;
+        }
+
+        protected virtual bool targetablePlayerMode(IPlayer player)
+        {
+            return (player == null || (player.WorldData.CurrentGameMode != EnumGameMode.Creative && player.WorldData.CurrentGameMode != EnumGameMode.Spectator && (player as IServerPlayer).ConnectionState == EnumClientState.Playing));
         }
 
         protected BlockSelection blockSel = new BlockSelection();
