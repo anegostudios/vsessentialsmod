@@ -26,7 +26,7 @@ namespace Vintagestory.GameContent
         string[] GetKeepElements(ItemStack stack);
         string GetTexturePrefixCode(ItemStack stack);
 
-        public static IAttachableToEntity FromCollectible(CollectibleObject cobj, ILogger logger)
+        public static IAttachableToEntity FromCollectible(CollectibleObject cobj)
         {
             var iate = cobj.GetCollectibleInterface<IAttachableToEntity>();
             if (iate != null) return iate;
@@ -220,8 +220,8 @@ namespace Vintagestory.GameContent
 
         protected virtual Shape addGearToShape(Shape entityShape, ItemSlot gearslot, string slotCode, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
         {
-            if (gearslot.Empty) return entityShape;
-            var iatta = IAttachableToEntity.FromCollectible(gearslot.Itemstack.Collectible, entity.World.Logger);
+            if (gearslot.Empty || entityShape == null) return entityShape;
+            var iatta = IAttachableToEntity.FromCollectible(gearslot.Itemstack.Collectible);
             if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack)) return entityShape;
 
             if (!shapeIsCloned)

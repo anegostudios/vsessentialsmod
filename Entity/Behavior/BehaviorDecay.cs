@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
                 
             }
 
-            Vec3d pos = entity.SidedPos.XYZ;
+            Vec3d pos = entity.SidedPos.XYZ + entity.CollisionBox.Center - entity.OriginCollisionBox.Center;
             pos.Y += entity.Properties.DeadCollisionBoxSize.Y / 2;
 
             entity.World.SpawnParticles(new EntityCubeParticles(

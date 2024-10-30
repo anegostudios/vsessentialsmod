@@ -130,7 +130,7 @@ namespace Vintagestory.GameContent
 
             foreach (var val in entities)
             {
-                if (val.IsCreature) largestTouchDistance = Math.Max(largestTouchDistance, val.SelectionBox.XSize / 2);
+                if (val.IsCreature) largestTouchDistance = Math.Max(largestTouchDistance, val.GetTouchDistance());
 
                 PartitionEntity(val);
             }

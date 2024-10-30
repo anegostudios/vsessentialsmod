@@ -135,6 +135,8 @@ namespace Vintagestory.GameContent
 
         public void Update(float dt)
         {
+            if (lowTrembleSound == null) return;
+
             dt = Math.Min(0.5f, dt);
 
             quarterSecAccum += dt;

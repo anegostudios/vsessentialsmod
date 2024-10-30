@@ -151,6 +151,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("aimingaccuracy", typeof(EntityBehaviorAimingAccuracy));
             api.RegisterEntityBehaviorClass("emotionstates", typeof(EntityBehaviorEmotionStates));
             api.RegisterEntityBehaviorClass("repulseagents", typeof(EntityBehaviorRepulseAgents));
+            api.RegisterEntityBehaviorClass("ellipsoidalrepulseagents", typeof(EntityBehaviorEllipsoidalRepulseAgents));            
             api.RegisterEntityBehaviorClass("tiredness", typeof(EntityBehaviorTiredness));
             api.RegisterEntityBehaviorClass("nametag", typeof(EntityBehaviorNameTag));
             api.RegisterEntityBehaviorClass("placeblock", typeof(EntityBehaviorPlaceBlock));

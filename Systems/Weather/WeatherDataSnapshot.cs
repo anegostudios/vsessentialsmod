@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
         {
             // 1-(1.1-x)^4
             // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIxLSgxLjEteCleNCIsImNvbG9yIjoiIzAwMDAwMCJ9LHsidHlwZSI6MTAwMCwid2luZG93IjpbIjAiLCIxIiwiMCIsIjEiXX1d
-            float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.Rainfall, 4), 0, 1);
+            float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.WorldgenRainfall, 4), 0, 1);
             float fogMultiplier = drynessMultiplier;
 
             Ambient.FlatFogDensity.Set((right.State.nowMistDensity * w + left.State.nowMistDensity * (1 - w)) / 250f, fogMultiplier);
@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
         {
             // 1-(1.1-x)^4
             // http://fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIxLSgxLjEteCleNCIsImNvbG9yIjoiIzAwMDAwMCJ9LHsidHlwZSI6MTAwMCwid2luZG93IjpbIjAiLCIxIiwiMCIsIjEiXX1d
-            float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.Rainfall, 4), 0, 1);
+            float drynessMultiplier = GameMath.Clamp(1 - (float)Math.Pow(1.1 - climateCond.WorldgenRainfall, 4), 0, 1);
             float fogMultiplier = drynessMultiplier;
 
             Ambient.FlatFogDensity.Set(left.State.nowMistDensity / 250f, fogMultiplier);

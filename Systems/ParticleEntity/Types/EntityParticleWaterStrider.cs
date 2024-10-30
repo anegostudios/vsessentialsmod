@@ -29,7 +29,7 @@ namespace Vintagestory.GameContent
             ColorGreen = 109;
             ColorBlue = 117;
 
-            VertexFlags = (int)EnumWindBitMode.Water << API.Common.VertexFlags.WindModeBitsPos;
+            VertexFlags = 12 << API.Common.VertexFlags.WindModeBitsPos;
         }
 
         public override void TickNow(float dt, float physicsdt, ICoreClientAPI api, ParticlePhysics physicsSim)
