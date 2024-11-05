@@ -517,10 +517,10 @@ namespace Vintagestory.GameContent
                     if (i == 4) continue;
                     BlockFacing facing = BlockFacing.ALLFACES[i];
 
-                    var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y, pos.Z + facing.Normali.Z);
+                    var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.InternalY + facing.Normali.Y, pos.Z + facing.Normali.Z);
                     if (nblock.Replaceable >= 6000)
                     {
-                        nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.Y + facing.Normali.Y - 1, pos.Z + facing.Normali.Z);
+                        nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.InternalY + facing.Normali.Y - 1, pos.Z + facing.Normali.Z);
                         if (nblock.Replaceable >= 6000)
                         {
                             if (Api.Side == EnumAppSide.Server)

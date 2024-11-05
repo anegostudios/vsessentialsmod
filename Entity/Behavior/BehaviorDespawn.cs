@@ -127,7 +127,7 @@ namespace Vintagestory.GameContent
         {
             if (minPlayerDistance < 0f) return false;
 
-            return entity.minRangeToClient < minPlayerDistance;
+            return entity.minHorRangeToClient < minPlayerDistance;
         }
 
         public bool LightLevelOk()

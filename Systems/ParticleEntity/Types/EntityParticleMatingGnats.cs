@@ -63,7 +63,7 @@ namespace Vintagestory.GameContent
             var npe = capi.World.NearestPlayer(Position.X, Position.Y, Position.Z).Entity;
             double sqdist = npe.Pos.SquareHorDistanceTo(Position);
 
-            if (npe == null || sqdist > 10*10)
+            if (sqdist > 10*10)
             {
                 var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)Position.Y, (int)Position.Z, BlockLayersAccess.Fluid);
                 if (block.IsLiquid() || GlobalConstants.CurrentWindSpeedClient.Length() > 0.35f)
@@ -91,6 +91,9 @@ namespace Vintagestory.GameContent
             {
                 var vec = npe.Pos.XYZ.Sub(Position).Normalize();
                 Velocity.Add(-(float)vec.X/2f, 0, -(float)vec.Z/2f);
+
+                var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)Position.Y - 1, (int)Position.Z, BlockLayersAccess.Solid);
+                if (block.Replaceable < 6000) Velocity.Add(0, 0.5f, 1);
             }
         }
     }

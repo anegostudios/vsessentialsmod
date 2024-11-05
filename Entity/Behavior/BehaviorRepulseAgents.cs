@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
         {
              base.Initialize(properties, attributes);
 
-            offset = attributes["offset"].AsObject<Vec3d>();
+            offset = attributes["offset"].AsObject<Vec3d>(new Vec3d());
             radius = attributes["radius"].AsObject<Vec3d>();
         }
 

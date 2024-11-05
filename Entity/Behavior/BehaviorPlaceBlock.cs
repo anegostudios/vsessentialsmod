@@ -113,7 +113,7 @@ namespace Vintagestory.GameContent
             Block blockAtPos = blockAccess.GetBlock(pos);
 
             pos.Y--;
-            if (blockAtPos.IsReplacableBy(block) && blockAccess.GetMostSolidBlock(pos.X, pos.Y, pos.Z).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
+            if (blockAtPos.IsReplacableBy(block) && blockAccess.GetMostSolidBlock(pos).CanAttachBlockAt(blockAccess, block, pos, BlockFacing.UP))
             {
                 pos.Y++;
                 blockAccess.SetBlock(block.BlockId, pos);

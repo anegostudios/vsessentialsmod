@@ -32,6 +32,8 @@ namespace Vintagestory.GameContent
             base.OnEntityLoaded();
         }
 
+        bool previfpMode;
+
         public override void TesselateShape()
         {
             var inv = entityPlayer.GetBehavior<EntityBehaviorPlayerInventory>().Inventory;
@@ -44,10 +46,13 @@ namespace Vintagestory.GameContent
 
             if (!watcherRegistered)
             {
+                previfpMode = capi.Settings.Bool["immersiveFpMode"];
                 if (IsSelf)
                 {
                     capi.Settings.Bool.AddWatcher("immersiveFpMode", (on) => {
                         entity.MarkShapeModified();
+
+                        (entityPlayer.AnimManager as PlayerAnimationManager).OnIfpModeChanged(previfpMode, on);
                     });
                 }
 
@@ -325,11 +330,13 @@ namespace Vintagestory.GameContent
             float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
             float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
             float bodyYaw;
+            float mdt = Math.Min(0.05f, dt);
 
             if (!isSelf || capi.World.Player.CameraMode != EnumCameraMode.FirstPerson)
             {
                 float yawDist = GameMath.AngleRadDistance(bodyYawLerped, eagent.BodyYaw);
-                bodyYawLerped += GameMath.Clamp(yawDist, -dt * 8, dt * 8);
+                
+                bodyYawLerped += GameMath.Clamp(yawDist, -mdt * 8, mdt * 8);
                 bodyYaw = bodyYawLerped;
 
                 smoothedBodyYaw = bodyYaw;
@@ -343,7 +350,7 @@ namespace Vintagestory.GameContent
                     float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
                     smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
                     yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
-                    smoothedBodyYaw += yawDist * Math.Min(0.1f, dt) * 25f;
+                    smoothedBodyYaw += yawDist * mdt * 25f;
                 }
             }
 

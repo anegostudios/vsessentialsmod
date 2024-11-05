@@ -156,7 +156,7 @@ namespace Vintagestory.GameContent
             particleModel.FlagsInstanced = true;
 
             particleModelRef = api.Render.UploadMesh(particleModel);
-            
+
             updateBuffers = new MeshData[5];
             cameraPos = new Vec3d[5];
             tickTimes = new float[5];
@@ -168,7 +168,7 @@ namespace Vintagestory.GameContent
                 velocities[i] = new float[3 * poolSize];
                 cameraPos[i] = new Vec3d();
                 updateBuffers[i] = genUpdateBuffer();
-            }            
+            }
         }
 
         bool isShuttingDown = false;
@@ -379,7 +379,7 @@ namespace Vintagestory.GameContent
             float[] velocity = velocities[writePosition];
             Vec3d curCamPos = this.cameraPos[writePosition].Set(cameraPos);
 
-            
+
             partPhysics.PhysicsTickTime = 0.125f / 8f;
 
             float pdt = Math.Max(partPhysics.PhysicsTickTime, dt);
@@ -426,8 +426,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-
-        public void Dipose()
+        public override void Dispose()
         {
             particleModelRef.Dispose();
         }

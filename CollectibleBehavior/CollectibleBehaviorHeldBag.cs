@@ -20,6 +20,7 @@ namespace Vintagestory.GameContent
     public interface IAttachedInteractions : IAttachedListener
     {
         bool OnTryAttach(ItemSlot itemslot, int slotIndex, Entity toEntity);
+        bool OnTryDetach(ItemSlot itemslot, int slotIndex, Entity toEntity);
         void OnInteract(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled, Action onRequireSave);
         void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn);
         void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave);
@@ -207,6 +208,11 @@ namespace Vintagestory.GameContent
         public bool OnTryAttach(ItemSlot itemslot, int slotIndex, Entity toEntity)
         {
             return true;
+        }
+
+        public bool OnTryDetach(ItemSlot itemslot, int slotIndex, Entity toEntity)
+        {
+            return IsEmpty(itemslot.Itemstack);
         }
 
         public void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn)

@@ -747,10 +747,9 @@ namespace Vintagestory.GameContent
             var selfMount = entityPlayer.MountedOn;
 
             // If this entity is mounted on the same mount as the client player, render as offset from mount. Prevents jitter
-            if (ims != null && thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
+            if (thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
             {
-                var mpos = selfMount.SeatPosition.XYZ - ims.Position.XYZ;
-
+                var mpos = thisMount.SeatPosition.XYZ - selfMount.SeatPosition.XYZ;
                 aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
                 aboveHeadPos.Add(mpos);
             }

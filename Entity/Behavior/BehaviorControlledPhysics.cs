@@ -365,15 +365,15 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         int posX = (int)(pos.X + offX);
         int posZ = (int)(pos.Z + offZ);
 
-        Block blockFluid = blockAccessor.GetBlock(posX, (int)pos.Y, posZ, BlockLayersAccess.Fluid);
-        Block middleWOIBlock = blockAccessor.GetBlock(posX, (int)(pos.Y + entity.SwimmingOffsetY), posZ, BlockLayersAccess.Fluid);
+        Block blockFluid = blockAccessor.GetBlock(posX, (int)pos.InternalY, posZ, BlockLayersAccess.Fluid);
+        Block middleWOIBlock = blockAccessor.GetBlock(posX, (int)(pos.InternalY + entity.SwimmingOffsetY), posZ, BlockLayersAccess.Fluid);
 
         entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
         entity.FeetInLiquid = false;
 
         if (blockFluid.IsLiquid())
         {
-            Block aboveBlock = blockAccessor.GetBlock(posX, (int)(pos.Y + 1), posZ, BlockLayersAccess.Fluid);
+            Block aboveBlock = blockAccessor.GetBlock(posX, (int)(pos.InternalY + 1), posZ, BlockLayersAccess.Fluid);
             entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
         }
 

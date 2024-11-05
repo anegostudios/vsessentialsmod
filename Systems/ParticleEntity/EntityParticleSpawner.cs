@@ -321,7 +321,7 @@ namespace Vintagestory.GameContent
 
         void spawnCicadas(EntityPos pos, ClimateCondition climate)
         {
-            if (climate.Temperature > 33 || climate.Temperature < 22 || climate.WorldGenTemperature < 10 || climate.Rainfall > 0.1f || climate.WorldgenRainfall < 0.5) return;
+            if (climate.Temperature > 33 || climate.Temperature < 22 || climate.WorldGenTemperature < 10 || climate.WorldGenTemperature > 22 || climate.Rainfall > 0.1f || climate.WorldgenRainfall < 0.5) return;
 
             var noise = cicadaNoise.Noise(pos.X, pos.Z, (int)capi.World.Calendar.Year); // Change the location of the cicadas every year
             if (noise < 0.7) return;
