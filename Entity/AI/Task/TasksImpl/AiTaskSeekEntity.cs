@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -10,9 +11,7 @@ namespace Vintagestory.GameContent
     public enum EnumAttackPattern
     {
         DirectAttack,
-        //BesiegeTarget, - whats the point of this
-        CircleTarget,
-        TacticalRetreat
+        CircleTarget
     }
 
     public class AiTaskSeekEntity : AiTaskBaseTargetable
@@ -22,7 +21,6 @@ namespace Vintagestory.GameContent
 
         protected float moveSpeed = 0.02f;
         protected float seekingRange = 25f;
-        protected float tacticalRetreatRange = 20f;
         protected float belowTempSeekingRange = 25f;
         protected float belowTempThreshold = -999;
         protected float maxFollowTime = 60;
@@ -44,13 +42,13 @@ namespace Vintagestory.GameContent
         protected bool jumpAnimOn;
 
         protected long lastSearchTotalMs;
-        protected long tacticalRetreatBeginTotalMs;
         protected long attackModeBeginTotalMs;
         protected long lastHurtByTargetTotalMs;
 
         protected float extraTargetDistance = 0f;
 
-        protected bool lowTempMode;
+        protected bool lowTempRangeMode;
+        protected bool revengeRangeMode;
         protected bool lastPathfindOk;
 
         /// <summary>
@@ -58,10 +56,8 @@ namespace Vintagestory.GameContent
         /// </summary>
         protected int searchWaitMs = 4000;
 
-        public float NowSeekRange => lowTempMode? belowTempSeekingRange : seekingRange;
-
+        public float NowSeekRange { get; set; }
         protected bool RecentlyHurt => entity.World.ElapsedMilliseconds - lastHurtByTargetTotalMs < 10000;
-        protected bool RemainInTacticalRetreat => entity.World.ElapsedMilliseconds - tacticalRetreatBeginTotalMs < 20000;
         protected bool RemainInOffensiveMode => entity.World.ElapsedMilliseconds - attackModeBeginTotalMs < 20000;
 
         protected Vec3d lastGoalReachedPos;
@@ -115,40 +111,33 @@ namespace Vintagestory.GameContent
             }
 
             if (cooldownUntilMs > entity.World.ElapsedMilliseconds && !RecentlyAttacked) return false;
-            
-
-
-            if (belowTempThreshold > -99)
-            {
-                float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
-                lowTempMode = temperature <= belowTempThreshold;
-            }
-
-            float range = NowSeekRange;
 
             lastSearchTotalMs = entity.World.ElapsedMilliseconds;
 
             if (!RecentlyAttacked)
             {
                 attackedByEntity = null;
+                revengeRangeMode = false;
             }
 
-            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, range, true))
+            NowSeekRange = getSeekRange();
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange, true))
             {
                 targetEntity = attackedByEntity;
                 targetPos = targetEntity.ServerPos.XYZ;
+                revengeRangeMode = true;
                 return true;
             }
             else
             {
                 ownPos.SetWithDimension(entity.ServerPos);
-                targetEntity = partitionUtil.GetNearestEntity(ownPos, range, (e) => IsTargetableEntity(e, range), EnumEntitySearchType.Creatures);
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange, (e) => IsTargetableEntity(e, NowSeekRange), EnumEntitySearchType.Creatures);
 
                 if (targetEntity != null)
                 {
                     if (alarmHerd && entity.HerdId > 0)
                     {
-                        entity.World.GetNearestEntity(ownPos, range, range, (e) =>
+                        entity.World.GetNearestEntity(ownPos, NowSeekRange, NowSeekRange, (e) =>
                         {
                             EntityAgent agent = e as EntityAgent;
                             if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == entity.HerdId)
@@ -173,6 +162,26 @@ namespace Vintagestory.GameContent
             return false;
         }
 
+        protected float getSeekRange()
+        {
+            float nowRange = seekingRange;
+            if (belowTempThreshold > -99)
+            {
+                float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
+                if (temperature <= belowTempThreshold)
+                {
+                    nowRange = belowTempSeekingRange;
+                }
+            }
+
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange * 1.5f, true))
+            {
+                nowRange *= 1.5f;
+            }
+
+            return nowRange;
+        }
+
         public float MinDistanceToTarget()
         {
             return extraTargetDistance + Math.Max(0.1f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 4);
@@ -184,17 +193,11 @@ namespace Vintagestory.GameContent
             active = true;
             currentFollowTime = 0;
 
-            if (RemainInTacticalRetreat)
-            {
-                tryTacticalRetreat();
-                return;
-            }
-
             attackPattern = EnumAttackPattern.DirectAttack;
-            
+
             // 1 in 20 times we do an expensive search
             int searchDepth = 3500;
-            if (world.Rand.NextDouble() < 0.05) 
+            if (world.Rand.NextDouble() < 0.05)
             {
                 searchDepth = 10000;
             }
@@ -224,7 +227,7 @@ namespace Vintagestory.GameContent
 
         public void OnCircleTargetUnable()
         {
-            tryTacticalRetreat();
+            entity.GetBehavior<EntityBehaviorTaskAI>().TaskManager.AllTasks.ForEach(t => (t as AiTaskFleeEntity)?.InstaFleeFrom(targetEntity));
         }
 
         private bool TryCircleTarget()
@@ -287,27 +290,6 @@ namespace Vintagestory.GameContent
             return false;
         }
 
-        private void tryTacticalRetreat()
-        {
-            if (RemainInOffensiveMode) return;
-
-            //Console.WriteLine("doTacticalRetreatIfHurt");
-
-            // Found no circling path, let's run away then
-            if (RecentlyHurt || RemainInTacticalRetreat)
-            {
-                // Console.WriteLine("tactical retreat!");
-
-                float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
-                updateTargetPosFleeMode(targetPos, yaw);
-                float size = targetEntity.SelectionBox.XSize;
-                pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
-                if (attackPattern != EnumAttackPattern.TacticalRetreat) tacticalRetreatBeginTotalMs = entity.World.ElapsedMilliseconds;
-
-                attackPattern = EnumAttackPattern.TacticalRetreat;
-                attackedByEntity = null;
-            }
-        }
 
 
         public override bool CanContinueExecute()
@@ -318,7 +300,16 @@ namespace Vintagestory.GameContent
                 lastPathfindOk = true;
             }
 
-            return pathTraverser.Ready || attackPattern == EnumAttackPattern.TacticalRetreat;
+            return pathTraverser.Ready;
+        }
+
+        private double getDistanceToTarget()
+        {
+            if (targetEntity == null) return double.MaxValue;
+            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
+            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
+            double distance = targetBox.ShortestDistanceFrom(pos);
+            return distance;
         }
 
         long jumpedMS = 0;
@@ -334,61 +325,41 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            tacticalRetreatRange = Math.Max(20f, tacticalRetreatRange - dt/4f);
-
             currentFollowTime += dt;
             lastPathUpdateSeconds += dt;
 
-            if (attackPattern == EnumAttackPattern.TacticalRetreat && world.Rand.NextDouble() < 0.2)
+            double distance = getDistanceToTarget();
+
+            if (attackPattern == EnumAttackPattern.DirectAttack && lastPathUpdateSeconds >= 0.75f && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3 * 3)
             {
-                float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
-                updateTargetPosFleeMode(targetPos, yaw);
-                pathTraverser.CurrentTarget.X = targetPos.X;
-                pathTraverser.CurrentTarget.Y = targetPos.Y;
-                pathTraverser.CurrentTarget.Z = targetPos.Z;
+                targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
+
+                pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, null, false, 2000, 1);
+                lastPathUpdateSeconds = 0;
             }
 
-            if (attackPattern != EnumAttackPattern.TacticalRetreat)
+            if (leapAtTarget && !entity.AnimManager.IsAnimationActive(animMeta.Code) && entity.AnimManager.Animator.GetAnimationState(leapAnimationCode)?.Active != true)
             {
-                if (RecentlyHurt && !lastPathfindOk)
-                {
-                    tryTacticalRetreat();
-                }
-
-                if (attackPattern == EnumAttackPattern.DirectAttack && lastPathUpdateSeconds >= 0.75f && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3 * 3)
-                {
-                    targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
-
-                    pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, null, false, 2000, 1);
-                    lastPathUpdateSeconds = 0;
-                }
-
-                if (leapAtTarget && !entity.AnimManager.IsAnimationActive(animMeta.Code) && entity.AnimManager.Animator.GetAnimationState(leapAnimationCode)?.Active != true)
-                {
-                    animMeta.EaseInSpeed = 1f;
-                    animMeta.EaseOutSpeed = 1f;
-                    entity.AnimManager.StartAnimation(animMeta);
-                }
-
-                if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
-                {
-                    entity.AnimManager.StopAnimation(leapAnimationCode);
-                    animMeta.EaseInSpeed = 1f;
-                    animMeta.EaseOutSpeed = 1f;
-                    entity.AnimManager.StartAnimation(animMeta);
-                }
-
-                if (attackPattern == EnumAttackPattern.DirectAttack/* || attackPattern == EnumAttackPattern.BesiegeTarget*/)
-                {
-                    pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
-                    pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
-                    pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
-                }
+                animMeta.EaseInSpeed = 1f;
+                animMeta.EaseOutSpeed = 1f;
+                entity.AnimManager.StartAnimation(animMeta);
             }
 
-            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
-            Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
-            double distance = targetBox.ShortestDistanceFrom(pos);
+            if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
+            {
+                entity.AnimManager.StopAnimation(leapAnimationCode);
+                animMeta.EaseInSpeed = 1f;
+                animMeta.EaseOutSpeed = 1f;
+                entity.AnimManager.StartAnimation(animMeta);
+            }
+
+            if (attackPattern == EnumAttackPattern.DirectAttack/* || attackPattern == EnumAttackPattern.BesiegeTarget*/)
+            {
+                pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
+                pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
+                pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
+            }
+
 
 
             bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
@@ -432,19 +403,13 @@ namespace Vintagestory.GameContent
             float minDist = MinDistanceToTarget();
             bool doContinue = targetEntity.Alive && !stopNow && !inCreativeMode && pathTraverser.Active;
 
-            if (attackPattern == EnumAttackPattern.TacticalRetreat)
-            {
-                return doContinue && currentFollowTime < 9 && distance < tacticalRetreatRange;
-                
-            } else
-            {
-                return 
-                    doContinue &&
-                    currentFollowTime < maxFollowTime &&
-                    distance < NowSeekRange &&
-                    (distance > minDist || (targetEntity is EntityAgent ea && ea.ServerControls.TriesToMove))
-                ;
-            }
+            return 
+                doContinue &&
+                currentFollowTime < maxFollowTime &&
+                distance < NowSeekRange &&
+                (distance > minDist || (targetEntity is EntityAgent ea && ea.ServerControls.TriesToMove))
+            ;
+            
         }
 
         
@@ -478,8 +443,12 @@ namespace Vintagestory.GameContent
             if (targetEntity == source.GetCauseEntity() || !active)
             {
                 lastHurtByTargetTotalMs = entity.World.ElapsedMilliseconds;
-                float dist = targetEntity == null ? 0 : (float)targetEntity.ServerPos.DistanceTo(entity.ServerPos);
-                tacticalRetreatRange = Math.Max(tacticalRetreatRange, dist + 15);
+                float dist = source.GetCauseEntity() == null ? 0 : (float)source.GetCauseEntity().ServerPos.DistanceTo(entity.ServerPos);
+                float seekrange = getSeekRange();
+                if (dist > seekrange)
+                {
+                    entity.GetBehavior<EntityBehaviorTaskAI>().TaskManager.AllTasks.ForEach(t => (t as AiTaskFleeEntity)?.InstaFleeFrom(targetEntity));
+                }
             }
         }
 

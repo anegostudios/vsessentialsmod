@@ -80,7 +80,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public double MaxExtension => Constraints.Max(c => c.Extension);
+        public double MaxExtension => Constraints.Count == 0 ? 0 : Constraints.Max(c => c.Extension);
 
         public Vec3d CenterPosition
         {

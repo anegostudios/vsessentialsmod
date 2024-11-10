@@ -256,7 +256,6 @@ namespace Vintagestory.GameContent
 
             var textures = entity.Properties.Client.Textures;
             string texturePrefixCode = iatta.GetTexturePrefixCode(stack);
-            //if (texturePrefixCode != null) texturePrefixCode = slotCode + "-" + texturePrefixCode;
 
             Shape gearShape = null;
             AssetLocation shapePath = null;
@@ -278,6 +277,7 @@ namespace Vintagestory.GameContent
                 }
 
                 gearShape.SubclassForStepParenting(texturePrefixCode, damageEffect);
+                gearShape.ResolveReferences(entity.World.Logger, shapePath);
             }
 
             Dictionary<string, CompositeTexture> intoDict = new Dictionary<string, CompositeTexture>();

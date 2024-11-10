@@ -181,6 +181,18 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         SimPhysics(dt, entity.SidedPos);
     }
 
+    public override void OnGameTick(float deltaTime)
+    {
+        base.OnGameTick(deltaTime);
+        // Player physics is called only client side, but we still need to call Block.OnEntityInside
+        if (entity.World.Side == EnumAppSide.Server)
+        {
+            callOnEntityInside();
+        }
+    }
+
+
+
     public void SimPhysics(float dt, EntityPos pos)
     {
         if (entity.State != EnumEntityState.Active) return;

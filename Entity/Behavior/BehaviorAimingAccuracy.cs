@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
@@ -140,8 +141,8 @@ namespace Vintagestory.GameContent
             float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
             float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed");
 
-            // https://pfortuny.net/fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIwLjkzKygxLTEveCkqMC4wNyIsImNvbG9yIjoiIzAwMDAwMCJ9LHsidHlwZSI6MTAwMCwid2luZG93IjpbIjAiLCIxMCIsIjAiLCIyIl0sInNpemUiOls2NDksMzk5XX1d
-            float maxAccuracy = Math.Min(0.93f + (1 - 1 / rangedAcc) * 0.1f, 1);
+            // https://pfortuny.net/fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIxLTAuMDc1L3giLCJjb2xvciI6IiMwMDAwMDAifSx7InR5cGUiOjEwMDAsIndpbmRvdyI6WyIwIiwiMTAiLCIwIiwiMiJdLCJzaXplIjpbNjQ5LDM5OV19XQ--
+            float maxAccuracy = Math.Min(1 - 0.075f / rangedAcc, 1);
 
             accuracy = GameMath.Clamp(SecondsSinceAimStart * modspeed * 1.7f, 0, maxAccuracy);
 

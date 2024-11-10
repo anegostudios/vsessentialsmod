@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
     public interface IAttachedListener
     {
         void OnAttached(ItemSlot itemslot, int slotIndex, Entity toEntity, EntityAgent byEntity);
-        void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity);
+        void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity, EntityAgent byEntity);
     }
     public interface IAttachedInteractions : IAttachedListener
     {
@@ -167,9 +167,9 @@ namespace Vintagestory.GameContent
 
         }
 
-        public void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity)
+        public void OnDetached(ItemSlot itemslot, int slotIndex, Entity fromEntity, EntityAgent byEntity)
         {
-
+            getOrCreateContainerWorkspace(slotIndex, fromEntity, null).Close((byEntity as EntityPlayer).Player);
         }
 
 
@@ -189,6 +189,7 @@ namespace Vintagestory.GameContent
             var controls = byEntity.MountedOn?.Controls ?? byEntity.Controls;
             if (!controls.Sprint)
             {
+                handled = EnumHandling.PreventDefault;
                 getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnInteract(bagSlot, slotIndex, onEntity, byEntity, hitPosition);
             }
         }
@@ -210,7 +211,7 @@ namespace Vintagestory.GameContent
             return true;
         }
 
-        public bool OnTryDetach(ItemSlot itemslot, int slotIndex, Entity toEntity)
+        public bool OnTryDetach(ItemSlot itemslot, int slotIndex, Entity fromEntity)
         {
             return IsEmpty(itemslot.Itemstack);
         }
@@ -222,18 +223,32 @@ namespace Vintagestory.GameContent
 
     }
 
+    public class DlgPositioner : ICustomDialogPositioning
+    {
+        public Entity entity;
+        public int slotIndex;
+
+        public DlgPositioner(Entity entity, int slotIndex)
+        {
+            this.entity = entity;
+            this.slotIndex = slotIndex;
+        }
+
+        public Vec3d GetDialogPosition()
+        {
+            return entity.GetBehavior<EntityBehaviorSelectionBoxes>().GetCenterPosOfBox(slotIndex)?.Add(0, 1, 0);
+        }
+    }
 
     public class AttachedContainerWorkspace
     {
         public Entity entity;
-
-        public BagInventory BagInventory => bagInv;
-        public InventoryGeneric WrapperInv => wrapperInv;
-
         protected BagInventory bagInv;
         protected GuiDialogCreatureContents dlg;
         protected InventoryGeneric wrapperInv;
         protected Action onRequireSave;
+        public BagInventory BagInventory => bagInv;
+        public InventoryGeneric WrapperInv => wrapperInv;
 
         public AttachedContainerWorkspace(Entity entity, Action onRequireSave)
         {
@@ -249,10 +264,13 @@ namespace Vintagestory.GameContent
                 return;
             }
 
+
             EntityPlayer entityplr = byEntity as EntityPlayer;
             IPlayer player = onEntity.World.PlayerByUid(entityplr.PlayerUID);
 
-            if (player.InventoryManager.OpenedInventories.FirstOrDefault(inv => inv.InventoryID == wrapperInv.InventoryID) != null)
+            
+            if (onEntity.World.Side == EnumAppSide.Client // Let the client decide when to open/close inventories
+                && player.InventoryManager.OpenedInventories.FirstOrDefault(inv => inv.InventoryID == wrapperInv.InventoryID) != null)
             {
                 Close(player);
                 return;
@@ -262,7 +280,7 @@ namespace Vintagestory.GameContent
 
             if (onEntity.World.Side == EnumAppSide.Client)
             {
-                dlg = new GuiDialogCreatureContents(wrapperInv, onEntity, onEntity.Api as ICoreClientAPI, "attachedcontainer-" + slotIndex, bagSlot.GetStackName());
+                dlg = new GuiDialogCreatureContents(wrapperInv, onEntity, onEntity.Api as ICoreClientAPI, "attachedcontainer-" + slotIndex, bagSlot.GetStackName(), new DlgPositioner(entity, slotIndex));
                 dlg.packetIdOffset = slotIndex << 11;
 
                 if (dlg.TryOpen())
@@ -282,8 +300,11 @@ namespace Vintagestory.GameContent
             }
             dlg?.Dispose();
             dlg = null;
-            (player.Entity.Api as ICoreClientAPI)?.Network.SendPacketClient(wrapperInv.Close(player));
-            player.InventoryManager.CloseInventory(wrapperInv);
+            if (player != null && wrapperInv != null)
+            {
+                (player.Entity.Api as ICoreClientAPI)?.Network.SendPacketClient(wrapperInv.Close(player));
+                player.InventoryManager.CloseInventory(wrapperInv);
+            }
         }
 
         public bool TryLoadInv(ItemSlot bagSlot, int slotIndex, Entity entity)
@@ -355,5 +376,6 @@ namespace Vintagestory.GameContent
             //bagInv.SaveSlotsIntoBags();
             //onRequireSave();
         }
+
     }
 }

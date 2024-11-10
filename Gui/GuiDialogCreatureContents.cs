@@ -4,10 +4,13 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
-using static Vintagestory.API.Client.GuiDialogGeneric;
 
 namespace Vintagestory.GameContent
 {
+    public interface ICustomDialogPositioning
+    {
+        Vec3d GetDialogPosition();
+    }
     public class GuiDialogCreatureContents : GuiDialog
     {
         public override string ToggleKeyCombinationCode => null;
@@ -24,11 +27,14 @@ namespace Vintagestory.GameContent
         EnumPosFlag screenPos;
         string title;
 
-        public GuiDialogCreatureContents(InventoryGeneric inv, Entity owningEntity, ICoreClientAPI capi, string code, string title = null) : base(capi)
+        ICustomDialogPositioning icdp;
+
+        public GuiDialogCreatureContents(InventoryGeneric inv, Entity owningEntity, ICoreClientAPI capi, string code, string title = null, ICustomDialogPositioning icdp = null) : base(capi)
         {
             this.inv = inv;
             this.title = title;
             this.owningEntity = owningEntity;
+            this.icdp = icdp;
 
             Compose(code);
         }
@@ -41,20 +47,11 @@ namespace Vintagestory.GameContent
 
             ElementBounds slotBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, pad, 40 + pad, 4, rows).FixedGrow(2 * pad, 2 * pad);
 
-            //ElementBounds bgBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
-            //bgBounds.BothSizing = ElementSizing.FitToChildren;
-
-            /*ElementBounds dialogBounds = ElementStdBounds
-                .AutosizedMainDialog.WithAlignment(EnumDialogArea.RightMiddle)
-                .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0);*/
-
             screenPos = GetFreePos("smallblockgui");
             float elemToDlgPad = 10;
 
-            // 3. Around all that is the dialog centered to screen middle, with some extra spacing right for the scrollbar
-            ElementBounds dialogBounds = slotBounds // insetBounds
+            ElementBounds dialogBounds = slotBounds
                 .ForkBoundingParent(elemToDlgPad, elemToDlgPad + 30, elemToDlgPad, elemToDlgPad)
-                //.AutosizedMainDialog.WithAlignment(EnumDialogArea.RightMiddle)
                 .WithFixedAlignmentOffset(IsRight(screenPos) ? -GuiStyle.DialogToScreenPadding : GuiStyle.DialogToScreenPadding, 0)
                 .WithAlignment(IsRight(screenPos) ? EnumDialogArea.RightMiddle : EnumDialogArea.LeftMiddle)
             ;
@@ -71,9 +68,7 @@ namespace Vintagestory.GameContent
                 .CreateCompo(code + owningEntity.EntityId, dialogBounds)
                 .AddShadedDialogBG(ElementBounds.Fill, true)
                 .AddDialogTitleBar(Lang.Get(title ?? code), OnTitleBarClose)
-                //.BeginChildElements(bgBounds)
-                    .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
-                //.EndChildElements()
+                .AddItemSlotGrid(inv, DoSendPacket, 4, slotBounds, "slots")
                 .Compose()
             ;
         }
@@ -121,6 +116,8 @@ namespace Vintagestory.GameContent
                 double offZ = owningEntity.SelectionBox.Z2 - owningEntity.OriginSelectionBox.Z2;
 
                 Vec3d aboveHeadPos = new Vec3d(owningEntity.Pos.X + offX, owningEntity.Pos.Y + FloatyDialogPosition, owningEntity.Pos.Z + offZ);
+                if (icdp != null) aboveHeadPos = icdp.GetDialogPosition();
+
                 Vec3d pos = MatrixToolsd.Project(aboveHeadPos, capi.Render.PerspectiveProjectionMat, capi.Render.PerspectiveViewMat, capi.Render.FrameWidth, capi.Render.FrameHeight);
 
                 // Z negative seems to indicate that the name tag is behind us \o/

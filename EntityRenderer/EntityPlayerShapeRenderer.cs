@@ -263,6 +263,8 @@ namespace Vintagestory.GameContent
             if (right)
             {
                 ItemSlot slot = eagent?.RightHandItemSlot;
+                if (slot is ItemSlotSkill) return;
+
                 ItemStack stack = slot?.Itemstack;
                 var tongStack = eagent?.LeftHandItemSlot?.Itemstack;
                 if (stack != null && stack.Collectible.GetTemperature(entity.World, stack) > 200 && tongStack?.ItemAttributes.IsTrue("heatResistant")==true)

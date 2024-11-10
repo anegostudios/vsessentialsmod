@@ -30,6 +30,7 @@ namespace Vintagestory.GameContent
         {
             ItemSlot hotbarslot = byPlayer.InventoryManager.ActiveHotbarSlot;
             ClothSystem cs = cm.GetClothSystemAttachedToBlock(blockSel.Position);
+
             if (cs != null)
             {
                 Entity byEntity = byPlayer.Entity;
@@ -38,9 +39,19 @@ namespace Vintagestory.GameContent
                 Vec3d aheadPos = lpos.AheadCopy(0.25f, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw);
 
                 // Already handled by ItemRope
-                if (!hotbarslot.Empty && hotbarslot.Itemstack.Collectible.Code.Path=="rope" && (cs.FirstPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId || cs.LastPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId))
+                if (!hotbarslot.Empty && hotbarslot.Itemstack.Collectible.Code.Path=="rope")
                 {
-                    return base.OnBlockInteractStart(world, byPlayer, blockSel, ref handling);
+                    if (cs.FirstPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId || cs.LastPoint.PinnedToEntity?.EntityId == byPlayer.Entity.EntityId)
+                    {
+                        return base.OnBlockInteractStart(world, byPlayer, blockSel, ref handling);
+                    }
+
+                    int clothId = hotbarslot.Itemstack.Attributes.GetInt("clothId");
+                    ClothSystem sys = clothId == 0 ? null : cm.GetClothSystem(clothId);
+                    if (sys != null)
+                    {
+                        return base.OnBlockInteractStart(world, byPlayer, blockSel, ref handling);
+                    }                    
                 }
 
                 ClothPoint targetPoint = cs.FirstPoint.PinnedToBlockPos == blockSel.Position ? cs.FirstPoint : cs.LastPoint;

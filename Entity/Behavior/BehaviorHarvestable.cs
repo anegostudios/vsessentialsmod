@@ -432,9 +432,13 @@ namespace Vintagestory.GameContent
                 }
             }*/
 
-            foreach (var stack in entity.GetDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer))
+            ItemStack[] entityDrops = entity.GetDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer);
+            if (entityDrops != null)
             {
-                todrop.Add(stack);
+                foreach (ItemStack stack in entityDrops)
+                {
+                    todrop.Add(stack);
+                }
             }
 
             inv.AddSlots(todrop.Count - inv.Count);

@@ -89,19 +89,20 @@ namespace Vintagestory.GameContent
 
             if (lowStabilityAttracted)
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) =>
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity =>
                 {
-                    if (!IsTargetableEntity(e, hereRange)) return false;
-                    if (!(e is EntityPlayer)) return true;
-                    return e.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
-                }, EnumEntitySearchType.Creatures);
+                    if (entity is not EntityAgent) return false;
+                    if (!IsTargetableEntity(entity, hereRange)) return false;
+                    if (entity is not EntityPlayer) return true;
+                    return entity.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
+                }, EnumEntitySearchType.Creatures) as EntityAgent;
             }
             else
             {
-                targetEntity = (EntityAgent)partitionUtil.GetNearestEntity(ownPos, hereRange, (e) => IsTargetableEntity(e, hereRange), EnumEntitySearchType.Creatures);
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntity(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
             }
 
-            nowFleeingDistance = (float)fleeingDistance;
+            nowFleeingDistance = fleeingDistance;
 
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-entitysearch");
 
@@ -205,11 +206,17 @@ namespace Vintagestory.GameContent
 
             if (cancelOnHurt) cancelNow = true;
 
-            if (entity.World.Rand.NextDouble() < instafleeOnDamageChance)
+            if (source.Type != EnumDamageType.Heal && entity.World.Rand.NextDouble() < instafleeOnDamageChance)
             {
                 instafleenow = true;
                 targetEntity = source.CauseEntity;
             }
+        }
+
+        public void InstaFleeFrom(Entity fromEntity)
+        {
+            instafleenow = true;
+            targetEntity = fromEntity;
         }
 
 

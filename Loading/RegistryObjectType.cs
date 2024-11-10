@@ -187,31 +187,7 @@ namespace Vintagestory.ServerMods.NoObf
         #region loading
         internal virtual void CreateBasetype(ICoreAPI api, string filepathForLogging, string entryDomain, JObject entityTypeObject)
         {
-            if (entityTypeObject.TryGetValue("inheritFrom", StringComparison.InvariantCultureIgnoreCase, out var iftok))
-            {
-                AssetLocation inheritFrom = iftok.ToObject<AssetLocation>(entryDomain).WithPathAppendixOnce(".json");
-
-                var asset = api.Assets.TryGet(inheritFrom);
-                if (asset != null) 
-                {
-                    try
-                    {
-                        var inheritedObj = JObject.Parse(asset.ToText());
-                        inheritedObj.Merge(entityTypeObject, new JsonMergeSettings() { 
-                            MergeArrayHandling = MergeArrayHandling.Replace, 
-                            PropertyNameComparison = StringComparison.InvariantCultureIgnoreCase 
-                        });
-                        entityTypeObject = inheritedObj;
-                        entityTypeObject.Remove("inheritFrom");
-                    } catch (Exception e)
-                    {
-                        api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this is not valid json. Exception: {2}.", filepathForLogging, inheritFrom, e));
-                    }
-                } else
-                {
-                    api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this file does not exist. Will ignore.", filepathForLogging, inheritFrom));
-                }
-            }
+            loadInherits(api, ref entityTypeObject, entryDomain, filepathForLogging);
 
             AssetLocation location;
             try
@@ -251,6 +227,41 @@ namespace Vintagestory.ServerMods.NoObf
             else Enabled = true;
 
             jsonObject = entityTypeObject;
+        }
+
+        private void loadInherits(ICoreAPI api, ref JObject entityTypeObject, string entryDomain, string parentFileNameForLogging)
+        {
+            if (entityTypeObject.TryGetValue("inheritFrom", StringComparison.InvariantCultureIgnoreCase, out var iftok))
+            {
+                AssetLocation inheritFrom = iftok.ToObject<AssetLocation>(entryDomain).WithPathAppendixOnce(".json");
+
+                var asset = api.Assets.TryGet(inheritFrom);
+                if (asset != null)
+                {
+                    try
+                    {
+                        var inheritedObj = JObject.Parse(asset.ToText());
+                        loadInherits(api, ref inheritedObj, entryDomain, inheritFrom.ToShortString());
+
+                        inheritedObj.Merge(entityTypeObject, new JsonMergeSettings()
+                        {
+                            MergeArrayHandling = MergeArrayHandling.Replace,
+                            PropertyNameComparison = StringComparison.InvariantCultureIgnoreCase
+                        });
+                        entityTypeObject = inheritedObj;
+                        entityTypeObject.Remove("inheritFrom");
+                    }
+                    catch (Exception e)
+                    {
+                        api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this is not valid json. Exception: {2}.", parentFileNameForLogging, inheritFrom, e));
+                    }
+                }
+                else
+                {
+                    api.Logger.Error(Lang.Get("File {0} wants to inherit from {1}, but this file does not exist. Will ignore.", parentFileNameForLogging, inheritFrom));
+                }
+            }
+
         }
 
         internal virtual RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)

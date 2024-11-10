@@ -98,6 +98,25 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     }
 
 
+    IMountable im;
+    public override void AfterInitialized(bool onFirstSpawn)
+    {
+        base.AfterInitialized(onFirstSpawn);
+        im = entity.GetInterface<IMountable>();
+    }
+
+    public override void OnGameTick(float deltaTime)
+    {
+        base.OnGameTick(deltaTime);
+
+        // Player physics is called only client side, but we still need to call Block.OnEntityInside
+        if (im != null && entity.World.Side == EnumAppSide.Server && im.AnyMounted())
+        {
+            callOnEntityInside();
+        }
+
+    }
+
     public void SetProperties(EntityProperties properties, JsonObject attributes)
     {
         StepHeight = attributes["stepHeight"].AsFloat(0.6f);
@@ -681,7 +700,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             Cuboidd collisionbox = blocks.cuboids[i];
             Block block = blocks.blocks[i];
 
-            if (!block.CanStep)
+            if (!block.CanStep && block.CollisionBoxes != null)
             {
                 if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
             }
@@ -692,7 +711,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 pos.Down();    // Avoid creating a new BlockPos object
                 Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
                 pos.Up();
-                if (!blockBelow.CanStep)
+                if (!blockBelow.CanStep && blockBelow.CollisionBoxes != null)
                 {
                     if (entity.CollisionBox.Height < 5 * blockBelow.CollisionBoxes[0].Height) continue;
                 }
@@ -783,6 +802,30 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
             entity.SelectionBox.Set(entity.OriginSelectionBox);
             entity.SelectionBox.Translate(endVec[0], 0, endVec[2]);
+        }
+    }
+
+    protected void callOnEntityInside()
+    {
+        collisionTester.entityBox.SetAndTranslate(entity.CollisionBox, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+        collisionTester.entityBox.RemoveRoundingErrors(); // Necessary to prevent unwanted clipping through blocks when there is knockback
+        Cuboidd entityBox = collisionTester.entityBox;
+        int xMax = (int)entityBox.X2;
+        int yMax = (int)entityBox.Y2;
+        int zMax = (int)entityBox.Z2;
+        int zMin = (int)entityBox.Z1;
+        for (int y = (int)entityBox.Y1; y <= yMax; y++)
+        {
+            for (int x = (int)entityBox.X1; x <= xMax; x++)
+            {
+                for (int z = zMin; z <= zMax; z++)
+                {
+                    var block = entity.World.BlockAccessor.GetBlock(x, y, z);
+                    if (block.Id == 0) continue;
+                    collisionTester.tmpPos.Set(x, y, z);
+                    block.OnEntityInside(entity.World, entity, collisionTester.tmpPos);
+                }
+            }
         }
     }
 
