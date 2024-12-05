@@ -139,7 +139,7 @@ namespace Vintagestory.GameContent
 
         private ClothSystem() { }
 
-        double minLen = 1;
+        double minLen = 1.5;
         double maxLen = 10;
 
         public bool ChangeRopeLength(double len)
@@ -340,7 +340,12 @@ namespace Vintagestory.GameContent
             int basep = cfloats.Count;
 
 
-            Vec4f lightRgba = api.World.BlockAccessor.GetLightRGBs(Constraints[Constraints.Count / 2].Point1.Pos.AsBlockPos);
+            Vec4f lightRgba = new Vec4f();
+
+            if (Constraints.Count > 0)
+            {
+                lightRgba = api.World.BlockAccessor.GetLightRGBs(Constraints[Constraints.Count / 2].Point1.Pos.AsBlockPos);
+            }
 
             for (int i = 0; i < Constraints.Count; i++)
             {

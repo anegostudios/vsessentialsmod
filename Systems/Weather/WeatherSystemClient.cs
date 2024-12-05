@@ -36,17 +36,21 @@ namespace Vintagestory.GameContent
         
         public AuroraRenderer auroraRenderer;
 
+        public event Action<WeatherDataSnapshot> OnGetBlendedWeatherData;
 
-        private long blendedLastCheckedMS = -1L;
+        private long blendedLastCheckedMSDiv60 = -1L;
         private WeatherDataSnapshot blendedWeatherDataCached = null;
         public WeatherDataSnapshot BlendedWeatherData {
             get
             {
-                long ms = capi.ElapsedMilliseconds / 10L;  //Can't possibly need to update client-side weather more than 100 times per second
-                if (ms != blendedLastCheckedMS)
+                long msd60 = capi.ElapsedMilliseconds / 60;
+                if (msd60 != blendedLastCheckedMSDiv60)
                 {
-                    blendedLastCheckedMS = ms;
+                    // Refresh at 16 FPS rate, thats plenty
+                    blendedLastCheckedMSDiv60 = msd60;
                     blendedWeatherDataCached = WeatherDataAtPlayer.BlendedWeatherData;
+
+                    OnGetBlendedWeatherData(blendedWeatherDataCached);
                 }
                 return blendedWeatherDataCached;
             }
@@ -334,31 +338,6 @@ namespace Vintagestory.GameContent
 
         public double RenderOrder => -0.1;
         public int RenderRange => 999;
-
-        /// <summary>
-        /// Get the current precipitation as seen by the client at pos
-        /// </summary>
-        /// <param name="rainOnly">If true, returns 0 if it is currently snowing</param>
-        /// <returns></returns>
-        public double GetActualRainLevel(BlockPos pos, bool rainOnly = false)
-        {
-            ClimateCondition conds = clientClimateCond;
-            if (conds == null || !playerChunkLoaded) return 0.0;
-            float precIntensity = conds.Rainfall;
-
-            if (rainOnly)
-            {
-                WeatherDataSnapshot weatherData = BlendedWeatherData;
-                EnumPrecipitationType precType = weatherData.BlendedPrecType;
-                if (precType == EnumPrecipitationType.Auto)
-                {
-                    precType = conds.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
-                }
-                if (precType == EnumPrecipitationType.Snow) return 0d;
-            }
-
-            return precIntensity;
-        }
 
 
         private void OnLightningFlashPacket(LightningFlashPacket msg)

@@ -22,9 +22,17 @@ namespace Vintagestory.GameContent
         protected int teleportToRange;
         public int TeleportMaxRange;
 
-        protected Vec3d targetOffset = new Vec3d();
+        public float minSeekSeconds = 3f;
 
+        protected Vec3d targetOffset = new Vec3d();
         protected Vec3d initialTargetPos;
+
+        public int allowTeleportCount = 0;
+
+        float executingSeconds =0;
+
+        int stuckCounter;
+        long cooldownUntilTotalMs;
 
         public AiTaskStayCloseToEntity(EntityAgent entity) : base(entity)
         {
@@ -37,6 +45,7 @@ namespace Vintagestory.GameContent
             moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
             range = taskConfig["searchRange"].AsFloat(8f);
             maxDistance = taskConfig["maxDistance"].AsFloat(3f);
+            minSeekSeconds = taskConfig["minSeekSeconds"].AsFloat(3f);
             onlyIfLowerId = taskConfig["onlyIfLowerId"].AsBool();
             entityCode = taskConfig["entityCode"].AsString();
             allowTeleport = taskConfig["allowTeleport"].AsBool();
@@ -48,6 +57,13 @@ namespace Vintagestory.GameContent
         public override bool ShouldExecute()
         {
             if (rand.NextDouble() > 0.01f) return false;
+
+            if (stuckCounter > 3)
+            {
+                stuckCounter = 0;
+                cooldownUntilTotalMs = entity.World.ElapsedMilliseconds + 60 * 1000;
+            }
+            if (entity.World.ElapsedMilliseconds < cooldownUntilMs) return false;
 
             if (targetEntity == null || !targetEntity.Alive)
             {
@@ -84,6 +100,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
+            executingSeconds = 0;
             initialTargetPos = targetEntity.ServerPos.XYZ;
 
             if (targetEntity.ServerPos.DistanceTo(entity.ServerPos) > TeleportMaxRange)
@@ -127,12 +144,14 @@ namespace Vintagestory.GameContent
                 return false;
             }
 
-            if (allowTeleport && dist > teleportAfterRange * teleportAfterRange && entity.World.Rand.NextDouble() < 0.05)
+            if ((allowTeleport || allowTeleportCount > 0) && executingSeconds > 4 && (dist > teleportAfterRange * teleportAfterRange || stuck) && entity.World.Rand.NextDouble() < 0.05)
             {
                 tryTeleport();
             }
 
-            return !stuck && pathTraverser.Active;
+            executingSeconds += dt;
+
+            return (!stuck && pathTraverser.Active) || executingSeconds < minSeekSeconds;
         }
 
         private Vec3d findDecentTeleportPos()
@@ -180,26 +199,36 @@ namespace Vintagestory.GameContent
 
         protected void tryTeleport()
         {
-            if (!allowTeleport || targetEntity == null) return;
+            if ((!allowTeleport && allowTeleportCount <= 0) || targetEntity == null) return;
             Vec3d pos = findDecentTeleportPos();
-            if (pos != null) entity.TeleportTo(pos);
+            if (pos != null)
+            {
+                entity.TeleportToDouble(pos.X, pos.Y, pos.Z, () =>
+                {
+                    initialTargetPos = targetEntity.ServerPos.XYZ;
+                    pathTraverser.Retarget();
+                    allowTeleportCount = Math.Max(0, allowTeleportCount - 1);
+                });
+            }
         }
 
 
         public override void FinishExecute(bool cancelled)
         {
+            if (stuck) stuckCounter++;
+            else stuckCounter = 0;
             base.FinishExecute(cancelled);
         }
 
         protected void OnStuck()
         {
             stuck = true;
-            tryTeleport();
+            //tryTeleport();
         }
 
         public void OnNoPath()
         {
-            tryTeleport();
+            // tryTeleport();
         }
 
         protected void OnGoalReached()

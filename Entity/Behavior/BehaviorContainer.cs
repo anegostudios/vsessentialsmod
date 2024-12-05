@@ -5,6 +5,7 @@ using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
@@ -155,11 +156,22 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected void Inventory_SlotModifiedBackpack(int slotid)
+        {
+            if (entity is EntityPlayer player)
+            {
+                var ownInventory = player.Player.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
+                var itemSlot = ownInventory[slotid];
+                if (itemSlot is ItemSlotBackpack)
+                {
+                    entity.MarkShapeModified();
+                }
+            }
+        }
         protected void Inventory_SlotModified(int slotid)
         {
             entity.MarkShapeModified();
         }
-
 
         public override void OnTesselation(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements)
         {
@@ -232,7 +244,7 @@ namespace Vintagestory.GameContent
                 shapeIsCloned = true;
             }
 
-            return addGearToShape(entityShape, gearslot.Itemstack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, overrideStepParent);            
+            return addGearToShape(entityShape, gearslot.Itemstack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, overrideStepParent);
         }
 
         protected virtual Shape addGearToShape(Shape entityShape, ItemStack stack, IAttachableToEntity iatta, string slotCode, string shapePathForLogging, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
@@ -328,7 +340,7 @@ namespace Vintagestory.GameContent
                     cmpt.Baked.TextureSubId = textureSubid;
                 }
             }
-            
+
 
             return entityShape;
         }

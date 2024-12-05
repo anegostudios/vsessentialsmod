@@ -25,6 +25,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
     public int RenderRange => 9999;
 
+    private int prevDimension = 0;
+    public const float ClippingToleranceOnDimensionChange = 0.0625f;
+
     public EntityBehaviorPlayerPhysics(Entity entity) : base(entity)
     {
 
@@ -226,7 +229,16 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         MotionAndCollision(pos, controls, dt);
         if (!controls.NoClip)
         {
-            collisionTester.NewTick(entity.Pos);
+            collisionTester.NewTick(pos);
+
+            if (prevDimension != pos.Dimension)
+            {
+                prevDimension = pos.Dimension;
+
+                // Dimension changes are allowed a small amount of clipping into terrain, so we need to push out on the client here, we add 20% for rounding/sync errors
+                collisionTester.PushOutFromBlocks(entity.World.BlockAccessor, entity, pos.XYZ, ClippingToleranceOnDimensionChange * 1.2f);
+            }
+
             ApplyTests(pos, controls, dt, false);
 
             // Attempt to stop gliding/flying.
@@ -253,6 +265,8 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             entity.FeetInLiquid = false;
             entity.OnGround = false;
             controls.Gliding = false;
+
+            prevDimension = pos.Dimension;   // If NoClip is enabled we don't care about dimension changes either
         }
     }
 
@@ -519,8 +533,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         }
         return foundStep;
     }
-#endregion
-
+    #endregion
 
 
     public override void OnEntityDespawn(EntityDespawnData despawn)

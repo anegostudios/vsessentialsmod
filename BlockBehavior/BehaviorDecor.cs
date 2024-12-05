@@ -1,4 +1,6 @@
-﻿using Vintagestory.API.Common;
+﻿using System;
+using System.Xml.Linq;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -99,12 +101,12 @@ namespace Vintagestory.GameContent
                         return false;
                     }
                     
-                    var decorBlock = world.BlockAccessor.GetDecor(pos, BlockSelection.GetDecorIndex(blockSel.Face));
+                    Block decorBlock = world.BlockAccessor.GetDecor(pos, BlockSelection.GetDecorIndex(blockSel.Face));
                     if (world.BlockAccessor.SetDecor(blockToPlace, pos, blockSel.Face))
                     {
-                        if (byPlayer.WorldData.CurrentGameMode == EnumGameMode.Survival && decorBlock != null)
+                        if (byPlayer.WorldData.CurrentGameMode == EnumGameMode.Survival && decorBlock != null && (decorBlock.decorBehaviorFlags & DecorFlags.Removable) != 0)
                         {
-                            var itemStack = new ItemStack(decorBlock.Id, decorBlock.ItemClass, 1, new TreeAttribute(), world);
+                            ItemStack itemStack = decorBlock.OnPickBlock(world, pos);
                             world.SpawnItemEntity(itemStack, pos.AddCopy(blockSel.Face).ToVec3d());
                         }
                         return true;

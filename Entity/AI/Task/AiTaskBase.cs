@@ -5,6 +5,7 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 using Vintagestory.API.Util;
+using Vintagestory.Essentials;
 
 namespace Vintagestory.API.Common
 {
@@ -26,8 +27,8 @@ namespace Vintagestory.API.Common
         protected float priority;
         protected float priorityForCancel;
         protected int slot;
-        protected int mincooldown;
-        protected int maxcooldown;
+        public int Mincooldown;
+        public int Maxcooldown;
 
         protected double mincooldownHours;
         protected double maxcooldownHours;
@@ -47,7 +48,7 @@ namespace Vintagestory.API.Common
         protected long cooldownUntilMs;
         protected double cooldownUntilTotalHours;
 
-        protected PathTraverserBase pathTraverser;
+        protected WaypointsTraverser pathTraverser;
 
         protected EntityBehaviorEmotionStates bhEmo;
 
@@ -71,14 +72,14 @@ namespace Vintagestory.API.Common
 
             this.Id = taskConfig["id"].AsString();
             this.slot = (int)taskConfig["slot"]?.AsInt(0);
-            this.mincooldown = (int)taskConfig["mincooldown"]?.AsInt(0);
-            this.maxcooldown = (int)taskConfig["maxcooldown"]?.AsInt(100);
+            this.Mincooldown = (int)taskConfig["mincooldown"]?.AsInt(0);
+            this.Maxcooldown = (int)taskConfig["maxcooldown"]?.AsInt(100);
 
             this.mincooldownHours = (double)taskConfig["mincooldownHours"]?.AsDouble(0);
             this.maxcooldownHours = (double)taskConfig["maxcooldownHours"]?.AsDouble(0);
 
-            int initialmincooldown = (int)taskConfig["initialMinCoolDown"]?.AsInt(mincooldown);
-            int initialmaxcooldown = (int)taskConfig["initialMaxCoolDown"]?.AsInt(maxcooldown);
+            int initialmincooldown = (int)taskConfig["initialMinCoolDown"]?.AsInt(Mincooldown);
+            int initialmaxcooldown = (int)taskConfig["initialMaxCoolDown"]?.AsInt(Maxcooldown);
 
             
 
@@ -172,6 +173,7 @@ namespace Vintagestory.API.Common
         public virtual float Priority
         {
             get { return priority; }
+            set { priority = value; }
         }
 
         public virtual float PriorityForCancel
@@ -218,7 +220,7 @@ namespace Vintagestory.API.Common
 
         public virtual void FinishExecute(bool cancelled)
         {
-            cooldownUntilMs = entity.World.ElapsedMilliseconds + mincooldown + entity.World.Rand.Next(maxcooldown - mincooldown);
+            cooldownUntilMs = entity.World.ElapsedMilliseconds + Mincooldown + entity.World.Rand.Next(Maxcooldown - Mincooldown);
             cooldownUntilTotalHours = entity.World.Calendar.TotalHours + mincooldownHours + entity.World.Rand.NextDouble() * (maxcooldownHours - mincooldownHours);
 
             // Ugly hack to fix attack animation sometimes not playing - it seems it gets stopped even before it gets sent to the client?
@@ -239,7 +241,7 @@ namespace Vintagestory.API.Common
             // Reset timer because otherwise the tasks will always be executed upon entering active state
             if (entity.State == EnumEntityState.Active)
             {
-                cooldownUntilMs = entity.World.ElapsedMilliseconds + mincooldown + entity.World.Rand.Next(maxcooldown - mincooldown);
+                cooldownUntilMs = entity.World.ElapsedMilliseconds + Mincooldown + entity.World.Rand.Next(Maxcooldown - Mincooldown);
             }
         }
 

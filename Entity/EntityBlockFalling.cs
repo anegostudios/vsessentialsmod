@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -237,7 +238,7 @@ namespace Vintagestory.GameContent
 
             ServerPos.SetPos(initialPos);
             ServerPos.X += 0.5;
-            ServerPos.Y += 0.01;
+            ServerPos.Y -= 0.01;
             ServerPos.Z += 0.5;
 
             Pos.SetFrom(ServerPos);
@@ -305,6 +306,8 @@ namespace Vintagestory.GameContent
                 particleSys.Register(this);
                 physicsBh = GetBehavior<EntityBehaviorPassivePhysics>();
             }
+
+            RandomizeFallingDirectionsOrder();
         }
 
 
@@ -422,7 +425,7 @@ namespace Vintagestory.GameContent
                 World.FrameProfiler.Mark("entity-tick-unsstablefalling-neighborstrigger");
             }
 
-            if (CollidedVertically && Pos.Motion.Length() == 0)
+            if (CollidedVertically && Pos.Motion.Length() < 1E-3f)
             {
                 OnFallToGround(0);
                 World.FrameProfiler.Mark("entity-tick-unsstablefalling-falltoground");
@@ -480,15 +483,28 @@ namespace Vintagestory.GameContent
         }
 
 
-
-
-
         private void OnChunkRetesselated(bool on)
         {
             EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
             if (renderer != null) renderer.DoRender = on;
         }
 
+        private readonly List<int> fallDirections = new() { 0, 1, 2, 3 };
+        private int lastFallDirection = 0;
+        private int hopUpHeight = 1;
+
+        // based on entitId so should be same on server and client
+        private void RandomizeFallingDirectionsOrder()
+        {
+            for (int i = fallDirections.Count - 1; i > 0; i--)
+            {
+                int swapIndex = GameMath.MurmurHash3Mod(EntityId.GetHashCode(), i, i, fallDirections.Count);
+                int temp = fallDirections[i];
+                fallDirections[i] = fallDirections[swapIndex];
+                fallDirections[swapIndex] = temp;
+            }
+            lastFallDirection = fallDirections[3];
+        }
 
         public override void OnFallToGround(double motionY)
         {
@@ -512,10 +528,13 @@ namespace Vintagestory.GameContent
 
             if (canFallSideways)
             {
-                for (int i = 0; i < 6; i++)
+                foreach (int i in fallDirections)
                 {
-                    if (i == 4) continue;
                     BlockFacing facing = BlockFacing.ALLFACES[i];
+                    if (facing == BlockFacing.NORTH && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.SOUTH) continue;
+                    if (facing == BlockFacing.WEST && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.EAST) continue;
+                    if (facing == BlockFacing.SOUTH && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.NORTH) continue;
+                    if (facing == BlockFacing.EAST && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.WEST) continue;
 
                     var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.InternalY + facing.Normali.Y, pos.Z + facing.Normali.Z);
                     if (nblock.Replaceable >= 6000)
@@ -531,6 +550,7 @@ namespace Vintagestory.GameContent
                             }
 
                             fallMotion.Set(facing.Normalf.X, 0, facing.Normalf.Z);
+                            lastFallDirection = i;
                             return;
                         }
                     }
@@ -560,7 +580,9 @@ namespace Vintagestory.GameContent
                     }
                     else
                     {
-                        SidedPos.Y += 1;
+                        SidedPos.Y += hopUpHeight;
+                        hopUpHeight += 1;
+                        if (hopUpHeight > 3) hopUpHeight = 1;
                         return;
                     }
                 }
@@ -584,6 +606,7 @@ namespace Vintagestory.GameContent
 
             lingerTicks = 50;
             fallHandled = true;
+            hopUpHeight = 1;
         }
 
         /// <summary>

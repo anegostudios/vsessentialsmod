@@ -45,7 +45,10 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityLoaded()
         {
-
+            if (SpawnPosition == null && !entity.Attributes.HasAttribute("spawnX"))
+            {
+                OnEntitySpawn();
+            }
         }
 
         public override void OnEntitySpawn()
@@ -76,8 +79,6 @@ namespace Vintagestory.GameContent
             wanderRangeMin = taskConfig["wanderRangeMin"].AsFloat(3);
             wanderRangeMax = taskConfig["wanderRangeMax"].AsFloat(30);
             wanderRangeHorizontal = NatFloat.createInvexp(wanderRangeMin, wanderRangeMax);
-
-
             maxHeight = taskConfig["maxHeight"].AsFloat(7f);
 
             preferredLightLevel = taskConfig["preferredLightLevel"].AsFloat(-99);
@@ -282,6 +283,7 @@ namespace Vintagestory.GameContent
         }
 
 
+        bool needsToTele = false;
         public override bool ShouldExecute()
         {
             if (rand.NextDouble() > (failedWanders > 0 ? (1 - wanderChance * 4 * failedWanders) : wanderChance))    // if a wander failed (got stuck) initially greatly increase the chance of trying again, but eventually give up
@@ -289,6 +291,8 @@ namespace Vintagestory.GameContent
                 failedWanders = 0;
                 return false;
             }
+
+            needsToTele = false;
 
             double dist = entity.ServerPos.XYZ.SquareDistanceTo(SpawnPosition);
             if (StayCloseToSpawn)
@@ -300,7 +304,7 @@ namespace Vintagestory.GameContent
                     // If after 2 minutes still not at spawn and no player nearby, teleport
                     if (ellapsedMs - lastTimeInRangeMs > 1000 * 60 * 2 && entity.World.GetNearestEntity(entity.ServerPos.XYZ, 15, 15, (e) => e is EntityPlayer) == null)
                     {
-                        entity.TeleportTo(SpawnPosition);
+                        needsToTele = true;
                     }
 
                     MainTarget = SpawnPosition.Clone();
@@ -311,9 +315,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-
             MainTarget = loadNextWanderTarget();
-
             return MainTarget != null;
         }
 
@@ -322,23 +324,20 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
-            done = false;
-            /*int searchDepth = 999;
-            // 1 in 20 times we do an expensive search
-            if (world.Rand.NextDouble() < 0.05)
+            if (needsToTele)
             {
-                searchDepth = 4999;
-            }*/
-            bool ok = pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);//, true, searchDepth);
+                entity.TeleportTo(SpawnPosition);
+                done = true;
+                return;
+            }
 
-
+            done = false;
+            bool ok = pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
         }
 
         public override bool ContinueExecute(float dt)
         {
             base.ContinueExecute(dt);
-
-  //          if (!awaitReached) return false;
 
             /*entity.World.SpawnParticles(
                 1, 

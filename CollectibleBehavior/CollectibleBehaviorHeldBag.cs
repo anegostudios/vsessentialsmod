@@ -23,6 +23,7 @@ namespace Vintagestory.GameContent
         bool OnTryDetach(ItemSlot itemslot, int slotIndex, Entity toEntity);
         void OnInteract(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled, Action onRequireSave);
         void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn);
+        void OnEntityDeath(ItemSlot itemslot, int slotIndex, Entity onEntity, DamageSource damageSourceForDeath);
         void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave);
     }
 
@@ -187,7 +188,7 @@ namespace Vintagestory.GameContent
         public virtual void OnInteract(ItemSlot bagSlot, int slotIndex, Entity onEntity, EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled, Action onRequireSave)
         {
             var controls = byEntity.MountedOn?.Controls ?? byEntity.Controls;
-            if (!controls.Sprint)
+            if (!controls.CtrlKey)
             {
                 handled = EnumHandling.PreventDefault;
                 getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnInteract(bagSlot, slotIndex, onEntity, byEntity, hitPosition);
@@ -218,9 +219,18 @@ namespace Vintagestory.GameContent
 
         public void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn)
         {
-            getContainerWorkspace(slotIndex, onEntity)?.OnDespawn();
+            getContainerWorkspace(slotIndex, onEntity)?.OnDespawn(despawn);
         }
 
+        public void OnEntityDeath(ItemSlot itemslot, int slotIndex, Entity onEntity, DamageSource damageSourceForDeath)
+        {
+            var contents = GetContents(itemslot.Itemstack, onEntity.World);
+            foreach (var stack in contents)
+            {
+                if (stack == null) continue;
+                onEntity.World.SpawnItemEntity(stack, onEntity.Pos.XYZ);
+            }
+        }
     }
 
     public class DlgPositioner : ICustomDialogPositioning
@@ -327,7 +337,6 @@ namespace Vintagestory.GameContent
             if (entity.World.Side == EnumAppSide.Server)
             {
                 wrapperInv.SlotModified += Inv_SlotModified;
-                wrapperInv.OnInventoryClosed += Inv_OnInventoryClosed;
             }
 
             return true;
@@ -342,15 +351,9 @@ namespace Vintagestory.GameContent
         {
             var slot = wrapperInv[slotid];
             bagInv.SaveSlotIntoBag((ItemSlotBagContent)slot);
-            onRequireSave();
+            onRequireSave?.Invoke();
         }
 
-        private void Inv_OnInventoryClosed(IPlayer player)
-        {
-            // This deletes recent changes for some reason. Also probably not needed
-            //bagInv.SaveSlotsIntoBags();
-            //onRequireSave();
-        }
 
         public void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled)
         {
@@ -364,7 +367,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public void OnDespawn()
+        public void OnDespawn(EntityDespawnData despawn)
         {
             dlg?.TryClose();
             if (wrapperInv == null) return;
@@ -372,10 +375,8 @@ namespace Vintagestory.GameContent
             {
                 entity.Api.World.PlayerByUid(uid)?.InventoryManager.CloseInventory(wrapperInv);
             }
-
-            //bagInv.SaveSlotsIntoBags();
-            //onRequireSave();
         }
+
 
     }
 }

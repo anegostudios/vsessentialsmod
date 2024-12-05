@@ -11,12 +11,14 @@ namespace Vintagestory.GameContent
         public float moveSpeed = 0.02f;
         public float seekingRange = 25f;
         public float maxFollowTime = 60;
-
+        public float allowedExtraDistance;
         
         bool stuck = false;
         
         float currentFollowTime = 0;
 
+
+        public bool Finished => !pathTraverser.Ready;
 
         public AiTaskGotoEntity(EntityAgent entity, Entity target) : base(entity)
         {
@@ -39,7 +41,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.8f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 2);
+            return allowedExtraDistance + System.Math.Max(0.8f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 2);
         }
 
         public override void StartExecute()

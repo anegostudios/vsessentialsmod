@@ -33,7 +33,7 @@ namespace Vintagestory.GameContent
             IInventory inv = Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
             if (inv != null)
             {
-                inv.SlotModified -= Inventory_SlotModified;
+                inv.SlotModified -= Inventory_SlotModifiedBackpack;
             }
         }
 
@@ -55,7 +55,7 @@ namespace Vintagestory.GameContent
                 IInventory inv = Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
                 if (inv != null)
                 {
-                    inv.SlotModified += Inventory_SlotModified;
+                    inv.SlotModified += Inventory_SlotModifiedBackpack;
                 }
             }
 

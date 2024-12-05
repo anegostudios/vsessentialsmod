@@ -35,6 +35,7 @@ namespace Vintagestory.GameContent
         protected bool retaliateAttacks = true;
 
         public string triggerEmotionState;
+        protected float tamingGenerations = 10f;
 
         protected bool noEntityCodes => targetEntityCodesExact.Length == 0 && targetEntityCodesBeginsWith.Length == 0;
 
@@ -60,6 +61,8 @@ namespace Vintagestory.GameContent
                 "off" => EnumCreatureHostility.NeverHostile,
                 _ => EnumCreatureHostility.Aggressive
             };
+
+            tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
 
             friendlyTarget = taskConfig["friendlyTarget"].AsBool(false);
 
@@ -123,7 +126,6 @@ namespace Vintagestory.GameContent
         {
             bhPhysics = entity.GetBehavior<EntityBehaviorControlledPhysics>();
         }
-
 
         public override void StartExecute()
         {
@@ -203,10 +205,11 @@ namespace Vintagestory.GameContent
                 rangeMul *= 0.6f;
             }
 
-            return
-                (rangeMul == 1 || entity.ServerPos.DistanceTo(eplr.Pos) < range * rangeMul) &&
-                targetablePlayerMode(player)
-            ;
+            if ((rangeMul == 1 || entity.ServerPos.DistanceTo(eplr.Pos) < range * rangeMul)
+                && targetablePlayerMode(player)
+                && entity.ServerPos.Dimension == eplr.Pos.Dimension) return true;
+            
+            return false;
         }
 
         protected virtual bool targetablePlayerMode(IPlayer player)
@@ -222,6 +225,8 @@ namespace Vintagestory.GameContent
         protected readonly Vec3d tmpPos = new Vec3d();
         protected virtual bool hasDirectContact(Entity targetEntity, float minDist, float minVerDist)
         {
+            if (targetEntity.Pos.Dimension != entity.Pos.Dimension) return false;
+
             Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
             tmpPos.Set(entity.ServerPos).Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
             double dist = targetBox.ShortestDistanceFrom(tmpPos);
@@ -348,6 +353,18 @@ namespace Vintagestory.GameContent
                 return entity.World.GetEntityById(id);
             }
         }
+
+        public int GetOwnGeneration()
+        {
+            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            if (entity.Properties.Attributes?.IsTrue("tamed") == true) generation += 10;
+            return generation;
+        }
+        protected bool isNonAttackingPlayer(Entity e)
+        {
+            return attackedByEntity != null && attackedByEntity.EntityId != e.EntityId && e is EntityPlayer;
+        }
+
 
 
         public override void OnEntityHurt(DamageSource source, float damage)

@@ -137,6 +137,8 @@ namespace Vintagestory.GameContent
 
 
             var entitySel = (byEntity as EntityPlayer)?.EntitySelection;
+            long selectedEntityId = entitySel?.Entity?.EntityId ?? 0;
+            long mountEntityId = byEntity?.MountedOn?.Entity?.EntityId ?? 0;
 
             if (byEntity.World.Side == EnumAppSide.Client)
             {
@@ -144,14 +146,14 @@ namespace Vintagestory.GameContent
 
                 if (byEntity.Attributes.GetInt("didattack") == 0)
                 {
-                    if (entitySel != null) world.TryAttackEntity(entitySel);
+                    if (entitySel != null && selectedEntityId != mountEntityId) world.TryAttackEntity(entitySel);
                     byEntity.Attributes.SetInt("didattack", 1);
                     world.AddCameraShake(0.25f);
                 }
             }
             else
             {
-                if (byEntity.Attributes.GetInt("didattack") == 0 && entitySel != null)
+                if (byEntity.Attributes.GetInt("didattack") == 0 && entitySel != null && selectedEntityId != mountEntityId)
                 {
                     byEntity.Attributes.SetInt("didattack", 1);
                 }

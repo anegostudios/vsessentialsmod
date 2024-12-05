@@ -26,7 +26,7 @@ namespace Vintagestory.GameContent
         
         bool lowStabilityAttracted;
         bool ignoreDeepDayLight;
-        float tamingGenerations = 10f;
+        
 		bool cancelNow;
 
         float nowFleeingDistance;
@@ -43,7 +43,6 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
             seekingRange = taskConfig["seekingRange"].AsFloat(25);
             executionChance = taskConfig["executionChance"].AsFloat(0.1f);
@@ -79,7 +78,7 @@ namespace Vintagestory.GameContent
                 if (sunlight < minDayLight) return false;
             }
 
-            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            int generation = GetOwnGeneration();
             float fearReductionFactor = (whenInEmotionState != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
 
             ownPos.SetWithDimension(entity.ServerPos);

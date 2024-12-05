@@ -13,6 +13,12 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+
+    public class ReadyMapPiece {
+        public int[] Pixels;
+        public Vec2i Cord;
+    }
+
     // We probably want to just transmit these maps as int[] blockids through the mapchunks (maybe rainheightmap suffices already?)
     // make a property block.BlockColor for the blocks color
     // and have the chunk intmap cached client side
@@ -62,6 +68,8 @@ namespace Vintagestory.GameContent
         UniqueQueue<Vec2i> chunksToGen = new UniqueQueue<Vec2i>();
         ConcurrentDictionary<Vec2i, MultiChunkMapComponent> loadedMapData = new ConcurrentDictionary<Vec2i, MultiChunkMapComponent>();
         HashSet<Vec2i> curVisibleChunks = new HashSet<Vec2i>();
+
+        ConcurrentQueue<ReadyMapPiece> readyMapPieces = new ConcurrentQueue<ReadyMapPiece>();
 
         public override MapLegendItem[] LegendItems => throw new NotImplementedException();
         public override EnumMinMagFilter MinFilter => EnumMinMagFilter.Linear;
@@ -348,6 +356,27 @@ namespace Vintagestory.GameContent
 
         public override void OnTick(float dt)
         {
+            if (readyMapPieces.Count > 0)
+            {
+                int q = Math.Min(readyMapPieces.Count, 20);
+                while (q-- > 0)
+                {
+                    if (readyMapPieces.TryDequeue(out var mappiece))
+                    {
+                        Vec2i mcord = new Vec2i(mappiece.Cord.X / MultiChunkMapComponent.ChunkLen, mappiece.Cord.Y / MultiChunkMapComponent.ChunkLen);
+                        Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
+
+                        MultiChunkMapComponent mccomp;
+                        if (!loadedMapData.TryGetValue(mcord, out mccomp))
+                        {
+                            loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
+                        }
+
+                        mccomp.setChunk(mappiece.Cord.X - baseCord.X, mappiece.Cord.Y - baseCord.Y, mappiece.Pixels);
+                    }
+                }
+            }
+
             mtThread1secAccum += dt;
             if (mtThread1secAccum > 1)
             {
@@ -415,20 +444,7 @@ namespace Vintagestory.GameContent
 
         void loadFromChunkPixels(Vec2i cord, int[] pixels)
         {
-            Vec2i mcord = new Vec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
-            Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
-
-            api.Event.EnqueueMainThreadTask(() =>
-            {
-                MultiChunkMapComponent mccomp;
-                if (!loadedMapData.TryGetValue(mcord, out mccomp))
-                {
-                    loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
-                }
-
-                mccomp.setChunk(cord.X - baseCord.X, cord.Y - baseCord.Y, pixels);
-
-            }, "chunkmaplayerready");
+            readyMapPieces.Enqueue(new ReadyMapPiece() { Pixels = pixels, Cord = cord });            
         }
 
 

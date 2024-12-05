@@ -92,9 +92,14 @@ namespace Vintagestory.GameContent
             this.api = api;
 
             gridSizeInBlocks = chunkSize / partitionsLength;
+
+            api.Event.PlayerDimensionChanged += Event_PlayerDimensionChanged;
         }
 
-
+        private void Event_PlayerDimensionChanged(IPlayer byPlayer)
+        {
+            RePartitionPlayer(byPlayer.Entity);
+        }
 
         public override void StartClientSide(ICoreClientAPI api)
         {

@@ -46,6 +46,7 @@ namespace Vintagestory.Essentials
 
         // These next five fields are used to save parameters, ready for the AfterPathFound() call which might be next tick or even later, after asynchronous pathfinding has finished
         private Action OnNoPath;
+        public Action OnFoundPath;
         private Action OnGoalReached_New;
         private Action OnStuck_New;
         private float movingSpeed_New;
@@ -68,6 +69,11 @@ namespace Vintagestory.Essentials
             this.creatureType = creatureType;
         }
 
+        public void FollowRoute(List<Vec3d> swoopPath, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
+        {
+            waypoints = swoopPath;
+            base.WalkTowards(desiredTarget, movingSpeed, targetDistance, OnGoalReached, OnStuck);
+        }
 
         public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
@@ -94,7 +100,7 @@ namespace Vintagestory.Essentials
 
         public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
-            if (this.asyncSearchObject != null) return false;  //Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
+            if (this.asyncSearchObject != null) return false;  // Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
 
             this.desiredTarget = target;
             if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
@@ -192,6 +198,8 @@ namespace Vintagestory.Essentials
             waypoints.Add(desiredTarget);
 
             base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
+
+            OnFoundPath?.Invoke();
 
             return true;
         }
@@ -479,10 +487,10 @@ namespace Vintagestory.Essentials
             if (!nearHorizontally)
             {
                 double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
-                nearHorizontally = horsqDistToTarget < targetDistance * targetDistance;
+                nearHorizontally = horsqDistToTarget < TargetDistance * TargetDistance;
             }
 
-            return sqDistToTarget < targetDistance * targetDistance;
+            return sqDistToTarget < TargetDistance * TargetDistance;
         }
 
         private float DiffSquared(double y1, double y2)
@@ -511,5 +519,7 @@ namespace Vintagestory.Essentials
 
             waypointToReachIndex = waypoints.Count - 1;
         }
+
+        
     }
 }

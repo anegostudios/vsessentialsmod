@@ -107,7 +107,8 @@ namespace Vintagestory.GameContent
             BlockPos pos = new BlockPos(
                 (int)(entity.SidedPos.X + entity.LocalEyePos.X),
                 (int)(entity.SidedPos.Y + eyeHeight),
-                (int)(entity.SidedPos.Z + entity.LocalEyePos.Z)
+                (int)(entity.SidedPos.Z + entity.LocalEyePos.Z),
+                entity.SidedPos.Dimension
             );
 
             Block block = entity.World.BlockAccessor.GetBlock(pos, BlockLayersAccess.FluidOrSolid);

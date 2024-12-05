@@ -21,6 +21,10 @@ namespace Vintagestory.GameContent
     public delegate float OnDamagedDelegate(float damage, DamageSource dmgSource);
     public class EntityBehaviorHealth : EntityBehavior
     {
+        // Experimentally determined - at 3.5 blocks the player has a motion of -0.19
+        public const double FallDamageYMotionThreshold = -0.19;
+        public const float FallDamageFallenDistanceThreshold = 3.5f;
+
         float secondsSinceLastUpdate;
 
         public event OnDamagedDelegate onDamaged = (dmg, dmgSource) => dmg;
@@ -55,10 +59,6 @@ namespace Vintagestory.GameContent
         public Dictionary<string, float> MaxHealthModifiers = new Dictionary<string, float>();
 
 
-        /// <summary>
-        /// Color used when the entity is being attacked
-        /// </summary>
-        protected int HurtColor = ColorUtil.ToRgba(255, 255, 100, 100);
 
 
         public void MarkDirty()
@@ -108,11 +108,6 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            int val = entity.RemainingActivityTime("invulnerable");
-            if (val > 0) {
-                entity.RenderColor = ColorUtil.ColorOverlay(HurtColor, ColorUtil.WhiteArgb, 1f - val / 500f);
-            }
-
             if (entity.World.Side == EnumAppSide.Client) return;
 
             if (entity.Pos.Y < -30)
@@ -272,7 +267,7 @@ namespace Vintagestory.GameContent
 
             double yDistance = Math.Abs(positionBeforeFalling.Y - entity.Pos.Y);
 
-            if (yDistance < 3.5f) return;
+            if (yDistance < FallDamageFallenDistanceThreshold) return;
             if (gliding)
             {
                 yDistance = Math.Min(yDistance / 2, Math.Min(14, yDistance));
@@ -287,11 +282,10 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            // Experimentally determined - at 3.5 blocks the player has a motion of -0.19
-            if (withYMotion > -0.19) return;
+            if (withYMotion > FallDamageYMotionThreshold) return;
 
             yDistance *= entity.Properties.FallDamageMultiplier;
-            double fallDamage = Math.Max(0, yDistance - 3.5f);
+            double fallDamage = Math.Max(0, yDistance - FallDamageFallenDistanceThreshold);
 
             // Some super rough experimentally determined formula that always underestimates
             // the actual ymotion.

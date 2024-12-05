@@ -5,6 +5,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -66,12 +67,14 @@ namespace Vintagestory.GameContent
 
         public AiTaskSeekEntity(EntityAgent entity) : base(entity)
         {
+            Id = "seekentity";
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
         {
             base.LoadConfig(taskConfig, aiConfig);
 
+            tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
             leapAnimationCode = taskConfig["leapAnimation"].AsString("jump");
             leapChance = taskConfig["leapChance"].AsFloat(1);
             leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
@@ -130,8 +133,13 @@ namespace Vintagestory.GameContent
             }
             else
             {
+                bool fullyTamed = GetOwnGeneration() >= tamingGenerations;
+
                 ownPos.SetWithDimension(entity.ServerPos);
-                targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange, (e) => IsTargetableEntity(e, NowSeekRange), EnumEntitySearchType.Creatures);
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange, (e) => {
+                    if (fullyTamed && isNonAttackingPlayer(e)) return false;
+                    return IsTargetableEntity(e, NowSeekRange);
+                }, EnumEntitySearchType.Creatures);
 
                 if (targetEntity != null)
                 {
@@ -259,7 +267,7 @@ namespace Vintagestory.GameContent
                 while (tries < 5)
                 {
                     // Down ok?
-                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y - dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y - dy + 1, tmp.Z + 0.5), false))
+                    if (world.BlockAccessor.GetBlockBelow(tmp, dy).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y - dy + 1, tmp.Z + 0.5), false))
                     {
                         ok = true;
                         targetPos.Y -= dy;
@@ -268,7 +276,7 @@ namespace Vintagestory.GameContent
                     }
 
                     // Up ok?
-                    if (world.BlockAccessor.GetBlock(tmp.X, tmp.Y + dy, tmp.Z).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y + dy + 1, tmp.Z + 0.5), false))
+                    if (world.BlockAccessor.GetBlockAbove(tmp, dy).SideSolid[BlockFacing.UP.Index] && !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, new Vec3d(tmp.X + 0.5, tmp.Y + dy + 1, tmp.Z + 0.5), false))
                     {
                         ok = true;
                         targetPos.Y += dy;

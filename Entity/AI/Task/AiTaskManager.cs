@@ -5,6 +5,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
@@ -62,9 +63,26 @@ namespace Vintagestory.GameContent
 
             Register("gotoentity", typeof(AiTaskGotoEntity));
             Register("lookatentity", typeof(AiTaskLookAtEntity));
+        }
+    }
 
-            Register("flycircle", typeof(AiTaskFlyCircle));
-            Register("flyswoopattack", typeof(AiTaskFlySwoopAttack));
+    public class AiRuntimeConfig : ModSystem
+    {
+        public static bool RunAiTasks = true;
+        public static bool RunAiActivities = true;
+        ICoreServerAPI sapi;
+        public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
+
+        public override void StartServerSide(ICoreServerAPI api)
+        {
+            sapi = api;
+            api.Event.RegisterGameTickListener(onTick250ms, 250, 31);
+        }
+
+        private void onTick250ms(float obj)
+        {
+            RunAiTasks = sapi.World.Config.GetAsBool("runAiTasks", true);
+            RunAiActivities = sapi.World.Config.GetAsBool("runAiActivities", true);
         }
     }
 
@@ -81,6 +99,7 @@ namespace Vintagestory.GameContent
         Entity entity;
         List<IAiTask> tasks = new List<IAiTask>();
         IAiTask[] activeTasksBySlot = new IAiTask[8];
+        public bool Shuffle;
 
         public IAiTask[] ActiveTasksBySlot => activeTasksBySlot;
         public List<IAiTask> AllTasks => tasks;
@@ -189,8 +208,25 @@ namespace Vintagestory.GameContent
             }
         }
 
+        bool wasRunAiTasks;
         public void OnGameTick(float dt)
         {
+            if (!AiRuntimeConfig.RunAiTasks)
+            {
+                if (wasRunAiTasks)
+                {
+                    foreach (var task in activeTasksBySlot) task?.FinishExecute(true);
+                }
+                wasRunAiTasks = false;
+                return;
+            }
+            wasRunAiTasks = AiRuntimeConfig.RunAiTasks;
+
+            if (Shuffle)
+            {
+                tasks.Shuffle(entity.World.Rand);
+            }
+
             foreach (IAiTask task in tasks)
             {
                 if (task.Priority < 0) continue;

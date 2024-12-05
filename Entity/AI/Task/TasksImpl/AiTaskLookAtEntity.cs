@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
         float maxTurnAnglePerSec;
         float curTurnRadPerSec;
 
-        float maxTurnAngleRad;
+        float maxTurnAngleRad = GameMath.TWOPI;
         float spawnAngleRad;
 
         public AiTaskLookAtEntity(EntityAgent entity) : base(entity)
@@ -45,7 +45,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return System.Math.Max(0.8f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 2);
+            return Math.Max(0.8f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 2);
         }
 
         public override void StartExecute()
@@ -79,7 +79,11 @@ namespace Vintagestory.GameContent
 
             float desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
 
-            desiredYaw = GameMath.Clamp(desiredYaw, spawnAngleRad - maxTurnAngleRad, spawnAngleRad + maxTurnAngleRad);
+            if (maxTurnAngleRad < GameMath.PI)
+            {
+                // This is for the eidolon
+                desiredYaw = GameMath.Clamp(desiredYaw, spawnAngleRad - maxTurnAngleRad, spawnAngleRad + maxTurnAngleRad);
+            }
 
             float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
             entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -curTurnRadPerSec * dt, curTurnRadPerSec * dt);

@@ -141,12 +141,12 @@ namespace Vintagestory.GameContent
                     if (!match) return false;
                 }
 
-                Block belowBlock = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.Y - 1, (int)entity.ServerPos.Z, BlockLayersAccess.Solid);
+                Block belowBlock = entity.World.BlockAccessor.GetBlockRaw((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY - 1, (int)entity.ServerPos.Z, BlockLayersAccess.Solid);
                 // Only with a solid block below (and here not lake ice: entities should not idle on lake ice!)
                 if (!belowBlock.SideSolid[API.MathTools.BlockFacing.UP.Index]) return false;
 
                 if (onBlockBelowCode == null) return true;
-                Block block = entity.World.BlockAccessor.GetBlock((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY, (int)entity.ServerPos.Z);
+                Block block = entity.World.BlockAccessor.GetBlockRaw((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY, (int)entity.ServerPos.Z);
 
                 return block.WildCardMatch(onBlockBelowCode) || (block.Replaceable >= 6000 && belowBlock.WildCardMatch(onBlockBelowCode));
             }

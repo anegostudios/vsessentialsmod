@@ -11,7 +11,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorTaskAI : EntityBehavior
     {
         public AiTaskManager TaskManager;
-        public PathTraverserBase PathTraverser;
+        public WaypointsTraverser PathTraverser;
 
         public EntityBehaviorTaskAI(Entity entity) : base(entity)
         {
@@ -53,6 +53,8 @@ namespace Vintagestory.GameContent
                 entity.World.Logger.Error("The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {0} ", entity.Code);
                 return;
             }
+
+            TaskManager.Shuffle = aiconfig["shuffle"].AsBool();
 
             EnumAICreatureType ect = EnumAICreatureType.Default;
             var typestr = aiconfig["aiCreatureType"].AsString("Default");

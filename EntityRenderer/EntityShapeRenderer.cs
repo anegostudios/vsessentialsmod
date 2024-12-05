@@ -24,9 +24,6 @@ namespace Vintagestory.GameContent
 
     public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
-        protected LoadedTexture nameTagTexture = null;
-        protected int renderRange = 999;
-        protected bool showNameTagOnlyWhenTargeted = false;
         protected long listenerId;
 
         protected LoadedTexture debugTagTexture = null;
@@ -58,7 +55,6 @@ namespace Vintagestory.GameContent
         public float frostAlphaAccum;
 
         protected List<MessageTexture> messageTextures = null;
-        protected NameTagRendererDelegate nameTagRenderHandler;
 
 
         protected EntityAgent eagent;
@@ -93,21 +89,13 @@ namespace Vintagestory.GameContent
             eagent = entity as EntityAgent;
 
             DoRenderHeldItem = true;
-
-            // For players the player data is not there yet, so we load the thing later
-            if (!(entity is EntityPlayer))
-            {
-                nameTagRenderHandler = api.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
-            }
-
             glitchAffected = true;
             glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
             frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
             shouldSwivelFromMotion = entity.Properties.Attributes?["shouldSwivelFromMotion"].AsBool(true) ?? true;
             frostAlphaAccum = (float)api.World.Rand.NextDouble();
 
-            entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
-            OnNameChanged();
+            
             listenerId = api.Event.RegisterGameTickListener(UpdateDebugInfo, 250);
             OnDebugInfoChanged();
 
@@ -351,35 +339,20 @@ namespace Vintagestory.GameContent
             lastDebugInfoChangeMs = entity.World.ElapsedMilliseconds;
         }
 
-        protected void OnNameChanged()
-        {
-            var bh = entity.GetBehavior<EntityBehaviorNameTag>();
-            if (nameTagRenderHandler == null || bh == null) return;
-            if (nameTagTexture != null)
-            {
-                nameTagTexture.Dispose();
-                nameTagTexture = null;
-            }
-
-            renderRange = bh.RenderRange;
-            showNameTagOnlyWhenTargeted = bh.ShowOnlyWhenTargeted;
-            nameTagTexture = nameTagRenderHandler.Invoke(capi, entity);
-        }
-
-
 
         public override void BeforeRender(float dt)
         {
             if (!entity.ShapeFresh)
             {
                 TesselateShape();
+                capi.World.FrameProfiler.Mark("esr-tesseleateshape");
             }
 
-            lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
+            lightrgbs = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.InternalY, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
 
             if (entity.SelectionBox.Y2 > 1)
             {
-                Vec4f lightrgbs2 = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.Y + 1, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
+                Vec4f lightrgbs2 = capi.World.BlockAccessor.GetLightRGBs((int)(entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1), (int)entity.Pos.InternalY + 1, (int)(entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1));
                 if (lightrgbs2.W > lightrgbs.W) lightrgbs = lightrgbs2;
             }
 
@@ -388,9 +361,8 @@ namespace Vintagestory.GameContent
             if (player == null && entity is EntityPlayer)
             {
                 player = capi.World.PlayerByUid((entity as EntityPlayer).PlayerUID) as IClientPlayer;
-                nameTagRenderHandler = capi.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
-                OnNameChanged();
             }
+
 
             if (capi.IsGamePaused) return;
 
@@ -452,7 +424,8 @@ namespace Vintagestory.GameContent
         protected float[] pMatrixHandFov = null;
         protected float[] pMatrixNormalFov = null;
 
-        protected virtual IShaderProgram getReadyShader() {
+        protected virtual IShaderProgram getReadyShader()
+        {
             var prog = capi.Render.StandardShader;
             prog.Use();
             return prog;
@@ -462,7 +435,7 @@ namespace Vintagestory.GameContent
         {
             ItemSlot slot = right ? eagent?.RightHandItemSlot : eagent?.LeftHandItemSlot;
             ItemStack stack = slot?.Itemstack;
-            if (stack == null) return;
+            if (stack == null || slot is ItemSlotSkill) return;
 
             AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
             if (apap == null) return;
@@ -531,7 +504,7 @@ namespace Vintagestory.GameContent
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
 
                 var baked = (stack.Item?.FirstTexture ?? stack.Block?.FirstTextureInventory).Baked;
-                Vec4f vec = baked == null ? new Vec4f(1,1,1,1) : ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
+                Vec4f vec = baked == null ? new Vec4f(1, 1, 1, 1) : ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
                 prog.Uniform("averageColor", vec);
                 prog.Uniform("extraGlow", (int)gi);
                 prog.Uniform("rgbaAmbientIn", rapi.AmbientColor);
@@ -678,7 +651,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender2D(float dt)
         {
-            if (isSpectator || (nameTagTexture == null && debugTagTexture == null)) return;
+            if (isSpectator || debugTagTexture == null) return;
             if ((entity as EntityPlayer)?.ServerControls.Sneak == true && debugTagTexture == null) return;
 
             IRenderAPI rapi = capi.Render;
@@ -698,17 +671,6 @@ namespace Vintagestory.GameContent
             float offY = 0;
 
             double dist = entityPlayer.Pos.SquareDistanceTo(entity.Pos);
-            if (nameTagTexture != null && (!showNameTagOnlyWhenTargeted || capi.World.Player.CurrentEntitySelection?.Entity == entity) && renderRange * renderRange > dist)
-            {
-                float posx = (float)pos.X - cappedScale * nameTagTexture.Width / 2;
-                float posy = rapi.FrameHeight - (float)pos.Y - (nameTagTexture.Height * Math.Max(0, cappedScale));
-
-                rapi.Render2DTexture(
-                    nameTagTexture.TextureId, posx, posy, cappedScale * nameTagTexture.Width, cappedScale * nameTagTexture.Height, 20
-                );
-
-                offY += nameTagTexture.Height;
-            }
 
             if (debugTagTexture != null)
             {
@@ -739,7 +701,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        protected virtual Vec3d getAboveHeadPosition(EntityPlayer entityPlayer)
+        public virtual Vec3d getAboveHeadPosition(EntityPlayer entityPlayer)
         {
             Vec3d aboveHeadPos;
 
@@ -795,7 +757,8 @@ namespace Vintagestory.GameContent
                     {
                         var selfMountPos = entityPlayer.MountedOn.SeatPosition;
                         Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - selfMountPos.X), (float)(seat.SeatPosition.InternalY - selfMountPos.Y), (float)(seat.SeatPosition.Z - selfMountPos.Z));
-                    } else
+                    }
+                    else
                     {
                         Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - entityPlayer.CameraPos.X), (float)(seat.SeatPosition.InternalY - entityPlayer.CameraPos.Y), (float)(seat.SeatPosition.Z - entityPlayer.CameraPos.Z));
                     }
@@ -878,20 +841,14 @@ namespace Vintagestory.GameContent
 
 
 
-        #region Sideways swivel when changing the movement direction
+        #region Step pitch and Sideways swivel when changing the movement direction
 
         float stepingAccum = 0f;
         float fallingAccum = 0f;
 
         private void updateStepPitch(float dt)
         {
-            if (entity.Properties.Habitat == EnumHabitat.Air)
-            {
-                stepPitch = 0;
-                return;
-            }
-
-            if (eagent?.MountedOn != null)
+            if (!entity.CanStepPitch)
             {
                 stepPitch = 0;
                 return;
@@ -956,7 +913,7 @@ namespace Vintagestory.GameContent
         float swivelaccum = 0f;
         public long LastJumpMs;
 
-        public bool shouldSwivelFromMotion=true;
+        public bool shouldSwivelFromMotion = true;
 
         protected virtual void determineSidewaysSwivel(float dt)
         {
@@ -965,14 +922,7 @@ namespace Vintagestory.GameContent
                 if (eagent != null) eagent.sidewaysSwivelAngle = 0;
                 return;
             }
-            if (eagent?.MountedOn != null || entity.Properties.Habitat == EnumHabitat.Air)
-            {
-                nowSwivelRad = 0;
-                targetSwivelRad = 0;
-                if (eagent != null) eagent.sidewaysSwivelAngle = 0;
-                return;
-            }
-            if (entity.Properties.Habitat == EnumHabitat.Land && entity.Swimming)
+            if (!entity.CanSwivel)
             {
                 nowSwivelRad = 0;
                 targetSwivelRad = 0;
@@ -982,7 +932,7 @@ namespace Vintagestory.GameContent
 
             swivelaccum += dt;
 
-            if (swivelaccum > 0.1 && (entity.OnGround || eagent?.MountedOn != null))
+            if (swivelaccum > 0.1 && entity.CanSwivelNow)
             {
                 double dx = entity.Pos.X - prevPosXSwing;
                 double dz = entity.Pos.Z - prevPosZSwing;
@@ -1007,7 +957,8 @@ namespace Vintagestory.GameContent
                 if (Math.Abs(anglechange) < GameMath.PIHALF)
                 {
                     targetSwivelRad = GameMath.Clamp((float)speed * anglechange * 3f, -0.4f, 0.4f);
-                } else
+                }
+                else
                 {
                     targetSwivelRad = 0;
                 }
@@ -1042,11 +993,6 @@ namespace Vintagestory.GameContent
                 meshRefOpaque = null;
             }
 
-            if (nameTagTexture != null)
-            {
-                nameTagTexture.Dispose();
-                nameTagTexture = null;
-            }
 
             if (debugTagTexture != null)
             {

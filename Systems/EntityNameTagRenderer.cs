@@ -18,7 +18,7 @@ namespace Vintagestory.GameContent
             if (name != null && name.Length > 0)
             {
                 return capi.Gui.TextTexture.GenUnscaledTextTexture(
-                    name,
+                    Lang.GetIfExists("nametag-", name) ?? name,
                     CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble),
                     new TextBackground() {
                         FillColor = GuiStyle.DialogLightBgColor,

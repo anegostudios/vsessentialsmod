@@ -149,7 +149,15 @@ namespace Vintagestory.GameContent
             {
                 if (pinnedTo != null)
                 {
-                    if (pinnedTo.ShouldDespawn && pinnedTo.DespawnReason?.Reason != EnumDespawnReason.Unload)
+                    Entity pinnedToMounted = pinnedTo;
+
+                    if (pinnedToMounted is EntityAgent pinnedToAgent && pinnedToAgent.MountedOn?.Entity != null)
+                    {
+                        pinnedToMounted = pinnedToAgent.MountedOn.Entity;
+                    }
+
+
+                    if (pinnedToMounted.ShouldDespawn && pinnedToMounted.DespawnReason?.Reason != EnumDespawnReason.Unload)
                     {
                         UnPin();
                         return;
@@ -159,11 +167,11 @@ namespace Vintagestory.GameContent
                     // don't apply force onto the player/entity on compression
                     // apply huge forces onto the player on strong extension (to prevent massive stretching) (just set player motion to 0 or so. or we add a new countermotion field thats used in EntityControlledPhysics?) 
 
-                    float weight = pinnedTo.Properties.Weight;
+                    float weight = pinnedToMounted.Properties.Weight;
                     
                     float counterTensionStrength = GameMath.Clamp(50f / weight, 0.1f, 2f);
 
-                    bool extraResist = (pinnedTo as EntityAgent)?.Controls.Sneak == true || (pinnedTo is EntityPlayer && (pinnedTo.AnimManager?.IsAnimationActive("sit") == true || pinnedTo.AnimManager?.IsAnimationActive("sleep") == true));
+                    bool extraResist = (pinnedToMounted as EntityAgent)?.Controls.Sneak == true || (pinnedToMounted is EntityPlayer && (pinnedToMounted.AnimManager?.IsAnimationActive("sit") == true || pinnedToMounted.AnimManager?.IsAnimationActive("sleep") == true));
                     float tensionResistStrength = weight / 10f * (extraResist ? 200 : 1);
 
                     var eplr = pinnedTo as EntityPlayer;
@@ -200,11 +208,12 @@ namespace Vintagestory.GameContent
                     if (pushable && extension > 0) // Do not act on compressive force
                     {
                         float f = counterTensionStrength * dt * 0.006f;
-                        pos.Motion.Add(
-                            GameMath.Clamp(Math.Abs(TensionDirection.X) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.X),
-                            GameMath.Clamp(Math.Abs(TensionDirection.Y) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.Y),
-                            GameMath.Clamp(Math.Abs(TensionDirection.Z) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.Z)
-                        );
+
+                        pinnedToMounted.SidedPos.Motion.Add(
+                                GameMath.Clamp(Math.Abs(TensionDirection.X) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.X),
+                                GameMath.Clamp(Math.Abs(TensionDirection.Y) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.Y),
+                                GameMath.Clamp(Math.Abs(TensionDirection.Z) - tensionResistStrength, 0, 400) * f * Math.Sign(TensionDirection.Z)
+                            );
                     }
 
                     Velocity.Set(0, 0, 0);

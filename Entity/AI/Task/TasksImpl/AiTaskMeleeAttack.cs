@@ -31,7 +31,6 @@ namespace Vintagestory.GameContent
 
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
-        protected float tamingGenerations = 10f;
         protected float attackRange = 3f;
         protected bool turnToTarget = true;
 
@@ -43,7 +42,6 @@ namespace Vintagestory.GameContent
         {
             base.LoadConfig(taskConfig, aiConfig);
 
-            this.tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
             this.damage = taskConfig["damage"].AsFloat(2);
             this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 4f));
             this.attackAngleRangeDeg = taskConfig["attackAngleRangeDeg"].AsFloat(20);
@@ -75,7 +73,9 @@ namespace Vintagestory.GameContent
 
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
 
-            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            int generation = GetOwnGeneration();
+            bool fullyTamed = generation >= tamingGenerations;
+
             float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
             if (whenInEmotionState != null) fearReductionFactor = 1;
 
@@ -93,7 +93,8 @@ namespace Vintagestory.GameContent
             {
                 targetEntity = entity.World.GetNearestEntity(pos, attackRange * fearReductionFactor, attackRange * fearReductionFactor, (e) =>
                 {
-                    return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
+                    if (fullyTamed && isNonAttackingPlayer(e)) return false;
+                    return base.IsTargetableEntity(e, 15) && base.hasDirectContact(e, minDist, minVerDist);
                 });
             }
 
@@ -119,6 +120,8 @@ namespace Vintagestory.GameContent
         {
             EntityPos own = entity.ServerPos;
             EntityPos his = targetEntity.ServerPos;
+            if (own.Dimension != his.Dimension) return false;   // One or other changed dimension, no further attack processing
+
             bool correctYaw = true;
 
             if (turnToTarget)

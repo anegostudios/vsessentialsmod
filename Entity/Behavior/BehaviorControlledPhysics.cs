@@ -42,6 +42,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     public float StepHeight = 0.6f;
     public bool Ticking { get; set; }
 
+    public float stepUpSpeed = 0.07f;
+    public float climbUpSpeed = 0.07f;
+    public float climbDownSpeed = 0.035f;
+
     public void SetState(EntityPos pos, float dt)
     {
         float dtFactor = dt * 60;
@@ -120,6 +124,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     public void SetProperties(EntityProperties properties, JsonObject attributes)
     {
         StepHeight = attributes["stepHeight"].AsFloat(0.6f);
+        stepUpSpeed = attributes["stepUpSpeed"].AsFloat(0.07f);
+        climbUpSpeed = attributes["climbUpSpeed"].AsFloat(0.07f);
+        climbDownSpeed = attributes["climbDownSpeed"].AsFloat(0.035f);
         sneakTestCollisionbox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.1f);
         sneakTestCollisionbox.Y2 /= 2;
 
@@ -322,8 +329,8 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             {
                 if (controls.WalkVector.Y == 0)
                 {
-                    pos.Motion.Y = controls.Sneak ? Math.Max(-0.07, pos.Motion.Y - 0.07) : pos.Motion.Y;
-                    if (controls.Jump) pos.Motion.Y = 0.035 * dt * 60f;
+                    pos.Motion.Y = controls.Sneak ? Math.Max(-climbUpSpeed, pos.Motion.Y - climbUpSpeed) : pos.Motion.Y;
+                    if (controls.Jump) pos.Motion.Y = climbDownSpeed * dt * 60f;
                 }
             }
 
@@ -344,7 +351,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
             if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping && entity.Properties.Habitat != EnumHabitat.Underwater)
             {
-                if (blockAccessor.GetBlock((int)pos.X, (int)(pos.InternalY + 0.5), (int)pos.Z).LiquidLevel >= 7 || blockAccessor.GetBlock((int)pos.X, (int)pos.InternalY, (int)pos.Z).LiquidLevel >= 7 || (blockAccessor.GetBlock((int)pos.X, (int)(pos.InternalY - 0.05), (int)pos.Z).LiquidLevel >= 7))
+                if (blockAccessor.GetBlockRaw((int)pos.X, (int)(pos.InternalY + 0.5), (int)pos.Z).LiquidLevel >= 7 || blockAccessor.GetBlockRaw((int)pos.X, (int)pos.InternalY, (int)pos.Z).LiquidLevel >= 7 || (blockAccessor.GetBlockRaw((int)pos.X, (int)(pos.InternalY - 0.05), (int)pos.Z).LiquidLevel >= 7))
                 {
                     pos.Motion.Y += 0.2 * dt;
                     controls.IsStepping = true;
@@ -382,17 +389,19 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         float offZ = entity.CollisionBox.Z2 - entity.OriginCollisionBox.Z2;
 
         int posX = (int)(pos.X + offX);
+        int posY = (int)pos.InternalY;
         int posZ = (int)(pos.Z + offZ);
+        int swimmingY = (int)(pos.InternalY + entity.SwimmingOffsetY);
 
-        Block blockFluid = blockAccessor.GetBlock(posX, (int)pos.InternalY, posZ, BlockLayersAccess.Fluid);
-        Block middleWOIBlock = blockAccessor.GetBlock(posX, (int)(pos.InternalY + entity.SwimmingOffsetY), posZ, BlockLayersAccess.Fluid);
+        Block blockFluid = blockAccessor.GetBlock(posX, posY, posZ, BlockLayersAccess.Fluid);
+        Block middleWOIBlock = (swimmingY == posY) ? blockFluid : blockAccessor.GetBlock(posX, swimmingY, posZ, BlockLayersAccess.Fluid);
 
         entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
         entity.FeetInLiquid = false;
 
         if (blockFluid.IsLiquid())
         {
-            Block aboveBlock = blockAccessor.GetBlock(posX, (int)(pos.InternalY + 1), posZ, BlockLayersAccess.Fluid);
+            Block aboveBlock = blockAccessor.GetBlock(posX, posY + 1, posZ, BlockLayersAccess.Fluid);
             entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
         }
 
@@ -406,7 +415,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
         if (!feetInLiquidBefore && entity.FeetInLiquid) entity.OnCollideWithLiquid();
 
-        if ((swimmingBefore && !entity.Swimming && !entity.FeetInLiquid) || (feetInLiquidBefore && !entity.FeetInLiquid && !entity.Swimming)) entity.OnExitedLiquid();
+        if ((swimmingBefore || feetInLiquidBefore) && (!entity.Swimming && !entity.FeetInLiquid))
+        {
+            entity.OnExitedLiquid();
+        }
 
         if (!falling || entity.OnGround || controls.IsClimbing) entity.PositionBeforeFalling.Set(pos);
 
@@ -446,7 +458,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             entity.Swimming = false;
             entity.OnGround = false;
             var seatPos = agent.MountedOn.SeatPosition;
-            
+
             if (!(agent is EntityPlayer))
             {
                 pos.SetFrom(agent.MountedOn.SeatPosition);
@@ -490,7 +502,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 tmpPos.Set(pos);
                 block = blockAccessor.GetBlock(tmpPos);
             }
-            if (block.Id > 0) block.OnEntityInside(entity.World, entity, tmpPos);
+            if (block?.Id > 0) block.OnEntityInside(entity.World, entity, tmpPos);
         }
     }
 
@@ -577,10 +589,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + (0.01 * 3f);
         Vec3d stepPos = newPos.OffsetCopy(moveDelta.X, heightDiff, moveDelta.Z);
         bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, stepPos, false);
-
+        
         if (canStep)
         {
-            pos.Y += 0.07 * dtFac;
+            pos.Y += stepUpSpeed * dtFac;
             collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref newPos);
             return true;
         }
@@ -814,16 +826,16 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         int yMax = (int)entityBox.Y2;
         int zMax = (int)entityBox.Z2;
         int zMin = (int)entityBox.Z1;
+        BlockPos tmpPos = new BlockPos(entity.ServerPos.Dimension);
         for (int y = (int)entityBox.Y1; y <= yMax; y++)
         {
             for (int x = (int)entityBox.X1; x <= xMax; x++)
             {
                 for (int z = zMin; z <= zMax; z++)
                 {
-                    var block = entity.World.BlockAccessor.GetBlock(x, y, z);
+                    var block = entity.World.BlockAccessor.GetBlock(tmpPos.Set(x, y, z));
                     if (block.Id == 0) continue;
-                    collisionTester.tmpPos.Set(x, y, z);
-                    block.OnEntityInside(entity.World, entity, collisionTester.tmpPos);
+                    block.OnEntityInside(entity.World, entity, tmpPos);
                 }
             }
         }

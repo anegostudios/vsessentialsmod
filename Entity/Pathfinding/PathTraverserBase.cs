@@ -17,7 +17,7 @@ namespace Vintagestory.API.Common
         protected float movingSpeed;
         public float curTurnRadPerSec;
 
-        protected float targetDistance;
+        public float TargetDistance;
 
         public virtual Vec3d CurrentTarget
         {
@@ -57,7 +57,7 @@ namespace Vintagestory.API.Common
             this.OnGoalReached = OnGoalReached;
             this.OnStuck = OnStuck;
             this.movingSpeed = movingSpeed;
-            this.targetDistance = targetDistance;
+            this.TargetDistance = targetDistance;
             this.target = target;
             Active = true;
             return BeginGo();

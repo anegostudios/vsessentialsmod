@@ -155,7 +155,7 @@ namespace Vintagestory.GameContent
             base.DoRender2D(dt);
         }
 
-        protected override Vec3d getAboveHeadPosition(EntityPlayer entityPlayer)
+        public override Vec3d getAboveHeadPosition(EntityPlayer entityPlayer)
         {
             if (IsSelf) return new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
 
@@ -349,10 +349,7 @@ namespace Vintagestory.GameContent
 
                 if (!isShadowPass)
                 {
-                    float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
-                    smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
-                    yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
-                    smoothedBodyYaw += yawDist * mdt * 25f;
+                    smoothCameraTurning(bodyYaw, mdt);
                 }
             }
 
@@ -388,18 +385,22 @@ namespace Vintagestory.GameContent
                 Mat4f.Translate(ModelMat, ModelMat, 0, capi.Settings.Float["fpHandsYOffset"], 0);
             }
 
-            if (selfEplr != null)
-            {
-                float targetIntensity = entity.WatchedAttributes.GetFloat("intoxication");
-                intoxIntensity += (targetIntensity - intoxIntensity) * dt / 3;
-                capi.Render.PerceptionEffects.ApplyToTpPlayer(selfEplr, ModelMat, intoxIntensity);
-            }
+            float targetIntensity = entity.WatchedAttributes.GetFloat("intoxication");
+            intoxIntensity += (targetIntensity - intoxIntensity) * dt / 3;
+            capi.Render.PerceptionEffects.ApplyToTpPlayer(entity as EntityPlayer, ModelMat, intoxIntensity);
 
             float scale = entity.Properties.Client.Size;
             Mat4f.Scale(ModelMat, ModelMat, new float[] { scale, scale, scale });
             Mat4f.Translate(ModelMat, ModelMat, -0.5f, 0, -0.5f);
         }
 
+        private void smoothCameraTurning(float bodyYaw, float mdt)
+        {
+            float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
+            smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
+            yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
+            smoothedBodyYaw += yawDist * mdt * 25f;
+        }
 
         protected Vec3f GetOtherPlayerRenderOffset()
         {

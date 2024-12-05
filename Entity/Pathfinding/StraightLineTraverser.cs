@@ -50,7 +50,7 @@ namespace Vintagestory.Essentials
                 ;
 
 
-            if (sqDistToTarget < targetDistance * targetDistance)
+            if (sqDistToTarget < TargetDistance * TargetDistance)
             {
                 Stop();
                 OnGoalReached?.Invoke();

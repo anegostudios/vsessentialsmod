@@ -79,7 +79,7 @@ namespace Vintagestory.GameContent
                 for (int i = 0; i < Vec3i.DirectAndIndirectNeighbours.Length; i++)
                 {
                     Vec3i vec = Vec3i.DirectAndIndirectNeighbours[i];
-                    Block block = sapi.World.BlockAccessor.GetBlock(pos.X + vec.X, pos.InternalY + vec.Y, pos.Z + vec.Z);
+                    Block block = sapi.World.BlockAccessor.GetBlockRaw(pos.X + vec.X, pos.InternalY + vec.Y, pos.Z + vec.Z);
                     if (block.Id == 0) continue;
 
                     if (canDecay(block))
@@ -240,7 +240,7 @@ namespace Vintagestory.GameContent
                 
                 if (canDecay(block))
                 {
-                    bfsQueue.Enqueue(new Vec4i(startPos.X, startPos.Y, startPos.Z, 2));
+                    bfsQueue.Enqueue(new Vec4i(startPos, 2));
                     checkedPositions.Add(startPos);
                 } else
                 {
@@ -290,7 +290,7 @@ namespace Vintagestory.GameContent
                         
                         if (canDecay(block))
                         {
-                            bfsQueue.Enqueue(new Vec4i(curPos.X, curPos.Y, curPos.Z, 0));
+                            bfsQueue.Enqueue(new Vec4i(curPos, 0));
                         }
                     }
                 }
