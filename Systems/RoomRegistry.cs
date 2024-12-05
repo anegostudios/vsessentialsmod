@@ -440,11 +440,11 @@ namespace Vintagestory.GameContent
                 else if (dz > maxz) maxz = dz;
 
                 Block bBlock = blockAccess.GetBlock(bpos);
-                int heatRetention = bBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
                 foreach (BlockFacing facing in BlockFacing.ALLFACES)
                 {
                     facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
+                    int heatRetention = bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat);
 
                     // We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
                     if (bBlock.Id != 0 && heatRetention != 0)
