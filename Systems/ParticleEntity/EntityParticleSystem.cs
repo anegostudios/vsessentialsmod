@@ -428,7 +428,7 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
-            particleModelRef.Dispose();
+            particleModelRef?.Dispose();
         }
 
         public void Clear()

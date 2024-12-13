@@ -100,9 +100,10 @@ namespace Vintagestory.GameContent
                         failureCode = "decorrequiressolid";
                         return false;
                     }
-                    
-                    Block decorBlock = world.BlockAccessor.GetDecor(pos, BlockSelection.GetDecorIndex(blockSel.Face));
-                    if (world.BlockAccessor.SetDecor(blockToPlace, pos, blockSel.Face))
+
+                    DecorBits decorPosition = new DecorBits(blockSel.Face);
+                    Block decorBlock = world.BlockAccessor.GetDecor(pos, decorPosition);
+                    if (world.BlockAccessor.SetDecor(blockToPlace, pos, decorPosition))
                     {
                         if (byPlayer.WorldData.CurrentGameMode == EnumGameMode.Survival && decorBlock != null && (decorBlock.decorBehaviorFlags & DecorFlags.Removable) != 0)
                         {

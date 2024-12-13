@@ -257,8 +257,16 @@ namespace Vintagestory.GameContent
             SimulationRange = (int)(0.75f * GlobalConstants.DefaultSimulationRange);
             base.Initialize(properties, api, InChunkIndex3d);
 
-            // Need to capture this now before we remove the block and start to fall
-            drops = Block.GetDrops(api.World, initialPos, null);
+            try
+            {
+                // Need to capture this now before we remove the block and start to fall
+                drops = Block.GetDrops(api.World, initialPos, null);
+            }
+            catch (Exception)
+            {
+                drops = null;
+                api.Logger.Warning("Falling block entity could not properly initialise its drops during chunk loading, as original block is no longer at " + initialPos);
+            }
 
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
 

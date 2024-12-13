@@ -94,7 +94,7 @@ namespace Vintagestory.GameContent
                 targetEntity = entity.World.GetNearestEntity(pos, attackRange * fearReductionFactor, attackRange * fearReductionFactor, (e) =>
                 {
                     if (fullyTamed && isNonAttackingPlayer(e)) return false;
-                    return base.IsTargetableEntity(e, 15) && base.hasDirectContact(e, minDist, minVerDist);
+                    return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
                 });
             }
 

@@ -25,9 +25,9 @@ namespace Vintagestory.GameContent
         void MBOnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
         bool MBOnBlockInteractCancel(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, EnumItemUseCancelReason cancelReason, Vec3i offset);
 
-        ItemStack MBOnPickBlock(IWorldAccessor world, BlockPos pos, Vec3i offset); 
+        ItemStack MBOnPickBlock(IWorldAccessor world, BlockPos pos, Vec3i offset);
         WorldInteraction[] MBGetPlacedBlockInteractionHelp(IWorldAccessor world, BlockSelection blockSel, IPlayer forPlayer, Vec3i offset);
-        BlockSounds GetSounds(IBlockAccessor blockAccessor, BlockSelection blockSel, ItemStack stack, Vec3i offset);
+        BlockSounds MBGetSounds(IBlockAccessor blockAccessor, BlockSelection blockSel, ItemStack stack, Vec3i offset);
     }
 
     public interface IMultiBlockBlockBreaking
@@ -51,7 +51,7 @@ namespace Vintagestory.GameContent
     // 3 Levels of modularity of multi block structures
     // Monolithic, Simple: The controller block takes care of the block shape, the other blocks are invisible and have full block hitboxes. Simply forwards all interaction and info events to the controller block
     // Monolithic, Configurable: The controller block takes care of the block shape and implements IMultiBlockMonolithic for custom hitboxes and interaction events. The other blocks are still invisible
-    // Modular, Configurable: The controller block implements IMultiBlockModular, most events are forwarded to the controller block. 
+    // Modular, Configurable: The controller block implements IMultiBlockModular, most events are forwarded to the controller block.
     public class BlockMultiblock : Block
     {
         public Vec3i Offset;
@@ -131,7 +131,7 @@ namespace Vintagestory.GameContent
             return Handle<BlockSounds, IMultiBlockInteract>(
                 ba,
                 blockSel.Position.X + OffsetInv.X, blockSel.Position.InternalY + OffsetInv.Y, blockSel.Position.Z + OffsetInv.Z,
-                (inf) => inf.GetSounds(ba, blockSel, stack, OffsetInv),
+                (inf) => inf.MBGetSounds(ba, blockSel, stack, OffsetInv),
                 (block) => base.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack),
                 (block) => block.GetSounds(ba, blockSel.AddPosCopy(OffsetInv), stack)
             );
@@ -189,7 +189,7 @@ namespace Vintagestory.GameContent
                   }
               );;
 
-            
+
         }
 
 

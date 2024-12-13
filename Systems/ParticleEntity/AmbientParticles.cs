@@ -124,7 +124,7 @@ public class ModSystemAmbientParticles : ModSystem
 
             if (conds.Rainfall <= 0.01 && GlobalConstants.CurrentWindSpeedClient.X < 0.2f && world.Rand.NextDouble() < chance && climate.Temperature >= 14 && climate.WorldgenRainfall >= 0.4f && blockPos.Y > world.SeaLevel && manager.BlockAccess.GetBlock(blockPos).Id == 0)
             {
-                var cs = world.BlockAccessor.ChunkSize;
+                const int cs = GlobalConstants.ChunkSize;
                 IMapChunk mapchunk = manager.BlockAccess.GetMapChunk(blockPos.X / cs, blockPos.Z / cs);
                 if (mapchunk != null && blockPos.Y > mapchunk.RainHeightMap[(blockPos.Z % cs) * cs + (blockPos.X % cs)])
                 {

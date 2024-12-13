@@ -29,6 +29,11 @@ namespace Vintagestory.GameContent
                 lastattackingEntity = null;
             }
 
+            if (attackedByEntity == guardedEntity)
+            {
+                attackedByEntity = null;
+            }
+
             return base.ShouldExecute();
         }
 
@@ -43,6 +48,7 @@ namespace Vintagestory.GameContent
         public override bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
             if (!base.IsTargetableEntity(e, range, ignoreEntityCode)) return false;
+            if (e == guardedEntity) return false;
 
             var tasks = e.GetBehavior<EntityBehaviorTaskAI>()?.TaskManager.ActiveTasksBySlot;
             return (e == lastattackingEntity && e.Alive) || tasks?.FirstOrDefault(task => {

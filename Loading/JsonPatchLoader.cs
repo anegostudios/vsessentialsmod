@@ -85,6 +85,15 @@ namespace Vintagestory.ServerMods.NoObf
                 worldConfig = new TreeAttribute();
             }
 
+            ApplyPatches();
+        }
+
+        /// <summary>
+        ///
+        /// </summary>
+        /// <param name="forPartialPath">Only apply patches that patch a file starting with this path.</param>
+        public void ApplyPatches(string forPartialPath = null)
+        {
             List<IAsset> entries = api.Assets.GetMany("patches/");
 
             int appliedCount = 0;
@@ -154,6 +163,8 @@ namespace Vintagestory.ServerMods.NoObf
                         }
                     }
 
+                    if(forPartialPath != null && !patch.File.PathStartsWith(forPartialPath)) continue;
+
                     totalCount++;
                     ApplyPatch(j, asset.Location, patch, ref appliedCount, ref notfoundCount, ref errorCount);
                 }
@@ -164,7 +175,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             if (totalCount == 0)
             {
-                sb.Append(string.Format("Nothing to patch", totalCount));
+                sb.Append("Nothing to patch");
             }
             else
             {
