@@ -70,7 +70,7 @@ namespace Vintagestory.GameContent
 
             if (soundCoolDownLeft <= 0 && shouldPlaySound())
             {
-                capi.Event.EnqueueMainThreadTask(() => capi.World.PlaySoundAt(sound, Position.X, Position.Y, Position.Z, null, RandomPitch(), soundRange), "playginsectsound");
+                playsound();
                 soundCoolDownLeft = soundCoolDown;
                 return;
             }
@@ -96,6 +96,20 @@ namespace Vintagestory.GameContent
             } else
             {
                 dieAccum = 0;
+            }
+        }
+
+        private void playsound()
+        {
+            var plrPos = capi.World.Player.Entity.Pos;
+
+            var roomReg = capi.ModLoader.GetModSystem<RoomRegistry>().GetRoomForPosition(plrPos.AsBlockPos);
+            float attnRoom = roomReg.ExitCount < 2 ? 0.1f : 1;
+
+            float volume = 1 * attnRoom;
+            if (volume > 0.05f)
+            {
+                capi.Event.EnqueueMainThreadTask(() => capi.World.PlaySoundAt(sound, Position.X, Position.Y, Position.Z, null, RandomPitch(), soundRange, volume), "playginsectsound");
             }
         }
 

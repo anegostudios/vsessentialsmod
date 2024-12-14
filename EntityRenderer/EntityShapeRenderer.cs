@@ -95,7 +95,7 @@ namespace Vintagestory.GameContent
             shouldSwivelFromMotion = entity.Properties.Attributes?["shouldSwivelFromMotion"].AsBool(true) ?? true;
             frostAlphaAccum = (float)api.World.Rand.NextDouble();
 
-            
+
             listenerId = api.Event.RegisterGameTickListener(UpdateDebugInfo, 250);
             OnDebugInfoChanged();
 
@@ -503,7 +503,7 @@ namespace Vintagestory.GameContent
                 float[] glowColor = ColorUtil.GetIncandescenceColorAsColor4f(temp);
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
 
-                var baked = (stack.Item?.FirstTexture ?? stack.Block?.FirstTextureInventory).Baked;
+                var baked = (stack.Item?.FirstTexture ?? stack.Block?.FirstTextureInventory)?.Baked;
                 Vec4f vec = baked == null ? new Vec4f(1, 1, 1, 1) : ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
                 prog.Uniform("averageColor", vec);
                 prog.Uniform("extraGlow", (int)gi);
