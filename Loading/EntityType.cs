@@ -197,7 +197,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// The chance that an idle sound will play for the entity.
         /// </summary>
         [JsonProperty]
-        public float IdleSoundChance = 0.3f;
+        public float IdleSoundChance = 0.05f;
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>24</jsondefault>-->
