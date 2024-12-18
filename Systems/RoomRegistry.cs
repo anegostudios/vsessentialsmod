@@ -444,10 +444,14 @@ namespace Vintagestory.GameContent
                 foreach (BlockFacing facing in BlockFacing.ALLFACES)
                 {
                     facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
+                    int heatRetention = bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat);
 
                     // We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
-                    if (bBlock.Id != 0 && bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat) != 0)
+                    if (bBlock.Id != 0 && heatRetention != 0)
                     {
+                        if (heatRetention < 0) coolingWallCount -=heatRetention;
+                        else nonCoolingWallCount += heatRetention;
+
                         continue;
                     }
 
@@ -459,7 +463,7 @@ namespace Vintagestory.GameContent
 
                     Block nBlock = blockAccess.GetBlock(npos);
                     allChunksLoaded &= blockAccess.LastChunkLoaded;
-                    int heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
+                    heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
                     // We hit a wall, no need to scan further
                     if (heatRetention != 0)
@@ -482,22 +486,22 @@ namespace Vintagestory.GameContent
                     switch (facing.Index)
                     {
                         case 0: // North
-                            if (dz < minz) outsideCube = dz < 0 || maxz - minz >= MAXROOMSIZE;
+                            if (dz < minz) outsideCube = dz < 0 || maxz - minz + 1 >= MAXROOMSIZE;
                             break;
                         case 1: // East
-                            if (dx > maxx) outsideCube = dx > maxSize || maxx - minx >= MAXROOMSIZE;
+                            if (dx > maxx) outsideCube = dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE;
                             break;
                         case 2: // South
-                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz >= MAXROOMSIZE;
+                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE;
                             break;
                         case 3: // West
-                            if (dx < minx) outsideCube = dx < 0 || maxx - minx >= MAXROOMSIZE;
+                            if (dx < minx) outsideCube = dx < 0 || maxx - minx + 1 >= MAXROOMSIZE;
                             break;
                         case 4: // Up
-                            if (dy > maxy) outsideCube = dy > maxSize || maxy - miny >= MAXROOMSIZE;
+                            if (dy > maxy) outsideCube = dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE;
                             break;
                         case 5: // Down
-                            if (dy < miny) outsideCube = dy < 0 || maxy - miny >= MAXROOMSIZE;
+                            if (dy < miny) outsideCube = dy < 0 || maxy - miny + 1 >= MAXROOMSIZE;
                             break;
                     }
                     if (outsideCube)
