@@ -301,12 +301,13 @@ namespace Vintagestory.GameContent
 
         public override string GetPlacedBlockInfo(IWorldAccessor world, BlockPos pos, IPlayer forPlayer)
         {
-            var block = world.BlockAccessor.GetBlock(pos.AddCopy(OffsetInv));
+            BlockPos mainPos = pos.AddCopy(OffsetInv);
+            var block = world.BlockAccessor.GetBlock(mainPos);
 
             // Prevent Stack overflow
             if (block is BlockMultiblock) return "";
 
-            return block.GetPlacedBlockInfo(world, pos.AddCopy(OffsetInv), forPlayer);
+            return block.GetPlacedBlockInfo(world, mainPos, forPlayer);
         }
 
         public override int GetRandomColor(ICoreClientAPI capi, BlockPos pos, BlockFacing facing, int rndIndex = -1)
