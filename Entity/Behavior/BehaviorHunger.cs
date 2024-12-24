@@ -358,8 +358,7 @@ namespace Vintagestory.GameContent
 
             float healthGain = 2.5f * (fruitRel + grainRel + vegetableRel + proteinRel + dairyRel);
 
-            bh.MaxHealthModifiers["nutrientHealthMod"] = healthGain;
-            bh.MarkDirty();
+            bh.SetMaxHealthModifiers("nutrientHealthMod", healthGain);
         }
 
 

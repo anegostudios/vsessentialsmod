@@ -386,10 +386,10 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             {
                 if (entityPlayer.EntityId != 0 && entityPlayer.Alive)
                 {
-                    capi.Network.SendPlayerEntityPacket(capi.World.Player.Entity);
+                    capi.Network.SendPlayerPositionPacket();
                     if (tickable != null)
                     {
-                        capi.Network.SendMountPacket(mountedEntity);
+                        capi.Network.SendPlayerMountPositionPacket(mountedEntity);
                     }
                 }
             }

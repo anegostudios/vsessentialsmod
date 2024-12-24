@@ -267,7 +267,7 @@ namespace Vintagestory.GameContent
 
                 ItemStack stack = slot?.Itemstack;
                 var tongStack = eagent?.LeftHandItemSlot?.Itemstack;
-                if (stack != null && stack.Collectible.GetTemperature(entity.World, stack) > 200 && tongStack?.ItemAttributes.IsTrue("heatResistant")==true)
+                if (stack != null && stack.Collectible.GetTemperature(entity.World, stack) > 200 && tongStack?.ItemAttributes?.IsTrue("heatResistant")==true)
                 {
                     AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose("LeftHand");
                     ItemRenderInfo renderInfo = capi.Render.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTpOff, dt);

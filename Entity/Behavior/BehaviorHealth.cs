@@ -56,7 +56,24 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public Dictionary<string, float> MaxHealthModifiers = new Dictionary<string, float>();
+        [Obsolete("This is nullable. Please call SetMaxHealthModifiers() instead of writing to it directly.")]
+        public Dictionary<string, float> MaxHealthModifiers = null;
+
+        public void SetMaxHealthModifiers(string key, float value)
+        {
+            bool dirty = true;
+            if (MaxHealthModifiers == null)
+            {
+                MaxHealthModifiers = new Dictionary<string, float>();
+                if (value == 0f) dirty = false;
+            }
+            else if (MaxHealthModifiers.TryGetValue(key, out float oldvalue) && oldvalue == value)
+            {
+                dirty = false;
+            }
+            MaxHealthModifiers[key] = value;
+            if (dirty) MarkDirty();              // Only markDirty if it actually changed
+        }
 
 
 
@@ -70,7 +87,11 @@ namespace Vintagestory.GameContent
         public void UpdateMaxHealth()
         {
             float totalMaxHealth = BaseMaxHealth;
-            foreach (var val in MaxHealthModifiers) totalMaxHealth += val.Value;
+            var MaxHealthModifiers = this.MaxHealthModifiers;
+            if (MaxHealthModifiers != null)
+            {
+                foreach (var val in MaxHealthModifiers) totalMaxHealth += val.Value;
+            }
 
             totalMaxHealth += entity.Stats.GetBlended("maxhealthExtraPoints") - 1;
 
@@ -97,12 +118,14 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            Health = healthTree.GetFloat("currenthealth");
-            BaseMaxHealth = healthTree.GetFloat("basemaxhealth");
+            float baseMaxHealth = healthTree.GetFloat("basemaxhealth");
+            if (baseMaxHealth == 0)
+            {
+                BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
+                MarkDirty();
+            }
+            // Otherwise we don't need to read and immediately set the same values back to the healthTree, nor mark it as dirty: and a MarkDirty() here messes up EntityPlayer health on joining a game, if done prior to initialising BehaviorHunger and its MaxHealthModifiers
 
-            if (BaseMaxHealth == 0) BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
-
-            MarkDirty();
             secondsSinceLastUpdate = (float) entity.World.Rand.NextDouble();   // Randomise which game tick these update, a starting server would otherwise start all loaded entities with the same zero timer
         }
 

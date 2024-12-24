@@ -2,6 +2,7 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -48,6 +49,11 @@ namespace Vintagestory.GameContent
 
         public override ITexPositionSource GetTextureSource(ref EnumHandling handling)
         {
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != RuntimeEnv.MainThreadId)
+            {
+                throw new InvalidOperationException("Potentially attempting to insert a texture into the atlas outside of the main thread (if this allocation causes a new atlas to be created).");
+            }
+
             handling = EnumHandling.PassThrough;
 
             if (!textureSpaceAllocated)
