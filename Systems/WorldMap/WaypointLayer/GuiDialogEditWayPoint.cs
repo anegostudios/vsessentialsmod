@@ -17,7 +17,12 @@ namespace Vintagestory.GameContent
         string[] icons;
 
         Waypoint waypoint;
+
+        public Waypoint Waypoint => waypoint;
+
         int wpIndex;
+
+        public int WpIndex => wpIndex;
 
         internal Vec3d WorldPos;
 

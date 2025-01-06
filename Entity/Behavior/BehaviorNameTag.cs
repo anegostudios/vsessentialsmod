@@ -167,6 +167,11 @@ namespace Vintagestory.GameContent
                 nameTagTexture.Dispose();
                 nameTagTexture = null;
             }
+
+            if (capi != null)
+            {
+                capi.Event.UnregisterRenderer(this, EnumRenderStage.Ortho);
+            }
         }
 
         public override string GetName(ref EnumHandling handling)

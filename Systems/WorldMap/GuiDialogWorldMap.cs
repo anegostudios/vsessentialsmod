@@ -84,8 +84,8 @@ namespace Vintagestory.GameContent
 
                 dialogBounds =
                     ElementStdBounds.AutosizedMainDialog
-                    .WithAlignment(EnumDialogArea.RightTop)
-                    .WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, GuiStyle.DialogToScreenPadding);
+                    .WithAlignment(GetMinimapPosition(out double offsetX, out double offsetY))
+                    .WithFixedAlignmentOffset(offsetX, offsetY);
 
                 compo = hudDialog;
             } else
@@ -235,6 +235,10 @@ namespace Vintagestory.GameContent
             if (dialogType == EnumDialogType.HUD)
             {
                 SingleComposer = hudDialog;
+                SingleComposer.Bounds.Alignment = GetMinimapPosition(out double offsetX, out double offsetY);
+                SingleComposer.Bounds.fixedOffsetX = offsetX;
+                SingleComposer.Bounds.fixedOffsetY = offsetY;
+                SingleComposer.ReCompose();
             } else
             {
                 SingleComposer = ComposeDialog(EnumDialogType.Dialog);
@@ -404,6 +408,22 @@ namespace Vintagestory.GameContent
         public override bool ShouldReceiveKeyboardEvents()
         {
             return base.ShouldReceiveKeyboardEvents() && dialogType == EnumDialogType.Dialog;
+        }
+
+        private EnumDialogArea GetMinimapPosition(out double offsetX, out double offsetY)
+        {
+            EnumDialogArea position;
+            offsetX = GuiStyle.DialogToScreenPadding;
+            offsetY = GuiStyle.DialogToScreenPadding;
+            switch (capi.Settings.Int["minimapHudPosition"])
+            {
+                case 1: position = EnumDialogArea.LeftTop; break;
+                case 2: position = EnumDialogArea.LeftBottom; offsetY = -offsetY; break;
+                case 3: position = EnumDialogArea.RightBottom; offsetX = -offsetX; offsetY = -offsetY; break;
+                default: position = EnumDialogArea.RightTop; offsetX = -offsetX; break;
+            }
+
+            return position;
         }
     }
 }

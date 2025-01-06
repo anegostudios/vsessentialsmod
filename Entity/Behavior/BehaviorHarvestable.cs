@@ -39,6 +39,14 @@ namespace Vintagestory.GameContent
 
     }
 
+    public interface IHarvestableDrops
+    {
+        public ItemStack[] GetHarvestableDrops(IWorldAccessor world, BlockPos pos, IPlayer byPlayer)
+        {
+            return null;
+        }
+    }
+
     public class EntityBehaviorHarvestable : EntityBehaviorContainer
     {
         const float minimumWeight = 0.5f;
@@ -422,24 +430,15 @@ namespace Vintagestory.GameContent
                 if (dstack.LastDrop) break;
             }
 
-            /*var eagent = entity as EntityAgent;
-            if (eagent.GearInventory != null)
+            List<IHarvestableDrops> harvestableInterfaces = entity.GetInterfaces<IHarvestableDrops>();
+            harvestableInterfaces?.ForEach(hInterface =>
             {
-                foreach (var slot in eagent.GearInventory)
-                {
-                    if (slot.Empty) continue;
-                    todrop.Add(slot.Itemstack);
-                }
-            }*/
-
-            ItemStack[] entityDrops = entity.GetDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer);
-            if (entityDrops != null)
-            {
-                foreach (ItemStack stack in entityDrops)
+                ItemStack[] harvestableDrops = hInterface.GetHarvestableDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer);
+                harvestableDrops?.Foreach(stack =>
                 {
                     todrop.Add(stack);
-                }
-            }
+                });
+            });
 
             inv.AddSlots(todrop.Count - inv.Count);
 

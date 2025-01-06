@@ -181,8 +181,10 @@ namespace Vintagestory.GameContent
             if (capi != null && mapAllowedClient())
             {
                 capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
+                capi.Input.RegisterHotKey("minimapposition", Lang.Get("keycontrol-minimap-position"), GlKeys.F6, HotkeyType.HelpAndOverlays, false, true, false);
                 capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
                 capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
+                capi.Input.SetHotKeyHandler("minimapposition", OnHotKeyMinimapPosition);
                 capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
                 capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
             }
@@ -243,6 +245,22 @@ namespace Vintagestory.GameContent
             return true;
         }
 
+        private bool OnHotKeyMinimapPosition(KeyCombination comb)
+        {
+            int prev = capi.Settings.Int["minimapHudPosition"];
+            capi.Settings.Int["minimapHudPosition"] = (prev + 1) % 4;
+
+            if (worldMapDlg == null || !worldMapDlg.IsOpened()) ToggleMap(EnumDialogType.HUD);
+            else
+            {
+                if (worldMapDlg.DialogType == EnumDialogType.HUD)
+                {
+                    worldMapDlg.Recompose();
+                }
+            }
+            return true;
+        }
+
         private bool OnHotKeyWorldMapDlg(KeyCombination comb)
         {
             ToggleMap(EnumDialogType.Dialog);
@@ -264,7 +282,7 @@ namespace Vintagestory.GameContent
             {
                 if (!isDlgOpened)
                 {
-                    if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
+                    if (asType == EnumDialogType.HUD) capi.Settings.Bool.Set("showMinimapHud", true, false);
 
                     worldMapDlg.Open(asType);
                     foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
@@ -282,7 +300,7 @@ namespace Vintagestory.GameContent
 
                     if (asType == EnumDialogType.HUD)
                     {
-                        capi.Settings.Bool["showMinimapHud"] = false;
+                        capi.Settings.Bool.Set("showMinimapHud", false, false);
                     }
                     else if (capi.Settings.Bool["showMinimapHud"])
                     {
@@ -307,7 +325,7 @@ namespace Vintagestory.GameContent
             foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
             clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
 
-            if (asType == EnumDialogType.HUD) capi.Settings.Bool["showMinimapHud"] = true;
+            capi.Settings.Bool.Set("showMinimapHud", true, false);   // Don't trigger the watcher which will call Toggle again recursively!
         }
 
         private List<string> getTabsOrdered()

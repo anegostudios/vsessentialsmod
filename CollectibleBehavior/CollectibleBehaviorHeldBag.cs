@@ -300,6 +300,10 @@ namespace Vintagestory.GameContent
 
                 dlg.OnClosed += () => Close(player);
             }
+            else
+            {
+                onEntity.Api.Logger.Audit("{0} opened a container on a {1} at {2}, slot {3}, id {4}", byEntity?.GetName(), onEntity.Code.ToShortString(), onEntity.ServerPos.AsBlockPos, slotIndex, wrapperInv.InventoryID);
+            }
         }
 
         public void Close(IPlayer player)

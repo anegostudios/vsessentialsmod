@@ -349,6 +349,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             string text = token.ToString();
             asset.Data = Encoding.UTF8.GetBytes(text);
+            asset.IsPatched = true;
 
             applied++;
         }
