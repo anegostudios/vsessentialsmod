@@ -14,12 +14,8 @@ namespace Vintagestory.GameContent
 
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
-        protected string[] targetEntityCodesBeginsWith = new string[0];
-        protected string[] targetEntityCodesExact;
-
+        protected AssetLocation[] targetEntityCodes;
         protected AssetLocation[] skipEntityCodes;
-
-        protected string targetEntityFirstLetters = "";
 
         protected EnumCreatureHostility creatureHostility;
         protected bool friendlyTarget;
@@ -37,7 +33,7 @@ namespace Vintagestory.GameContent
         public string triggerEmotionState;
         protected float tamingGenerations = 10f;
 
-        protected bool noEntityCodes => targetEntityCodesExact.Length == 0 && targetEntityCodesBeginsWith.Length == 0;
+        protected bool noEntityCodes => targetEntityCodes.Length == 0;
 
         protected EntityPartitioning partitionUtil;
         protected EntityBehaviorControlledPhysics bhPhysics;
@@ -70,10 +66,9 @@ namespace Vintagestory.GameContent
 
             this.triggerEmotionState = taskConfig["triggerEmotionState"].AsString();
 
+            // Defaulting to entity.Code.Domain instead of * would be more proper, but would also break every mod from 1.20.0-rc and earlier
+            targetEntityCodes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" }).Select(str => AssetLocation.Create(str, "*")).ToArray();
             skipEntityCodes = taskConfig["skipEntityCodes"].AsArray<string>()?.Select(str => AssetLocation.Create(str, entity.Code.Domain)).ToArray();
-
-            string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
-            InitializeTargetCodes(codes, ref targetEntityCodesExact, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
         }
 
         /// <summary>
@@ -83,6 +78,7 @@ namespace Vintagestory.GameContent
         /// <param name="targetEntityCodesExact"></param>
         /// <param name="targetEntityCodesBeginsWith"></param>
         /// <param name="targetEntityFirstLetters"></param>
+        [Obsolete("Use WildcardUtil instead for better consistency with the rest of the game")]
         public static void InitializeTargetCodes(string[] codes, ref string[] targetEntityCodesExact, ref string[] targetEntityCodesBeginsWith, ref string targetEntityFirstLetters)
         {
             List<string> targetEntityCodesList = new List<string>();
@@ -149,24 +145,17 @@ namespace Vintagestory.GameContent
             if (!e.Alive) return false;
             if (ignoreEntityCode) return CanSense(e, range);
 
-            if (IsTargetEntity(e.Code.Path)) return CanSense(e, range);
+            if (IsTargetEntity(e.Code)) return CanSense(e, range);
 
             return false;
         }
 
-        private bool IsTargetEntity(string testPath)
+        private bool IsTargetEntity(AssetLocation code)
         {
-            if (targetEntityFirstLetters.Length == 0) return true;     // target everything (there was a universal wildcard "*", for example BeeMob)
-            if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
-
-            for (int i = 0; i < targetEntityCodesExact.Length; i++)
-            {
-                if (testPath == targetEntityCodesExact[i]) return true;
-            }
-
-            for (int i = 0; i < targetEntityCodesBeginsWith.Length; i++)
-            {
-                if (testPath.StartsWithFast(targetEntityCodesBeginsWith[i])) return true;
+            for (int i = 0; i < targetEntityCodes.Length; ++i) {
+                if (WildcardUtil.Match(targetEntityCodes[i], code)) {
+                    return true;
+                }
             }
 
             return false;
