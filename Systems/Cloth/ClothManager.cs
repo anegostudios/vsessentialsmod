@@ -323,7 +323,11 @@ namespace Vintagestory.GameContent
                 foreach (int id in toRemove)
                 {
                     bool spawnitem = true;
-                    if (clothSystems[id].FirstPoint.PinnedToEntity is EntityAgent eagentn)
+
+                    var cs = clothSystems[id];
+                    spawnitem &= (cs.FirstPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code != new AssetLocation("rope") && (cs.LastPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code != new AssetLocation("rope");
+
+                    if (cs.FirstPoint.PinnedToEntity is EntityAgent eagentn)
                     {
                         eagentn.WalkInventory((slot) =>
                         {
@@ -341,7 +345,7 @@ namespace Vintagestory.GameContent
                         });
                     }
 
-                    if (clothSystems[id].LastPoint.PinnedToEntity is EntityAgent eagentn2)
+                    if (cs.LastPoint.PinnedToEntity is EntityAgent eagentn2)
                     {
                         eagentn2.WalkInventory((slot) =>
                         {

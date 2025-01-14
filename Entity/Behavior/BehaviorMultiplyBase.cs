@@ -20,7 +20,7 @@ namespace Vintagestory.GameContent
         public double TotalDaysCooldownUntil
         {
             get { return multiplyTree.GetDouble("totalDaysCooldownUntil"); }
-            set { multiplyTree.SetDouble("totalDaysCooldownUntil", value); }
+            set { multiplyTree.SetDouble("totalDaysCooldownUntil", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
         bool eatAnyway = false;

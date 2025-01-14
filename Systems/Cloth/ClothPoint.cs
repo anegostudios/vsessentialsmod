@@ -325,6 +325,10 @@ namespace Vintagestory.GameContent
                 else UnPin();
                 
             }
+            else
+            { 
+                pinnedTo = null;
+            }
 
             pinnedToBlockPos = pinnedToBlockPos.SetOrCreate(point.pinnedToBlockPos);
             pinnedToOffset = pinnedToOffset.SetOrCreate(point.pinnedToOffset);

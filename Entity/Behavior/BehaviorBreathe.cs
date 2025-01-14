@@ -162,7 +162,7 @@ namespace Vintagestory.GameContent
                 float oxygen = Math.Max(0, Oxygen - deltaTime * 1000);
                 Oxygen = oxygen;
 
-                if (oxygen <= 0)
+                if (oxygen <= 0 && entity.World.Side == EnumAppSide.Server)
                 {
                     damageAccum += deltaTime;
                     if (damageAccum > 0.75)

@@ -217,7 +217,7 @@ namespace Vintagestory.GameContent
         EntityBehaviorPassivePhysics physicsBh;
         FallingBlockParticlesModSystem particleSys;
 
-        public EntityBlockFalling (Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, float dustIntensity)
+        public EntityBlockFalling(Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, float dustIntensity)
         {
             this.impactDamageMul = impactDamageMul;
             this.fallSound = fallSound;
@@ -577,6 +577,13 @@ namespace Vintagestory.GameContent
                 }
                 else if (block.IsReplacableBy(Block))
                 {
+                    // Here one more time because it might not get called in time
+                    if (!InitialBlockRemoved)
+                    {
+                        InitialBlockRemoved = true;
+                        UpdateBlock(true, initialPos);
+                    }
+
                     UpdateBlock(false, finalPos);
                     (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
                 }

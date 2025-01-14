@@ -32,8 +32,6 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     protected readonly Cuboidd steppingCollisionBox = new();
     protected readonly Vec3d steppingTestVec = new();
     protected readonly Vec3d steppingTestMotion = new();
-    protected volatile int serverPhysicsTickDone;
-    public ref int FlagTickDone { get => ref serverPhysicsTickDone; }
 
     /// <summary>
     /// For adjusting hitbox to dying enemies.
@@ -450,8 +448,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         if (entity.State != EnumEntityState.Active) return;
 
         EntityPos pos = entity.SidedPos;
-        EntityControls controls = ((EntityAgent)entity).Controls;
+        collisionTester.AssignToEntity(this, pos.Dimension);
 
+        EntityControls controls = ((EntityAgent)entity).Controls;
         EntityAgent agent = entity as EntityAgent;
         if (agent?.MountedOn != null)
         {
@@ -655,8 +654,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     {
         Cuboidd steppableBox = null;
 
-        CachedCuboidList blocks = collisionTester.CollisionBoxList;
+        CachedCuboidListFaster blocks = collisionTester.CollisionBoxList;
         int maxCount = blocks.Count;
+        BlockPos pos = new BlockPos(entity.ServerPos.Dimension);
         for (int i = 0; i < maxCount; i++)
         {
             Block block = blocks.blocks[i];
@@ -667,7 +667,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
             }
 
-            BlockPos pos = blocks.positions[i];
+            pos.Set(blocks.positions[i]);
             if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
             {
                 pos.Down();    // Avoid creating a new BlockPos object
