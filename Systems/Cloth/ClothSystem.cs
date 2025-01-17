@@ -122,10 +122,6 @@ namespace Vintagestory.GameContent
 
         public ClothPoint[] Ends => new ClothPoint[] { FirstPoint, LastPoint };
 
-        public int Width => Points2d.Count;
-        public int Length => Points2d[0].Points.Count;
-
-
         public static ClothSystem CreateCloth(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end)
         {
             return new ClothSystem(api, cm, start, end, EnumClothType.Cloth);
@@ -135,7 +131,6 @@ namespace Vintagestory.GameContent
         {
             return new ClothSystem(api, cm, start, end, EnumClothType.Rope, clothSectionModel);
         }
-
 
         private ClothSystem() { }
 
@@ -194,6 +189,7 @@ namespace Vintagestory.GameContent
 
             if (pine != null) FirstPoint.PinTo(pine, pino);
             if (pinb != null) FirstPoint.PinTo(pinb, pino);
+            
             genDebugMesh();
 
             return true;
@@ -241,7 +237,6 @@ namespace Vintagestory.GameContent
 
                 int hleni = (int)(hlen * Resolution);
                 int vleni = (int)(vlen * Resolution);
-                int totalPoints = hleni * vleni;
 
                 int index = 0;
 
@@ -578,6 +573,16 @@ namespace Vintagestory.GameContent
 
         public void updatePoint(ClothPointPacket msg)
         {
+            if (msg.PointX >= Points2d.Count)
+            {
+                api.Logger.Error($"ClothSystem: {ClothId} got invalid Points2d update index for {msg.PointX}/{Points2d.Count}");
+                return;
+            }
+            if (msg.PointY >= Points2d[msg.PointX].Points.Count)
+            {
+                api.Logger.Error($"ClothSystem: {ClothId} got invalid Points2d[{msg.PointX}] update index for {msg.PointY}/{Points2d[msg.PointX].Points.Count}");
+                return;
+            }
             ClothPoint point = Points2d[msg.PointX].Points[msg.PointY];
             point.updateFromPoint(msg.Point, api.World);
         }

@@ -51,7 +51,9 @@ namespace Vintagestory.GameContent
                     if (sys != null)
                     {
                         return base.OnBlockInteractStart(world, byPlayer, blockSel, ref handling);
-                    }                    
+                    }
+
+                    return false;
                 }
 
                 ClothPoint targetPoint = cs.FirstPoint.PinnedToBlockPos == blockSel.Position ? cs.FirstPoint : cs.LastPoint;

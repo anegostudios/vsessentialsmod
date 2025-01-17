@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -31,6 +30,13 @@ namespace Vintagestory.GameContent
         public ClothPoint Point;
     }
 
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class ClothLengthPacket
+    {
+        public int ClothId;
+        public double LengthChange;
+    }
+
     public class ClothManager : ModSystem, IRenderer
 	{
         int nextClothId = 1;
@@ -55,6 +61,7 @@ namespace Vintagestory.GameContent
 
         public float accum3s;
         public float accum100ms;
+        private IServerNetworkChannel clothSystemChannel;
 
         public override double ExecuteOrder()
         {
@@ -77,6 +84,7 @@ namespace Vintagestory.GameContent
                 .RegisterMessageType<UnregisterClothSystemPacket>()
                 .RegisterMessageType<ClothSystemPacket>()
                 .RegisterMessageType<ClothPointPacket>()
+                .RegisterMessageType<ClothLengthPacket>()
             ;
         }
 
@@ -105,6 +113,7 @@ namespace Vintagestory.GameContent
                 .SetMessageHandler<UnregisterClothSystemPacket>(onUnregPacketClient)
                 .SetMessageHandler<ClothSystemPacket>(onRegPacketClient)
                 .SetMessageHandler<ClothPointPacket>(onPointPacketClient)
+                .SetMessageHandler<ClothLengthPacket>(onLengthPacketClient)
             ;
 
             api.Event.LeaveWorld += Event_LeaveWorld;
@@ -271,7 +280,8 @@ namespace Vintagestory.GameContent
                             {
                                 Vec3d soundPos = cs.CenterPosition;
 
-                                if (cs.FirstPoint.PinnedToEntity != null) soundPos = cs.FirstPoint.PinnedToEntity.Pos.XYZ;
+                                if (cs.FirstPoint.PinnedToEntity != null) 
+                                    soundPos = cs.FirstPoint.PinnedToEntity.Pos.XYZ;
                                 sapi.World.PlaySoundAt(new AssetLocation("sounds/effect/roperip"), soundPos.X, soundPos.Y, soundPos.Z);
 
                                 var fp = cs.FirstPoint;
@@ -287,7 +297,6 @@ namespace Vintagestory.GameContent
                                 }
 
                                 toRemove.Add(val.Key);
-                                continue;
                             }
                         } else
                         {
@@ -297,7 +306,7 @@ namespace Vintagestory.GameContent
 
                     foreach (var p in packets)
                     {
-                        sapi.Network.GetChannel("clothphysics").BroadcastPacket(p);
+                        clothSystemChannel.BroadcastPacket(p);
                     }
                 }
 
@@ -318,14 +327,13 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-
-
                 foreach (int id in toRemove)
                 {
                     bool spawnitem = true;
 
                     var cs = clothSystems[id];
-                    spawnitem &= (cs.FirstPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code != new AssetLocation("rope") && (cs.LastPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code != new AssetLocation("rope");
+                    spawnitem &= (cs.FirstPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code.Path != "rope" &&
+                                 (cs.LastPoint.PinnedToEntity as EntityItem)?.Itemstack?.Collectible.Code.Path != "rope";
 
                     if (cs.FirstPoint.PinnedToEntity is EntityAgent eagentn)
                     {
@@ -363,7 +371,18 @@ namespace Vintagestory.GameContent
                         });
                     }
 
-                    if (spawnitem) sapi.World.SpawnItemEntity(new ItemStack(sapi.World.GetItem(new AssetLocation("rope"))), clothSystems[id].CenterPosition);
+                    if (spawnitem)
+                    {
+                        sapi.World.SpawnItemEntity(new ItemStack(sapi.World.GetItem(new AssetLocation("rope"))), clothSystems[id].CenterPosition);
+                    }
+                    else
+                    {
+                        // if the first rope end is on the ground as an item delete it since one will be in the players inventory already
+                        if (cs.FirstPoint.PinnedToEntity is EntityItem && cs.LastPoint.PinnedToEntity is EntityPlayer)
+                        {
+                            cs.FirstPoint.PinnedToEntity.Die(EnumDespawnReason.Removed);
+                        }
+                    }
                     UnregisterCloth(id);
                 }
             }
@@ -385,7 +404,13 @@ namespace Vintagestory.GameContent
             if (clothSystems.TryGetValue(msg.ClothId, out var sys)) {
                 sys.updatePoint(msg);
             }
-            
+        }
+
+        private void onLengthPacketClient(ClothLengthPacket msg)
+        {
+            if (clothSystems.TryGetValue(msg.ClothId, out var sys)) {
+                sys.ChangeRopeLength(msg.LengthChange);
+            }
         }
 
         private void onRegPacketClient(ClothSystemPacket msg)
@@ -465,7 +490,7 @@ namespace Vintagestory.GameContent
             api.Event.ServerRunPhase(EnumServerRunPhase.RunGame, onNowRunGame);
 
             api.Event.PlayerJoin += Event_PlayerJoin;
-
+            clothSystemChannel = api.Network.GetChannel("clothphysics");
 
             api.ChatCommands.GetOrCreate("debug")
                 .BeginSubCommand("clothtest")
@@ -505,7 +530,7 @@ namespace Vintagestory.GameContent
         {
             if (clothSystems.Values.Count > 0)
             {
-                sapi.Network.GetChannel("clothphysics").BroadcastPacket(new ClothSystemPacket() { ClothSystems = clothSystems.Values.ToArray() });
+                clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = clothSystems.Values.ToArray() });
             }
         }
 
@@ -567,7 +592,7 @@ namespace Vintagestory.GameContent
 
             if (!sapi.Server.IsShuttingDown)
             {
-                sapi.Network.GetChannel("clothphysics").BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = clothIds });
+                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = clothIds });
             }
         }
 
@@ -606,7 +631,7 @@ namespace Vintagestory.GameContent
 
                     if (rsystems.Count > 0)
                     {
-                        sapi.Network.GetChannel("clothphysics").BroadcastPacket(new ClothSystemPacket() { ClothSystems = rsystems.ToArray() });
+                        clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = rsystems.ToArray() });
                     }
                 }
 
@@ -627,7 +652,7 @@ namespace Vintagestory.GameContent
             int cnt = clothSystems.Count;
             int[] clothids = clothSystems.Select(s => s.Value.ClothId).ToArray();
             if (clothids.Length > 0)
-                sapi.Network.GetChannel("clothphysics").BroadcastPacket(new UnregisterClothSystemPacket()
+                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket()
                     { ClothIds = clothids });
             clothSystems.Clear();
             nextClothId = 1;
@@ -657,14 +682,14 @@ namespace Vintagestory.GameContent
 
             sys.updateActiveState(EnumActiveStateChange.Default);
 
-            sapi.Network.GetChannel("clothphysics").BroadcastPacket(new ClothSystemPacket() { ClothSystems = new ClothSystem[] { sys } });
+            clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = new ClothSystem[] { sys } });
         }
 
         public void UnregisterCloth(int clothId)
         {
             if (sapi != null)
             {
-                sapi.Network.GetChannel("clothphysics").BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = new int[] { clothId } });
+                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = new int[] { clothId } });
             }
 
             clothSystems.Remove(clothId);
