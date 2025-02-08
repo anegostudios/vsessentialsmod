@@ -1,4 +1,5 @@
 ﻿using System;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -112,6 +113,8 @@ namespace Vintagestory.GameContent
 
         protected double touchdist;
 
+        IClientWorldAccessor cworld;
+
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
             entity.hasRepulseBehavior = true;
@@ -126,6 +129,8 @@ namespace Vintagestory.GameContent
             movable = attributes["movable"].AsBool(true);
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
             ignorePlayers = entity is EntityPlayer && entity.World.Config.GetAsBool("player2PlayerCollisions", true);
+
+            cworld = entity.World as IClientWorldAccessor;
         }
 
         public override void AfterInitialized(bool onFirstSpawn)
@@ -156,7 +161,14 @@ namespace Vintagestory.GameContent
 
             if (selfEagent != null && selfEagent.Controls.Sneak) mySize *= 2;
 
-            partitionUtil.WalkEntityPartitions(entity.ownPosRepulse, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
+            if (cworld != null && entity != cworld.Player.Entity)
+            {
+                WalkEntity(cworld.Player.Entity);
+            }
+            else
+            {
+                partitionUtil.WalkEntityPartitions(entity.ownPosRepulse, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
+            }
 
             pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
             pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 0.5);

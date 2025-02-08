@@ -724,8 +724,11 @@ namespace Vintagestory.ServerMods.NoObf
         private void FreeRam()
         {
             blockTypes = null;
+            blockVariants = null;
             itemTypes = null;
+            itemVariants = null;
             entityTypes = null;
+            entityVariants = null;
             worldProperties = null;
             worldPropertiesVariants = null;
         }

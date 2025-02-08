@@ -159,7 +159,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.ToolTier = this.ToolTier;
             item.HeldSounds = this.HeldSounds?.Clone();
             item.Durability = this.Durability;
-            item.Dimensions = this.Dimensions?.Clone();
+            item.Dimensions = this.Size ?? CollectibleObject.DefaultSize;
             item.MiningSpeed = this.MiningSpeed;
             item.AttackRange = this.AttackRange;
             item.StorageFlags = (EnumItemStorageFlags)this.StorageFlags;

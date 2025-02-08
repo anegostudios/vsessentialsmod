@@ -162,6 +162,8 @@ namespace Vintagestory.GameContent
     /// </summary>
     public class EntityBlockFalling : Entity
     {
+        private const int packetIdMagicNumber = 1234;
+
         private int ticksAlive;
         int lingerTicks;
 
@@ -526,8 +528,13 @@ namespace Vintagestory.GameContent
             {
                 block = World.BlockAccessor.GetMostSolidBlock(finalPos);
 
-                if (block.OnFallOnto(World, finalPos, Block, blockEntityAttributes))
+                if (block.CanAcceptFallOnto(World, finalPos, Block, blockEntityAttributes))
                 {
+                    Api.Event.EnqueueMainThreadTask(() =>
+                    {
+                        block.OnFallOnto(World, finalPos, Block, blockEntityAttributes);
+                    }, "BlockFalling-OnFallOnto");
+
                     lingerTicks = 3;
                     fallHandled = true;
                     return;
@@ -570,10 +577,13 @@ namespace Vintagestory.GameContent
 
             if (Api.Side == EnumAppSide.Server)
             {
+                Api.Event.EnqueueMainThreadTask(() =>
+                {
+
                 if (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow)
                 {
                     UpdateSnowLayer(finalPos, block);
-                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
+                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
                 }
                 else if (block.IsReplacableBy(Block))
                 {
@@ -585,7 +595,7 @@ namespace Vintagestory.GameContent
                     }
 
                     UpdateBlock(false, finalPos);
-                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, 1234);
+                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
                 }
                 else
                 {
@@ -617,6 +627,8 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
+
+                }, "BlockFalling-consequences");
             }
 
             lingerTicks = 50;
@@ -640,7 +652,7 @@ namespace Vintagestory.GameContent
         {
             base.OnReceivedServerPacket(packetid, data);
 
-            if (packetid == 1234)
+            if (packetid == packetIdMagicNumber)
             {
                 EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
                 if (renderer != null)

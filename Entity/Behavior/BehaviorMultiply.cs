@@ -11,7 +11,7 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorMultiply : EntityBehaviorMultiplyBase
     {
         JsonObject typeAttributes;
-        long callbackId;
+        long callbackId = 0;
         AssetLocation[] spawnEntityCodes;
 
         internal float PregnancyDays
@@ -114,7 +114,11 @@ namespace Vintagestory.GameContent
 
         protected virtual void CheckMultiply(float dt)
         {
-            if (!entity.Alive) return;
+            if (!entity.Alive)
+            {
+                callbackId = 0;
+                return;
+            }
 
             callbackId = entity.World.RegisterCallback(CheckMultiply, 3000);
 

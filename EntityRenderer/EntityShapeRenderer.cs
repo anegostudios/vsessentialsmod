@@ -986,6 +986,7 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             capi.World.UnregisterGameTickListener(listenerId);
+            listenerId = 0;
 
             if (meshRefOpaque != null)
             {

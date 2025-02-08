@@ -180,11 +180,13 @@ namespace Vintagestory.GameContent
                     Block aboveBlock = ba.GetBlock(bpos);
                     var boxes = aboveBlock.GetCollisionBoxes(ba, bpos);
                     if (boxes != null && boxes.Length > 0) continue;
+                    if (aboveBlock.Attributes?["insideDamage"].AsInt(0) > 0) continue;
 
                     bpos.Set((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
                     Block belowBlock = ba.GetBlock(bpos);
                     boxes = belowBlock.GetCollisionBoxes(ba, bpos);
                     if (boxes == null || boxes.Length == 0) continue;
+                    if (belowBlock.Attributes?["insideDamage"].AsInt(0) > 0) continue;
 
                     pos.Y = (int)pos.Y - 1 + boxes.Max(c => c.Y2);
 

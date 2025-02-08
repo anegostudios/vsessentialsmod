@@ -71,10 +71,18 @@ namespace Vintagestory.ServerMods.NoObf
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>0.5, 0.5, 0.5</jsondefault>-->
-        /// Physical size of this collectible, 0.5 x 0.5 x 0.5 meters by default.
+        /// Notional physical size of this collectible, 0.5 x 0.5 x 0.5 meters by default. Explicitly setting a null value in JSON will result in the default 0.5m size
         /// </summary>
         [JsonProperty]
-        public Size3f Dimensions = new Size3f(0.5f, 0.5f, 0.5f);
+        [Obsolete("Use Size instead from game version 1.20.4 onwards, with the same values")]
+        public Size3f Dimensions { get { return Size; } set { Size = value; } }
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>0.5, 0.5, 0.5</jsondefault>-->
+        /// Notional physical size of this collectible, 0.5 x 0.5 x 0.5 meters by default. Explicitly setting a null value in JSON will result in the default 0.5m size
+        /// </summary>
+        [JsonProperty]
+        public Size3f Size = null;
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->

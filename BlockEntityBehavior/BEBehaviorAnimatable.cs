@@ -120,9 +120,9 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            shape.ResolveReferences(api.World.Logger, nameForLogging);
+            var elementsByName = shape.CollectAndResolveReferences(api.World.Logger, nameForLogging);
             shape.CacheInvTransforms();
-            shape.ResolveAndFindJoints(api.World.Logger, nameForLogging);
+            shape.ResolveAndFindJoints(api.World.Logger, nameForLogging, elementsByName);
 
             TesselationMetaData meta = new TesselationMetaData()
             {

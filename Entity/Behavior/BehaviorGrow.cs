@@ -9,7 +9,7 @@ namespace Vintagestory.GameContent
     {
         ITreeAttribute growTree;
         JsonObject typeAttributes;
-        long callbackId;
+        long callbackId = 0;
 
         internal float HoursToGrow { get; set; }
 
@@ -51,6 +51,7 @@ namespace Vintagestory.GameContent
 
         private void CheckGrowth(float dt)
         {
+            callbackId = 0;
             if (!entity.Alive) return;
 
             if (entity.World.Calendar.TotalHours >= TimeSpawned + HoursToGrow)

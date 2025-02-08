@@ -301,7 +301,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
         /// <jsonalias>CollisionBox</jsonalias>
-        /// Defines the area with which the player character collides with.
+        /// Defines the area with which the player character collides with. If not specified, the default of (0, 0, 0, 1, 1, 1) will be used
         /// </summary>
         [JsonProperty("CollisionBox")]
         private RotatableCube CollisionBoxR = DefaultCollisionBoxR.Clone();
@@ -309,7 +309,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Default Collision Box</jsondefault>-->
         /// <jsonalias>SelectionBox</jsonalias>
-        /// Defines the area which the players mouse pointer collides with for selection.
+        /// Defines the area which the players mouse pointer collides with for selection. If not specified, the default of (0, 0, 0, 1, 1, 1) will be used
         /// </summary>
         [JsonProperty("SelectionBox")]
         private RotatableCube SelectionBoxR = DefaultCollisionBoxR.Clone();
@@ -427,7 +427,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// Defines what creature groups may spawn on this block.
         /// </summary>
         [JsonProperty]
-        public string[] AllowSpawnCreatureGroups = new string[] { "*" };
+        public string[] AllowSpawnCreatureGroups = Block.DefaultAllowAllSpawns;
 
 
         public Block CreateBlock(ICoreServerAPI api)
@@ -474,7 +474,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.WalkSpeedMultiplier = this.WalkspeedMultiplier;
             block.DragMultiplier = this.DragMultiplier;
             block.Durability = this.Durability;
-            block.Dimensions = this.Dimensions?.Clone();
+            block.Dimensions = this.Size ?? CollectibleObject.DefaultSize;
             block.DamagedBy = (EnumItemDamageSource[])this.DamagedBy?.Clone();
             block.Tool = this.Tool;
             block.DrawType = this.DrawType;
@@ -550,39 +550,27 @@ namespace Vintagestory.ServerMods.NoObf
 
             block.HeldTpUseAnimation = this.HeldTpUseAnimation;
             block.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
-            block.AllowSpawnCreatureGroups = (string[])this.AllowSpawnCreatureGroups.Clone();
-            block.AllCreaturesAllowed = block.AllowSpawnCreatureGroups.Length == 1 && block.AllowSpawnCreatureGroups[0] == "*";
+            block.AllowSpawnCreatureGroups = this.AllowSpawnCreatureGroups;
+            block.AllCreaturesAllowed = AllowSpawnCreatureGroups.Length == 1 && AllowSpawnCreatureGroups[0] == "*";
 
             // BlockType net only sends the collisionboxes at an accuracy of 1/10000 so we have to make sure they are the same server and client side
-            if (block.CollisionBoxes != null)
-            {
-                for (int i = 0; i < block.CollisionBoxes.Length; i++)
-                {
-                    block.CollisionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            if (block.SelectionBoxes != null)
-            {
-                for (int i = 0; i < block.SelectionBoxes.Length; i++)
-                {
-                    block.SelectionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
-
-            if (block.ParticleCollisionBoxes != null)
-            {
-                for (int i = 0; i < block.ParticleCollisionBoxes.Length; i++)
-                {
-                    block.ParticleCollisionBoxes[i].RoundToFracsOfOne10thousand();
-                }
-            }
+            EnsureClientServerAccuracy(block.CollisionBoxes);
+            EnsureClientServerAccuracy(block.SelectionBoxes);
+            EnsureClientServerAccuracy(block.ParticleCollisionBoxes);
 
             this.InitBlock(api.ClassRegistry, api.World.Logger, block, this.Variant);
 
             return block;
         }
 
+        private void EnsureClientServerAccuracy(Cuboidf[] boxes)
+        {
+            if (boxes == null) return;
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                boxes[i].RoundToFracsOfOne10thousand();
+            }
+        }
 
         Cuboidf[] ToCuboidf(params RotatableCube[] cubes)
         {
@@ -600,7 +588,7 @@ namespace Vintagestory.ServerMods.NoObf
 
             // Only one collision/selectionbox 
             if (CollisionBoxR != null) CollisionBoxes = ToCuboidf(CollisionBoxR);
-            if (SelectionBoxR != null) SelectionBoxes = ToCuboidf(SelectionBoxR);
+            if (SelectionBoxR != null) SelectionBoxes =  ToCuboidf(SelectionBoxR);
             if (ParticleCollisionBoxR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxR);
 
             // Multiple collision/selectionboxes
@@ -773,26 +761,28 @@ namespace Vintagestory.ServerMods.NoObf
 
             block.CreativeInventoryTabs = GetCreativeTabs(block.Code, CreativeInventory, searchReplace);
 
+            if (SideOpaque != null && SideOpaque.Count > 0) block.SideOpaque = new bool[] { true, true, true, true, true, true };  // Without this, the DefaultSideOpaque would be modified
+            if (SideAo != null && SideAo.Count > 0) block.SideAo = new bool[] { true, true, true, true, true, true };  // Without this, the DefaultSideAo would be modified
             foreach (BlockFacing facing in BlockFacing.ALLFACES)
             {
-                if (SideAo != null && SideAo.ContainsKey(facing.Code))
+                if (SideAo != null && SideAo.TryGetValue(facing.Code, out bool sideAoValue))
                 {
-                    block.SideAo[facing.Index] = SideAo[facing.Code];
+                    block.SideAo[facing.Index] = sideAoValue;
                 }
 
-                if (EmitSideAo != null && EmitSideAo.ContainsKey(facing.Code))
+                if (EmitSideAo != null && EmitSideAo.TryGetValue(facing.Code, out bool emitSideAoValue))
                 {
-                    if (EmitSideAo[facing.Code]) block.EmitSideAo |= (byte) facing.Flag;
+                    if (emitSideAoValue) block.EmitSideAo |= (byte) facing.Flag;
                 }
 
-                if (SideSolid != null && SideSolid.ContainsKey(facing.Code))
+                if (SideSolid != null && SideSolid.TryGetValue(facing.Code, out bool sideSolidValue))
                 {
-                    block.SideSolid[facing.Index] = SideSolid[facing.Code];
+                    block.SideSolid[facing.Index] = sideSolidValue;
                 }
 
-                if (SideOpaque != null && SideOpaque.ContainsKey(facing.Code))
+                if (SideOpaque != null && SideOpaque.TryGetValue(facing.Code, out bool sideOpaqueValue))
                 {
-                    block.SideOpaque[facing.Index] = SideOpaque[facing.Code];
+                    block.SideOpaque[facing.Index] = sideOpaqueValue;
                 }
             }
 

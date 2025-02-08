@@ -217,7 +217,7 @@ namespace Vintagestory.GameContent
 
         public void SpawnParticle(EntityParticle eparticle)
         {
-            if (System.Threading.Thread.CurrentThread.ManagedThreadId != offthreadid) throw new InvalidOperationException("Only in the entityparticle thread");
+            if (Environment.CurrentManagedThreadId != offthreadid) throw new InvalidOperationException("Only in the entityparticle thread");
 
             eparticle.Prev = null;
             eparticle.Next = null;
@@ -241,7 +241,7 @@ namespace Vintagestory.GameContent
 
         protected void KillParticle(EntityParticle entityParticle)
         {
-            if (System.Threading.Thread.CurrentThread.ManagedThreadId != offthreadid) throw new InvalidOperationException("Only in the entityparticle thread");
+            if (Environment.CurrentManagedThreadId != offthreadid) throw new InvalidOperationException("Only in the entityparticle thread");
 
             var prevParticle = entityParticle.Prev;
             var nextParticle = entityParticle.Next;

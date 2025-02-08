@@ -325,7 +325,7 @@ namespace Vintagestory.GameContent
             foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
             clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
 
-            capi.Settings.Bool.Set("showMinimapHud", true, false);   // Don't trigger the watcher which will call Toggle again recursively!
+            if (asType == EnumDialogType.HUD) capi.Settings.Bool.Set("showMinimapHud", true, false);   // Don't trigger the watcher which will call Toggle again recursively!
         }
 
         private List<string> getTabsOrdered()

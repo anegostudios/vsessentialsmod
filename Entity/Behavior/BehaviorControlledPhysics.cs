@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -39,6 +39,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     public Matrixf tmpModelMat = new();
     public float StepHeight = 0.6f;
     public bool Ticking { get; set; }
+    public bool allowUnloadedTraverse;
 
     public float stepUpSpeed = 0.07f;
     public float climbUpSpeed = 0.07f;
@@ -125,6 +126,8 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         stepUpSpeed = attributes["stepUpSpeed"].AsFloat(0.07f);
         climbUpSpeed = attributes["climbUpSpeed"].AsFloat(0.07f);
         climbDownSpeed = attributes["climbDownSpeed"].AsFloat(0.035f);
+        allowUnloadedTraverse = attributes["allowUnloadedTraverse"].AsBool(false);
+
         sneakTestCollisionbox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.1f);
         sneakTestCollisionbox.Y2 /= 2;
 
@@ -369,9 +372,12 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 }
             }
 
-            if (entity.World.BlockAccessor.IsNotTraversable((int)nextX, (int)pos.Y, (int)pos.Z, pos.Dimension)) newPos.X = pos.X;
-            if (entity.World.BlockAccessor.IsNotTraversable((int)pos.X, (int)nextY, (int)pos.Z, pos.Dimension)) newPos.Y = pos.Y;
-            if (entity.World.BlockAccessor.IsNotTraversable((int)pos.X, (int)pos.Y, (int)nextZ, pos.Dimension)) newPos.Z = pos.Z;
+            if (!allowUnloadedTraverse)
+            {
+                if (entity.World.BlockAccessor.IsNotTraversable((int)nextX, (int)pos.Y, (int)pos.Z, pos.Dimension)) newPos.X = pos.X;
+                if (entity.World.BlockAccessor.IsNotTraversable((int)pos.X, (int)nextY, (int)pos.Z, pos.Dimension)) newPos.Y = pos.Y;
+                if (entity.World.BlockAccessor.IsNotTraversable((int)pos.X, (int)pos.Y, (int)nextZ, pos.Dimension)) newPos.Z = pos.Z;
+            }
 
             pos.SetPos(newPos);
 
@@ -588,7 +594,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + (0.01 * 3f);
         Vec3d stepPos = newPos.OffsetCopy(moveDelta.X, heightDiff, moveDelta.Z);
         bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, stepPos, false);
-        
+
         if (canStep)
         {
             pos.Y += stepUpSpeed * dtFac;
@@ -633,8 +639,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                     blockPosVec.Set(x, y, z);
 
                     Cuboidf[] collisionBoxes = block.GetCollisionBoxes(blockAccessor, tmpPos);
+                    if (collisionBoxes == null) continue;
 
-                    for (int i = 0; collisionBoxes != null && i < collisionBoxes.Length; i++)
+                    for (int i = 0; i < collisionBoxes.Length; i++)
                     {
                         Cuboidf collBox = collisionBoxes[i];
                         if (collBox == null) continue;
@@ -661,7 +668,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             Block block = blocks.blocks[i];
 
-            if (!block.CanStep)
+            if (block.CollisionBoxes != null && !block.CanStep)
             {
                 // Blocks which are low relative to this entity (e.g. small troughs are low for the player) can still be stepped on
                 if (entity.CollisionBox.Height < 5 * block.CollisionBoxes[0].Height) continue;
@@ -673,7 +680,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 pos.Down();    // Avoid creating a new BlockPos object
                 Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
                 pos.Up();
-                if (!blockBelow.CanStep)
+                if (blockBelow.CollisionBoxes != null && !blockBelow.CanStep)
                 {
                     if (entity.CollisionBox.Height < 5 * blockBelow.CollisionBoxes[0].Height) continue;
                 }
@@ -757,9 +764,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         float[] hitboxOff = new float[4] { 0, 0, 0, 1 };
         AttachmentPoint ap = apap.AttachPoint;
 
-        float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
-        float rotY = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateY : 0;
-        float rotZ = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateZ : 0;
+        CompositeShape shape = entity.Properties.Client.Shape;
+        float rotX = shape != null ? shape.rotateX : 0;
+        float rotY = shape != null ? shape.rotateY : 0;
+        float rotZ = shape != null ? shape.rotateZ : 0;
 
         float[] ModelMat = Mat4f.Create();
         Mat4f.Identity(ModelMat);
@@ -820,7 +828,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     protected void callOnEntityInside()
     {
         collisionTester.entityBox.SetAndTranslate(entity.CollisionBox, entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-        collisionTester.entityBox.RemoveRoundingErrors(); // Necessary to prevent unwanted clipping through blocks when there is knockback
+        collisionTester.entityBox.RemoveRoundingErrors();
         Cuboidd entityBox = collisionTester.entityBox;
         int xMax = (int)entityBox.X2;
         int yMax = (int)entityBox.Y2;

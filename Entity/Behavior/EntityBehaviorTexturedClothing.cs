@@ -49,7 +49,7 @@ namespace Vintagestory.GameContent
 
         public override ITexPositionSource GetTextureSource(ref EnumHandling handling)
         {
-            if (System.Threading.Thread.CurrentThread.ManagedThreadId != RuntimeEnv.MainThreadId)
+            if (Environment.CurrentManagedThreadId != RuntimeEnv.MainThreadId)
             {
                 throw new InvalidOperationException("Potentially attempting to insert a texture into the atlas outside of the main thread (if this allocation causes a new atlas to be created).");
             }

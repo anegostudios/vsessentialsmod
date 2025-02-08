@@ -397,9 +397,9 @@ namespace Vintagestory.GameContent
 
             var playerWaypoints = Waypoints.Where(p => p.OwningPlayerUid == player.PlayerUID).ToArray();
 
-            if (args.Parsers[0].IsMissing || wpIndex < 0 || playerWaypoints.Length < wpIndex - 1)
+            if (args.Parsers[0].IsMissing || wpIndex < 0 || wpIndex >= playerWaypoints.Length)
             {
-                return TextCommandResult.Success(Lang.Get("command-modwaypoint-invalidindex", playerWaypoints.Length));
+                return TextCommandResult.Success(Lang.Get("command-modwaypoint-invalidindex", playerWaypoints.Length - 1));
             }
 
             if (string.IsNullOrEmpty(title))

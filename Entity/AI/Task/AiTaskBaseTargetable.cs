@@ -313,8 +313,6 @@ namespace Vintagestory.GameContent
             ;
         }
 
-
-
         public Vec3i MapSize { get { return entity.World.BlockAccessor.MapSize; } }
 
         public Block GetBlock(BlockPos pos)
@@ -362,7 +360,7 @@ namespace Vintagestory.GameContent
         }
         protected bool isNonAttackingPlayer(Entity e)
         {
-            return attackedByEntity != null && attackedByEntity.EntityId != e.EntityId && e is EntityPlayer;
+            return (attackedByEntity == null || attackedByEntity != null && attackedByEntity.EntityId != e.EntityId) && e is EntityPlayer;
         }
 
 

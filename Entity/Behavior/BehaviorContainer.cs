@@ -292,11 +292,16 @@ namespace Vintagestory.GameContent
                 gearShape.ResolveReferences(entity.World.Logger, shapePath);
             }
 
-            Dictionary<string, CompositeTexture> intoDict = new Dictionary<string, CompositeTexture>();
-            // Item stack textures take precedence over shape textures
-            iatta.CollectTextures(stack, gearShape, texturePrefixCode, intoDict);
-
             var capi = Api as ICoreClientAPI;
+
+            Dictionary<string, CompositeTexture> intoDict = null;
+            if (capi != null)
+            {
+                intoDict = new Dictionary<string, CompositeTexture>();
+                // Item stack textures take precedence over shape textures
+                iatta.CollectTextures(stack, gearShape, texturePrefixCode, intoDict);
+            }
+
             applyStepParentOverrides(overrideStepParent, gearShape);
 
             entityShape.StepParentShape(
@@ -321,10 +326,11 @@ namespace Vintagestory.GameContent
 
                     oshape.SubclassForStepParenting(texturePrefixCode, damageEffect);
 
-
-                    // Item stack textures take precedence over shape textures
-                    iatta.CollectTextures(stack, oshape, texturePrefixCode, intoDict);
-
+                    if (capi != null)
+                    {
+                        // Item stack textures take precedence over shape textures
+                        iatta.CollectTextures(stack, oshape, texturePrefixCode, intoDict);
+                    }
 
                     applyStepParentOverrides(overrideStepParent, oshape);
                     entityShape.StepParentShape(oshape, overlay.Base.ToShortString(), shapePathForLogging, Api.Logger, (texcode, tloc) => addTexture(texcode, tloc, textures, texturePrefixCode, capi));

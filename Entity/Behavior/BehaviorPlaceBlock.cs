@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent
 
         ITreeAttribute createBlockTree;
         JsonObject attributes;
-        long callbackId;
+        long callbackId = 0;
 
         internal float MinHourDelay
         {
@@ -78,8 +78,11 @@ namespace Vintagestory.GameContent
 
         private void CheckShouldPlace(float dt)
         {
-            if (!entity.Alive) return;
-            if (entity.Swimming || entity.FeetInLiquid) return; // Quick fix for chicken laying eggs in water
+            if (!entity.Alive || entity.Swimming || entity.FeetInLiquid)  // Quick fix for chicken laying eggs in water
+            {
+                callbackId = 0;
+                return; 
+            }
 
             callbackId = entity.World.RegisterCallback(CheckShouldPlace, 3000);
 
