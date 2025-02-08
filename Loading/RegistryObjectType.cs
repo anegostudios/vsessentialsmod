@@ -318,6 +318,10 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         string trueKey = entry.Key.Substring(0, entry.Key.Length - "byType".Length);
                         var jobj = entry.Value as JObject;
+                        if (jobj == null)
+                        {
+                            throw new FormatException("Invalid value at key: " + entry.Key);
+                        }
                         foreach (var byTypeProperty in jobj)
                         {
                             if (WildcardUtil.Match(byTypeProperty.Key, codePath))
