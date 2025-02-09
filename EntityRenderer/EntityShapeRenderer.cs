@@ -651,7 +651,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender2D(float dt)
         {
-            if (isSpectator || debugTagTexture == null) return;
+            if (isSpectator || (debugTagTexture == null && messageTextures == null)) return;
             if ((entity as EntityPlayer)?.ServerControls.Sneak == true && debugTagTexture == null) return;
 
             IRenderAPI rapi = capi.Render;
