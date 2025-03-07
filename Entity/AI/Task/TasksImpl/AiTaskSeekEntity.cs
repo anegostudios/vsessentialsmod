@@ -75,7 +75,8 @@ namespace Vintagestory.GameContent
             base.LoadConfig(taskConfig, aiConfig);
 
             tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
-            leapAnimationCode = taskConfig["leapAnimation"].AsString("jump");
+            JsonObject leapCodeRaw = taskConfig["leapAnimation"];
+            leapAnimationCode = leapCodeRaw.Token == null ? "jump" : leapCodeRaw.AsString(null);    // Allow to be null if explicitly set to null in the JSON
             leapChance = taskConfig["leapChance"].AsFloat(1);
             leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);

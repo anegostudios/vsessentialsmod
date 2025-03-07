@@ -324,12 +324,15 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            Mat4f.Translate(ModelMat, ModelMat, dx + renderInfo.Transform.Translation.X, renderInfo.Transform.Translation.Y, dz +  renderInfo.Transform.Translation.Z);
+            var itemTransform = renderInfo.Transform;
+            var itemTranslation = itemTransform.Translation;
+            var itemRotation = itemTransform.Rotation;
+            Mat4f.Translate(ModelMat, ModelMat, dx + itemTranslation.X, itemTranslation.Y, dz +  itemTranslation.Z);
             Mat4f.Scale(ModelMat, ModelMat, new float[] { sizeX + scaleRand, sizeY + scaleRand, sizeZ + scaleRand });
-            Mat4f.RotateY(ModelMat, ModelMat, GameMath.DEG2RAD * (renderInfo.Transform.Rotation.Y + yangle) + (renderInfo.Transform.Rotate ? yRotRand : 0));
-            Mat4f.RotateZ(ModelMat, ModelMat, GameMath.DEG2RAD * (renderInfo.Transform.Rotation.Z + zangle));
-            Mat4f.RotateX(ModelMat, ModelMat, GameMath.DEG2RAD * (renderInfo.Transform.Rotation.X + xangle));
-            Mat4f.Translate(ModelMat, ModelMat, -renderInfo.Transform.Origin.X , -renderInfo.Transform.Origin.Y, -renderInfo.Transform.Origin.Z);
+            Mat4f.RotateY(ModelMat, ModelMat, GameMath.DEG2RAD * (itemRotation.Y + yangle) + (itemTransform.Rotate ? yRotRand : 0));
+            Mat4f.RotateZ(ModelMat, ModelMat, GameMath.DEG2RAD * (itemRotation.Z + zangle));
+            Mat4f.RotateX(ModelMat, ModelMat, GameMath.DEG2RAD * (itemRotation.X + xangle));
+            Mat4f.Translate(ModelMat, ModelMat, -itemTransform.Origin.X , -itemTransform.Origin.Y, -itemTransform.Origin.Z);
         }
 
 

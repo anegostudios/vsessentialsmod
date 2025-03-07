@@ -239,9 +239,10 @@ namespace Vintagestory.GameContent
                     int altTexNumber = entity.WatchedAttributes.GetInt("textureIndex", 0);
 
                     TextureAtlasPosition pos = defaultTexSource["all"];
-                    CompositeTexture[] Alternates = entity.Properties.Client.FirstTexture.Alternates;
+                    var FirstTexture = entity.Properties.Client.FirstTexture;
+                    CompositeTexture[] Alternates = FirstTexture.Alternates;
 
-                    CompositeTexture tex = altTexNumber == 0 ? entity.Properties.Client.FirstTexture : Alternates[altTexNumber % Alternates.Length];
+                    CompositeTexture tex = altTexNumber == 0 ? FirstTexture : Alternates[altTexNumber % Alternates.Length];
                     meshdata = capi.Tesselator.VoxelizeTexture(tex, capi.EntityTextureAtlas.Size, pos);
                     for (int i = 0; i < meshdata.xyz.Length; i += 3)
                     {
@@ -453,16 +454,21 @@ namespace Vintagestory.GameContent
 
             if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
 
+            var itemTransform = renderInfo.Transform;
+            var itemOrigin = itemTransform.Origin;
+            var itemTranslation = itemTransform.Translation;
+            var itemRotation = itemTransform.Rotation;
+            var itemScaleXYZ = itemTransform.ScaleXYZ;
             ItemModelMat
                 .Set(ModelMat)
                 .Mul(apap.AnimModelMatrix)
-                .Translate(renderInfo.Transform.Origin.X, renderInfo.Transform.Origin.Y, renderInfo.Transform.Origin.Z)
-                .Scale(renderInfo.Transform.ScaleXYZ.X, renderInfo.Transform.ScaleXYZ.Y, renderInfo.Transform.ScaleXYZ.Z)
-                .Translate(ap.PosX / 16f + renderInfo.Transform.Translation.X, ap.PosY / 16f + renderInfo.Transform.Translation.Y, ap.PosZ / 16f + renderInfo.Transform.Translation.Z)
-                .RotateX((float)(ap.RotationX + renderInfo.Transform.Rotation.X) * GameMath.DEG2RAD)
-                .RotateY((float)(ap.RotationY + renderInfo.Transform.Rotation.Y) * GameMath.DEG2RAD)
-                .RotateZ((float)(ap.RotationZ + renderInfo.Transform.Rotation.Z) * GameMath.DEG2RAD)
-                .Translate(-renderInfo.Transform.Origin.X, -renderInfo.Transform.Origin.Y, -renderInfo.Transform.Origin.Z)
+                .Translate(itemOrigin.X, itemOrigin.Y, itemOrigin.Z)
+                .Scale(itemScaleXYZ.X, itemScaleXYZ.Y, itemScaleXYZ.Z)
+                .Translate(ap.PosX / 16f + itemTranslation.X, ap.PosY / 16f + itemTranslation.Y, ap.PosZ / 16f + itemTranslation.Z)
+                .RotateX((float)(ap.RotationX + itemRotation.X) * GameMath.DEG2RAD)
+                .RotateY((float)(ap.RotationY + itemRotation.Y) * GameMath.DEG2RAD)
+                .RotateZ((float)(ap.RotationZ + itemRotation.Z) * GameMath.DEG2RAD)
+                .Translate(-itemOrigin.X, -itemOrigin.Y, -itemOrigin.Z)
             ;
 
             string samplername = "tex";

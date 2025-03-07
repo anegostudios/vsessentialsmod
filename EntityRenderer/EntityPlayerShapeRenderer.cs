@@ -8,6 +8,13 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    public enum RenderMode
+    {
+        FirstPerson,
+        ImmersiveFirstPerson,
+        ThirdPerson
+    }
+
     public class EntityPlayerShapeRenderer : EntityShapeRenderer
     {
         MultiTextureMeshRef firstPersonMeshRef;
@@ -15,6 +22,13 @@ namespace Vintagestory.GameContent
         bool watcherRegistered;
         EntityPlayer entityPlayer;
         ModSystemFpHands modSys;
+
+        RenderMode renderMode;
+
+        public float? HeldItemPitchFollowOverride { get; set; } = null;
+
+        float smoothedBodyYaw;
+
 
         protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
 
@@ -51,7 +65,6 @@ namespace Vintagestory.GameContent
                 {
                     capi.Settings.Bool.AddWatcher("immersiveFpMode", (on) => {
                         entity.MarkShapeModified();
-
                         (entityPlayer.AnimManager as PlayerAnimationManager).OnIfpModeChanged(previfpMode, on);
                     });
                 }
@@ -90,7 +103,8 @@ namespace Vintagestory.GameContent
 
                     thirdPersonMeshRef = capi.Render.UploadMultiTextureMesh(meshData);
 
-                    if (IsSelf && capi.Settings.Bool["immersiveFpMode"])
+                    determineRenderMode();
+                    if (renderMode == RenderMode.ImmersiveFirstPerson)
                     {
                         HashSet<int> skipJointIds = new HashSet<int>();
                         loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName("Neck"), skipJointIds);
@@ -132,6 +146,39 @@ namespace Vintagestory.GameContent
             meshRefOpaque = null;
         }
 
+        public override void BeforeRender(float dt)
+        {
+            var prevRenderMode = renderMode;
+            determineRenderMode();
+
+            if ((prevRenderMode == RenderMode.FirstPerson && renderMode == RenderMode.ImmersiveFirstPerson) || (prevRenderMode == RenderMode.ImmersiveFirstPerson && renderMode == RenderMode.FirstPerson))
+            {
+                entity.MarkShapeModified();
+                (entityPlayer.AnimManager as PlayerAnimationManager).OnIfpModeChanged(previfpMode, renderMode == RenderMode.ImmersiveFirstPerson);
+            }
+
+            base.BeforeRender(dt);
+        }
+
+        private void determineRenderMode()
+        {
+            if (IsSelf && capi.Render.CameraType == EnumCameraMode.FirstPerson)
+            {
+                if (capi.Settings.Bool["immersiveFpMode"] && !capi.Render.CameraStuck)
+                {
+                    renderMode = RenderMode.ImmersiveFirstPerson;
+                }
+                else
+                {
+                    renderMode = RenderMode.FirstPerson;
+                }
+            }
+            else
+            {
+                renderMode = RenderMode.ThirdPerson;
+            }
+        }
+
         public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
             if (IsSelf)
@@ -166,11 +213,11 @@ namespace Vintagestory.GameContent
         {
             if (IsSelf) entityPlayer.selfNowShadowPass = isShadowPass;
 
-            bool isHandRender = HandRenderMode && !isShadowPass;
+            bool isHandRender = renderMode == RenderMode.FirstPerson && !isShadowPass;
 
             loadModelMatrixForPlayer(entity, IsSelf, dt, isShadowPass);
 
-            if (IsSelf && ((capi.Settings.Bool["immersiveFpMode"] && capi.Render.CameraType == EnumCameraMode.FirstPerson) || isShadowPass))
+            if (IsSelf && (renderMode == RenderMode.ImmersiveFirstPerson || isShadowPass))
             {
                 OriginPos.Set(0, 0, 0);
             }
@@ -236,7 +283,7 @@ namespace Vintagestory.GameContent
 
         protected override IShaderProgram getReadyShader()
         {
-            if (!entityPlayer.selfNowShadowPass && HandRenderMode)
+            if (!entityPlayer.selfNowShadowPass && renderMode == RenderMode.FirstPerson)
             {
                 var prog = modSys.fpModeItemShader;
                 prog.Use();
@@ -277,7 +324,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            var ishandrender = HandRenderMode;
+            var ishandrender = renderMode == RenderMode.FirstPerson;
             if ((ishandrender && /*!isShadowPass &&*/ !capi.Settings.Bool["hideFpHands"]) || !ishandrender)
             {
                 base.RenderHeldItem(dt, isShadowPass, right);
@@ -286,7 +333,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
         {
-            if (HandRenderMode && !isShadowPass)
+            if (renderMode == RenderMode.FirstPerson && !isShadowPass)
             {
                 return;
             }
@@ -297,16 +344,12 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                meshRefOpaque = IsSelf && player?.ImmersiveFpMode == true && player?.CameraMode == EnumCameraMode.FirstPerson ? firstPersonMeshRef : thirdPersonMeshRef;
+                meshRefOpaque = renderMode == RenderMode.ImmersiveFirstPerson ? firstPersonMeshRef : thirdPersonMeshRef;
             }
 
             base.DoRender3DOpaqueBatched(dt, isShadowPass);
         }
 
-        bool HandRenderMode => IsSelf && player?.ImmersiveFpMode==false && player?.CameraMode == EnumCameraMode.FirstPerson;
-        public float? HeldItemPitchFollowOverride { get; set; } = null;
-
-        float smoothedBodyYaw;
 
         public void loadModelMatrixForPlayer(Entity entity, bool isSelf, float dt, bool isShadowPass)
         {
@@ -345,7 +388,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                bodyYaw = capi.World.Player.ImmersiveFpMode || HandRenderMode /* <- will this break something? It's needed to prevent hand rotation when mounted on elk */ ? eagent.BodyYaw : eagent.Pos.Yaw;
+                bodyYaw = renderMode != RenderMode.ThirdPerson ? eagent.BodyYaw : eagent.Pos.Yaw;
 
                 if (!isShadowPass)
                 {
@@ -357,9 +400,9 @@ namespace Vintagestory.GameContent
             float bodyPitch = entityPlayer == null ? 0 : entityPlayer.WalkPitch;
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
             Mat4f.RotateY(ModelMat, ModelMat, smoothedBodyYaw + (90 + rotY) * GameMath.DEG2RAD);
-            var selfSwimming = isSelf && eagent.Swimming && !capi.World.Player.ImmersiveFpMode && capi.World.Player.CameraMode == EnumCameraMode.FirstPerson;
+            var selfSwimming = isSelf && eagent.Swimming && renderMode == RenderMode.FirstPerson;
 
-            if (!selfSwimming && ((selfEplr?.Controls.Gliding != true && selfEplr.MountedOn == null) || capi.World.Player.ImmersiveFpMode || capi.World.Player.CameraMode != EnumCameraMode.FirstPerson))
+            if (!selfSwimming && ((selfEplr?.Controls.Gliding != true && selfEplr.MountedOn == null) || renderMode != RenderMode.FirstPerson))
             {
                 Mat4f.RotateZ(ModelMat, ModelMat, bodyPitch + rotZ * GameMath.DEG2RAD);
             }
@@ -368,7 +411,7 @@ namespace Vintagestory.GameContent
 
 
             // Rotate player hands with pitch
-            if (isSelf && selfEplr != null && !capi.World.Player.ImmersiveFpMode && capi.World.Player.CameraMode == EnumCameraMode.FirstPerson && !isShadowPass)
+            if (selfEplr != null && renderMode == RenderMode.FirstPerson && !isShadowPass)
             {
                 float itemSpecificPitchFollow = eagent.RightHandItemSlot?.Itemstack?.ItemAttributes?["heldItemPitchFollow"].AsFloat(0.75f) ?? 0.75f;
                 float ridingSpecificPitchFollow = eagent.MountedOn?.FpHandPitchFollow ?? 1;
@@ -380,7 +423,7 @@ namespace Vintagestory.GameContent
             }
 
 
-            if (isSelf && !capi.World.Player.ImmersiveFpMode && capi.World.Player.CameraMode == EnumCameraMode.FirstPerson && !isShadowPass)
+            if (renderMode == RenderMode.FirstPerson && !isShadowPass)
             {
                 Mat4f.Translate(ModelMat, ModelMat, 0, capi.Settings.Float["fpHandsYOffset"], 0);
             }

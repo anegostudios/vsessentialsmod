@@ -44,25 +44,33 @@ namespace Vintagestory.GameContent
             base.Initialize(api);
             if (Block.Attributes?["transientProps"].Exists != true) return;
 
-            // Sanity check
+            // Sanity check - typically triggered during chunk loading on servers, as it is sometimes possible for block != Block during chunk loading (in contrast, if this is a newly created BlockEntity then block should be the same as Block)
             if (api.Side == EnumAppSide.Server) {
-                var block = Api.World.BlockAccessor.GetBlock(Pos);
-                if (block.Id != Block.Id)
+                var block = Api.World.BlockAccessor.GetBlock(Pos, BlockLayersAccess.Solid);
+                if (block.Id != Block.Id)    // This can happen very easily when the Weather system bulk replaces surface blocks with snow equivalents (or vice-versa), prior to completion of chunk loading
                 {
-                    // Cant delete during init
                     if (block.EntityClass == Block.EntityClass)
                     {
-                        // Attempt to recreate the BlockEntity correctly by a SetBlock call if the two blocks are similar (e.g. Coopers Reed in pre 1.16 worlds with different blocks now due to water layer updates)
-                        Api.World.Logger.Warning("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE and attempt to recreate it", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
-                        api.Event.EnqueueMainThreadTask(() => { api.World.BlockAccessor.RemoveBlockEntity(Pos); Block b = api.World.BlockAccessor.GetBlock(Pos); api.World.BlockAccessor.SetBlock(b.Id, Pos); }, "delete betransient");
+                        if (block.Code.FirstCodePart() == Block.Code.FirstCodePart())
+                        {
+                            // If it's essentially the same block, let's just reproduce the effect of BlockEntity.OnExchange() and continue silently; no need even to MarkDirty() as this cannot yet have been sent to any client
+                            Block = block;
+                        }
+                        else
+                        {
+                            // Attempt to recreate the BlockEntity correctly by a SetBlock call if the two blocks are similar (e.g. Coopers reed in pre 1.16 worlds with different blocks now due to water layer updates)
+                            Api.World.Logger.Warning("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE and attempt to recreate it", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
+                            api.Event.EnqueueMainThreadTask(() => { api.World.BlockAccessor.RemoveBlockEntity(Pos); Block b = api.World.BlockAccessor.GetBlock(Pos, BlockLayersAccess.Solid); api.World.BlockAccessor.SetBlock(b.Id, Pos, BlockLayersAccess.Solid); }, "delete betransient");
+                            return;
+                        }
                     }
                     else
                     {
-                        // Otherwise simply delete this BlockEntity
-                        Api.World.Logger.Error("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
+                        // Otherwise simply delete this BlockEntity, it doesn't belong here if its Block is not here
+                        Api.World.Logger.Warning("BETransient @{0} for Block {1}, but there is {2} at this position? Will delete BE", Pos, this.Block.Code.ToShortString(), block.Code.ToShortString());
                         api.Event.EnqueueMainThreadTask(() => api.World.BlockAccessor.RemoveBlockEntity(Pos), "delete betransient");
+                        return;
                     }
-                    return;
                 }
             }
 
@@ -84,8 +92,8 @@ namespace Vintagestory.GameContent
 
                 if (transitionAtTotalDaysOld != null)
                 {
-                    transitionHoursLeft = ((double)transitionAtTotalDaysOld - Api.World.Calendar.TotalDays) * Api.World.Calendar.HoursPerDay;
                     lastCheckAtTotalDays = Api.World.Calendar.TotalDays;
+                    transitionHoursLeft = ((double)transitionAtTotalDaysOld - lastCheckAtTotalDays) * Api.World.Calendar.HoursPerDay;
                 }
             }
         }
@@ -114,7 +122,8 @@ namespace Vintagestory.GameContent
             float baseTemperature = baseClimate.Temperature;
 
             float oneHour = 1f / Api.World.Calendar.HoursPerDay;
-            while (Api.World.Calendar.TotalDays - lastCheckAtTotalDays > oneHour)
+            double timeNow = Api.World.Calendar.TotalDays;
+            while (timeNow - lastCheckAtTotalDays > oneHour)
             {
                 lastCheckAtTotalDays += oneHour;
                 transitionHoursLeft -= 1f;
@@ -168,25 +177,23 @@ namespace Vintagestory.GameContent
             if (fromCode.IndexOf(':') == -1) fromCode = block.Code.Domain + ":" + fromCode;
             if (toCode.IndexOf(':') == -1) toCode = block.Code.Domain + ":" + toCode;
 
-
+            AssetLocation blockCode;
             if (fromCode == null || !toCode.Contains('*'))
             {
-                tblock = Api.World.GetBlock(new AssetLocation(toCode));
-                if (tblock == null) return;
-
-                Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos);
-                return;
+                blockCode = new AssetLocation(toCode);
             }
-            
-            AssetLocation blockCode = block.Code.WildCardReplace(
-                new AssetLocation(fromCode), 
-                new AssetLocation(toCode)
-            );
+            else
+            {
+                blockCode = block.Code.WildCardReplace(
+                    new AssetLocation(fromCode),
+                    new AssetLocation(toCode)
+                );
+            }
 
             tblock = Api.World.GetBlock(blockCode);
             if (tblock == null) return;
 
-            Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos);
+            Api.World.BlockAccessor.SetBlock(tblock.BlockId, Pos, BlockLayersAccess.Solid);
         }
 
         public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldForResolving)

@@ -546,10 +546,10 @@ namespace Vintagestory.GameContent
                 foreach (int i in fallDirections)
                 {
                     BlockFacing facing = BlockFacing.ALLFACES[i];
-                    if (facing == BlockFacing.NORTH && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.SOUTH) continue;
-                    if (facing == BlockFacing.WEST && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.EAST) continue;
-                    if (facing == BlockFacing.SOUTH && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.NORTH) continue;
-                    if (facing == BlockFacing.EAST && BlockFacing.ALLFACES[lastFallDirection] == BlockFacing.WEST) continue;
+                    if (facing == BlockFacing.NORTH && lastFallDirection == BlockFacing.SOUTH.Index) continue;
+                    if (facing == BlockFacing.WEST && lastFallDirection == BlockFacing.EAST.Index) continue;
+                    if (facing == BlockFacing.SOUTH && lastFallDirection == BlockFacing.NORTH.Index) continue;
+                    if (facing == BlockFacing.EAST && lastFallDirection == BlockFacing.WEST.Index) continue;
 
                     var nblock = World.BlockAccessor.GetMostSolidBlock(pos.X + facing.Normali.X, pos.InternalY + facing.Normali.Y, pos.Z + facing.Normali.Z);
                     if (nblock.Replaceable >= 6000)
@@ -577,25 +577,30 @@ namespace Vintagestory.GameContent
 
             if (Api.Side == EnumAppSide.Server)
             {
-                Api.Event.EnqueueMainThreadTask(() =>
-                {
+                bool updateBlock = (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow) || block.IsReplacableBy(Block);
 
-                if (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow)
+                if (updateBlock)
                 {
-                    UpdateSnowLayer(finalPos, block);
-                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
-                }
-                else if (block.IsReplacableBy(Block))
-                {
-                    // Here one more time because it might not get called in time
-                    if (!InitialBlockRemoved)
+                    Api.Event.EnqueueMainThreadTask(() =>
                     {
-                        InitialBlockRemoved = true;
-                        UpdateBlock(true, initialPos);
-                    }
+                        if (block.Id != 0 && Block.BlockMaterial == EnumBlockMaterial.Snow)
+                        {
+                            UpdateSnowLayer(finalPos, block);
+                            (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
+                        }
+                        else if (block.IsReplacableBy(Block))
+                        {
+                            // Here one more time because it might not get called in time
+                            if (!InitialBlockRemoved)
+                            {
+                                InitialBlockRemoved = true;
+                                UpdateBlock(true, initialPos);
+                            }
 
-                    UpdateBlock(false, finalPos);
-                    (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
+                            UpdateBlock(false, finalPos);
+                            (Api as ICoreServerAPI).Network.BroadcastEntityPacket(EntityId, packetIdMagicNumber);
+                        }
+                    }, "BlockFalling-consequences");
                 }
                 else
                 {
@@ -612,7 +617,6 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-
                 if (impactDamageMul > 0)
                 {
                     Entity[] entities = World.GetEntitiesInsideCuboid(finalPos, finalPos.AddCopy(1, 1, 1), (e) => !(e is EntityBlockFalling));
@@ -627,8 +631,6 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
-
-                }, "BlockFalling-consequences");
             }
 
             lingerTicks = 50;

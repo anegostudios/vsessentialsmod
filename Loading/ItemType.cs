@@ -64,7 +64,11 @@ namespace Vintagestory.ServerMods.NoObf
             // Special code to rotate our 3D items in inventory by default, unless they expressly set GuiTransform.Rotate to false
             if (resolvedType.Shape != null && !resolvedType.Shape.VoxelizeTexture)
             {
-                if (jobject["guiTransform"]?["rotate"] == null) GuiTransform.Rotate = true;
+                if (jobject["guiTransform"]?["rotate"] == null)
+                {
+                    GuiTransform = ModelTransform.ItemDefaultGui();
+                    GuiTransform.Rotate = true;
+                }
             }
             return resolvedType;
         }
@@ -137,11 +141,11 @@ namespace Vintagestory.ServerMods.NoObf
             item.MaterialDensity = this.MaterialDensity;
 
 
-            item.GuiTransform = this.GuiTransform?.Clone();
-            item.FpHandTransform = this.FpHandTransform?.Clone();
-            item.TpHandTransform = this.TpHandTransform?.Clone();
-            item.TpOffHandTransform = this.TpOffHandTransform?.Clone();
-            item.GroundTransform = this.GroundTransform?.Clone();
+            item.GuiTransform = this.GuiTransform;
+            item.FpHandTransform = this.FpHandTransform;
+            item.TpHandTransform = this.TpHandTransform;
+            item.TpOffHandTransform = this.TpOffHandTransform;
+            item.GroundTransform = this.GroundTransform;
 
             item.LightHsv = this.LightHsv;
             item.DamagedBy = (EnumItemDamageSource[])this.DamagedBy?.Clone();

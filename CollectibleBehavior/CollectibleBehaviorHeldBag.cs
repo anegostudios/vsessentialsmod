@@ -30,6 +30,8 @@ namespace Vintagestory.GameContent
 
     public class CollectibleBehaviorHeldBag : CollectibleBehavior, IHeldBag, IAttachedInteractions
     {
+        public const int PacketIdBitShift = 11;    // magic number; see also IClientNetworkAPI.SendEntityPacketWithOffset() which enables such tricks
+
         public CollectibleBehaviorHeldBag(CollectibleObject collObj) : base(collObj)
         {
         }
@@ -197,11 +199,11 @@ namespace Vintagestory.GameContent
 
         public void OnReceivedClientPacket(ItemSlot bagSlot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave)
         {
-            int targetSlotIndex = packetid >> 11;
+            int targetSlotIndex = packetid >> PacketIdBitShift;
 
             if (slotIndex != targetSlotIndex) return;
 
-            int first10Bits = (1 << 11) - 1;
+            int first10Bits = (1 << PacketIdBitShift) - 1;
             packetid = packetid & first10Bits;
 
             getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnReceivedClientPacket(player, packetid, data, ref handled);
@@ -252,6 +254,11 @@ namespace Vintagestory.GameContent
 
     public class AttachedContainerWorkspace
     {
+        /// <summary>
+        /// Corresponds with MouseInWorldInteractions.BuildRepeatDelay(), but here expressed in milliseconds not fractions of a second
+        /// </summary>
+        private const int mouseBuildRepeatDelayMs = 250;
+
         public Entity entity;
         protected BagInventory bagInv;
         protected GuiDialogCreatureContents dlg;
@@ -259,6 +266,7 @@ namespace Vintagestory.GameContent
         protected Action onRequireSave;
         public BagInventory BagInventory => bagInv;
         public InventoryGeneric WrapperInv => wrapperInv;
+        private long lastMouseActionTime = 0;
 
         public AttachedContainerWorkspace(Entity entity, Action onRequireSave)
         {
@@ -274,28 +282,32 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-
             EntityPlayer entityplr = byEntity as EntityPlayer;
             IPlayer player = onEntity.World.PlayerByUid(entityplr.PlayerUID);
 
-            
-            if (onEntity.World.Side == EnumAppSide.Client // Let the client decide when to open/close inventories
-                && player.InventoryManager.OpenedInventories.FirstOrDefault(inv => inv.InventoryID == wrapperInv.InventoryID) != null)
-            {
-                Close(player);
-                return;
-            }
 
-            player.InventoryManager.OpenInventory(wrapperInv);
-
-            if (onEntity.World.Side == EnumAppSide.Client)
+            if (onEntity.World.Side == EnumAppSide.Client) // Let the client decide when to open/close inventories
             {
+                long timeNow = Environment.TickCount64;
+                if (timeNow - lastMouseActionTime < mouseBuildRepeatDelayMs) return;    // Prevents immediate re-opening of just closed inventory
+                lastMouseActionTime = timeNow;
+
+                if (player.InventoryManager.OpenedInventories.FirstOrDefault(inv => inv.InventoryID == wrapperInv.InventoryID) != null)
+                {
+                    Close(player);
+                    return;
+                }
+
+                player.InventoryManager.OpenInventory(wrapperInv);
+
                 dlg = new GuiDialogCreatureContents(wrapperInv, onEntity, onEntity.Api as ICoreClientAPI, "attachedcontainer-" + slotIndex, bagSlot.GetStackName(), new DlgPositioner(entity, slotIndex));
-                dlg.packetIdOffset = slotIndex << 11;
+                dlg.packetIdOffset = slotIndex << CollectibleBehaviorHeldBag.PacketIdBitShift;
 
                 if (dlg.TryOpen())
                 {
-                    (onEntity.World.Api as ICoreClientAPI).Network.SendPacketClient(wrapperInv.Open(player));
+                    var capi = onEntity.World.Api as ICoreClientAPI;
+                    capi.Network.SendPacketClient(wrapperInv.Open(player));
+                    capi.Network.SendEntityPacket(onEntity.EntityId, (int)EntityClientPacketId.OpenAttachedInventory + dlg.packetIdOffset, null);
                 }
 
                 dlg.OnClosed += () => Close(player);
@@ -363,11 +375,19 @@ namespace Vintagestory.GameContent
         {
             if (wrapperInv == null) return;
 
-            if (packetid < 1000 && wrapperInv.HasOpened(player))
+            if (packetid < 1000)
             {
-                wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
-                handled = EnumHandling.PreventSubsequent;
-                return;
+                if (wrapperInv.HasOpened(player))
+                {
+                    wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
+                    handled = EnumHandling.PreventSubsequent;
+                    return;
+                }
+            }
+
+            if (packetid == (int)EntityClientPacketId.OpenAttachedInventory)       // radfast 3.3.2025:  Compare BEOpenableContainer.OnReceivedClientPacket(), this is similar
+            {
+                player.InventoryManager?.OpenInventory(wrapperInv);
             }
         }
 
@@ -381,6 +401,9 @@ namespace Vintagestory.GameContent
             }
         }
 
-
+        public enum EntityClientPacketId
+        {
+            OpenAttachedInventory = 1001
+        }
     }
 }

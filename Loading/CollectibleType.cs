@@ -335,14 +335,6 @@ namespace Vintagestory.ServerMods.NoObf
 
         virtual internal void OnDeserialized()
         {
-            GuiTransform.EnsureDefaultValues();
-            FpHandTransform.EnsureDefaultValues();
-            TpHandTransform.EnsureDefaultValues();
-
-            if (TpOffHandTransform == null) TpOffHandTransform = TpHandTransform.Clone();
-            TpOffHandTransform.EnsureDefaultValues();
-            GroundTransform.EnsureDefaultValues();
-
             if (Texture != null)
             {
                 if (Textures == null) Textures = new Dictionary<string, CompositeTexture>(1);

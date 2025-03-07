@@ -86,9 +86,9 @@ namespace Vintagestory.GameContent
                 adult.WatchedAttributes.SetInt("generation", entity.WatchedAttributes.GetInt("generation", 0));
                 adult.WatchedAttributes.SetDouble("birthTotalDays", entity.World.Calendar.TotalDays);
                 // Transfer the textureIndex of the child to the adult, if both have same number of alternates (e.g. used for pullets)
-                if (entity.WatchedAttributes.HasAttribute("textureIndex") && entity.Properties.Client?.FirstTexture?.Alternates != null && adultType.Client?.FirstTexture?.Alternates != null)
+                if (entity.Properties.Client != null && entity.Properties.Client.TexturesAlternatesCount > 0 && adultType.Client != null)
                 {
-                    if (entity.Properties.Client.FirstTexture.Alternates.Length == adultType.Client.FirstTexture.Alternates.Length)
+                    if (entity.Properties.Client.TexturesAlternatesCount == adultType.Client.TexturesAlternatesCount && entity.WatchedAttributes.HasAttribute("textureIndex"))
                     {
                         adult.WatchedAttributes.SetAttribute("textureIndex", entity.WatchedAttributes.GetAttribute("textureIndex"));
                     }
