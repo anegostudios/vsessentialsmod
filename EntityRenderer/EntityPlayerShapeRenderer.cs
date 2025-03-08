@@ -164,7 +164,7 @@ namespace Vintagestory.GameContent
         {
             if (IsSelf && capi.Render.CameraType == EnumCameraMode.FirstPerson)
             {
-                if (capi.Settings.Bool["immersiveFpMode"] && !capi.Render.CameraStuck)
+                if (capi.Settings.Bool["immersiveFpMode"] && !capi.Render.CameraStuck && entity.WatchedAttributes.GetTreeAttribute("tiredness")?.GetInt("isSleeping") != 1)
                 {
                     renderMode = RenderMode.ImmersiveFirstPerson;
                 }
