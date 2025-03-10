@@ -70,10 +70,17 @@ namespace Vintagestory.GameContent
 
             // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
             // Has to be checked every tick because the drifter attributes change during temporal storms  (grrr, this is a slow way to do it)
-            if (minDayLight > 0 && !entity.Attributes.GetBool("ignoreDaylightFlee", false))
+
+            // Do we use daylight levels to determine fleeing behaviour? If not skip all of this.
+            if (minDayLight > 0)
             {
+                // Are we currently in a temporal storm? If so then return false because we don't flee in storms.
+                if ( entity.Attributes.GetBool("ignoreDaylightFlee", false)) return false;
+
+                // Are we below sea level and set to ignore daylight levels underground? If so then return false because we don't flee underground.
                 if (ignoreDeepDayLight && entity.ServerPos.Y < world.SeaLevel - 2) return false;
 
+                //Is the light level too weak to affect us? If so then return false because the light is too dim to make us flee.
                 float sunlight = entity.World.BlockAccessor.GetLightLevel((int)entity.ServerPos.X, (int)entity.ServerPos.Y, (int)entity.ServerPos.Z, EnumLightLevelType.TimeOfDaySunLight) / (float)entity.World.SunBrightness;
                 if (sunlight < minDayLight) return false;
             }
