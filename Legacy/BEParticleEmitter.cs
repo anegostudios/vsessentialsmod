@@ -21,6 +21,7 @@ namespace Vintagestory.GameContent
 
         public override void OnBlockRemoved()
         {
+            base.OnBlockRemoved();
             Api.World.UnregisterGameTickListener(listenerId);
         }
 
@@ -35,7 +36,7 @@ namespace Vintagestory.GameContent
                 AdvancedParticleProperties bps = block.ParticleProperties[i];
 
                 bps.basePos.X = Pos.X + block.TopMiddlePos.X;
-                bps.basePos.Y = Pos.Y + block.TopMiddlePos.Y;
+                bps.basePos.Y = Pos.InternalY + block.TopMiddlePos.Y;
                 bps.basePos.Z = Pos.Z + block.TopMiddlePos.Z;
 
                 Api.World.SpawnParticles(bps);

@@ -454,7 +454,7 @@ namespace Vintagestory.GameContent
 
             if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
 
-            var itemTransform = renderInfo.Transform;
+            var itemTransform = renderInfo.Transform.EnsureDefaultValues();
             var itemOrigin = itemTransform.Origin;
             var itemTranslation = itemTransform.Translation;
             var itemRotation = itemTransform.Rotation;

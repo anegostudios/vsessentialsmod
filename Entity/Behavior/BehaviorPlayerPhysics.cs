@@ -501,7 +501,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         double minX = -maxX;
         double maxZ = Math.Abs(walkVecOrtho.Y * 0.3) + 0.001;
         double minZ = -maxZ;
-        Cuboidf col = new((float)minX, entity.CollisionBox.Y1 + pos.DimensionYAdjustment, (float)minZ, (float)maxX, entity.CollisionBox.Y2 + pos.DimensionYAdjustment, (float)maxZ);
+        Cuboidf col = new((float)minX, entity.CollisionBox.Y1, (float)minZ, (float)maxX, entity.CollisionBox.Y2, (float)maxZ);
 
         double newYPos = pos.Y;
         bool foundStep = false;

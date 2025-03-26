@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -88,9 +87,8 @@ namespace Vintagestory.GameContent
 
             foreach (var bef in fallingBlocks)
             {
-                //if (api.Side == EnumAppSide.Server || dustIntensity == 0) return;
-
                 float dustAdd = 0f;
+
                 if (bef.nowImpacted)
                 {
                     var lblock = capi.World.BlockAccessor.GetBlock(bef.Pos.AsBlockPos, BlockLayersAccess.Fluid);
@@ -111,6 +109,7 @@ namespace Vintagestory.GameContent
                     dustParticles.MinSize = 1f;
 
                     float veloMul = dustAdd / 20f;
+                    dustParticles.AddPos.Y = bef.maxSpawnHeightForParticles;
                     dustParticles.MinVelocity.Set(-0.2f * veloMul, 1f * (float)bef.Pos.Motion.Y, -0.2f * veloMul);
                     dustParticles.AddVelocity.Set(0.4f * veloMul, 0.2f * (float)bef.Pos.Motion.Y + -veloMul, 0.4f * veloMul);
                     dustParticles.MinQuantity = dustAdd * bef.dustIntensity * particlemul / 2f;
@@ -126,6 +125,7 @@ namespace Vintagestory.GameContent
                 bitsParticles.MinQuantity = particlemul;
                 bitsParticles.AddQuantity = 6 * Math.Abs((float)bef.Pos.Motion.Y) * particlemul;
                 bitsParticles.Color = dustParticles.Color;
+                bitsParticles.AddPos.Y = bef.maxSpawnHeightForParticles;
 
                 dustParticles.Color = bef.Block.GetRandomColor(capi, bef.stackForParticleColor);
 
@@ -163,61 +163,44 @@ namespace Vintagestory.GameContent
     public class EntityBlockFalling : Entity
     {
         private const int packetIdMagicNumber = 1234;
-
-        private int ticksAlive;
-        int lingerTicks;
-
-        public bool InitialBlockRemoved;
-
-
-        private AssetLocation blockCode;
-        public BlockPos initialPos;
-        private ItemStack[] drops;
-        public TreeAttribute blockEntityAttributes;
-        public string blockEntityClass;
-
-        public BlockEntity removedBlockentity;
-
-        float impactDamageMul;
-
-        bool fallHandled;
-        internal float dustIntensity;
-        internal float nowDustIntensity;
-
-        byte[] lightHsv;
-        AssetLocation fallSound;
-        ILoadedSound sound;
-        float soundStartDelay;
-
-        internal ItemStack stackForParticleColor;
-        bool canFallSideways;
-
-
-        Vec3d fallMotion = new Vec3d();
-        float pushaccum;
-
         static HashSet<long> fallingNow = new HashSet<long>();
 
+        private readonly List<int> fallDirections = new() { 0, 1, 2, 3 };
+        private int lastFallDirection = 0;
+        private int hopUpHeight = 1;
+        private FallingBlockParticlesModSystem particleSys;
+        private int ticksAlive;
+        private int lingerTicks;
+        private AssetLocation blockCode;
+        private ItemStack[] drops;
+        private float impactDamageMul;
+        private bool fallHandled;
+        private byte[] lightHsv;
+        private AssetLocation fallSound;
+        private ILoadedSound sound;
+        private float soundStartDelay;
+        private bool canFallSideways;
+        private Vec3d fallMotion = new Vec3d();
+        private float pushaccum;
 
-        // Additional config options
-        public bool DoRemoveBlock = true;
-
+        internal float dustIntensity;
+        internal ItemStack stackForParticleColor;
         internal bool nowImpacted;
 
+
+        public bool InitialBlockRemoved;
+        public BlockPos initialPos;
+        public TreeAttribute blockEntityAttributes;
+        public string blockEntityClass;
+        public BlockEntity removedBlockentity;
+        // Additional config options
+        public bool DoRemoveBlock = true;
+        public float maxSpawnHeightForParticles = 1.4f;
+
         public EntityBlockFalling() { }
-
         public override float MaterialDensity => 99999;
+        public override byte[] LightHsv => lightHsv;
 
-        public override byte[] LightHsv
-        {
-            get
-            {
-                return lightHsv;
-            }
-        }
-
-        EntityBehaviorPassivePhysics physicsBh;
-        FallingBlockParticlesModSystem particleSys;
 
         public EntityBlockFalling(Block block, BlockEntity blockEntity, BlockPos initialPos, AssetLocation fallSound, float impactDamageMul, bool canFallSideways, float dustIntensity)
         {
@@ -272,7 +255,6 @@ namespace Vintagestory.GameContent
 
             lightHsv = Block.GetLightHsv(World.BlockAccessor, initialPos);
 
-			//SidedPos.Motion.Y = -0.02;
 
             if (drops != null && drops.Length > 0)
             {
@@ -314,10 +296,16 @@ namespace Vintagestory.GameContent
             {
                 particleSys = api.ModLoader.GetModSystem<FallingBlockParticlesModSystem>();
                 particleSys.Register(this);
-                physicsBh = GetBehavior<EntityBehaviorPassivePhysics>();
             }
 
             RandomizeFallingDirectionsOrder();
+
+            if (DoRemoveBlock)
+            {
+                // We have captured the BlockEntity and drops, we can now remove the initial block
+                // (but on a server we delay neighbour updates and notifying the client, deferred until later calls to UpdateBlock(true...)
+                World.BlockAccessor.SetBlock(0, initialPos);
+            }
         }
 
 
@@ -363,14 +351,6 @@ namespace Vintagestory.GameContent
                 }
 
                 return;
-            }
-
-            if (!Collided && !fallHandled)
-            {
-                nowDustIntensity = 1;
-            } else
-            {
-                nowDustIntensity = 0;
             }
 
             World.FrameProfiler.Mark("entity-tick-unsstablefalling-sound(etc)");
@@ -462,8 +442,10 @@ namespace Vintagestory.GameContent
             {
                 if (DoRemoveBlock)
                 {
-                    World.BlockAccessor.SetBlock(0, pos);
                     World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(true));
+                } else
+                {
+                    OnChunkRetesselated(true);
                 }
             } else
             {
@@ -472,6 +454,9 @@ namespace Vintagestory.GameContent
                 {
                     World.BlockAccessor.SetBlock(Block.BlockId, pos);
                     World.BlockAccessor.MarkBlockDirty(pos, () => OnChunkRetesselated(false));
+                } else
+                {
+                    OnChunkRetesselated(true);
                 }
 
                 if (blockEntityAttributes != null)
@@ -498,10 +483,6 @@ namespace Vintagestory.GameContent
             EntityBlockFallingRenderer renderer = (Properties.Client.Renderer as EntityBlockFallingRenderer);
             if (renderer != null) renderer.DoRender = on;
         }
-
-        private readonly List<int> fallDirections = new() { 0, 1, 2, 3 };
-        private int lastFallDirection = 0;
-        private int hopUpHeight = 1;
 
         // based on entitId so should be same on server and client
         private void RandomizeFallingDirectionsOrder()
@@ -699,6 +680,8 @@ namespace Vintagestory.GameContent
 
         public override void ToBytes(BinaryWriter writer, bool forClient)
         {
+            WatchedAttributes.SetFloat("maxSpawnHeightForParticles", maxSpawnHeightForParticles);
+
             base.ToBytes(writer, forClient);
 
             writer.Write(initialPos.X);
@@ -741,6 +724,7 @@ namespace Vintagestory.GameContent
 
             canFallSideways = WatchedAttributes.GetBool("canFallSideways");
             dustIntensity = WatchedAttributes.GetFloat("dustIntensity");
+            maxSpawnHeightForParticles = WatchedAttributes.GetFloat("maxSpawnHeightForParticles");
 
             DoRemoveBlock = reader.ReadBoolean();
         }

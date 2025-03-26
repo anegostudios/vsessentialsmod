@@ -193,7 +193,11 @@ namespace Vintagestory.GameContent
             if (!controls.CtrlKey)
             {
                 handled = EnumHandling.PreventDefault;
-                getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnInteract(bagSlot, slotIndex, onEntity, byEntity, hitPosition);
+                if (onEntity.Api.Side == EnumAppSide.Client)
+                {
+                    var workspace = getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave);
+                    workspace.OnInteract(bagSlot, slotIndex, onEntity, byEntity, hitPosition);
+                }
             }
         }
 
@@ -206,7 +210,7 @@ namespace Vintagestory.GameContent
             int first10Bits = (1 << PacketIdBitShift) - 1;
             packetid = packetid & first10Bits;
 
-            getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnReceivedClientPacket(player, packetid, data, ref handled);
+            getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnReceivedClientPacket(player, packetid, data, bagSlot, slotIndex, ref handled);
         }
 
         public bool OnTryAttach(ItemSlot itemslot, int slotIndex, Entity toEntity)
@@ -221,17 +225,22 @@ namespace Vintagestory.GameContent
 
         public void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn)
         {
+            if (despawn.Reason == EnumDespawnReason.Death)
+            {
+                var contents = GetContents(itemslot.Itemstack, onEntity.World);
+                foreach (var stack in contents)
+                {
+                    if (stack == null) continue;
+                    onEntity.World.SpawnItemEntity(stack, onEntity.Pos.XYZ);
+                }
+            }
+
             getContainerWorkspace(slotIndex, onEntity)?.OnDespawn(despawn);
         }
 
         public void OnEntityDeath(ItemSlot itemslot, int slotIndex, Entity onEntity, DamageSource damageSourceForDeath)
         {
-            var contents = GetContents(itemslot.Itemstack, onEntity.World);
-            foreach (var stack in contents)
-            {
-                if (stack == null) continue;
-                onEntity.World.SpawnItemEntity(stack, onEntity.Pos.XYZ);
-            }
+            
         }
     }
 
@@ -285,7 +294,7 @@ namespace Vintagestory.GameContent
             EntityPlayer entityplr = byEntity as EntityPlayer;
             IPlayer player = onEntity.World.PlayerByUid(entityplr.PlayerUID);
 
-
+            bool opened = false;
             if (onEntity.World.Side == EnumAppSide.Client) // Let the client decide when to open/close inventories
             {
                 long timeNow = Environment.TickCount64;
@@ -306,16 +315,20 @@ namespace Vintagestory.GameContent
                 if (dlg.TryOpen())
                 {
                     var capi = onEntity.World.Api as ICoreClientAPI;
-                    capi.Network.SendPacketClient(wrapperInv.Open(player));
+                    wrapperInv.Open(player);
                     capi.Network.SendEntityPacket(onEntity.EntityId, (int)EntityClientPacketId.OpenAttachedInventory + dlg.packetIdOffset, null);
+                    opened = true;
                 }
 
                 dlg.OnClosed += () => Close(player);
             }
             else
             {
-                onEntity.Api.Logger.Audit("{0} opened a container on a {1} at {2}, slot {3}, id {4}", byEntity?.GetName(), onEntity.Code.ToShortString(), onEntity.ServerPos.AsBlockPos, slotIndex, wrapperInv.InventoryID);
+                player.InventoryManager?.OpenInventory(wrapperInv);
+                opened = true;
             }
+
+            if (opened) entity.World.Logger.Audit("{0} opened held bag inventory ({3}) on entity {1}/{2}", player?.PlayerName, entity.EntityId, entity.GetName(), wrapperInv.InventoryID);
         }
 
         public void Close(IPlayer player)
@@ -330,6 +343,7 @@ namespace Vintagestory.GameContent
             {
                 (player.Entity.Api as ICoreClientAPI)?.Network.SendPacketClient(wrapperInv.Close(player));
                 player.InventoryManager.CloseInventory(wrapperInv);
+                entity.World.Logger.Audit("{0} closed held bag inventory {3} on entity {1}/{2}", player?.PlayerName, entity.EntityId, entity.GetName(), wrapperInv.InventoryID);
             }
         }
 
@@ -371,23 +385,22 @@ namespace Vintagestory.GameContent
         }
 
 
-        public void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled)
+        public void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ItemSlot bagSlot, int slotIndex, ref EnumHandling handled)
         {
-            if (wrapperInv == null) return;
-
             if (packetid < 1000)
             {
-                if (wrapperInv.HasOpened(player))
+                if (wrapperInv != null && wrapperInv.HasOpened(player))
                 {
                     wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
                     handled = EnumHandling.PreventSubsequent;
-                    return;
                 }
+
+                return;
             }
 
             if (packetid == (int)EntityClientPacketId.OpenAttachedInventory)       // radfast 3.3.2025:  Compare BEOpenableContainer.OnReceivedClientPacket(), this is similar
             {
-                player.InventoryManager?.OpenInventory(wrapperInv);
+                OnInteract(bagSlot, slotIndex, entity, player.Entity, null);   // null hitPosition here is ok, it is never used in the OnInteract() method. If we need to use it in future, it would need to be encoded in the packet data byte[]
             }
         }
 
@@ -397,7 +410,9 @@ namespace Vintagestory.GameContent
             if (wrapperInv == null) return;
             foreach (var uid in wrapperInv.openedByPlayerGUIds)
             {
-                entity.Api.World.PlayerByUid(uid)?.InventoryManager.CloseInventory(wrapperInv);
+                var plr = entity.Api.World.PlayerByUid(uid);
+                plr?.InventoryManager.CloseInventory(wrapperInv);
+                if (plr != null) entity.World.Logger.Audit("{0} closed held bag inventory {3} on entity {1}/{2}", plr?.PlayerName, entity.EntityId, entity.GetName(), wrapperInv.InventoryID);
             }
         }
 

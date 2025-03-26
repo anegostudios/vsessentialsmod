@@ -13,12 +13,10 @@ namespace Vintagestory.GameContent
     public class EntityBlockFallingRenderer : EntityRenderer, ITerrainMeshPool
     {
         protected EntityBlockFalling blockFallingEntity;
-        protected MeshRef meshRef;
+        protected MultiTextureMeshRef meshRef;
         protected Block block;
-        protected int atlasTextureId;
         protected Matrixf ModelMat = new Matrixf();
 
-        double accum;
         Vec3d prevPos = new Vec3d();
         Vec3d curPos = new Vec3d();
         internal bool DoRender;
@@ -46,25 +44,23 @@ namespace Vintagestory.GameContent
                     mesh.CustomBytes = null;
                     mesh.CustomFloats = null;
                     mesh.CustomInts = null;
-                    this.meshRef = capi.Render.UploadMesh(mesh);
+                    this.meshRef = capi.Render.UploadMultiTextureMesh(mesh);
                 }
             }
 
             if (this.meshRef == null)
             {
                 MeshData mesh = api.TesselatorManager.GetDefaultBlockMesh(block);
-                this.meshRef = api.Render.UploadMesh(mesh);
+                this.meshRef = api.Render.UploadMultiTextureMesh(mesh);
             }
 
             int textureSubId = block.FirstTextureInventory.Baked.TextureSubId;
-            this.atlasTextureId = api.BlockTextureAtlas.Positions[textureSubId].atlasTextureId;
 
             prevPos.Set(entity.Pos.X + entity.SelectionBox.X1, entity.Pos.Y + entity.SelectionBox.Y1, entity.Pos.Z + entity.SelectionBox.Z1);
         }
 
         public void OnPhysicsTick(float nextAccum, Vec3d prevPos)
         {
-            this.accum = nextAccum;
             this.prevPos.Set(prevPos.X + entity.SelectionBox.X1, prevPos.Y + entity.SelectionBox.Y1, prevPos.Z + entity.SelectionBox.Z1);
         }
 
@@ -113,27 +109,26 @@ namespace Vintagestory.GameContent
 
             IStandardShaderProgram prog = rapi.PreparedStandardShader((int)entity.Pos.X, (int)(entity.Pos.Y + 0.2), (int)entity.Pos.Z);
             Vec3d camPos = capi.World.Player.Entity.CameraPos;
-            prog.Tex2D = atlasTextureId;
             prog.ModelMatrix = ModelMat
-                    .Identity()
-                    .Translate(
-                        curPos.X - camPos.X + GameMath.Sin(capi.InWorldEllapsedMilliseconds / 120f + 30) / 20f / div,
-                        curPos.Y - camPos.Y,
-                        curPos.Z - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
-                    )
-                    .RotateX((float)(Math.Sin(rotaccum * 10) / 10.0 / div))
-                    .RotateZ((float)(Math.Cos(10 + rotaccum * 9.0) / 10.0 / div))
-                    .Values
-                ;
+                .Identity()
+                .Translate(
+                    curPos.X - camPos.X + GameMath.Sin(capi.InWorldEllapsedMilliseconds / 120f + 30) / 20f / div,
+                    curPos.Y - camPos.Y,
+                    curPos.Z - camPos.Z + GameMath.Cos(capi.InWorldEllapsedMilliseconds / 110f + 20) / 20f / div
+                )
+                .RotateX((float)(Math.Sin(rotaccum * 10) / 10.0 / div))
+                .RotateZ((float)(Math.Cos(10 + rotaccum * 9.0) / 10.0 / div))
+                .Values
+            ;
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
             prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;
-            rapi.RenderMesh(meshRef);
+            rapi.RenderMultiTextureMesh(meshRef, "tex");
             prog.Stop();
         }
 
         public override void Dispose()
         {
-            capi.Render.DeleteMesh(meshRef);
+            meshRef?.Dispose();
         }
     }
 }

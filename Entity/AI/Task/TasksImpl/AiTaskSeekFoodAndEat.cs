@@ -403,7 +403,7 @@ namespace Vintagestory.GameContent
         {
             this.entity.Itemstack.StackSize--;
             if (this.entity.Itemstack.StackSize <= 0) this.entity.Die();
-            return 1f;
+            return this.entity.Itemstack.StackSize >= 0 ? 1f : 0f;
         }
 
         public bool IsSuitableFor(Entity entity, CreatureDiet diet)

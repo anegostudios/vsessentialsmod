@@ -423,7 +423,7 @@ namespace Vintagestory.GameContent
 
         private void OnViewChangedServer(IServerPlayer fromPlayer, OnViewChangedPacket networkMessage)
         {
-            List<Vec2i> empty = new List<Vec2i>();
+            List<Vec2i> empty = new List<Vec2i>(0);
 
             foreach (MapLayer layer in MapLayers)
             {
@@ -438,15 +438,15 @@ namespace Vintagestory.GameContent
             if (api.Side == EnumAppSide.Client) return;
             if (forPlayer.ConnectionState != EnumClientState.Playing) return;
 
-            List<MapLayerData> maplayerdatas = new List<MapLayerData>();
+            MapLayerData[] maplayerdatas = new MapLayerData[1] {
+                new MapLayerData()
+                {
+                    Data = data,
+                    ForMapLayer = MapLayerRegistry.FirstOrDefault(x => x.Value == forMapLayer.GetType()).Key
+                }
+            };
 
-            maplayerdatas.Add(new MapLayerData()
-            {
-                Data = data,
-                ForMapLayer = MapLayerRegistry.FirstOrDefault(x => x.Value == forMapLayer.GetType()).Key
-            });
-
-            serverChannel.SendPacket(new MapLayerUpdate() { Maplayers = maplayerdatas.ToArray() }, forPlayer);
+            serverChannel.SendPacket(new MapLayerUpdate() { Maplayers = maplayerdatas }, forPlayer);
         }
 
         #endregion

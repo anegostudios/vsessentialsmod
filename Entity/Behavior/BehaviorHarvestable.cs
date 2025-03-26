@@ -74,6 +74,14 @@ namespace Vintagestory.GameContent
             }
         }
 
+        bool GotAcidified
+        {
+            get
+            {
+                return entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Acid;
+            }
+        }
+
         public float AnimalWeight
         {
             get
@@ -106,6 +114,10 @@ namespace Vintagestory.GameContent
                 if (GotCrushed)
                 {
                     return 0.5f;
+                }
+                if (GotAcidified)
+                {
+                    return 0.25f;
                 }
 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");
@@ -505,6 +517,10 @@ namespace Vintagestory.GameContent
                 if (GotElectrocuted)
                 {
                     infotext.AppendLine(Lang.Get("Looks partially charred, perhaps due to a lightning strike."));
+                }
+                if (GotAcidified)
+                {
+                    infotext.AppendLine(Lang.Get("Looks partially dissolved, likely due to high acidity."));
                 }
 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");

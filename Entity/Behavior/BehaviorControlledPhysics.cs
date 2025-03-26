@@ -56,7 +56,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         swimmingBefore = entity.Swimming;
 
         traversed.Clear();
-        if (!entity.Alive) AdjustCollisionBoxToAnimation(dtFactor);
+        if (entity.AdjustCollisionBoxToAnimation)
+        {
+            AdjustCollisionBoxToAnimation(dtFactor);
+        }
     }
 
     public EntityBehaviorControlledPhysics(Entity entity) : base(entity) { }
