@@ -358,7 +358,10 @@ namespace Vintagestory.GameContent
         {
             if (readyMapPieces.Count > 0)
             {
-                int q = Math.Min(readyMapPieces.Count, 20);
+                int q = Math.Min(readyMapPieces.Count, 80); // was 20, not 80
+                // 20/tick was too low and caused a backlog of unloaded chunks in queue, rendering map unresponsive
+                //potential improvements would be clearing queue at end of loop
+                //could also potentially be changed from queue to stack in order to render what's being served currently first instead of last
                 while (q-- > 0)
                 {
                     if (readyMapPieces.TryDequeue(out var mappiece))
