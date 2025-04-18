@@ -315,7 +315,7 @@ namespace Vintagestory.GameContent
         private double getDistanceToTarget()
         {
             if (targetEntity == null) return double.MaxValue;
-            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z);
+            Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.ServerPos.X, targetEntity.ServerPos.InternalY, targetEntity.ServerPos.Z);
             Vec3d pos = entity.ServerPos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.ServerPos.Yaw);
             double distance = targetBox.ShortestDistanceFrom(pos);
             return distance;
@@ -339,9 +339,9 @@ namespace Vintagestory.GameContent
 
             double distance = getDistanceToTarget();
 
-            if (attackPattern == EnumAttackPattern.DirectAttack && lastPathUpdateSeconds >= 0.75f && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z) >= 3 * 3)
+            if (attackPattern == EnumAttackPattern.DirectAttack && lastPathUpdateSeconds >= 0.75f && targetPos.SquareDistanceTo(targetEntity.ServerPos.X, targetEntity.ServerPos.InternalY, targetEntity.ServerPos.Z) >= 3 * 3)
             {
-                targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.Y, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
+                targetPos.Set(targetEntity.ServerPos.X + targetEntity.ServerPos.Motion.X * 10, targetEntity.ServerPos.InternalY, targetEntity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * 10);
 
                 pathTraverser.NavigateTo(targetPos, moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, null, false, 2000, 1);
                 lastPathUpdateSeconds = 0;
@@ -365,7 +365,7 @@ namespace Vintagestory.GameContent
             if (attackPattern == EnumAttackPattern.DirectAttack/* || attackPattern == EnumAttackPattern.BesiegeTarget*/)
             {
                 pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
-                pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
+                pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.InternalY;
                 pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
             }
 

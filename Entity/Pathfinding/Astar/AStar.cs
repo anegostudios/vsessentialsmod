@@ -139,6 +139,7 @@ namespace Vintagestory.Essentials
         protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
         {
             tmpVec.Set(node.X + centerOffsetX, node.Y, node.Z + centerOffsetZ);
+            tmpPos.dimension = node.dimension;
             Block block;
 
             if (!collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))

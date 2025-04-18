@@ -1,4 +1,5 @@
 ﻿using System;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.Essentials
@@ -28,12 +29,13 @@ namespace Vintagestory.Essentials
         
 
         public PathNode(PathNode nearestNode, Cardinal card) : base (nearestNode.X + card.Normali.X, nearestNode.Y + card.Normali.Y, nearestNode.Z + card.Normali.Z)
-        { 
+        {
+            dimension = nearestNode.dimension;
         }
 
         public PathNode(BlockPos pos) : base (pos.X, pos.Y, pos.Z)
         {
-            
+            dimension = pos.dimension;
         }
 
         public bool Equals(PathNode other)
@@ -90,7 +92,7 @@ namespace Vintagestory.Essentials
 
         public Vec3d ToWaypoint()
         {
-            return new Vec3d(X, Y, Z);
+            return new Vec3d(X, InternalY, Z);
         }
 
         public int CompareTo(PathNode other)

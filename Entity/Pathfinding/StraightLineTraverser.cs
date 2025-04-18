@@ -46,7 +46,7 @@ namespace Vintagestory.Essentials
             double sqDistToTarget =
                 entity.Properties.Habitat == EnumHabitat.Land ?
                     target.SquareDistanceTo(entity.ServerPos.X, target.Y, entity.ServerPos.Z) :
-                    target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z)
+                    target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z)
                 ;
 
 
@@ -63,7 +63,7 @@ namespace Vintagestory.Essentials
                 (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0)
             ;
 
-            prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+            prevPos.Set(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z);
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
 
@@ -81,7 +81,7 @@ namespace Vintagestory.Essentials
 
             targetVec.Set(
                 (float)(target.X - entity.ServerPos.X),
-                (float)(target.Y - entity.ServerPos.Y),
+                (float)(target.Y - entity.ServerPos.InternalY),
                 (float)(target.Z - entity.ServerPos.Z)
             );
 

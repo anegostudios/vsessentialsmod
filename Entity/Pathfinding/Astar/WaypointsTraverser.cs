@@ -331,7 +331,7 @@ namespace Vintagestory.Essentials
             {
                 prevPosAccum = 0;
                 prevPrevPos.Set(prevPos);
-                prevPos.Set(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
+                prevPos.Set(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z);
             }
 
             // Long duration tests to make sure we're not just wobbling around in the same spot
@@ -366,7 +366,7 @@ namespace Vintagestory.Essentials
 
             targetVec.Set(
                 (float)(target.X - entity.ServerPos.X),
-                (float)(target.Y - entity.ServerPos.Y),
+                (float)(target.Y - entity.ServerPos.InternalY),
                 (float)(target.Z - entity.ServerPos.Z)
             );
             targetVec.Normalize();
@@ -477,7 +477,7 @@ namespace Vintagestory.Essentials
             int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + waypointOffset);
             Vec3d target = waypoints[wayPointIndex];
 
-            double curPosY = entity.ServerPos.Y;
+            double curPosY = entity.ServerPos.InternalY;
             sqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
 
             var vdistsq = (target.Y - curPosY) * (target.Y - curPosY);

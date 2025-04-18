@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -78,9 +79,17 @@ namespace Vintagestory.GameContent
             if (Api.Side == EnumAppSide.Client)
             {
                 Inventory.OnInventoryOpened += Inventory_OnInventoryOpenedClient;
+            } else
+            {
+                Inventory.SlotModified += Inventory_SlotModified;
             }
 
             prevInventory = Inventory;
+        }
+
+        private void Inventory_SlotModified(int obj)
+        {
+            Api.World.BlockAccessor.GetChunkAtBlockPos(positionProvider()).MarkModified();
         }
 
         private void Inventory_OnInventoryOpenedClient(IPlayer player)

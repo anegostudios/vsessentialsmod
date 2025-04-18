@@ -221,7 +221,7 @@ namespace Vintagestory.GameContent
         {
             return Handle<ItemStack, IMultiBlockInteract>(
                 world.BlockAccessor,
-                pos.X + OffsetInv.X, pos.Y + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
                 (inf) => inf.MBOnPickBlock(world, pos, OffsetInv),
                 (block) => base.OnPickBlock(world, pos.AddCopy(OffsetInv)),
                 (block) => block.OnPickBlock(world, pos.AddCopy(OffsetInv))
