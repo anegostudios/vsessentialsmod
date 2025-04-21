@@ -442,34 +442,42 @@ namespace Vintagestory.GameContent
             float extra = Math.Max(1, intensity * 3);
             int cnt = (int)(dustParticlesPerTick * extra);
 
-            for (int i = 0; i < cnt; i++)
+            try
             {
-                double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-                double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
 
-                int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
-                Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-                if (block.Id == 0) continue;
-                if (capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid).Id != 0) continue;    // Liquid surface or ice produces no particles
-                if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
+                for (int i = 0; i < cnt; i++)
                 {
-                    if (rand.NextDouble() < 0.7f || block.RenderPass == EnumChunkRenderPass.TopSoil) continue;
+                    double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                    double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+
+                    int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
+                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
+                    if (block.Id == 0) continue;
+                    if (capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid).Id != 0) continue;    // Liquid surface or ice produces no particles
+                    if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
+                    {
+                        if (rand.NextDouble() < 0.7f || block.RenderPass == EnumChunkRenderPass.TopSoil) continue;
+                    }
+                    if (block.BlockMaterial == EnumBlockMaterial.Sand)
+                    {
+                        sandFinds += 1 / extra;
+                        sandCountByBlock[indicesBySandBlockId[block.Id]] += 1 / extra;
+                    }
+
+                    if (Math.Abs(py - particlePos.Y) > 15) continue;
+
+                    tmpPos.Set((int)px, py, (int)pz);
+                    stormDustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));
+                    stormDustParticles.Color |= 255 << 24;
+
+                    manager.Spawn(stormDustParticles);
                 }
-                if (block.BlockMaterial == EnumBlockMaterial.Sand)
-                {
-                    sandFinds+=1/ extra;
-                    sandCountByBlock[indicesBySandBlockId[block.Id]]+=1/ extra;
-                }
 
-                if (Math.Abs(py - particlePos.Y) > 15) continue;
-
-                tmpPos.Set((int)px, py, (int)pz);
-                stormDustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));
-                stormDustParticles.Color |= 255 << 24;
-
-                manager.Spawn(stormDustParticles);
+            } catch (Exception)
+            {
+                // On extremely rare cases the offthread call to block.GetColor() throws an exception due to race conditions (Issue #5739)
+                // It doesn't really matter here to just ignore this one in a million issue
             }
-
 
 
             spawnCount++;
