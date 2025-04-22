@@ -89,7 +89,9 @@ namespace Vintagestory.GameContent
 
         private void Inventory_SlotModified(int obj)
         {
-            Api.World.BlockAccessor.GetChunkAtBlockPos(positionProvider()).MarkModified();
+            if (Inventory is InventoryBasePlayer) return;
+
+            Api.World.BlockAccessor.GetChunkAtBlockPos(positionProvider())?.MarkModified();
         }
 
         private void Inventory_OnInventoryOpenedClient(IPlayer player)
