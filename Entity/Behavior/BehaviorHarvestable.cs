@@ -333,8 +333,9 @@ namespace Vintagestory.GameContent
         public override void OnInteract(EntityAgent byEntity, ItemSlot itemslot, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled)
         {
             Vec3d centerPos = entity.Pos.XYZ;
-            centerPos.Add(entity.SelectionBox.X2 - entity.SelectionBox.X1, 0, entity.SelectionBox.Z2 - entity.SelectionBox.Z1);
-            bool inRange = (byEntity.World.Side == EnumAppSide.Client && byEntity.Pos.SquareDistanceTo(centerPos) <= 5) || (byEntity.World.Side == EnumAppSide.Server && byEntity.Pos.SquareDistanceTo(centerPos) <= 14);
+
+            var dist = entity.Pos.XYZ.Add(hitPosition).DistanceTo(byEntity.SidedPos.XYZ.Add(byEntity.LocalEyePos));
+            bool inRange = dist <= 5 + (Api.Side == EnumAppSide.Server ? 1 : 0);
 
             if (!IsHarvested || !inRange)
             {
