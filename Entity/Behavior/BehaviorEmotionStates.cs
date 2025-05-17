@@ -126,7 +126,7 @@ namespace Vintagestory.GameContent
                     EntityAgent agent = e as EntityAgent;
                     if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == (entity as EntityAgent).HerdId)
                     {
-                        agent.GetBehavior<EntityBehaviorEmotionStates>().TryTriggerState("aggressiveondamage", sourceEntityId);
+                        agent.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState("aggressiveondamage", sourceEntityId);
                     }
 
                     return false;
