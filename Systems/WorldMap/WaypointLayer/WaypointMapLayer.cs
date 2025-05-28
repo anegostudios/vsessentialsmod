@@ -459,9 +459,15 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnViewChangedServer(IServerPlayer fromPlayer, List<Vec2i> nowVisible, List<Vec2i> nowHidden)
+        [Obsolete("Receiving the OnViewChangedPacket now calls: OnViewChangedServer(fromPlayer, int x1, int z1, int x2, int z2) but retained in 1.20.10 for backwards compatibility")]
+        public override void OnViewChangedServer(IServerPlayer fromPlayer, List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
         {
             ResendWaypoints(fromPlayer);
+        }
+
+        public override void OnViewChangedServer(IServerPlayer fromPlayer, int x1, int z1, int x2, int z2)
+        {
+            OnViewChangedServer(fromPlayer, null, null);
         }
 
 

@@ -8,7 +8,8 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    public delegate void OnViewChangedDelegate(List<Vec2i> nowVisibleChunks, List<Vec2i> nowHiddenChunks);
+    public delegate void OnViewChangedDelegate(List<FastVec2i> nowVisibleChunks, List<FastVec2i> nowHiddenChunks);
+    public delegate void OnViewChangedSyncDelegate(int x1, int z1, int x2, int z2);
 
     public class GuiDialogWorldMap : GuiDialogGeneric
     {
@@ -18,6 +19,7 @@ namespace Vintagestory.GameContent
 
         protected EnumDialogType dialogType = EnumDialogType.HUD;
         protected OnViewChangedDelegate viewChanged;
+        protected OnViewChangedSyncDelegate viewChangedSync;
         protected long listenerId;
         protected bool requireRecompose = false;
         protected int mapWidth=1200, mapHeight=800;
@@ -28,9 +30,10 @@ namespace Vintagestory.GameContent
         List<string> tabnames;
         HashSet<string> renderLayerGroups = new HashSet<string>();
 
-        public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, ICoreClientAPI capi, List<string> tabnames) : base("", capi)
+        public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, OnViewChangedSyncDelegate viewChangedSync, ICoreClientAPI capi, List<string> tabnames) : base("", capi)
         {
             this.viewChanged = viewChanged;
+            this.viewChangedSync = viewChangedSync;
             this.tabnames = tabnames;
 
             fullDialog = ComposeDialog(EnumDialogType.Dialog);
@@ -141,6 +144,7 @@ namespace Vintagestory.GameContent
                 mapElem.chunkViewBoundsBefore = beforeBounds.ToCuboidi().Div(GlobalConstants.ChunkSize);
             }
             mapElem.viewChanged = viewChanged;
+            mapElem.viewChangedSync = viewChangedSync;
             mapElem.ZoomAdd(1, 0.5f, 0.5f);
 
 

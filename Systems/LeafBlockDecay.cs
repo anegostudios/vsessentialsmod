@@ -110,10 +110,11 @@ namespace Vintagestory.GameContent
 
         private void onGameGettingSaved()
         {
+            using FastMemoryStream ms = new ();
             lock (checkDecayLock)
             {
-                sapi.WorldManager.SaveGame.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue));
-                sapi.WorldManager.SaveGame.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue));
+                sapi.WorldManager.SaveGame.StoreData("checkDecayQueue", SerializerUtil.Serialize(checkDecayQueue, ms));
+                sapi.WorldManager.SaveGame.StoreData("performDecayQueue", SerializerUtil.Serialize(performDecayQueue, ms));
             }
         }
 

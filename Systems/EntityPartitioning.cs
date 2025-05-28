@@ -18,20 +18,20 @@ namespace Vintagestory.GameContent
         public EntityPartitionChunk()
         {
             Entities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
-            InanimateEntities = new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength];
         }
 
         public List<Entity> Add(Entity e, int gridIndex)
         {
-            List<Entity> list = e.IsCreature ? FetchOrCreateList(ref Entities[gridIndex]) : FetchOrCreateList(ref InanimateEntities[gridIndex]);
+            List<Entity> list = e.IsCreature ?
+                FetchOrCreateList(ref Entities[gridIndex]) :
+                FetchOrCreateList(ref (InanimateEntities ??= new List<Entity>[EntityPartitioning.partitionsLength * EntityPartitioning.partitionsLength])[gridIndex]);
             list.Add(e);
             return list;
         }
 
         private List<Entity> FetchOrCreateList(ref List<Entity> list)
         {
-            if (list == null) list = new List<Entity>(4);
-            return list;
+            return list ??= new List<Entity>(4);
         }
     }
 
@@ -57,8 +57,8 @@ namespace Vintagestory.GameContent
 
     public class EntityPartitioning : ModSystem, IEntityPartitioning
     {
-        public const int partitionsLength = 8;
-        int gridSizeInBlocks;
+        public const int partitionsLength = 4;
+        private const int gridSizeInBlocks = chunkSize / partitionsLength;
 
         ICoreAPI api;
         ICoreClientAPI capi;
@@ -67,8 +67,6 @@ namespace Vintagestory.GameContent
         public Dictionary<long, EntityPartitionChunk> Partitions = new Dictionary<long, EntityPartitionChunk>();
 
         const int chunkSize = GlobalConstants.ChunkSize;
-        int chunkMapSizeX;
-        int chunkMapSizeZ;
 
 
         /// <summary>
@@ -90,8 +88,6 @@ namespace Vintagestory.GameContent
         public override void Start(ICoreAPI api)
         {
             this.api = api;
-
-            gridSizeInBlocks = chunkSize / partitionsLength;
 
             api.Event.PlayerDimensionChanged += Event_PlayerDimensionChanged;
         }
@@ -117,58 +113,56 @@ namespace Vintagestory.GameContent
 
         private void OnClientTick(float dt)
         {
-            partitionEntities(capi.World.LoadedEntities.Values);
+            PartitionEntities(capi.World.LoadedEntities.Values);
         }
 
         private void OnServerTick(float dt)
         {
-            partitionEntities(((CachingConcurrentDictionary<long, Entity>)sapi.World.LoadedEntities).Values);
+            PartitionEntities(((CachingConcurrentDictionary<long, Entity>)sapi.World.LoadedEntities).Values);
         }
 
-        void partitionEntities(ICollection<Entity> entities)
+        void PartitionEntities(ICollection<Entity> entities)
         {
-            chunkMapSizeX = api.World.BlockAccessor.MapSizeX / chunkSize;
-            chunkMapSizeZ = api.World.BlockAccessor.MapSizeZ / chunkSize;
+            long chunkMapSizeX = api.World.BlockAccessor.MapSizeX / chunkSize;
+            long chunkMapSizeZ = api.World.BlockAccessor.MapSizeZ / chunkSize;
             double largestTouchDistance = 0;
 
+            var Partitions = this.Partitions;
             Partitions.Clear();
 
-            foreach (var val in entities)
+            foreach (var entity in entities)
             {
-                if (val.IsCreature) largestTouchDistance = Math.Max(largestTouchDistance, val.GetTouchDistance());
+                if (entity.IsCreature)
+                {
+                    if (entity.touchDistance > largestTouchDistance) largestTouchDistance = entity.touchDistance;
+                }
 
-                PartitionEntity(val);
+                EntityPos pos = entity.SidedPos;
+
+                int x = (int)pos.X;
+                int z = (int)pos.Z;
+                int gridIndex = (z / gridSizeInBlocks) % partitionsLength * partitionsLength + (x / gridSizeInBlocks) % partitionsLength;
+                if (gridIndex < 0) continue;    // entities could be outside the map edge
+
+                long nowInChunkIndex3d = MapUtil.Index3dL(x / chunkSize, (int)pos.Y / chunkSize, z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
+
+                if (!Partitions.TryGetValue(nowInChunkIndex3d, out EntityPartitionChunk partition))
+                {
+                    Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
+                }
+
+                var list = partition.Add(entity, gridIndex);
+                if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
             }
+
             this.LargestTouchDistance = largestTouchDistance;   // Only write to the field when we finished the operation, there could be 10k entities
-        }
-
-
-        private void PartitionEntity(Entity entity)
-        {
-            EntityPos pos = entity.SidedPos;
-
-            int lgx = ((int)pos.X / gridSizeInBlocks) % partitionsLength;
-            int lgz = ((int)pos.Z / gridSizeInBlocks) % partitionsLength;
-            int gridIndex = lgz * partitionsLength + lgx;
-            if (gridIndex < 0) return;    // entities could be outside the map edge
-
-            long nowInChunkIndex3d = MapUtil.Index3dL((int)pos.X / chunkSize, (int)pos.Y / chunkSize, (int)pos.Z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
-
-            EntityPartitionChunk partition;
-            if (!Partitions.TryGetValue(nowInChunkIndex3d, out partition))
-            {
-                Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
-            }
-
-            var list = partition.Add(entity, gridIndex);
-            if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
         }
 
 
         public void RePartitionPlayer(EntityPlayer entity)
         {
             entity.entityListForPartitioning?.Remove(entity);
-            PartitionEntity(entity);
+            PartitionEntities(new Entity[] { entity });
         }
 
         private void OnSwitchedGameMode(IServerPlayer player)
@@ -205,7 +199,7 @@ namespace Vintagestory.GameContent
 
             if (api.Side == EnumAppSide.Client)
             {
-                WalkEntities(position, radius, (e) =>
+                WalkEntities(position.X, position.Y, position.Z, radius, (e) =>
                 {
                     double distSq = e.Pos.SquareDistanceTo(position);
 
@@ -219,7 +213,7 @@ namespace Vintagestory.GameContent
                 }, onIsInRangePartition, searchType);
             } else
             {
-                WalkEntities(position, radius, (e) =>
+                WalkEntities(position.X, position.Y, position.Z, radius, (e) =>
                 {
                     double distSq = e.ServerPos.SquareDistanceTo(position);
 
@@ -238,27 +232,29 @@ namespace Vintagestory.GameContent
 
 
 
-        public delegate bool RangeTestDelegate(Entity e, Vec3d pos, double radiuSq);
+        public delegate bool RangeTestDelegate(Entity e, double posX, double posY, double posZ, double radiuSq);
 
-        private bool onIsInRangeServer(Entity e, Vec3d pos, double radiusSq)
+        private bool onIsInRangeServer(Entity e, double posX, double posY, double posZ, double radiusSq)
         {
-            double dx = e.ServerPos.X - pos.X;
-            double dy = e.ServerPos.Y - pos.Y;
-            double dz = e.ServerPos.Z - pos.Z;
+            var ePos = e.ServerPos;
+            double dx = ePos.X - posX;
+            double dy = ePos.Y - posY;
+            double dz = ePos.Z - posZ;
 
             return (dx * dx + dy * dy + dz * dz) < radiusSq;
         }
 
-        private bool onIsInRangeClient(Entity e, Vec3d pos, double radiusSq)
+        private bool onIsInRangeClient(Entity e, double posX, double posY, double posZ, double radiusSq)
         {
-            double dx = e.Pos.X - pos.X;
-            double dy = e.Pos.Y - pos.Y;
-            double dz = e.Pos.Z - pos.Z;
+            var ePos = e.Pos;
+            double dx = ePos.X - posX;
+            double dy = ePos.Y - posY;
+            double dz = ePos.Z - posZ;
 
             return (dx * dx + dy * dy + dz * dz) < radiusSq;
         }
 
-        private bool onIsInRangePartition(Entity e, Vec3d pos, double radiusSq)
+        private bool onIsInRangePartition(Entity e, double posX, double posY, double posZ, double radiusSq)
         {
             return true;
         }
@@ -290,10 +286,10 @@ namespace Vintagestory.GameContent
         {
             if (api.Side == EnumAppSide.Client)
             {
-                WalkEntities(centerPos, radius, callback, onIsInRangeClient, searchType);
+                WalkEntities(centerPos.X, centerPos.Y, centerPos.Z, radius, callback, onIsInRangeClient, searchType);
             } else
             {
-                WalkEntities(centerPos, radius, callback, onIsInRangeServer, searchType);
+                WalkEntities(centerPos.X, centerPos.Y, centerPos.Z, radius, callback, onIsInRangeServer, searchType);
             }
         }
 
@@ -305,30 +301,35 @@ namespace Vintagestory.GameContent
         /// <param name="callback"></param>
         public void WalkEntityPartitions(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            WalkEntities(centerPos, radius, callback, onIsInRangePartition, EnumEntitySearchType.Creatures);
+            WalkEntities(centerPos.X, centerPos.Y, centerPos.Z, radius, callback, onIsInRangePartition, EnumEntitySearchType.Creatures);
         }
 
 
-        private void WalkEntities(Vec3d centerPos, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest, EnumEntitySearchType searchType)
+        public void WalkEntities(double centerPosX, double centerPosY, double centerPosZ, double radius, ActionConsumable<Entity> callback, RangeTestDelegate onRangeTest, EnumEntitySearchType searchType)
         {
-            int dimension = (int)centerPos.Y / BlockPos.DimensionBoundary;
-            double trueY = centerPos.Y - dimension * BlockPos.DimensionBoundary;
+            var blockAccessor = api.World.BlockAccessor;
+            long chunkMapSizeX = blockAccessor.MapSizeX / chunkSize;
+            long chunkMapSizeZ = blockAccessor.MapSizeZ / chunkSize;
 
-            int gridXMax = api.World.BlockAccessor.MapSizeX / gridSizeInBlocks - 1;
-            int cyTop = api.World.BlockAccessor.MapSizeY / chunkSize - 1;
-            int gridZMax = api.World.BlockAccessor.MapSizeZ / gridSizeInBlocks - 1;
+            int dimension = (int)centerPosY / BlockPos.DimensionBoundary;
+            double trueY = centerPosY - dimension * BlockPos.DimensionBoundary;
 
-            int mingx = (int)GameMath.Clamp((centerPos.X - radius) / gridSizeInBlocks, 0, gridXMax);
-            int maxgx = (int)GameMath.Clamp((centerPos.X + radius) / gridSizeInBlocks, 0, gridXMax);
+            int gridXMax = blockAccessor.MapSizeX / gridSizeInBlocks - 1;
+            int cyTop = blockAccessor.MapSizeY / chunkSize - 1;
+            int gridZMax = blockAccessor.MapSizeZ / gridSizeInBlocks - 1;
+
+            int mingx = (int)GameMath.Clamp((centerPosX - radius) / gridSizeInBlocks, 0, gridXMax);
+            int maxgx = (int)GameMath.Clamp((centerPosX + radius) / gridSizeInBlocks, 0, gridXMax);
 
             int mincy = (int)GameMath.Clamp((trueY - radius) / chunkSize, 0, cyTop);
             int maxcy = (int)GameMath.Clamp((trueY + radius) / chunkSize, 0, cyTop);
 
-            int mingz = (int)GameMath.Clamp((centerPos.Z - radius) / gridSizeInBlocks, 0, gridZMax);
-            int maxgz = (int)GameMath.Clamp((centerPos.Z + radius) / gridSizeInBlocks, 0, gridZMax);
+            int mingz = (int)GameMath.Clamp((centerPosZ - radius) / gridSizeInBlocks, 0, gridZMax);
+            int maxgz = (int)GameMath.Clamp((centerPosZ + radius) / gridSizeInBlocks, 0, gridZMax);
 
             double radiusSq = radius * radius;
 
+            var Partitions = this.Partitions;
             EntityPartitionChunk partitionChunk = null;
             long index3d;
             long lastIndex3d = -1;
@@ -353,13 +354,13 @@ namespace Vintagestory.GameContent
                         if (partitionChunk == null) continue;
 
                         int index = (gridZ % partitionsLength) * partitionsLength + lgx;
-                        List<Entity> entities = searchType == EnumEntitySearchType.Creatures ? partitionChunk.Entities[index] : partitionChunk.InanimateEntities[index];
+                        List<Entity> entities = searchType == EnumEntitySearchType.Creatures ? partitionChunk.Entities[index] : partitionChunk.InanimateEntities?[index];
                         if (entities == null) continue;
 
                         foreach (Entity entity in entities)
                         {
                             if (entity.Pos.Dimension != dimension) continue;
-                            if (onRangeTest(entity, centerPos, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
+                            if (onRangeTest(entity, centerPosX, centerPosY, centerPosZ, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
                             {
                                 return;
                             }

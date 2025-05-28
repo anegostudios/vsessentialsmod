@@ -77,6 +77,7 @@ namespace Vintagestory.ServerMods.NoObf
             LoadWorldProperties();
             int maxThreads = api.Server.IsDedicated ? 3 : 8;
             int threads = GameMath.Clamp(Environment.ProcessorCount / 2 - 2, 1, maxThreads);
+            if (api.Server.ReducedServerThreads) threads = 1;
 
             itemTypes = new Dictionary<AssetLocation, RegistryObjectType>();
             blockTypes = new Dictionary<AssetLocation, RegistryObjectType>();

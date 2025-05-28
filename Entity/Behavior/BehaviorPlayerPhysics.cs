@@ -36,6 +36,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     public override void Initialize(EntityProperties properties, JsonObject attributes)
     {
         entityPlayer = entity as EntityPlayer;
+        // Note in contrast with BehaviorControlledPhysics we intentionally do not register this as a PhysicsTickable: each player's physics is periodically sent by the player client to the server
 
         Init();
         SetProperties(properties, attributes);
@@ -92,6 +93,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         player ??= entityPlayer.Player;
 
         if (player == null) return;
+        var entity = this.entity;
 
         if (nPos == null)
         {
@@ -99,6 +101,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             nPos.Set(entity.ServerPos);
         }
 
+        var lPos = this.lPos;
         float dtFactor = dt * 60;
 
         lPos.SetFrom(nPos);
@@ -186,18 +189,21 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
     public override void OnGameTick(float deltaTime)
     {
-        base.OnGameTick(deltaTime);
-        // Player physics is called only client side, but we still need to call Block.OnEntityInside
-        if (entity.World.Side == EnumAppSide.Server)
+        // Player physics is called only client side, but we still need to call Block.OnEntityInside and other usual server-side AfterPhysicsTick things
+        if (entity.World is IServerWorldAccessor)
         {
             callOnEntityInside();
+            entity.AfterPhysicsTick?.Invoke();
         }
+
+        // note: no need to invoke AfterPhysicsTick on the client, as client-side it will be called from this behavior's OnRenderFrame() method
     }
 
 
 
     public void SimPhysics(float dt, EntityPos pos)
     {
+        var entity = this.entity;
         if (entity.State != EnumEntityState.Active) return;
         player ??= entityPlayer.Player;
         if (player == null) return;

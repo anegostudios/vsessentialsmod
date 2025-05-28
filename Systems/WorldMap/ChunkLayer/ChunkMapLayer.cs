@@ -16,7 +16,7 @@ namespace Vintagestory.GameContent
 
     public class ReadyMapPiece {
         public int[] Pixels;
-        public Vec2i Cord;
+        public FastVec2i Cord;
     }
 
     // We probably want to just transmit these maps as int[] blockids through the mapchunks (maybe rainheightmap suffices already?)
@@ -65,9 +65,9 @@ namespace Vintagestory.GameContent
         IWorldChunk[] chunksTmp;
 
         object chunksToGenLock = new object();
-        UniqueQueue<Vec2i> chunksToGen = new UniqueQueue<Vec2i>();
-        ConcurrentDictionary<Vec2i, MultiChunkMapComponent> loadedMapData = new ConcurrentDictionary<Vec2i, MultiChunkMapComponent>();
-        HashSet<Vec2i> curVisibleChunks = new HashSet<Vec2i>();
+        UniqueQueue<FastVec2i> chunksToGen = new ();
+        ConcurrentDictionary<FastVec2i, MultiChunkMapComponent> loadedMapData = new ();
+        HashSet<FastVec2i> curVisibleChunks = new ();
 
         ConcurrentQueue<ReadyMapPiece> readyMapPieces = new ConcurrentQueue<ReadyMapPiece>();
 
@@ -147,7 +147,7 @@ namespace Vintagestory.GameContent
 
             lock (chunksToGenLock)
             {
-                foreach (Vec2i cord in curVisibleChunks)
+                foreach (FastVec2i cord in curVisibleChunks)
                 {
                     chunksToGen.Enqueue(cord.Copy());
                 }
@@ -181,25 +181,22 @@ namespace Vintagestory.GameContent
             }
         }
 
-        Vec2i tmpMccoord = new Vec2i();
-        Vec2i tmpCoord = new Vec2i();
-
         private void Event_OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
             lock (chunksToGenLock)
             {
                 if (!mapSink.IsOpened) return;
 
-                tmpMccoord.Set(chunkCoord.X / MultiChunkMapComponent.ChunkLen, chunkCoord.Z / MultiChunkMapComponent.ChunkLen);
-                tmpCoord.Set(chunkCoord.X, chunkCoord.Z);
+                FastVec2i tmpMccoord = new FastVec2i(chunkCoord.X / MultiChunkMapComponent.ChunkLen, chunkCoord.Z / MultiChunkMapComponent.ChunkLen);
+                FastVec2i tmpCoord = new FastVec2i(chunkCoord.X, chunkCoord.Z);
 
                 if (!loadedMapData.ContainsKey(tmpMccoord) && !curVisibleChunks.Contains(tmpCoord)) return;
 
-                chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z));
-                chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z - 1));
-                chunksToGen.Enqueue(new Vec2i(chunkCoord.X - 1, chunkCoord.Z));
-                chunksToGen.Enqueue(new Vec2i(chunkCoord.X, chunkCoord.Z + 1));
-                chunksToGen.Enqueue(new Vec2i(chunkCoord.X + 1, chunkCoord.Z + 1));
+                chunksToGen.Enqueue(new FastVec2i(chunkCoord.X, chunkCoord.Z));
+                chunksToGen.Enqueue(new FastVec2i(chunkCoord.X, chunkCoord.Z - 1));
+                chunksToGen.Enqueue(new FastVec2i(chunkCoord.X - 1, chunkCoord.Z));
+                chunksToGen.Enqueue(new FastVec2i(chunkCoord.X, chunkCoord.Z + 1));
+                chunksToGen.Enqueue(new FastVec2i(chunkCoord.X + 1, chunkCoord.Z + 1));
             }
         }
 
@@ -280,7 +277,7 @@ namespace Vintagestory.GameContent
         float mtThread1secAccum = 0f;
         float genAccum = 0f;
         float diskSaveAccum = 0f;
-        Dictionary<Vec2i, MapPieceDB> toSaveList = new Dictionary<Vec2i, MapPieceDB>();
+        Dictionary<FastVec2i, MapPieceDB> toSaveList = new Dictionary<FastVec2i, MapPieceDB>();
 
         public override void OnOffThreadTick(float dt)
         {
@@ -294,7 +291,7 @@ namespace Vintagestory.GameContent
                 if (mapSink.IsShuttingDown) break;
 
                 quantityToGen--;
-                Vec2i cord;
+                FastVec2i cord;
 
                 lock (chunksToGenLock)
                 {
@@ -304,7 +301,7 @@ namespace Vintagestory.GameContent
 
                 if (!api.World.BlockAccessor.IsValidPos(cord.X * chunksize, 1, cord.Y * chunksize)) continue;
 
-                IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord);
+                IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord.X, cord.Y);
                 if (mc == null)
                 {
                     try
@@ -326,10 +323,8 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                int[] tintedPixels = new int[chunksize * chunksize];;
-
-                bool ok = GenerateChunkImage(cord, mc, ref tintedPixels, colorAccurate);
-                if (!ok)
+                int[] tintedPixels = GenerateChunkImage(cord, mc, colorAccurate);
+                if (tintedPixels == null)
                 {
                     lock (chunksToGenLock)
                     {
@@ -356,15 +351,17 @@ namespace Vintagestory.GameContent
 
         public override void OnTick(float dt)
         {
-            if (readyMapPieces.Count > 0)
+            int count = readyMapPieces.Count;
+            if (count > 0)
             {
-                int q = Math.Min(readyMapPieces.Count, 20);
+                int q = Math.Min(count, 200);
+                List<MultiChunkMapComponent> modified = new();
                 while (q-- > 0)
                 {
                     if (readyMapPieces.TryDequeue(out var mappiece))
                     {
-                        Vec2i mcord = new Vec2i(mappiece.Cord.X / MultiChunkMapComponent.ChunkLen, mappiece.Cord.Y / MultiChunkMapComponent.ChunkLen);
-                        Vec2i baseCord = new Vec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
+                        FastVec2i mcord = new FastVec2i(mappiece.Cord.X / MultiChunkMapComponent.ChunkLen, mappiece.Cord.Y / MultiChunkMapComponent.ChunkLen);
+                        FastVec2i baseCord = new FastVec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
 
                         MultiChunkMapComponent mccomp;
                         if (!loadedMapData.TryGetValue(mcord, out mccomp))
@@ -373,14 +370,17 @@ namespace Vintagestory.GameContent
                         }
 
                         mccomp.setChunk(mappiece.Cord.X - baseCord.X, mappiece.Cord.Y - baseCord.Y, mappiece.Pixels);
+                        modified.Add(mccomp);
                     }
                 }
+
+                foreach (var mccomp in modified) mccomp.FinishSetChunks();
             }
 
             mtThread1secAccum += dt;
             if (mtThread1secAccum > 1)
             {
-                List<Vec2i> toRemove = new List<Vec2i>();
+                List<FastVec2i> toRemove = new List<FastVec2i>();
 
                 foreach (var val in loadedMapData)
                 {
@@ -392,7 +392,7 @@ namespace Vintagestory.GameContent
 
                         if (mcmp.TTL <= 0)
                         {
-                            Vec2i mccord = val.Key;
+                            FastVec2i mccord = val.Key;
                             toRemove.Add(mccord);
                             mcmp.ActuallyDispose();
                         }
@@ -442,14 +442,14 @@ namespace Vintagestory.GameContent
             }
         }
 
-        void loadFromChunkPixels(Vec2i cord, int[] pixels)
+        void loadFromChunkPixels(FastVec2i cord, int[] pixels)
         {
             readyMapPieces.Enqueue(new ReadyMapPiece() { Pixels = pixels, Cord = cord });            
         }
 
 
 
-        public override void OnViewChangedClient(List<Vec2i> nowVisible, List<Vec2i> nowHidden)
+        public override void OnViewChangedClient(List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
         {
             foreach (var val in nowVisible)
             {
@@ -463,17 +463,15 @@ namespace Vintagestory.GameContent
 
             lock (chunksToGenLock)
             {
-                foreach (Vec2i cord in nowVisible)
+                foreach (FastVec2i cord in nowVisible)
                 {
-                    tmpMccoord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
-
-                    MultiChunkMapComponent mcomp;
+                    FastVec2i tmpMccoord = new FastVec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
 
                     int dx = cord.X % MultiChunkMapComponent.ChunkLen;
                     int dz = cord.Y % MultiChunkMapComponent.ChunkLen;
                     if (dx < 0 || dz < 0) continue;
 
-                    if (loadedMapData.TryGetValue(tmpMccoord, out mcomp))
+                    if (loadedMapData.TryGetValue(tmpMccoord, out MultiChunkMapComponent mcomp))
                     {
                         if (mcomp.IsChunkSet(dx, dz)) continue;
                     }
@@ -482,16 +480,13 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            Vec2i mcord = new Vec2i();
-            foreach (Vec2i cord in nowHidden)
+            foreach (FastVec2i cord in nowHidden)
             {
-                MultiChunkMapComponent mc;
-                
-                mcord.Set(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
-
                 if (cord.X < 0 || cord.Y < 0) continue;
 
-                if (loadedMapData.TryGetValue(mcord, out mc))
+                FastVec2i mcord = new FastVec2i(cord.X / MultiChunkMapComponent.ChunkLen, cord.Y / MultiChunkMapComponent.ChunkLen);
+
+                if (loadedMapData.TryGetValue(mcord, out MultiChunkMapComponent mc))
                 {
                     mc.unsetChunk(cord.X % MultiChunkMapComponent.ChunkLen, cord.Y % MultiChunkMapComponent.ChunkLen);
                 }
@@ -505,7 +500,11 @@ namespace Vintagestory.GameContent
             return block.BlockMaterial == EnumBlockMaterial.Liquid || (block.BlockMaterial == EnumBlockMaterial.Ice && block.Code.Path != "glacierice");
         }
 
-        public bool GenerateChunkImage(Vec2i chunkPos, IMapChunk mc, ref int[] tintedImage, bool colorAccurate = false)
+        [ThreadStatic]
+        static byte[] shadowMapReusable;
+        [ThreadStatic]
+        static byte[] shadowMapBlurReusable;
+        public int[] GenerateChunkImage(FastVec2i chunkPos, IMapChunk mc, bool colorAccurate = false)
         {
             BlockPos tmpPos = new BlockPos();
             Vec2i localpos = new Vec2i();
@@ -514,19 +513,25 @@ namespace Vintagestory.GameContent
             for (int cy = 0; cy < chunksTmp.Length; cy++)
             {
                 chunksTmp[cy] = capi.World.BlockAccessor.GetChunk(chunkPos.X, cy, chunkPos.Y);
-                if (chunksTmp[cy] == null || !(chunksTmp[cy] as IClientChunk).LoadedFromServer) return false;
+                if (chunksTmp[cy] == null || !(chunksTmp[cy] as IClientChunk).LoadedFromServer) return null;
             }
 
-            // Prefetch map chunks
-            IMapChunk[] mapChunks = new IMapChunk[]
-            {
-                capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y - 1),
-                capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y),
-                capi.World.BlockAccessor.GetMapChunk(chunkPos.X, chunkPos.Y - 1)            
-            };
+            int[] tintedImage = new int[chunksize * chunksize];
 
-            byte[] shadowMap = new byte[tintedImage.Length];
-            for (int i = 0; i < shadowMap.Length; i++) shadowMap[i] = 128;
+            // Prefetch map chunks
+            IMapChunk chunkNeibNW = capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y - 1);
+            IMapChunk chunkNeibW = capi.World.BlockAccessor.GetMapChunk(chunkPos.X - 1, chunkPos.Y);
+            IMapChunk chunkNeibN = capi.World.BlockAccessor.GetMapChunk(chunkPos.X, chunkPos.Y - 1);
+
+            shadowMapReusable ??= new byte[tintedImage.Length];
+            byte[] shadowMap = shadowMapReusable;
+            for (int i = 0; i < shadowMap.Length; i += 4)
+            {
+                shadowMap[i + 0] = 128;
+                shadowMap[i + 1] = 128;
+                shadowMap[i + 2] = 128;
+                shadowMap[i + 3] = 128;
+            }
 
             for (int i = 0; i < tintedImage.Length; i++)
             {
@@ -551,21 +556,21 @@ namespace Vintagestory.GameContent
                 int rightZ = lz;
 
                 if (topX < 0 && leftZ < 0)
-                {     
-                    leftTopMapChunk = mapChunks[0];
-                    rightTopMapChunk = mapChunks[1];
-                    leftBotMapChunk = mapChunks[2];
+                {
+                    leftTopMapChunk = chunkNeibNW;
+                    rightTopMapChunk = chunkNeibW;
+                    leftBotMapChunk = chunkNeibN;
                 } else
                 {
                     if (topX < 0)
                     {
-                        leftTopMapChunk = mapChunks[1];
-                        rightTopMapChunk = mapChunks[1];
+                        leftTopMapChunk = chunkNeibW;
+                        rightTopMapChunk = chunkNeibW;
                     }
                     if (leftZ < 0)
                     {
-                        leftTopMapChunk = mapChunks[2];
-                        leftBotMapChunk = mapChunks[2];
+                        leftTopMapChunk = chunkNeibN;
+                        leftBotMapChunk = chunkNeibN;
                     }
                 }
 
@@ -578,10 +583,10 @@ namespace Vintagestory.GameContent
 
                 float slopedir = (Math.Sign(leftTop) + Math.Sign(rightTop) + Math.Sign(leftBot));
                 float steepness = Math.Max(Math.Max(Math.Abs(leftTop), Math.Abs(rightTop)), Math.Abs(leftBot));
-                
+
                 int blockId = chunksTmp[cy].UnpackAndReadBlock(MapUtil.Index3d(lx, y % chunksize, lz, chunksize, chunksize), BlockLayersAccess.FluidOrSolid);
                 Block block = api.World.Blocks[blockId];
-                
+
                 if (slopedir > 0) b = 1.08f + Math.Min(0.5f, steepness / 10f) / 1.25f;
                 if (slopedir < 0) b = 0.92f - Math.Min(0.5f, steepness / 10f) / 1.25f;
 
@@ -614,9 +619,9 @@ namespace Vintagestory.GameContent
                     {
                         // Water
                         IWorldChunk lChunk = chunksTmp[cy];
-                        IWorldChunk rChunk = chunksTmp[cy];
-                        IWorldChunk tChunk = chunksTmp[cy];
-                        IWorldChunk bChunk = chunksTmp[cy];
+                        IWorldChunk rChunk = lChunk;
+                        IWorldChunk tChunk = lChunk;
+                        IWorldChunk bChunk = lChunk;
 
                         int leftX = localpos.X - 1;
                         int rightX = localpos.X + 1;
@@ -675,11 +680,18 @@ namespace Vintagestory.GameContent
                 }
 
 
-             
+
             }
 
-            byte[] bla = new byte[shadowMap.Length];
-            for (int i = 0; i < bla.Length; i++) bla[i] = shadowMap[i];
+            shadowMapBlurReusable ??= new byte[shadowMap.Length];
+            byte[] bla = shadowMapBlurReusable;
+            for (int i = 0; i < bla.Length; i+=4)
+            {
+                bla[i + 0] = shadowMap[i + 0];
+                bla[i + 1] = shadowMap[i + 1];
+                bla[i + 2] = shadowMap[i + 2];
+                bla[i + 3] = shadowMap[i + 3];
+            }
 
             BlurTool.Blur(shadowMap, 32, 32, 2);
             float sharpen = 1.0f;
@@ -694,7 +706,7 @@ namespace Vintagestory.GameContent
 
             for (int cy = 0; cy < chunksTmp.Length; cy++) chunksTmp[cy] = null;
 
-            return true;
+            return tintedImage;
         }
 
         private int getColor(Block block, int x, int y1, int y2)

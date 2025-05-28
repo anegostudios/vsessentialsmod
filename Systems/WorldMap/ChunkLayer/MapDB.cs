@@ -73,7 +73,7 @@ public class MapDB : SQLiteDBConnection
         cmd.ExecuteNonQuery();
     }
 
-    public MapPieceDB[] GetMapPieces(List<Vec2i> chunkCoords)
+    public MapPieceDB[] GetMapPieces(List<FastVec2i> chunkCoords)
     {
         var pieces = new MapPieceDB[chunkCoords.Count];
         for (var i = 0; i < chunkCoords.Count; i++)
@@ -92,7 +92,7 @@ public class MapDB : SQLiteDBConnection
         return pieces;
     }
 
-    public MapPieceDB GetMapPiece(Vec2i chunkCoord)
+    public MapPieceDB GetMapPiece(FastVec2i chunkCoord)
     {
         getMapPieceCmd.Parameters["@pos"].Value = chunkCoord.ToChunkIndex();
 
@@ -108,7 +108,7 @@ public class MapDB : SQLiteDBConnection
         return null;
     }
 
-    public void SetMapPieces(Dictionary<Vec2i, MapPieceDB> pieces)
+    public void SetMapPieces(Dictionary<FastVec2i, MapPieceDB> pieces)
     {
         using var transaction = sqliteConn.BeginTransaction();
         setMapPieceCmd.Transaction = transaction;

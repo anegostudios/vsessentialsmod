@@ -55,6 +55,8 @@ namespace Vintagestory.GameContent
         protected InventoryGeneric inv;
         protected GuiDialogCreatureContents dlg;
 
+        public override bool ThreadSafe { get { return true; } }
+
         bool GotCrushed
         {
             get

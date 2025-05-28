@@ -19,6 +19,7 @@ namespace Vintagestory.GameContent
         public Cuboidi chunkViewBoundsBefore = new Cuboidi();
 
         public OnViewChangedDelegate viewChanged;
+        public OnViewChangedSyncDelegate viewChangedSync;
 
         public ICoreClientAPI Api => api;
 
@@ -239,8 +240,8 @@ namespace Vintagestory.GameContent
 
 
 
-        List<Vec2i> nowVisible = new List<Vec2i>();
-        List<Vec2i> nowHidden = new List<Vec2i>();
+        List<FastVec2i> nowVisible = new List<FastVec2i>();
+        List<FastVec2i> nowHidden = new List<FastVec2i>();
 
         public void EnsureMapFullyLoaded()
         {
@@ -252,46 +253,54 @@ namespace Vintagestory.GameContent
             Cuboidi chunkviewBounds = CurrentBlockViewBounds.ToCuboidi();
             chunkviewBounds.Div(chunksize);
 
-            BlockPos cur = new BlockPos().Set(chunkviewBounds.X1, 0, chunkviewBounds.Z1);
+            if (chunkViewBoundsBefore.Equals(chunkviewBounds)) return;
+            viewChangedSync(chunkviewBounds.X1, chunkviewBounds.Z1, chunkviewBounds.X2, chunkviewBounds.Z2);
+            
+            BlockPos cur = new BlockPos();
 
             bool beforeBoundsEmpty = chunkViewBoundsBefore.SizeX == 0 && chunkViewBoundsBefore.SizeZ == 0;
 
-            while (cur.X <= chunkviewBounds.X2)
+            // When panning, add to nowVisible incrementally in the direction we moved before (i.e. starting from the edge of the current visible area)
+            int xDir = (chunkviewBounds.X2 > chunkViewBoundsBefore.X2) ? 1 : -1;
+            int zDir = (chunkviewBounds.Z2 > chunkViewBoundsBefore.Z2) ? 1 : -1;
+            cur.Set(xDir > 0 ? chunkviewBounds.X1 : chunkviewBounds.X2, 0, chunkviewBounds.Z1);
+            while ((xDir > 0 && cur.X <= chunkviewBounds.X2) || (xDir < 0 && cur.X >= chunkviewBounds.X1))
             {
-                cur.Z = chunkviewBounds.Z1;
+                cur.Z = zDir > 0 ? chunkviewBounds.Z1 : chunkviewBounds.Z2;
 
-                while (cur.Z <= chunkviewBounds.Z2)
+                while ((zDir > 0 && cur.Z <= chunkviewBounds.Z2) || (zDir < 0 && cur.Z >= chunkviewBounds.Z1))
                 {
                     if (beforeBoundsEmpty || !chunkViewBoundsBefore.ContainsOrTouches(cur))
                     {
-                        nowVisible.Add(new Vec2i(cur.X, cur.Z));
+                        nowVisible.Add(new FastVec2i(cur.X, cur.Z));
                     }
-                    cur.Z++;
+                    cur.Z += zDir;
                 }
 
-                cur.X++;
+                cur.X += xDir;
             }
 
-
-            cur.Set(chunkViewBoundsBefore.X1, 0, chunkViewBoundsBefore.Z1);
-
-            while (cur.X <= chunkViewBoundsBefore.X2)
+            if (!beforeBoundsEmpty)
             {
-                cur.Z = chunkViewBoundsBefore.Z1;
+                cur.Set(chunkViewBoundsBefore.X1, 0, chunkViewBoundsBefore.Z1);
 
-                while (cur.Z <= chunkViewBoundsBefore.Z2)
+                while (cur.X <= chunkViewBoundsBefore.X2)
                 {
-                    if (!chunkviewBounds.ContainsOrTouches(cur))
+                    cur.Z = chunkViewBoundsBefore.Z1;
+
+                    while (cur.Z <= chunkViewBoundsBefore.Z2)
                     {
-                        nowHidden.Add(new Vec2i(cur.X, cur.Z));
+                        if (!chunkviewBounds.ContainsOrTouches(cur))
+                        {
+                            nowHidden.Add(new FastVec2i(cur.X, cur.Z));
+                        }
+
+                        cur.Z++;
                     }
 
-                    cur.Z++;
+                    cur.X++;
                 }
-
-                cur.X++;
             }
-
 
             chunkViewBoundsBefore = chunkviewBounds.Clone();
 

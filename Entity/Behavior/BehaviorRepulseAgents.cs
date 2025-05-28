@@ -33,6 +33,8 @@ namespace Vintagestory.GameContent
         public override void AfterInitialized(bool onFirstSpawn)
         {
             touchdist = Math.Max(radius.X, radius.Z);
+            entity.BHRepulseAgents = this;                  // These two lines are needed because we do not call the base.AfterInitialized()
+            entity.AfterPhysicsTick = AfterPhysicsTick;
         }
 
         public override void UpdateColSelBoxes()
@@ -50,20 +52,20 @@ namespace Vintagestory.GameContent
 
         public bool Repulse(Entity e, Vec3d pushVector)
         {
-            var ownPosRepulseY = entity.ownPosRepulse.Y + entity.Pos.DimensionYAdjustment;
+            if (e.BHRepulseAgents is not EntityBehaviorRepulseAgents theirRepulse) return true;
+            var ourEntity = this.entity;
+            var radius = this.radius;
 
-            if (e.ownPosRepulse.Y > ownPosRepulseY+radius.Y || ownPosRepulseY > e.ownPosRepulse.Y + e.SelectionBox.Height)
+            double theirRepulseY = theirRepulse.ownPosRepulseY;
+            if (theirRepulseY > ownPosRepulseY + radius.Y || ownPosRepulseY > theirRepulseY + e.SelectionBox.Height)
             {
                 return true;
             }
 
-            var ownPosRepulseX = entity.ownPosRepulse.X;
-            var ownPosRepulseZ = entity.ownPosRepulse.Z;
+            double dx = ownPosRepulseX - theirRepulse.ownPosRepulseX;
+            double dz = ownPosRepulseZ - theirRepulse.ownPosRepulseZ;
 
-            double dx = ownPosRepulseX - e.ownPosRepulse.X;
-            double dz = ownPosRepulseZ - e.ownPosRepulse.Z;
-
-            var yaw = entity.Pos.Yaw;
+            var yaw = ourEntity.ServerPos.Yaw;
 
             double dist = RelDistanceToEllipsoid(dx, dz, radius.X, radius.Z, yaw);
             if (dist >= 1) return true;
@@ -73,7 +75,7 @@ namespace Vintagestory.GameContent
             double py = 0;
             double pz = dz * pushForce;
 
-            var mySize = entity.SelectionBox.Length * entity.SelectionBox.Height;
+            var mySize = ourEntity.SelectionBox.Length * ourEntity.SelectionBox.Height;
 
             float hisSize = e.SelectionBox.Length * e.SelectionBox.Height;
 
@@ -109,17 +111,15 @@ namespace Vintagestory.GameContent
         protected EntityPartitioning partitionUtil;
         protected bool movable = true;
         protected bool ignorePlayers = false;
-        protected EntityAgent selfEagent;
 
         protected double touchdist;
+        public override bool ThreadSafe { get { return true; } }
 
         IClientWorldAccessor cworld;
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
             entity.hasRepulseBehavior = true;
-
-            selfEagent = entity as EntityAgent;
         }
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
@@ -135,31 +135,44 @@ namespace Vintagestory.GameContent
 
         public override void AfterInitialized(bool onFirstSpawn)
         {
-            touchdist = entity.SelectionBox.XSize * 2;
+            touchdist = entity.touchDistance;
+            entity.BHRepulseAgents = this;
+            entity.AfterPhysicsTick = AfterPhysicsTick;
         }
 
-        protected double ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ;
-        protected float mySize;
+        public double ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ;
+        public float mySize;
+        protected int dimension;
 
         public override void UpdateColSelBoxes()
         {
-            touchdist = entity.SelectionBox.XSize * 2;
+            touchdist = entity.touchDistance;
         }
 
+        public void AfterPhysicsTick()
+        {
+            var entity = this.entity;
+            var SidedPos = entity.SidedPos;
+            var CollisionBox = entity.CollisionBox;
+            var OriginCollisionBox = entity.OriginCollisionBox;
+            ownPosRepulseX = SidedPos.X + (CollisionBox.X2 - OriginCollisionBox.X2);
+            ownPosRepulseY = SidedPos.Y + (CollisionBox.Y2 - OriginCollisionBox.Y2);
+            ownPosRepulseZ = SidedPos.Z + (CollisionBox.Z2 - OriginCollisionBox.Z2);
+        }
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable || !movable || (entity is EntityAgent eagent && eagent.MountedOn != null)) return;
+            var entity = this.entity;
+            if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable || !movable) return;
+            EntityAgent eagent = entity as EntityAgent;
+            if (eagent?.MountedOn != null) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
 
+            var pushVector = this.pushVector;
             pushVector.Set(0, 0, 0);
 
-            ownPosRepulseX = entity.ownPosRepulse.X;
-            ownPosRepulseY = entity.ownPosRepulse.Y + entity.Pos.DimensionYAdjustment;
-            ownPosRepulseZ = entity.ownPosRepulse.Z;
-            mySize = entity.SelectionBox.Length * entity.SelectionBox.Height;
-
-            if (selfEagent != null && selfEagent.Controls.Sneak) mySize *= 2;
+            mySize = entity.SelectionBox.Length * entity.SelectionBox.Height * (eagent != null && eagent.Controls.Sneak ? 2 : 1);
+            dimension = entity.ServerPos.Dimension;
 
             if (cworld != null && entity != cworld.Player.Entity)
             {
@@ -167,33 +180,45 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                partitionUtil.WalkEntityPartitions(entity.ownPosRepulse, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity);
+                partitionUtil.WalkEntities(ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity, IsInRangePartition, EnumEntitySearchType.Creatures);
             }
 
-            pushVector.X = GameMath.Clamp(pushVector.X, -3, 3);
-            pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 0.5);
-            pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3);
+            if (pushVector.X == 0 && pushVector.Z == 0 && pushVector.Y == 0) return;
 
-            entity.SidedPos.Motion.Add(pushVector.X / 30, pushVector.Y / 30, pushVector.Z / 30);
+            pushVector.X = GameMath.Clamp(pushVector.X, -3, 3) / 30;
+            pushVector.Y = GameMath.Clamp(pushVector.Y, -3, 0.5) / 30;
+            pushVector.Z = GameMath.Clamp(pushVector.Z, -3, 3) / 30;
+
+            if (cworld != null && entity == cworld.Player.Entity)
+            {
+                // Necessary in 1.20 because currently BehaviorPlayerPhysics clientside calls SimPhysics on entity.SidedPos
+                entity.SidedPos.Motion.Add(pushVector);
+            }
+            else
+            {
+                entity.ServerPos.Motion.Add(pushVector);
+            }
         }
 
 
         private bool WalkEntity(Entity e)
         {
-            if (!e.hasRepulseBehavior || !e.IsInteractable || e == entity || (ignorePlayers && e is EntityPlayer)) return true;
-            if (e is EntityAgent eagent && eagent.MountedOn?.Entity == entity) return true;
+            var ourEntity = this.entity;
+            if (e == ourEntity || (e.BHRepulseAgents is not EntityBehaviorRepulseAgents theirRepulse) || !e.IsInteractable || (ignorePlayers && e is EntityPlayer)) return true;
+            if (e is EntityAgent eagent && eagent.MountedOn?.Entity == ourEntity) return true;
+            if (e.ServerPos.Dimension != dimension) return true;
 
-            if (e.customRepulseBehavior)
+            if (theirRepulse is ICustomRepulseBehavior custom)
             {
-                return e.GetInterface<ICustomRepulseBehavior>().Repulse(entity, pushVector);
+                return custom.Repulse(ourEntity, pushVector);
             }
 
-            double dx = ownPosRepulseX - e.ownPosRepulse.X;
-            double dy = ownPosRepulseY - e.ownPosRepulse.Y;
-            double dz = ownPosRepulseZ - e.ownPosRepulse.Z;
+            double dx = ownPosRepulseX - theirRepulse.ownPosRepulseX;
+            double dy = ownPosRepulseY - theirRepulse.ownPosRepulseY;
+            double dz = ownPosRepulseZ - theirRepulse.ownPosRepulseZ;
 
             double distSq = dx * dx + dy * dy + dz * dz;
-            double minDistSq = entity.touchDistanceSq + e.touchDistanceSq;
+            double minDistSq = ourEntity.touchDistanceSq + e.touchDistanceSq;
 
             if (distSq >= minDistSq) return true;
             
@@ -202,11 +227,11 @@ namespace Vintagestory.GameContent
             double py = dy * pushForce;
             double pz = dz * pushForce;
 
-            float hisSize = e.SelectionBox.Length * e.SelectionBox.Height;
+            float theirSize = e.SelectionBox.Length * e.SelectionBox.Height;
 
-            float pushDiff = GameMath.Clamp(hisSize / mySize, 0, 1);
+            float pushDiff = GameMath.Clamp(theirSize / mySize, 0, 1);
 
-            if (entity.OnGround) pushDiff *= 3;
+            if (ourEntity.OnGround) pushDiff *= 3;
             
             pushVector.Add(px * pushDiff, py * pushDiff * 0.75, pz * pushDiff);
 
@@ -217,6 +242,12 @@ namespace Vintagestory.GameContent
         public override string PropertyName()
         {
             return "repulseagents";
+        }
+
+
+        private bool IsInRangePartition(Entity e, double posX, double posY, double posZ, double radiusSq)
+        {
+            return true;
         }
     }
 }

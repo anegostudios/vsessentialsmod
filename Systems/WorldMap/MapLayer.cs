@@ -67,12 +67,17 @@ namespace Vintagestory.GameContent
 
         }
 
-        public virtual void OnViewChangedClient(List<Vec2i> nowVisible, List<Vec2i> nowHidden)
+        public virtual void OnViewChangedClient(List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
         {
 
         }
 
-        public virtual void OnViewChangedServer(IServerPlayer fromPlayer, List<Vec2i> nowVisible, List<Vec2i> nowHidden)
+        [Obsolete("Receiving the OnViewChangedPacket now calls: OnViewChangedServer(fromPlayer, int x1, int z1, int x2, int z2) but retained in 1.20.10 for backwards compatibility")]
+        public virtual void OnViewChangedServer(IServerPlayer fromPlayer, List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
+        {
+        }
+            
+        public virtual void OnViewChangedServer(IServerPlayer fromPlayer, int x1, int z1, int x2, int z2)
         {
         }
 
@@ -159,7 +164,7 @@ namespace Vintagestory.GameContent
 
     public abstract class RGBMapLayer : MapLayer
     {
-        public Dictionary<Vec2i, int> ChunkTextures = new Dictionary<Vec2i, int>();
+        public Dictionary<FastVec2i, int> ChunkTextures = new Dictionary<FastVec2i, int>();
         public bool Visible;
 
         public RGBMapLayer(ICoreAPI api, IWorldMapManager mapSink) : base(api, mapSink)

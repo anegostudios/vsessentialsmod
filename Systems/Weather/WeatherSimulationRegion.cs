@@ -640,9 +640,14 @@ namespace Vintagestory.GameContent
             OldWePattern.EnsureCloudTileCacheIsFresh(tilePos);
         }
 
-        
 
         public byte[] ToBytes()
+        {
+            using FastMemoryStream ms = new ();
+            return ToBytes(ms);
+        }
+
+        public byte[] ToBytes(FastMemoryStream ms)
         {
             WeatherState state = new WeatherState()
             {
@@ -663,7 +668,7 @@ namespace Vintagestory.GameContent
                 Ringarraycursor = SnowAccumSnapshots.EndPosition
             };
 
-            return SerializerUtil.Serialize(state);
+            return SerializerUtil.Serialize(state, ms);
         }
 
         internal void FromBytes(byte[] data)

@@ -184,8 +184,9 @@ namespace Vintagestory.GameContent
             int regionSize = sapi.WorldManager.RegionSize;
             byte[] data = SerializerUtil.Serialize(state);
 
-            List<IServerPlayer> playersToSend = new List<IServerPlayer>(sapi.World.AllOnlinePlayers.Length);
-            foreach (var plr in sapi.World.AllOnlinePlayers)
+            var allOnlinePlayers = sapi.World.AllOnlinePlayers;
+            List<IServerPlayer> playersToSend = new List<IServerPlayer>(allOnlinePlayers.Length);
+            foreach (var plr in allOnlinePlayers)
             {
                 int plrRegionX = (int)plr.Entity.ServerPos.X / regionSize;
                 int plrRegionZ = (int)plr.Entity.ServerPos.Z / regionSize;
@@ -228,12 +229,13 @@ namespace Vintagestory.GameContent
         {
             HashSet<long> toRemove = new HashSet<long>();
 
+            using API.Datastructures.FastMemoryStream ms = new();
             foreach (var val in weatherSimByMapRegion)
             {
                 IMapRegion mapregion = sapi.WorldManager.GetMapRegion(val.Key);
                 if (mapregion != null)
                 {
-                    mapregion.SetModdata("weatherState", val.Value.ToBytes());
+                    mapregion.SetModdata("weatherState", val.Value.ToBytes(ms));
                 } else
                 {
                     toRemove.Add(val.Key);

@@ -236,12 +236,17 @@ namespace Vintagestory.API.Common
         }
 
 
+        /// <summary>
+        /// Called whenever the entity changes from Active to Inactive state, or vice versa
+        /// </summary>
+        /// <param name="beforeState"></param>
         public virtual void OnStateChanged(EnumEntityState beforeState)
         {
             // Reset timer because otherwise the tasks will always be executed upon entering active state
             if (entity.State == EnumEntityState.Active)
             {
-                cooldownUntilMs = entity.World.ElapsedMilliseconds + Mincooldown + entity.World.Rand.Next(Maxcooldown - Mincooldown);
+                var World = entity.World;
+                cooldownUntilMs = World.ElapsedMilliseconds + Mincooldown + World.Rand.Next(Maxcooldown - Mincooldown);
             }
         }
 

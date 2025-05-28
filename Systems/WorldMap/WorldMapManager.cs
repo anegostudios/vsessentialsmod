@@ -314,7 +314,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, capi, getTabsOrdered());
+            worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, syncViewChange, capi, getTabsOrdered());
             worldMapDlg.OnClosed += () => {
                 foreach (MapLayer layer in MapLayers) layer.OnMapClosedClient();
                 clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = false });
@@ -345,16 +345,19 @@ namespace Vintagestory.GameContent
             return tabs.OrderBy(val => val.Value).Select(val => val.Key).ToList();
         }
 
-        private void onViewChangedClient(List<Vec2i> nowVisible, List<Vec2i> nowHidden)
+        private void onViewChangedClient(List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
         {
+            if (nowHidden.Count > 0) { int aa = 0; }
             foreach (MapLayer layer in MapLayers)
             {
                 layer.OnViewChangedClient(nowVisible, nowHidden);
             }
-
-            clientChannel.SendPacket(new OnViewChangedPacket() { NowVisible = nowVisible, NowHidden = nowHidden });
         }
 
+        private void syncViewChange(int x1, int z1, int x2, int z2)
+        {
+            clientChannel.SendPacket(new OnViewChangedPacket());
+        }
         
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
@@ -423,13 +426,12 @@ namespace Vintagestory.GameContent
 
         private void OnViewChangedServer(IServerPlayer fromPlayer, OnViewChangedPacket networkMessage)
         {
-            List<Vec2i> empty = new List<Vec2i>(0);
-
             foreach (MapLayer layer in MapLayers)
             {
                 if (layer.DataSide == EnumMapAppSide.Client) continue;
 
-                layer.OnViewChangedServer(fromPlayer, networkMessage.NowVisible, empty);
+                var pos = fromPlayer.Entity.ServerPos;
+                layer.OnViewChangedServer(fromPlayer, (int)pos.X - 128, (int)pos.X + 128, (int)pos.Z - 128, (int)pos.Z + 128);
             }
         }
 

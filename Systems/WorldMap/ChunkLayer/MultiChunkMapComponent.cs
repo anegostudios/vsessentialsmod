@@ -8,11 +8,11 @@ namespace Vintagestory.GameContent
 {
     public class MultiChunkMapComponent : MapComponent
     {
-        public static int ChunkLen=3;
+        public const int ChunkLen = 3;
         public static LoadedTexture tmpTexture;
 
         public float renderZ = 50;
-        public Vec2i chunkCoord;
+        public FastVec2i chunkCoord;
         public LoadedTexture Texture;
 
         static int[] emptyPixels;
@@ -41,7 +41,7 @@ namespace Vintagestory.GameContent
         }
 
         public float TTL = MaxTTL;
-        public static float MaxTTL = 15f;
+        public static float MaxTTL = 30f;   // Allow map chunk textures to survive off-screen for 30 seconds before being unloaded; gives more lee-way for players who are panning zoomed-out maps 
 
         public bool IsChunkSet(int dx, int dz)
         {
@@ -50,7 +50,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public MultiChunkMapComponent(ICoreClientAPI capi, Vec2i baseChunkCord) : base(capi)
+        public MultiChunkMapComponent(ICoreClientAPI capi, FastVec2i baseChunkCord) : base(capi)
         {
             this.chunkCoord = baseChunkCord;
 
@@ -64,10 +64,20 @@ namespace Vintagestory.GameContent
         }
 
         
-
+        int[][] pixelsToSet;
         public void setChunk(int dx, int dz, int[] pixels)
         {
             if (dx < 0 || dx >= ChunkLen || dz < 0 || dz >= ChunkLen) throw new ArgumentOutOfRangeException("dx/dz must be within [0," + (ChunkLen - 1) + "]");
+
+            if (pixelsToSet == null) pixelsToSet = new int[ChunkLen * ChunkLen][];
+
+            pixelsToSet[dz * ChunkLen + dx] = pixels;
+            chunkSet[dx, dz] = true;
+        }
+
+        public void FinishSetChunks()
+        {
+            if (pixelsToSet == null) return;
 
             if (tmpTexture == null || tmpTexture.Disposed)
             {
@@ -80,17 +90,24 @@ namespace Vintagestory.GameContent
                 Texture = new LoadedTexture(capi, 0, size, size);
                 capi.Render.LoadOrUpdateTextureFromRgba(emptyPixels, false, 0, ref Texture);
             }
-            
-            capi.Render.LoadOrUpdateTextureFromRgba(pixels, false, 0, ref tmpTexture);
 
-            capi.Render.GlToggleBlend(false);
-            capi.Render.GLDisableDepthTest();
-            capi.Render.RenderTextureIntoTexture(tmpTexture, 0, 0, chunksize, chunksize, Texture, chunksize * dx, chunksize * dz);
+            FrameBufferRef fb = capi.Render.CreateFrameBuffer(Texture);
+            for (int i = 0; i < pixelsToSet.Length; i++)
+            {
+                if (pixelsToSet[i] == null) continue;
+
+                capi.Render.LoadOrUpdateTextureFromRgba(pixelsToSet[i], false, 0, ref tmpTexture);
+
+                capi.Render.GlToggleBlend(false);
+                capi.Render.GLDisableDepthTest();
+                capi.Render.RenderTextureIntoFrameBuffer(0, tmpTexture, 0, 0, chunksize, chunksize, fb, chunksize * (i % ChunkLen), chunksize * (i / ChunkLen));
+            }
+            capi.Render.DestroyFrameBuffer(fb);
 
             capi.Render.BindTexture2d(Texture.TextureId);
             capi.Render.GlGenerateTex2DMipmaps();
 
-            chunkSet[dx, dz] = true;
+            pixelsToSet = null;
         }
 
         public void unsetChunk(int dx, int dz)
@@ -130,14 +147,13 @@ namespace Vintagestory.GameContent
             Texture.Dispose();
         }
 
-        Vec2i tmpVec = new Vec2i();
-        public bool IsVisible(HashSet<Vec2i> curVisibleChunks)
+        public bool IsVisible(HashSet<FastVec2i> curVisibleChunks)
         {
             for (int dx = 0; dx < ChunkLen; dx++)
             {
                 for (int dz = 0; dz < ChunkLen; dz++)
                 {
-                    tmpVec.Set(chunkCoord.X + dx, chunkCoord.Y + dz);
+                    FastVec2i tmpVec = new FastVec2i(chunkCoord.X + dx, chunkCoord.Y + dz);
                     if (curVisibleChunks.Contains(tmpVec)) return true;
                 }
             }

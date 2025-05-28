@@ -101,14 +101,15 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            var ePos = entity.SidedPos;
             var eyeHeight = entity.Swimming ? entity.Properties.SwimmingEyeHeight : entity.Properties.EyeHeight;
-            var eyeHeightMod1 = (entity.SidedPos.Y + eyeHeight) % 1;
+            var eyeHeightMod1 = (ePos.Y + eyeHeight) % 1;
 
             BlockPos pos = new BlockPos(
-                (int)(entity.SidedPos.X + entity.LocalEyePos.X),
-                (int)(entity.SidedPos.Y + eyeHeight),
-                (int)(entity.SidedPos.Z + entity.LocalEyePos.Z),
-                entity.SidedPos.Dimension
+                (int)(ePos.X + entity.LocalEyePos.X),
+                (int)(ePos.Y + eyeHeight),
+                (int)(ePos.Z + entity.LocalEyePos.Z),
+                ePos.Dimension
             );
 
             Block block = entity.World.BlockAccessor.GetBlock(pos, BlockLayersAccess.FluidOrSolid);
@@ -126,7 +127,7 @@ namespace Vintagestory.GameContent
                         tmp.Set(pos.X + box.X1, pos.Y + box.Y1, pos.Z + box.Z1, pos.X + box.X2, pos.Y + box.Y2, pos.Z + box.Z2);
                         box.OmniGrowBy(padding);
 
-                        if (tmp.Contains(entity.ServerPos.X + entity.LocalEyePos.X, entity.ServerPos.Y + entity.LocalEyePos.Y, entity.ServerPos.Z + entity.LocalEyePos.Z))
+                        if (tmp.Contains(ePos.X + entity.LocalEyePos.X, ePos.Y + entity.LocalEyePos.Y, ePos.Z + entity.LocalEyePos.Z))
                         {
                             Cuboidd EntitySuffocationBox = entity.SelectionBox.ToDouble();
 
@@ -174,7 +175,10 @@ namespace Vintagestory.GameContent
                 }
             } else
             {
-                Oxygen = Math.Min(MaxOxygen, Oxygen + deltaTime * 10000);
+                if (Oxygen < maxOxygen)        // rarely true
+                {
+                    Oxygen = Math.Min(maxOxygen, Oxygen + deltaTime * 10000);
+                }
             }
 
             base.OnGameTick(deltaTime);
