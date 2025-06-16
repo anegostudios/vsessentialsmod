@@ -9,6 +9,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     /// <summary>
@@ -57,7 +59,7 @@ namespace Vintagestory.ServerMods.NoObf
             GroundTransform = ModelTransform.ItemDefaultGround();
         }
 
-        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
         {
             ItemType resolvedType = CreateResolvedType<ItemType>(api, fullcode, jobject, deserializer, variant);
 
@@ -73,7 +75,7 @@ namespace Vintagestory.ServerMods.NoObf
             return resolvedType;
         }
 
-        public void InitItem(IClassRegistryAPI instancer, ILogger logger, Item item, OrderedDictionary<string, string> searchReplace)
+        public void InitItem(IClassRegistryAPI instancer, ILogger logger, Item item, API.Datastructures.OrderedDictionary<string, string> searchReplace)
         {
 
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);

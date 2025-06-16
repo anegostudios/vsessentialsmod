@@ -9,6 +9,8 @@ using Vintagestory.API.Server;
 using Vintagestory.Essentials;
 using VSEssentialsMod.Entity.AI.Task;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public enum EnumAccumType
@@ -31,7 +33,7 @@ namespace Vintagestory.GameContent
         public bool whenSourceUntargetable = false;
 
 
-        public string[] NotifyEntityCodes = new string[0];
+        public string[] NotifyEntityCodes = Array.Empty<string>();
         public string[] EntityCodes = null;
 
         public AssetLocation[] EntityCodeLocs = null;
@@ -126,7 +128,7 @@ namespace Vintagestory.GameContent
                     EntityAgent agent = e as EntityAgent;
                     if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == (entity as EntityAgent).HerdId)
                     {
-                        agent.GetBehavior<EntityBehaviorEmotionStates>().TryTriggerState("aggressiveondamage", sourceEntityId);
+                        agent.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState("aggressiveondamage", sourceEntityId);
                     }
 
                     return false;

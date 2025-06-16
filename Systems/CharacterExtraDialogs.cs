@@ -5,6 +5,8 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+
+#nullable disable
 using static Vintagestory.API.Client.GuiDialog;
 
 namespace Vintagestory.GameContent
@@ -191,11 +193,7 @@ namespace Vintagestory.GameContent
                 .WithFixedAlignmentOffset((leftDlgBounds.renderX + leftDlgBounds.OuterWidth + 10) / RuntimeEnv.GUIScale, b / 2)
             ;
 
-            float? health = null;
-            float? maxhealth = null;
-            float? saturation = null;
-            float? maxsaturation = null;
-            getHealthSat(out health, out maxhealth, out saturation, out maxsaturation);
+            getHealthSat(out float? health, out float? maxhealth, out float? saturation, out float? maxsaturation);
 
             float walkspeed = entity.Stats.GetBlended("walkspeed");
             float healingEffectivness = entity.Stats.GetBlended("healingeffectivness");
@@ -346,11 +344,7 @@ namespace Vintagestory.GameContent
             GuiComposer compo = Composers["playerstats"];
             if (compo == null || !IsOpened()) return;
 
-            float? health;
-            float? maxhealth;
-            float? saturation;
-            float? maxsaturation;
-            getHealthSat(out health, out maxhealth, out saturation, out maxsaturation);
+            getHealthSat(out float? health, out float? maxhealth, out float? saturation, out float? maxsaturation);
 
             float walkspeed = entity.Stats.GetBlended("walkspeed");
             float healingEffectivness = entity.Stats.GetBlended("healingeffectivness");

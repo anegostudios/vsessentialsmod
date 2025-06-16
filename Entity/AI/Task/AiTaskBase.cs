@@ -7,6 +7,8 @@ using Vintagestory.GameContent;
 using Vintagestory.API.Util;
 using Vintagestory.Essentials;
 
+#nullable disable
+
 namespace Vintagestory.API.Common
 {
     public abstract class AiTaskBase : IAiTask
@@ -41,9 +43,9 @@ namespace Vintagestory.API.Common
         protected float soundChance=1.01f;
         protected long lastSoundTotalMs;
 
-        protected string whenInEmotionState;
-        protected bool? whenSwimming;
-        protected string whenNotInEmotionState;
+        public string WhenInEmotionState;
+        public bool? WhenSwimming;
+        public string WhenNotInEmotionState;
 
         protected long cooldownUntilMs;
         protected double cooldownUntilTotalHours;
@@ -51,6 +53,10 @@ namespace Vintagestory.API.Common
         protected WaypointsTraverser pathTraverser;
 
         protected EntityBehaviorEmotionStates bhEmo;
+
+        protected double defaultTimeoutSec = 30;
+        protected TimeSpan timeout;
+        protected long executeStartTimeMs;
 
         private string profilerName;
         public string ProfilerName { get => profilerName; set => profilerName = value; }
@@ -81,7 +87,7 @@ namespace Vintagestory.API.Common
             int initialmincooldown = (int)taskConfig["initialMinCoolDown"]?.AsInt(Mincooldown);
             int initialmaxcooldown = (int)taskConfig["initialMaxCoolDown"]?.AsInt(Maxcooldown);
 
-            
+            timeout = TimeSpan.FromSeconds(taskConfig["timeoutSec"]?.AsDouble(defaultTimeoutSec) ?? defaultTimeoutSec);
 
             JsonObject animationCfg = taskConfig["animation"];
             if (animationCfg.Exists)
@@ -115,9 +121,9 @@ namespace Vintagestory.API.Common
                 }
             }
 
-            this.whenSwimming = taskConfig["whenSwimming"]?.AsBool();
-            this.whenInEmotionState = taskConfig["whenInEmotionState"].AsString();
-            this.whenNotInEmotionState = taskConfig["whenNotInEmotionState"].AsString();
+            this.WhenSwimming = taskConfig["whenSwimming"]?.AsBool();
+            this.WhenInEmotionState = taskConfig["whenInEmotionState"].AsString();
+            this.WhenNotInEmotionState = taskConfig["whenNotInEmotionState"].AsString();
 
             JsonObject soundCfg = taskConfig["sound"];
             if (soundCfg.Exists)
@@ -138,9 +144,9 @@ namespace Vintagestory.API.Common
 
         protected bool PreconditionsSatisifed()
         {
-            if (whenSwimming != null && whenSwimming != entity.Swimming) return false;
-            if (whenInEmotionState != null && IsInEmotionState(whenInEmotionState) != true) return false;
-            if (whenNotInEmotionState != null && IsInEmotionState(whenNotInEmotionState) == true) return false;
+            if (WhenSwimming != null && WhenSwimming != entity.Swimming) return false;
+            if (WhenInEmotionState != null && IsInEmotionState(WhenInEmotionState) != true) return false;
+            if (WhenNotInEmotionState != null && IsInEmotionState(WhenNotInEmotionState) == true) return false;
             return true;
         }
 
@@ -205,6 +211,8 @@ namespace Vintagestory.API.Common
                 }
                 
             }
+
+            executeStartTimeMs = entity.World.ElapsedMilliseconds;
         }
 
         public virtual bool ContinueExecute(float dt)
@@ -284,5 +292,7 @@ namespace Vintagestory.API.Common
         {
             return true;
         }
+
+        protected virtual bool timeoutExceeded() => (entity.World.ElapsedMilliseconds - executeStartTimeMs) > timeout.TotalMilliseconds;
     }
 }

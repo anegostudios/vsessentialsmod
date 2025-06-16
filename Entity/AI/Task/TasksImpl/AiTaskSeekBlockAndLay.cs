@@ -5,6 +5,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class AiTaskSeekBlockAndLay : AiTaskBase
@@ -133,8 +135,7 @@ namespace Vintagestory.GameContent
 
                 if ((nestPoi = poi as IAnimalNest)?.IsSuitableFor(entity) == true && !nestPoi.Occupied(entity))
                 {
-                    FailedAttempt attempt;
-                    failedSeekTargets.TryGetValue(nestPoi, out attempt);
+                    failedSeekTargets.TryGetValue(nestPoi, out FailedAttempt attempt);
                     if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000))
                     {
                         return true;
@@ -313,8 +314,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            FailedAttempt attempt = null;
-            failedSeekTargets.TryGetValue(targetPoi, out attempt);
+            failedSeekTargets.TryGetValue(targetPoi, out FailedAttempt attempt);
             if (attempt == null)
             {
                 failedSeekTargets[targetPoi] = attempt = new FailedAttempt();

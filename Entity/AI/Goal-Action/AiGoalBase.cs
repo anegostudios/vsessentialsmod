@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Vintagestory.API.Datastructures;
 using Vintagestory.GameContent;
 
+#nullable disable
+
 namespace Vintagestory.API.Common
 {
     public enum EnumGoalTrigger

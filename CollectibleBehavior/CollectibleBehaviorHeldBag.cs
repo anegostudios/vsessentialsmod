@@ -9,6 +9,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
@@ -341,8 +343,7 @@ namespace Vintagestory.GameContent
             dlg = null;
             if (player != null && wrapperInv != null)
             {
-                (player.Entity.Api as ICoreClientAPI)?.Network.SendPacketClient(wrapperInv.Close(player));
-                player.InventoryManager.CloseInventory(wrapperInv);
+                player.InventoryManager.CloseInventoryAndSync(wrapperInv);
                 entity.World.Logger.Audit("{0} closed held bag inventory {3} on entity {1}/{2}", player?.PlayerName, entity.EntityId, entity.GetName(), wrapperInv.InventoryID);
             }
         }
@@ -411,7 +412,7 @@ namespace Vintagestory.GameContent
             foreach (var uid in wrapperInv.openedByPlayerGUIds)
             {
                 var plr = entity.Api.World.PlayerByUid(uid);
-                plr?.InventoryManager.CloseInventory(wrapperInv);
+                plr?.InventoryManager.CloseInventoryAndSync(wrapperInv);
                 if (plr != null) entity.World.Logger.Audit("{0} closed held bag inventory {3} on entity {1}/{2}", plr?.PlayerName, entity.EntityId, entity.GetName(), wrapperInv.InventoryID);
             }
         }

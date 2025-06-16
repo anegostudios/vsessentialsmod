@@ -5,6 +5,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class HailParticleProps : WeatherParticleProps
@@ -444,16 +446,15 @@ namespace Vintagestory.GameContent
 
             try
             {
-
                 for (int i = 0; i < cnt; i++)
                 {
                     double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
                     double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
 
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
-                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);
-                    if (block.Id == 0) continue;
-                    if (capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid).Id != 0) continue;    // Liquid surface or ice produces no particles
+                    Block block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz);
+                    if (block.BlockId == 0) continue;
+                    if (capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz, BlockLayersAccess.Fluid).BlockId != 0) continue;    // Liquid surface or ice produces no particles
                     if (block.BlockMaterial != EnumBlockMaterial.Sand && block.BlockMaterial != EnumBlockMaterial.Snow)
                     {
                         if (rand.NextDouble() < 0.7f || block.RenderPass == EnumChunkRenderPass.TopSoil) continue;

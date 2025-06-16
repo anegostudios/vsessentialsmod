@@ -4,6 +4,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public delegate LoadedTexture NameTagRendererDelegate(ICoreClientAPI capi, Entity forEntity);
@@ -54,12 +56,10 @@ namespace Vintagestory.GameContent
             if (entitlements?.Count > 0)
             {
                 Entitlement ent = entitlements[0];
-                double[] color = null;
-                
-                if (GlobalConstants.playerColorByEntitlement.TryGetValue(ent.Code, out color))
+
+                if (GlobalConstants.playerColorByEntitlement.TryGetValue(ent.Code, out double[] color))
                 {
-                    TextBackground bg;
-                    GlobalConstants.playerTagBackgroundByEntitlement.TryGetValue(ent.Code, out bg);
+                    GlobalConstants.playerTagBackgroundByEntitlement.TryGetValue(ent.Code, out TextBackground bg);
                     DefaultEntitlementTagRenderer var = new DefaultEntitlementTagRenderer() { color = color, background = bg };
 
                     return var.renderTag;

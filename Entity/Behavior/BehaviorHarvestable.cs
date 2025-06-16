@@ -11,6 +11,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class ModSystemSyncHarvestableDropsToClient : ModSystem
@@ -126,7 +128,10 @@ namespace Vintagestory.GameContent
 
                 if (deathByEntityCode != null && !entity.WatchedAttributes.HasAttribute("deathByPlayer"))
                 {
-                    return 0.4f;
+                    EntityProperties type = Api.World.GetEntityType(new AssetLocation(deathByEntityCode));
+                    float mult = type?.Attributes?["deathByMultiplier"]?.AsFloat(0.4f) ?? 0.4f;
+
+                    return mult;
                 }
 
                 return 1f;
@@ -158,6 +163,14 @@ namespace Vintagestory.GameContent
 
         public override InventoryBase Inventory => this.inv;
         public override string InventoryClassName => "harvestableInv";
+
+
+        public bool DropsGenerated
+        {
+            get { return entity.WatchedAttributes.GetBool("dropsgenerated"); }
+            set { entity.WatchedAttributes.SetBool("dropsgenerated", value); }
+        }
+
 
         public EntityBehaviorHarvestable(Entity entity) : base(entity)
         {
@@ -373,41 +386,40 @@ namespace Vintagestory.GameContent
                 handled = EnumHandling.PreventSubsequent;
                 return;
             }
-
-            // This seems useless? I cant find any place in the code that would generate a packed of id 1012
-            /*if (packetid == 1012)
-            {
-                if (!IsHarvested)
-                {
-                    entity.WatchedAttributes.MarkPathDirty("harvested");
-                } else
-                {
-                    player.InventoryManager.OpenInventory(inv);
-                }
-
-            }*/
         }
 
 
         public void SetHarvested(IPlayer byPlayer, float dropQuantityMultiplier = 1f)
         {
             if (entity.WatchedAttributes.GetBool("harvested", false)) return;
-
             entity.WatchedAttributes.SetBool("harvested", true);
+            GenerateDrops(byPlayer);
+        }
 
+        public override void OnEntityDeath(DamageSource damageSourceForDeath)
+        {
+            base.OnEntityDeath(damageSourceForDeath);
+
+            if (DropsGenerated && inv.Empty && entity.GetBehavior<EntityBehaviorDeadDecay>() != null)
+            {
+                entity.WatchedAttributes.SetBool("harvested", true);
+            }
+        }
+
+        public void GenerateDrops(IPlayer byPlayer)
+        {
             if (entity.World.Side == EnumAppSide.Client) return;
 
+            if (DropsGenerated) return;
+            DropsGenerated = true;
 
+
+            float dropQuantityMultiplier = 1;
             if (entity.Properties.Attributes?["isMechanical"].AsBool() != true)
             {
                 dropQuantityMultiplier *= byPlayer.Entity.Stats.GetBlended("animalLootDropRate");
             }
 
-            generateDrops(byPlayer, dropQuantityMultiplier);
-        }
-
-        private void generateDrops(IPlayer byPlayer, float dropQuantityMultiplier)
-        {
             List<ItemStack> todrop = new List<ItemStack>();
 
             for (int i = 0; i < jsonDrops.Length; i++)
@@ -424,17 +436,15 @@ namespace Vintagestory.GameContent
                     extraMul = byPlayer?.Entity?.Stats.GetBlended(dstack.DropModbyStat) ?? 0;
                 }
 
-                ItemStack stack = dstack.GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier * extraMul);
-
-                if (stack == null) continue;
-
-                if (stack.Collectible.NutritionProps != null || stack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.NutritionProps != null)
+                if (dstack.ResolvedItemstack.Collectible.NutritionProps != null || dstack.ResolvedItemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.NutritionProps != null)
                 {
-                    float weightedStackSize = stack.StackSize * AnimalWeight;
-                    stack.StackSize = GameMath.RoundRandom(entity.World.Rand, weightedStackSize);
+                    // Adjust the multiplier by animal weight beforehand so that we can set an offset in NatFloat
+                    extraMul *= AnimalWeight;
                 }
 
-                if (stack.StackSize == 0) continue;
+                ItemStack stack = dstack.GetNextItemStack(this.dropQuantityMultiplier * dropQuantityMultiplier * extraMul);
+
+                if (stack == null || stack.StackSize == 0) continue;
 
                 if (stack.Collectible is IResolvableCollectible irc)
                 {
@@ -443,6 +453,13 @@ namespace Vintagestory.GameContent
                     stack = slot.Itemstack;
                 }
 
+                while (stack.StackSize > stack.Collectible.MaxStackSize )
+                {
+                    ItemStack overflow = stack.GetEmptyClone();
+                    overflow.StackSize = stack.Collectible.MaxStackSize;
+                    stack.StackSize -= stack.Collectible.MaxStackSize;
+                    todrop.Add(overflow);
+                }
                 todrop.Add(stack);
                 if (dstack.LastDrop) break;
             }

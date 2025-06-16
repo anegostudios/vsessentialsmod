@@ -6,6 +6,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class AiTaskStayCloseToEntity : AiTaskBase
@@ -233,7 +235,7 @@ namespace Vintagestory.GameContent
             // tryTeleport();
         }
 
-        protected void OnGoalReached()
+        protected virtual void OnGoalReached()
         {
         }
     }

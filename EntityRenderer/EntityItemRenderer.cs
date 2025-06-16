@@ -5,33 +5,10 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
-    public class ModSystemDormancyStateChecker : ModSystem
-    {
-        ICoreAPI api;
-
-        public override bool ShouldLoad(EnumAppSide forSide) => true;
-        public override void Start(ICoreAPI api)
-        {
-            //api.Event.RegisterGameTickListener(on1stick, 1000);
-
-            this.api = api;
-        }
-
-        private void on1stick(float dt)
-        {
-            // if (api.Side == EnumAppSide.Client)
-            // {
-            //     EntityBehaviorPassivePhysics.UsePhysicsDormancyStateClient = (api as ICoreClientAPI).World.LoadedEntities.Count > 1500;
-            // }
-            // else
-            // {
-            //     EntityBehaviorPassivePhysics.UsePhysicsDormancyStateServer = (api as ICoreServerAPI).World.LoadedEntities.Count > 1500;
-            // }
-        }
-    }
-
     public class ModSystemItemRendererOptimizer : ModSystem, IRenderer
     {
         int itemCount;

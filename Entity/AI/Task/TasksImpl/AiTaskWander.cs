@@ -3,6 +3,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Datastructures;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class AiTaskWander : AiTaskBase
@@ -332,12 +334,22 @@ namespace Vintagestory.GameContent
             }
 
             done = false;
-            bool ok = pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
+            pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
+
+            tryStartAnimAgain = 0.1f;
         }
+
+        float tryStartAnimAgain = 0.1f;
 
         public override bool ContinueExecute(float dt)
         {
             base.ContinueExecute(dt);
+
+            // We have a bug with the animation sync server->client where the wander right after spawn is not synced. this is a workaround
+            if (animMeta != null && tryStartAnimAgain > 0 && (tryStartAnimAgain -= dt) <= 0) 
+            {
+                entity.AnimManager.StartAnimation(animMeta);
+            }
 
             /*entity.World.SpawnParticles(
                 1, 

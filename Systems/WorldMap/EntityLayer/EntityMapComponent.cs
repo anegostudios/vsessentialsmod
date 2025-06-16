@@ -5,6 +5,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityMapComponent : MapComponent
@@ -29,7 +31,7 @@ namespace Vintagestory.GameContent
         public override void Render(GuiElementMap map, float dt)
         {
             var player = (entity as EntityPlayer)?.Player;
-            if (player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true) return;
+            if (player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true && capi.World.Player != player) return;
             if ((entity as EntityPlayer)?.Controls.Sneak == true && player != capi.World.Player) return;
 
             map.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);

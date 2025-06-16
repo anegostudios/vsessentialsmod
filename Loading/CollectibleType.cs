@@ -9,6 +9,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     /// <summary>
@@ -25,7 +27,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// Modifiers that can alter the behavior of the item or block, mostly for held interactions.
         /// </summary>
         [JsonProperty]
-        public CollectibleBehaviorType[] Behaviors = new CollectibleBehaviorType[0];
+        public CollectibleBehaviorType[] Behaviors = Array.Empty<CollectibleBehaviorType>();
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>[0, 0, 0]</jsondefault>-->

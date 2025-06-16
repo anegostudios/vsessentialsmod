@@ -12,6 +12,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     /// <summary>
@@ -114,14 +116,6 @@ namespace Vintagestory.ServerMods.NoObf
         /// </summary>
         [JsonProperty]
         public bool CanClimbAnywhere = false;
-
-        /// <summary>
-        /// <!--<jsonoptional>Obsolete</jsonoptional>-->
-        /// Obsolete. Will be removed in 1.20. Set FallDamageMultiplier to 0.0 for no fall damage.
-        /// </summary>
-        [Obsolete("This will be removed in 1.20. Instead set FallDamageMultiplier to 0.0 for no fall damage")]
-        [JsonProperty]
-        public bool FallDamage = true;
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>1</jsondefault>-->
@@ -230,7 +224,7 @@ namespace Vintagestory.ServerMods.NoObf
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
-                Variant = new OrderedDictionary<string, string>(Variant),
+                Variant = new (Variant),
                 Class = Class,
                 Habitat = Habitat,
                 CollisionBoxSize = CollisionBoxSize,
@@ -240,7 +234,7 @@ namespace Vintagestory.ServerMods.NoObf
                 Weight = Weight,
                 CanClimb = CanClimb,
                 CanClimbAnywhere = CanClimbAnywhere,
-                FallDamage = FallDamage && FallDamageMultiplier > 0,
+                FallDamage = FallDamageMultiplier > 0,
                 FallDamageMultiplier = FallDamageMultiplier,
                 ClimbTouchDistance = ClimbTouchDistance,
                 RotateModelOnClimb = RotateModelOnClimb,
@@ -283,7 +277,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
         {
             return CreateResolvedType<EntityType>(api, fullcode, jobject, deserializer, variant);
         }

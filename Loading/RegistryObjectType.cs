@@ -11,6 +11,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
 
@@ -74,7 +76,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// <summary>
         /// Variant values as resolved from blocktype/itemtype or entitytype
         /// </summary>
-        public OrderedDictionary<string, string> Variant = new OrderedDictionary<string, string>();
+        public API.Datastructures.OrderedDictionary<string, string> Variant = new ();
 
         /// <summary>
         /// <!--<jsonoptional>Unused</jsonoptional><jsondefault>None</jsondefault>-->
@@ -199,11 +201,10 @@ namespace Vintagestory.ServerMods.NoObf
                 throw new Exception("Asset has no valid code property. Will ignore. Exception thrown:-", e);
             }
 
-            JToken property;
 
             Code = location;
 
-            if (entityTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out property))
+            if (entityTypeObject.TryGetValue("variantgroups", StringComparison.InvariantCultureIgnoreCase, out JToken property))
             {
                 VariantGroups = property.ToObject<RegistryObjectVariantGroup[]>();
                 entityTypeObject.Remove(property.Path);
@@ -264,12 +265,12 @@ namespace Vintagestory.ServerMods.NoObf
 
         }
 
-        internal virtual RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        internal virtual RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
         {
             return this;
         }
 
-        protected T CreateResolvedType<T>(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant) where T : RegistryObjectType, new()
+        protected T CreateResolvedType<T>(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant) where T : RegistryObjectType, new()
         {
             T resolvedType = new T()
             {
@@ -305,7 +306,7 @@ namespace Vintagestory.ServerMods.NoObf
             return resolvedType;
         }
 
-        protected static void solveByType(JToken json, string codePath, OrderedDictionary<string, string> searchReplace)
+        protected static void solveByType(JToken json, string codePath, API.Datastructures.OrderedDictionary<string, string> searchReplace)
         {
             if (json is JObject jsonObj)
             {
@@ -318,6 +319,10 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         string trueKey = entry.Key.Substring(0, entry.Key.Length - "byType".Length);
                         var jobj = entry.Value as JObject;
+                        if (jobj == null)
+                        {
+                            throw new FormatException("Invalid value at key: " + entry.Key);
+                        }
                         foreach (var byTypeProperty in jobj)
                         {
                             if (WildcardUtil.Match(byTypeProperty.Key, codePath))

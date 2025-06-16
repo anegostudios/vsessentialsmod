@@ -4,6 +4,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorDrunkTyping : EntityBehavior
@@ -110,6 +112,7 @@ namespace Vintagestory.GameContent
                         break;
                     // Add random letter left/right from the last pressed key
                     case 5:
+                    case 6:
                         if (text.Length > 0)
                         {
                             string[] keybLayout = new string[] { "1234567890-", "qwertyuiop[", "asdfghjkl;", "zxcvbnm,." };
@@ -121,7 +124,7 @@ namespace Vintagestory.GameContent
                                 if (index >= 0)
                                 {
                                     int rndoffset = rnd.Next(2) * 2 - 1;
-                                    text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length)];
+                                    text = text + keybLayout[i][GameMath.Clamp(index + rndoffset, 0, keybLayout[i].Length - 1)];
                                     caretPos++;
                                 }
                             }

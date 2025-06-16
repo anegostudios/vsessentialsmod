@@ -7,6 +7,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public enum EnumAttackPattern
@@ -102,11 +104,11 @@ namespace Vintagestory.GameContent
             if (noEntityCodes && (attackedByEntity == null || !retaliateAttacks)) return false;
 
             // React immediately on hurt, otherwise only 1/10 chance of execution
-            if (rand.NextDouble() > executionChance && (whenInEmotionState == null || IsInEmotionState(whenInEmotionState) != true) && !RecentlyAttacked) return false;
+            if (rand.NextDouble() > executionChance && (WhenInEmotionState == null || IsInEmotionState(WhenInEmotionState) != true) && !RecentlyAttacked) return false;
 
             if (!PreconditionsSatisifed()) return false;
 
-            if (whenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
+            if (WhenInEmotionState == null && rand.NextDouble() > 0.5f) return false;
             if (lastSearchTotalMs + searchWaitMs > entity.World.ElapsedMilliseconds) return false;
 
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
@@ -125,7 +127,7 @@ namespace Vintagestory.GameContent
             }
 
             NowSeekRange = getSeekRange();
-            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange, true))
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange, true) && !entity.ToleratesDamageFrom(attackedByEntity))
             {
                 targetEntity = attackedByEntity;
                 targetPos = targetEntity.ServerPos.XYZ;
@@ -138,7 +140,7 @@ namespace Vintagestory.GameContent
 
                 ownPos.SetWithDimension(entity.ServerPos);
                 targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange, (e) => {
-                    if (fullyTamed && isNonAttackingPlayer(e)) return false;
+                    if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
                     return IsTargetableEntity(e, NowSeekRange);
                 }, EnumEntitySearchType.Creatures);
 
@@ -183,7 +185,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange * 1.5f, true))
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, NowSeekRange * 1.5f, true) && !entity.ToleratesDamageFrom(attackedByEntity))
             {
                 nowRange *= 1.5f;
             }

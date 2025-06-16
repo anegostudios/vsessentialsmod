@@ -2,6 +2,8 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods
 {
     public class LoadColorMaps : ModSystem

@@ -9,12 +9,14 @@ using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using VSEssentialsMod.Entity.AI.Task;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
-        protected string[] targetEntityCodesBeginsWith = new string[0];
+        protected string[] targetEntityCodesBeginsWith = Array.Empty<string>();
         protected string[] targetEntityCodesExact;
 
         protected AssetLocation[] skipEntityCodes;
@@ -154,7 +156,7 @@ namespace Vintagestory.GameContent
             return false;
         }
 
-        private bool IsTargetEntity(string testPath)
+        protected bool IsTargetEntity(string testPath)
         {
             if (targetEntityFirstLetters.Length == 0) return true;     // target everything (there was a universal wildcard "*", for example BeeMob)
             if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
@@ -335,7 +337,7 @@ namespace Vintagestory.GameContent
 
         public Entity[] GetEntitiesAround(Vec3d position, float horRange, float vertRange, ActionConsumable<Entity> matches = null)
         {
-            return new Entity[0];
+            return Array.Empty<Entity>();
         }
 
         public Entity GetGuardedEntity()
@@ -360,7 +362,7 @@ namespace Vintagestory.GameContent
         }
         protected bool isNonAttackingPlayer(Entity e)
         {
-            return (attackedByEntity == null || attackedByEntity != null && attackedByEntity.EntityId != e.EntityId) && e is EntityPlayer;
+            return (attackedByEntity == null || (attackedByEntity != null && attackedByEntity.EntityId != e.EntityId)) && e is EntityPlayer;
         }
 
 

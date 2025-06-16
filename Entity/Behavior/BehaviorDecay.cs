@@ -3,6 +3,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorDeadDecay : EntityBehavior
@@ -59,6 +61,15 @@ namespace Vintagestory.GameContent
             if ((entity as EntityAgent).AllowDespawn) return;
 
             (entity as EntityAgent).AllowDespawn = true;
+
+            if (entity.DespawnReason == null)
+            {
+                entity.DespawnReason = new EntityDespawnData()
+                {
+                    DamageSourceForDeath = null,
+                    Reason = EnumDespawnReason.Death
+                };
+            }
 
             if (typeAttributes["decayedBlock"].Exists)
             {

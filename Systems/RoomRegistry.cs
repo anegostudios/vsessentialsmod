@@ -7,6 +7,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class Room
@@ -281,13 +283,12 @@ namespace Vintagestory.GameContent
         private void Event_ChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
         {
             long index3d = MapUtil.Index3dL(chunkCoord.X, chunkCoord.Y, chunkCoord.Z, chunkMapSizeX, chunkMapSizeZ);
-            ChunkRooms chunkrooms;
             Cuboidi cuboid;
             FastSetOfLongs set = new FastSetOfLongs();
             set.Add(index3d);
             lock (roomsByChunkIndexLock)
             {
-                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+                roomsByChunkIndex.TryGetValue(index3d, out ChunkRooms chunkrooms);
                 if (chunkrooms != null)
                 {
                     set.Add(index3d);

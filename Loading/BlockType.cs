@@ -11,6 +11,8 @@ using Vintagestory.API.Util;
 using Vintagestory.API.Server;
 using Vintagestory.API;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     /// <summary>
@@ -65,7 +67,7 @@ namespace Vintagestory.ServerMods.NoObf
             MaxStackSize = 64;
         }
 
-        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant)
+        internal override RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
         {
             return CreateResolvedType<BlockType>(api, fullcode, jobject, deserializer, variant);
         }
@@ -83,7 +85,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// This array adds modifiers that can alter the behavior of a block entity defined in <see cref="EntityClass"/>.
         /// </summary>
         [JsonProperty]
-        public BlockEntityBehaviorType[] EntityBehaviors = new BlockEntityBehaviorType[0];
+        public BlockEntityBehaviorType[] EntityBehaviors = Array.Empty<BlockEntityBehaviorType>();
 
         /// <summary>
         /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>JSON</jsondefault>-->
@@ -463,7 +465,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.Class = this.Class;
             block.LiquidSelectable = this.LiquidSelectable;
             block.LiquidCode = this.LiquidCode;
-            block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? new BlockEntityBehaviorType[0];
+            block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? Array.Empty<BlockEntityBehaviorType>();
 
             if (block.EntityClass == null && block.BlockEntityBehaviors != null && block.BlockEntityBehaviors.Length > 0)
             {
@@ -664,14 +666,20 @@ namespace Vintagestory.ServerMods.NoObf
             ResolveStringBoolDictFaces(targetDict);
         }
 
-        public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, OrderedDictionary<string, string> searchReplace)
+        [ThreadStatic]
+        private static List<BlockBehavior> reusableBehaviorList;
+        [ThreadStatic]
+        private static List<CollectibleBehavior> reusableCollectibleBehaviorList;
+        public void InitBlock(IClassRegistryAPI instancer, ILogger logger, Block block, API.Datastructures.OrderedDictionary<string, string> searchReplace)
         {
             CollectibleBehaviorType[] behaviorTypes = Behaviors;
 
             if (behaviorTypes != null)
             {
-                List<BlockBehavior> blockbehaviors = new List<BlockBehavior>();
-                List<CollectibleBehavior> collbehaviors = new List<CollectibleBehavior>();
+                List<BlockBehavior> blockbehaviors = reusableBehaviorList ??= new();
+                List<CollectibleBehavior> collbehaviors = reusableCollectibleBehaviorList ??= new();
+                blockbehaviors.Clear();
+                collbehaviors.Clear();
 
                 for (int i = 0; i < behaviorTypes.Length; i++)
                 {
@@ -714,6 +722,8 @@ namespace Vintagestory.ServerMods.NoObf
 
                 block.BlockBehaviors = blockbehaviors.ToArray();
                 block.CollectibleBehaviors = collbehaviors.ToArray();
+                blockbehaviors.Clear();
+                collbehaviors.Clear();
             }
 
             if (CropProps != null)
@@ -760,8 +770,8 @@ namespace Vintagestory.ServerMods.NoObf
 
             block.CreativeInventoryTabs = GetCreativeTabs(block.Code, CreativeInventory, searchReplace);
 
-            if (SideOpaque != null && SideOpaque.Count > 0) block.SideOpaque = new bool[] { true, true, true, true, true, true };  // Without this, the DefaultSideOpaque would be modified
-            if (SideAo != null && SideAo.Count > 0) block.SideAo = new bool[] { true, true, true, true, true, true };  // Without this, the DefaultSideAo would be modified
+            if (SideOpaque != null && SideOpaque.Count > 0) block.SideOpaque = new SmallBoolArray(SmallBoolArray.OnAllSides);
+            if (SideAo != null && SideAo.Count > 0) block.SideAo = new SmallBoolArray(SmallBoolArray.OnAllSides);
             foreach (BlockFacing facing in BlockFacing.ALLFACES)
             {
                 if (SideAo != null && SideAo.TryGetValue(facing.Code, out bool sideAoValue))
@@ -792,9 +802,12 @@ namespace Vintagestory.ServerMods.NoObf
             }
         }
 
-        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, OrderedDictionary<string, string> searchReplace)
+        [ThreadStatic]
+        private static List<string> reusableStringList;
+        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, API.Datastructures.OrderedDictionary<string, string> searchReplace)
         {
-            List<string> tabs = new List<string>();
+            List<string> tabs = reusableStringList ??= new();
+            tabs.Clear();
 
             foreach (var val in CreativeInventory)
             {
@@ -806,12 +819,14 @@ namespace Vintagestory.ServerMods.NoObf
                     //if (WildCardMatch(blockCode, code.Path))
                     {
                         string tabCode = val.Key;
-                        tabs.Add(tabCode);
+                        tabs.Add(String.Intern(tabCode));
                     }
                 }
             }
 
-            return tabs.ToArray();
+            string[] result = tabs.ToArray();
+            tabs.Clear();
+            return result;
         }
 
         void ResolveStringBoolDictFaces(Dictionary<string, bool> stringBoolDict)

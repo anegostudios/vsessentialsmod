@@ -5,6 +5,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public interface ICustomDialogPositioning
@@ -97,7 +99,7 @@ namespace Vintagestory.GameContent
         {
             base.OnGuiClosed();
 
-            capi.Network.SendPacketClient(capi.World.Player.InventoryManager.CloseInventory(inv));
+            capi.World.Player.InventoryManager.CloseInventoryAndSync(inv);
             SingleComposer.GetSlotGrid("slots").OnGuiClosed(capi);
 
             FreePos("smallblockgui", screenPos);

@@ -4,6 +4,8 @@ using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods
 {
     public class JsonExport : ModSystem

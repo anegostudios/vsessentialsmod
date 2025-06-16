@@ -2,23 +2,25 @@
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
     public class AiTaskUseInventory : AiTaskBase
     {
-        AssetLocation useSound;
+        protected AssetLocation useSound;
 
-        float useTime = 1f;
+        protected float useTime = 1f;
 
-        float useTimeNow = 0;
-        bool soundPlayed = false;
-        bool doConsumePortion = true;
+        protected float useTimeNow = 0;
+        protected bool soundPlayed = false;
+        protected bool doConsumePortion = true;
 
-        HashSet<EnumFoodCategory> eatItemCategories = new HashSet<EnumFoodCategory>();
-        HashSet<AssetLocation> eatItemCodes = new HashSet<AssetLocation>();
+        protected HashSet<EnumFoodCategory> eatItemCategories = new HashSet<EnumFoodCategory>();
+        protected HashSet<AssetLocation> eatItemCodes = new HashSet<AssetLocation>();
 
-        bool isEdible;
+        protected bool isEdible;
 
 
         public AiTaskUseInventory(EntityAgent entity) : base(entity)
@@ -39,12 +41,12 @@ namespace Vintagestory.GameContent
 
             useTime = taskConfig["useTime"].AsFloat(1.5f);
 
-            foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(new EnumFoodCategory[0]))
+            foreach (var val in taskConfig["eatItemCategories"].AsArray<EnumFoodCategory>(System.Array.Empty<EnumFoodCategory>()))
             {
                 eatItemCategories.Add(val);
             }
 
-            foreach (var val in taskConfig["eatItemCodes"].AsArray(new AssetLocation[0]))
+            foreach (var val in taskConfig["eatItemCodes"].AsArray(System.Array.Empty<AssetLocation>()))
             {
                 eatItemCodes.Add(val);
             }

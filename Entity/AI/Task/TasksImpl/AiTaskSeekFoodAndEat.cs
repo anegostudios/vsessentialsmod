@@ -6,6 +6,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     class FailedAttempt
@@ -28,7 +30,7 @@ namespace Vintagestory.GameContent
         bool soundPlayed = false;
         bool doConsumePortion = true;
         bool eatAnimStarted = false;
-        bool playEatAnimForLooseItems = true;
+        
 
         bool eatLooseItems;
         float quantityEaten;
@@ -65,7 +67,7 @@ namespace Vintagestory.GameContent
             eatTime = taskConfig["eatTime"].AsFloat(1.5f);
             doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
             eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
-            playEatAnimForLooseItems = taskConfig["playEatAnimForLooseItems"].AsBool(true);
+            
             Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>();
             if (Diet == null) api.Logger.Warning("Creature " + entity.Code.ToShortString() + " has SeekFoodAndEat task but no Diet specified");
 
@@ -134,8 +136,7 @@ namespace Vintagestory.GameContent
 
                     if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity, Diet) == true)
                     {
-                        FailedAttempt attempt;
-                        failedSeekTargets.TryGetValue(foodPoi, out attempt);
+                        failedSeekTargets.TryGetValue(foodPoi, out FailedAttempt attempt);
                         if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000))
                         {
                             return true;
@@ -151,20 +152,11 @@ namespace Vintagestory.GameContent
 
         private bool suitableFoodSource(ItemStack itemStack)
         {
-            EnumFoodCategory? cat = itemStack?.Collectible?.NutritionProps?.FoodCategory;
-            if (cat != null && Diet.FoodCategories != null && Diet.FoodCategories.Contains((EnumFoodCategory)cat))
-            {
-                return true;
-            }
-
+            EnumFoodCategory cat = itemStack?.Collectible?.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition;
             var attr = itemStack?.ItemAttributes;
-            if (Diet.FoodTags != null && attr != null && attr["foodTags"].Exists)
-            {
-                var tags = attr["foodTags"].AsArray<string>();
-                for (int i = 0; i < tags.Length; i++) if (Diet.FoodTags.Contains(tags[i])) return true;
-            }
+            var tags = attr["foodTags"].AsArray<string>();
 
-            return false;
+            return Diet.Matches(cat, tags, 0f);
         }
 
         public float MinDistanceToTarget()
@@ -228,7 +220,7 @@ namespace Vintagestory.GameContent
 
                 if (targetPoi is LooseItemFoodSource foodSource)
                 {
-                    entity.World.SpawnCubeParticles(entity.ServerPos.XYZ, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
+                    entity.World.SpawnCubeParticles(targetPoi.Position, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
                 }
                 
 
@@ -330,8 +322,7 @@ namespace Vintagestory.GameContent
             stuckatMs = entity.World.ElapsedMilliseconds;
             nowStuck = true;
 
-            FailedAttempt attempt = null;
-            failedSeekTargets.TryGetValue(targetPoi, out attempt);
+            failedSeekTargets.TryGetValue(targetPoi, out FailedAttempt attempt);
             if (attempt == null)
             {
                 failedSeekTargets[targetPoi] = attempt = new FailedAttempt();

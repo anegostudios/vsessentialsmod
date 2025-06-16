@@ -7,6 +7,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -123,8 +125,7 @@ namespace Vintagestory.GameContent
 
         public ClothSystem GetClothSystem(int clothid)
         {
-            ClothSystem sys;
-            clothSystems.TryGetValue(clothid, out sys);
+            clothSystems.TryGetValue(clothid, out ClothSystem sys);
             return sys;
         }
 
@@ -453,8 +454,7 @@ namespace Vintagestory.GameContent
 
             Shape shape = Shape.TryGet(capi, "shapes/item/ropesection.json");
             if (itemRope == null || shape == null) return;
-            MeshData meshData;
-            capi.Tesselator.TesselateShape(itemRope, shape, out meshData);
+            capi.Tesselator.TesselateShape(itemRope, shape, out MeshData meshData);
 
 
             updateMesh = new MeshData(false);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -7,6 +7,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+
+#nullable disable
 
 namespace Vintagestory.GameContent;
 
@@ -41,7 +43,6 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     public Matrixf tmpModelMat = new();
     public float StepHeight = 0.6f;
     public bool Ticking { get; set; }
-    public bool allowUnloadedTraverse;
 
     public float stepUpSpeed = 0.07f;
     public float climbUpSpeed = 0.07f;
@@ -121,10 +122,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             // Player physics is called only client side, but for their mounts we still need to call Block.OnEntityInside and other usual server-side AfterPhysicsTick things
             if (mountableSupplier?.Controller is EntityPlayer p && p.Alive)
-            {
-                callOnEntityInside();
+        {
+            callOnEntityInside();
                 entity.AfterPhysicsTick?.Invoke();
-            }
+        }
 
             return;
         }
@@ -139,8 +140,6 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         stepUpSpeed = attributes["stepUpSpeed"].AsFloat(0.07f);
         climbUpSpeed = attributes["climbUpSpeed"].AsFloat(0.07f);
         climbDownSpeed = attributes["climbDownSpeed"].AsFloat(0.035f);
-        allowUnloadedTraverse = attributes["allowUnloadedTraverse"].AsBool(false);
-
         sneakTestCollisionbox = entity.CollisionBox.Clone().OmniNotDownGrowBy(-0.1f);
         sneakTestCollisionbox.Y2 /= 2;
 
@@ -327,29 +326,29 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 for (int i = 0; i < 4; i++)
                 {
                     tmpPos.IterateHorizontalOffsets(i);
-                    for (int dy = 0; dy < height; dy++)
-                    {
+                for (int dy = 0; dy < height; dy++)
+                {
                         tmpPos.Y = baseY + dy;
                         Block inBlock = blockAccessor.GetBlock(tmpPos, searchBlockLayer);        // This is fairly costly, typically 8 GetBlock calls for each climbing entity
                         if (!inBlock.IsClimbable(tmpPos) && !canClimbAnywhere) continue;
 
-                        Cuboidf[] collisionBoxes = inBlock.GetCollisionBoxes(blockAccessor, tmpPos);
-                        if (collisionBoxes == null) continue;
+                    Cuboidf[] collisionBoxes = inBlock.GetCollisionBoxes(blockAccessor, tmpPos);
+                    if (collisionBoxes == null) continue;
 
-                        for (int j = 0; j < collisionBoxes.Length; j++)
-                        {
-                            double distance = entityBox.ShortestDistanceFrom(collisionBoxes[j], tmpPos);
+                    for (int j = 0; j < collisionBoxes.Length; j++)
+                    {
+                        double distance = entityBox.ShortestDistanceFrom(collisionBoxes[j], tmpPos);
 
                             if (distance < touchDistance)
-                            {
+                        {
                                 controls.IsClimbing = true;
                                 entity.ClimbingOnFace = BlockFacing.HORIZONTALS[i];
-                                entity.ClimbingOnCollBox = collisionBoxes[j];
+                            entity.ClimbingOnCollBox = collisionBoxes[j];
                                 goto DoneClimbing;      // break out of all loops
-                            }
                         }
                     }
                 }
+            }
             DoneClimbing:;
             }
         }
@@ -407,12 +406,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 }
             }
 
-            if (!allowUnloadedTraverse)
-            {
-                if (blockAccessor.IsNotTraversable((int)nextX, y, z, pos.Dimension)) newPos.X = pos.X;
-                if (blockAccessor.IsNotTraversable(x, (int)nextY, z, pos.Dimension)) newPos.Y = pos.Y;
-                if (blockAccessor.IsNotTraversable(x, y, (int)nextZ, pos.Dimension)) newPos.Z = pos.Z;
-            }
+            if (blockAccessor.IsNotTraversable((int)nextX, y, z, pos.Dimension)) newPos.X = pos.X;
+            if (blockAccessor.IsNotTraversable(x, (int)nextY, z, pos.Dimension)) newPos.Y = pos.Y;
+            if (blockAccessor.IsNotTraversable(x, y, (int)nextZ, pos.Dimension)) newPos.Z = pos.Z;
 
             pos.SetPos(newPos);
 
@@ -442,7 +438,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             Block aboveBlock = blockAccessor.GetBlockRaw(posX, posY + 1, posZ, BlockLayersAccess.Fluid);
             entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
-            entity.InLava = blockFluid.LiquidCode == "lava";
+        entity.InLava = blockFluid.LiquidCode == "lava";
 
             if (!feetInLiquidBefore && entity.FeetInLiquid) entity.OnCollideWithLiquid();
         }
@@ -647,7 +643,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + (0.01 * 3f);
         Vec3d stepPos = newPos.OffsetCopy(moveDelta.X, heightDiff, moveDelta.Z);
         bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, stepPos, false);
-
+        
         if (canStep)
         {
             pos.Y += stepUpSpeed * dtFac;

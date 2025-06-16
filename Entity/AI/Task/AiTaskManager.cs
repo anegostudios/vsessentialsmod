@@ -7,6 +7,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public static class ApiTaskAdditions
@@ -279,8 +281,7 @@ namespace Vintagestory.GameContent
                     if (task == null) continue;
                     if (j++ > 0) tasks += ", ";
 
-                    string code;
-                    AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out code);
+                    AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out string code);
 
                     tasks += code + "(p"+task.Priority+", pc"+task.PriorityForCancel+")";
 #if DEBUG

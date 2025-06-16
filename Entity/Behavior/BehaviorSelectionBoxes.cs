@@ -8,6 +8,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
@@ -18,7 +20,7 @@ namespace Vintagestory.GameContent
         bool debug = false;
         bool rendererRegistered=false;
 
-        public AttachmentPointAndPose[] selectionBoxes = new AttachmentPointAndPose[0];
+        public AttachmentPointAndPose[] selectionBoxes = Array.Empty<AttachmentPointAndPose>();
         string[] selectionBoxCodes;
 
         public EntityBehaviorSelectionBoxes(Entity entity) : base(entity) { }
@@ -43,7 +45,7 @@ namespace Vintagestory.GameContent
             entity.trickleDownRayIntersects = true;
             entity.requirePosesOnServer = true;
 
-            selectionBoxCodes = attributes["selectionBoxes"].AsStringArray(new string[0]);
+            selectionBoxCodes = attributes["selectionBoxes"].AsArray<string>(Array.Empty<string>());
             if (selectionBoxCodes.Length == 0)
             {
                 capi.World.Logger.Warning("EntityBehaviorSelectionBoxes, missing selectionBoxes property. Will ignore.");
@@ -322,6 +324,25 @@ namespace Vintagestory.GameContent
                             return true;
                         }
                     }
+                }
+            }
+
+            return false;
+        }
+
+
+
+        public bool IsAPCode(EntitySelection es, string apcode)
+        {
+            var ebs = entity.GetBehavior<EntityBehaviorSelectionBoxes>();
+            if (ebs != null)
+            {
+                int seleBox = es?.SelectionBoxIndex - 1 ?? -1;
+                var seleBoxes = ebs.selectionBoxes;
+                if (seleBox > 0 && seleBoxes.Length >= seleBox)
+                {
+                    string apCode = seleBoxes[seleBox].AttachPoint.Code;
+                    return apCode == apcode;
                 }
             }
 

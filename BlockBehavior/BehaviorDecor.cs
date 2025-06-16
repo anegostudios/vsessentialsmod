@@ -4,6 +4,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class BlockBehaviorDecor : BlockBehavior
@@ -19,7 +21,7 @@ namespace Vintagestory.GameContent
 
         public override void Initialize(JsonObject properties)
         {
-            string[] sidenames = properties["sides"].AsArray<string>(new string[0]);
+            string[] sidenames = properties["sides"].AsArray<string>(Array.Empty<string>());
             sides = new BlockFacing[sidenames.Length];
             for (int i = 0; i < sidenames.Length; i++)
             {

@@ -10,6 +10,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     public class VariantEntry
@@ -22,7 +24,7 @@ namespace Vintagestory.ServerMods.NoObf
 
     public class ResolvedVariant
     {
-        public OrderedDictionary<string, string> CodeParts = new OrderedDictionary<string, string>();
+        public API.Datastructures.OrderedDictionary<string, string> CodeParts = new ();
 
         public AssetLocation Code;
 
@@ -36,6 +38,11 @@ namespace Vintagestory.ServerMods.NoObf
                     Code.Path += "-" + code;
                 }
             }
+        }
+
+        public void AddCodePart(string key, string val)
+        {
+            CodeParts.Add(String.Intern(key), String.Intern(val));
         }
     }
 
@@ -201,7 +208,7 @@ namespace Vintagestory.ServerMods.NoObf
                     if (variants[i].Code == null)
                     {
                         api.Server.LogError("Error in worldproperties {0}, variant {1}, code is null, so I won't load it", val.Key, i);
-                        worldPropertiesVariants[val.Value.Code] = worldPropertiesVariants[val.Value.Code].RemoveEntry(i);
+                        worldPropertiesVariants[val.Value.Code] = worldPropertiesVariants[val.Value.Code].RemoveAt(i);
                         continue;
                     }
 
@@ -371,7 +378,7 @@ namespace Vintagestory.ServerMods.NoObf
             // Single variant
             if (variants == null || variants.Count == 0)
             {
-                RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, baseType.Code.Clone(), baseType.jsonObject, deserializer, new OrderedDictionary<string, string>());
+                RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, baseType.Code.Clone(), baseType.jsonObject, deserializer, new ());
                 typesResolved.Add(resolvedType);
             }
             else
@@ -418,8 +425,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         public StandardWorldProperty GetWorldPropertyByCode(AssetLocation code)
         {
-            StandardWorldProperty property = null;
-            worldProperties.TryGetValue(code, out property);
+            worldProperties.TryGetValue(code, out StandardWorldProperty property);
             return property;
         }
 
@@ -430,7 +436,7 @@ namespace Vintagestory.ServerMods.NoObf
         {
             List<ResolvedVariant> variantsFinal = new List<ResolvedVariant>();
 
-            OrderedDictionary<string, VariantEntry[]> variantsMul = new OrderedDictionary<string, VariantEntry[]>();
+            API.Datastructures.OrderedDictionary<string, VariantEntry[]> variantsMul = new ();
 
 
             // 1. Collect all types
@@ -468,12 +474,12 @@ namespace Vintagestory.ServerMods.NoObf
                     {
                         for (int k = 0; k < variant.Codes.Count; k++)
                         {
-                            resolved.CodeParts.Add(variant.Types[k], variant.Codes[k]);
+                            resolved.AddCodePart(variant.Types[k], variant.Codes[k]);
                         }
                     }
                     else
                     {
-                        resolved.CodeParts.Add(variantsMul.GetKeyAtIndex(j), variant.Code);
+                        resolved.AddCodePart(variantsMul.GetKeyAtIndex(j), variant.Code);
                     }
                 }
 
@@ -547,7 +553,7 @@ namespace Vintagestory.ServerMods.NoObf
             return variantsFinal;
         }
 
-        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> variantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
+        private void CollectFromStateList(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, API.Datastructures.OrderedDictionary<string, VariantEntry[]> variantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation filename)
         {
             if (variantGroup.Code == null)
             {
@@ -567,7 +573,7 @@ namespace Vintagestory.ServerMods.NoObf
                 for (int j = 0; j < states.Length; j++)
                 {
                     ResolvedVariant resolved = new ResolvedVariant();
-                    resolved.CodeParts.Add(type, states[j]);
+                    resolved.AddCodePart(type, states[j]);
                     blockvariantsFinal.Add(resolved);
                 }
             }
@@ -630,12 +636,12 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldProperties(RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, API.Datastructures.OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             CollectFromWorldPropertiesCombine(new AssetLocation[] { variantGroup.LoadFromProperties }, variantGroup, variantgroups, blockvariantsMul, blockvariantsFinal, location);
         }
 
-        private void CollectFromWorldPropertiesCombine(AssetLocation[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
+        private void CollectFromWorldPropertiesCombine(AssetLocation[] propList, RegistryObjectVariantGroup variantGroup, RegistryObjectVariantGroup[] variantgroups, API.Datastructures.OrderedDictionary<string, VariantEntry[]> blockvariantsMul, List<ResolvedVariant> blockvariantsFinal, AssetLocation location)
         {
             if (propList.Length > 1 && variantGroup.Code == null)
             {
@@ -667,22 +673,22 @@ namespace Vintagestory.ServerMods.NoObf
                     foreach (WorldPropertyVariant variant in property.Variants)
                     {
                         ResolvedVariant resolved = new ResolvedVariant();
-                        resolved.CodeParts.Add(typename, variant.Code.Path);
+                        resolved.AddCodePart(typename, variant.Code.Path);
                         blockvariantsFinal.Add(resolved);
                     }
                 }
 
                 if (variantGroup.Combine == EnumCombination.Multiply)
                 {
-                    VariantEntry[] variants;
-                    if (blockvariantsMul.TryGetValue(typename, out variants))
+                    if (blockvariantsMul.TryGetValue(typename, out VariantEntry[] variants))
                     {
                         blockvariantsMul[typename] = variants.Append(worldPropertiesVariants[property.Code]);
-                    } else
+                    }
+                    else
                     {
                         blockvariantsMul.Add(typename, worldPropertiesVariants[property.Code]);
                     }
-                    
+
                 }
             }
         }

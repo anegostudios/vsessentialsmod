@@ -2,6 +2,8 @@
 using System.Linq;
 using Vintagestory.API.Common;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods
 {
     // By DarkHekroMant: https://github.com/DArkHekRoMaNT/CompatibilityLib/blob/40ab78c40d6fb69e9b5c702534be5b5fcb74627e/src/Core.cs

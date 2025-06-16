@@ -10,6 +10,8 @@ using System.Text;
 using Vintagestory.API.Util;
 using System.Linq;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityParticleSpawner : ModSystem
@@ -56,17 +58,22 @@ namespace Vintagestory.GameContent
             api.ChatCommands
                 .GetOrCreate("debug")
                 .BeginSub("eps")
+                    .WithDesc("eps")
                     .BeginSub("testspawn")
+                        .WithDesc("testspawn")
                         .WithArgs(api.ChatCommands.Parsers.WordRange("type", "gh", "ws", "coq", "mg", "cic", "fis"))
                         .HandleWith(handleSpawn)
                     .EndSub()
                     .BeginSub("count")
+                        .WithDesc("count")
                         .HandleWith(handleCount)
                     .EndSub()
                     .BeginSub("clear")
+                        .WithDesc("clear")
                         .HandleWith(handleClear)
                     .EndSub()
                     .BeginSub("testnoise")
+                        .WithDesc("testnoise")
                         .HandleWith(handleTestnoise)
                         .WithArgs(api.ChatCommands.Parsers.OptionalWordRange("clear", "clear"))
                     .EndSub()
@@ -133,6 +140,7 @@ namespace Vintagestory.GameContent
         private TextCommandResult handleClear(TextCommandCallingArgs args)
         {
             sys.Clear();
+            sys.SpawnedFish.Clear();
             return TextCommandResult.Success("cleared");
         }
 
@@ -179,7 +187,7 @@ namespace Vintagestory.GameContent
                         var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
                         if (block.LiquidCode == "saltwater" && block.PushVector == null)
                         {
-                            var ws = new EntityParticleFish(capi, x, y - block.LiquidLevel, z);
+                            var ws = new EntityParticleFish(capi, x, y - block.LiquidLevel, z, new Vec3f(0.4f), 0, 0.3f);
                             sys.SpawnParticle(ws);
                         }
                     }
@@ -224,7 +232,7 @@ namespace Vintagestory.GameContent
                 if (!disabledInsects.Contains("gnats")) spawnMatingGnatsSwarm(pos, climate);
                 if (!disabledInsects.Contains("coqui")) spawnCoquis(pos, climate);
                 if (!disabledInsects.Contains("waterstrider")) spawnWaterStriders(pos, climate);
-                //spawnFish(pos, climate);
+                spawnFish(pos, climate);
             }
         }
 
@@ -244,7 +252,7 @@ namespace Vintagestory.GameContent
                 double z = pos.Z + (rand.NextDouble() - 0.5) * 60;
                 double y = capi.World.BlockAccessor.GetRainMapHeightAt((int)x, (int)z);
 
-                if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 3) continue;
+                if (pos.HorDistanceTo(x, z) < 3) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
                 var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y - 1, (int)z);
@@ -261,33 +269,58 @@ namespace Vintagestory.GameContent
         {
             if (climate.Temperature > 40 || climate.Temperature < 0) return;
 
-            // var noise = fishNoise.Noise(pos.X, pos.Z);
-            // if (noise < 0.5) return;
             var bpos = new BlockPos();
 
-            if (sys.Count["fish"] > 100) return;
+            if (sys.Count["fish"] > 500) return;
 
             for (int i = 0; i < 100; i++)
             {
-                double x = pos.X + (rand.NextDouble() - 0.5) * 40;
-                double z = pos.Z + (rand.NextDouble() - 0.5) * 40;
-                bpos.Set((int)x, 0, (int)z);
+                var x = (int)(pos.X + (rand.NextDouble() - 0.5) * 60);
+                var z = (int)(pos.Z + (rand.NextDouble() - 0.5) * 60);
+                bpos.Set(x, 0, z);
                 var y = capi.World.BlockAccessor.GetTerrainMapheightAt(bpos);
                 bpos.Y = Math.Min(capi.World.SeaLevel - 1, y + 2);
-                if (bpos.HorDistanceSqTo(pos.X, pos.Z) < 3) continue;
+                
+                if (bpos.HorDistanceSqTo(pos.X, pos.Z) < 4*4) continue;
+
+                var startPos = new FastVec3i(bpos.X, bpos.Y, bpos.Z);
+                if(sys.SpawnedFish.Contains(startPos)) continue;
+
+                var chance = GameMath.MurmurHash3Mod(bpos.X, bpos.Y, bpos.Z, 100);
+                if(chance < 80) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock(bpos, BlockLayersAccess.Fluid);
                 var belowBlock = capi.World.BlockAccessor.GetBlock(bpos.DownCopy());
-                if (block.LiquidCode == "saltwater" && belowBlock.Code.PathStartsWith("coral"))
+                if (block.LiquidCode != "saltwater" || !belowBlock.Code.Path.StartsWithFast("coral")) continue;
+                
+                sys.SpawnedFish.Add(startPos);
+                var fishAmount = 5 + rand.Next(15);
+                EntityParticleFish[] fishes = new EntityParticleFish[fishAmount];
+
+                var size = new Vec3f(0.55f + (float)rand.NextDouble() * 0.65f, 0.3f, 0.3f);
+                size.Mul(1 + (float)rand.NextDouble() * 0.5f);
+
+                float maxspeed = 0.15f + (float)rand.NextDouble() * 0.2f;
+                int colorindex = rand.Next(EntityParticleFish.Colors.Length);
+
+                for (var j = 0; j < fishAmount; j++)
                 {
-                    var fishAmount = 10 + rand.Next(10);
-                    for (var j = 0; j < fishAmount; j++)
-                    {
-                        var offX = rand.NextDouble() - 0.5;
-                        var offZ = rand.NextDouble() - 0.5;
-                        var ws = new EntityParticleFish(capi, x + offX, bpos.Y, z + offZ);
-                        sys.SpawnParticle(ws);
-                    }
+                    var offX = rand.NextDouble() - 0.5;
+                    var offZ = rand.NextDouble() - 0.5;
+                    var ws = new EntityParticleFish(capi, x + offX, bpos.Y, z + offZ, size, colorindex, maxspeed);
+                    ws.StartPos = startPos;
+                    fishes[j] = ws;
+                    sys.SpawnParticle(ws);
+                }
+
+                for (int j = 0; j < fishAmount; j++)
+                {
+                    fishes[j].FriendFishes = [
+                        fishes[GameMath.Mod(j - 2, fishAmount)],
+                        fishes[GameMath.Mod(j - 1, fishAmount)],
+                        fishes[GameMath.Mod(j + 1, fishAmount)],
+                        fishes[GameMath.Mod(j + 2, fishAmount)]
+                    ];
                 }
             }
         }
@@ -307,7 +340,7 @@ namespace Vintagestory.GameContent
                 double z = pos.Z + (rand.NextDouble() - 0.5) * 60;
                 double y = capi.World.BlockAccessor.GetRainMapHeightAt((int)x, (int)z);
 
-                if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 3) continue;
+                if (pos.HorDistanceTo(x, z) < 3) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
                 var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
@@ -333,7 +366,7 @@ namespace Vintagestory.GameContent
                 double z = pos.Z + (rand.NextDouble() - 0.5) * 50;
                 double y = pos.Y + (rand.NextDouble() - 0.5) * 10;
 
-                if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 2) continue;
+                if (pos.HorDistanceTo(x, z) < 2) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
                 var blockbelow = capi.World.BlockAccessor.GetBlock((int)x, (int)y-1, (int)z);
@@ -377,7 +410,7 @@ namespace Vintagestory.GameContent
                 double z = pos.Z + (rand.NextDouble() - 0.5) * 60;
                 double y = capi.World.BlockAccessor.GetRainMapHeightAt((int)x, (int)z);
 
-                if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 3) continue;
+                if (pos.HorDistanceTo(x, z) < 3) continue;
 
                 var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
                 var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
@@ -406,7 +439,7 @@ namespace Vintagestory.GameContent
                 double z = pos.Z + (rand.NextDouble() - 0.5) * 24;
                 double y = capi.World.BlockAccessor.GetRainMapHeightAt((int)x, (int)z);
 
-                if (pos.HorDistanceTo(new Vec3d(x, y, z)) < 2) continue;
+                if (pos.HorDistanceTo(x, z) < 2) continue;
 
                 var ab2block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 2, (int)z);
                 var abblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);

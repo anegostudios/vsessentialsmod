@@ -3,6 +3,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorPlaceBlock : EntityBehavior
@@ -39,7 +41,7 @@ namespace Vintagestory.GameContent
         internal AssetLocation[] BlockCodes
         {
             get {
-                string[] codes = attributes["blockCodes"].AsArray(new string[0]);
+                string[] codes = attributes["blockCodes"].AsArray(System.Array.Empty<string>());
                 AssetLocation[] locs = new AssetLocation[codes.Length];
                 for (int i = 0; i < locs.Length; i++) locs[i] = new AssetLocation(codes[i]);
                 return locs;

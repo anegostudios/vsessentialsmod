@@ -5,6 +5,8 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EPCounter
@@ -72,7 +74,9 @@ namespace Vintagestory.GameContent
         protected ParticlePhysics partPhysics;
         protected EnumParticleModel ModelType = EnumParticleModel.Cube;
 
-        int poolSize = 5000;
+        IShaderProgram vec3ScaleCubeParticleShader;
+
+        int poolSize = 10000;
         int quantityAlive = 0;
 
         public event Action<float> OnSimTick;
@@ -94,6 +98,7 @@ namespace Vintagestory.GameContent
         EPCounter counter = new EPCounter();
         public EPCounter Count => counter;
 
+        public HashSet<FastVec3i> SpawnedFish = new HashSet<FastVec3i>();
 
 
         public virtual MeshData LoadModel()
@@ -127,16 +132,16 @@ namespace Vintagestory.GameContent
             partPhysics.PhysicsTickTime = 0.125f;
             MeshData particleModel = LoadModel();
 
-            // vec3 pos, vec2 size
+            // vec3 pos, vec3 size
             particleModel.CustomFloats = new CustomMeshDataPartFloat()
             {
                 Instanced = true,
                 StaticDraw = false,
-                Values = new float[poolSize * (3 + 1)],
-                InterleaveSizes = new int[] { 3, 1 },
-                InterleaveStride = (3 + 1) * 4,
-                InterleaveOffsets = new int[] { 0, 12 },
-                Count = poolSize * (3 + 1)
+                Values = new float[poolSize * (3 + 3 + 4)],
+                InterleaveSizes = new int[] { 3, 3, 4 },
+                InterleaveStride = (3 + 3 + 4) * 4,
+                InterleaveOffsets = new int[] { 0, 12, 24 },
+                Count = poolSize * (3 + 3 + 4)
             };
 
             // vec4 rgba * 2 (each channel = 1 byte), vec4 direction
@@ -145,11 +150,11 @@ namespace Vintagestory.GameContent
                 Conversion = DataConversion.NormalizedFloat,
                 Instanced = true,
                 StaticDraw = false,
-                Values = new byte[poolSize * (8 + 4)],
-                InterleaveSizes = new int[] { 4, 4, 4 },
-                InterleaveStride = 4 + 4 + 4,
-                InterleaveOffsets = new int[] { 0, 4, 8 },
-                Count = poolSize * (8 + 4)
+                Values = new byte[poolSize * (8)],
+                InterleaveSizes = new int[] { 4, 4 },
+                InterleaveStride = 4 + 4,
+                InterleaveOffsets = new int[] { 0, 4 },
+                Count = poolSize * (8)
             };
 
             particleModel.Flags = new int[poolSize];
@@ -169,7 +174,26 @@ namespace Vintagestory.GameContent
                 cameraPos[i] = new Vec3d();
                 updateBuffers[i] = genUpdateBuffer();
             }
+
+            api.Event.ReloadShader += LoadShader;
+            LoadShader();
         }
+
+
+        public bool LoadShader()
+        {
+            var prog = vec3ScaleCubeParticleShader = capi.Shader.NewShaderProgram();
+
+            prog.VertexShader = capi.Shader.NewShader(EnumShaderType.VertexShader);
+            prog.FragmentShader = capi.Shader.NewShader(EnumShaderType.FragmentShader);
+
+            prog.VertexShader.PrefixCode += "#define VEC3SCALE 1\n";
+
+            capi.Shader.RegisterFileShaderProgram("particlescube", prog);
+
+            return prog.Compile();
+        }
+
 
         bool isShuttingDown = false;
         private void onThreadStart()
@@ -196,13 +220,13 @@ namespace Vintagestory.GameContent
             MeshData updateBuffer = new MeshData();
             updateBuffer.CustomFloats = new CustomMeshDataPartFloat()
             {
-                Values = new float[poolSize * (3 + 1)],
-                Count = poolSize * (3 + 1),
+                Values = new float[poolSize * (3 + 3 + 4)],
+                Count = poolSize * (3 + 3 + 4),
             };
             updateBuffer.CustomBytes = new CustomMeshDataPartByte()
             {
-                Values = new byte[poolSize * 12],
-                Count = poolSize * 12,
+                Values = new byte[poolSize * 8],
+                Count = poolSize * 8,
             };
 
             updateBuffer.Flags = new int[poolSize];
@@ -255,6 +279,11 @@ namespace Vintagestory.GameContent
             entityParticle.Prev = null;
             entityParticle.Next = null;
 
+            if (entityParticle is EntityParticleFish fish)
+            {
+                SpawnedFish.Remove(fish.StartPos);
+            } 
+
             quantityAlive--;
             counter.Dec(entityParticle.Type);
         }
@@ -265,7 +294,7 @@ namespace Vintagestory.GameContent
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
-            var prog = capi.Shader.GetProgram((int)EnumShaderProgram.Particlescube);
+            var prog = vec3ScaleCubeParticleShader;
             prog.Use();
 
             capi.Render.GlToggleBlend(true); // let see what happens if we do this. yolo.
@@ -336,10 +365,11 @@ namespace Vintagestory.GameContent
 
             float[] nowFloats = buffer.CustomFloats.Values;
 
+            
 
             for (int i = 0; i < cnt; i++)
             {
-                int a = i * (3 + 1) + 0;
+                int a = i * (3 + 3 + 4) + 0;
                 nowFloats[a] += camdX + velocity[i * 3 + 0] * step;
                 a++;
                 nowFloats[a] += camdY + velocity[i * 3 + 1] * step;
@@ -412,8 +442,8 @@ namespace Vintagestory.GameContent
             }
 
             // Only update as much positions as there are alive particles
-            updateBuffer.CustomFloats.Count = j * (3 + 1);
-            updateBuffer.CustomBytes.Count = j * (4 + 4 + 4);
+            updateBuffer.CustomFloats.Count = j * (3 + 3 + 4);
+            updateBuffer.CustomBytes.Count = j * (4 + 4);
             updateBuffer.VerticesCount = j;
 
 

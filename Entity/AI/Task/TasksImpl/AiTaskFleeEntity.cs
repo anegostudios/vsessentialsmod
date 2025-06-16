@@ -5,6 +5,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class AiTaskFleeEntity : AiTaskBaseTargetable
@@ -86,7 +88,7 @@ namespace Vintagestory.GameContent
             }
 
             int generation = GetOwnGeneration();
-            float fearReductionFactor = (whenInEmotionState != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
+            float fearReductionFactor = (WhenInEmotionState != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
 
             ownPos.SetWithDimension(entity.ServerPos);
             float hereRange = fearReductionFactor * seekingRange;
@@ -114,6 +116,7 @@ namespace Vintagestory.GameContent
 
             if (targetEntity != null)
             {
+                if (entity.ToleratesDamageFrom(targetEntity)) nowFleeingDistance /= 2;
                 float yaw = (float)Math.Atan2(targetEntity.ServerPos.X - entity.ServerPos.X, targetEntity.ServerPos.Z - entity.ServerPos.Z);
                 updateTargetPosFleeMode(targetPos, yaw);
                 return true;
@@ -137,6 +140,7 @@ namespace Vintagestory.GameContent
             else
             {
                 nowFleeingDistance = (float)entity.ServerPos.DistanceTo(targetEntity.ServerPos) + 15;
+                if (entity.ToleratesDamageFrom(targetEntity)) nowFleeingDistance /= 2.5f;
                 updateTargetPosFleeMode(targetPos, entity.ServerPos.Yaw);
             }
 
@@ -215,7 +219,7 @@ namespace Vintagestory.GameContent
             if (source.Type != EnumDamageType.Heal && entity.World.Rand.NextDouble() < instafleeOnDamageChance)
             {
                 instafleenow = true;
-                targetEntity = source.CauseEntity;
+                targetEntity = source.GetCauseEntity();
             }
         }
 

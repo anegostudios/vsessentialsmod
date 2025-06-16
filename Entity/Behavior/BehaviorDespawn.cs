@@ -4,6 +4,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorDespawn : EntityBehavior, ITimedDespawn
@@ -81,6 +83,8 @@ namespace Vintagestory.GameContent
         {
             if (!entity.Alive || entity.World.Side == EnumAppSide.Client) return;
 
+            deltaTime = (float)System.Math.Min(deltaTime, 0.2);
+
             if ((accumSeconds += deltaTime) > accumOffset)
             {
                 if (despawnMode == EnumDespawnMode.AfterSecondsOrAfterDaysIgnorePlayer)
@@ -127,7 +131,7 @@ namespace Vintagestory.GameContent
         {
             if (minPlayerDistance < 0f) return false;
 
-            return entity.minHorRangeToClient < minPlayerDistance;
+            return entity.NearestPlayerDistance < minPlayerDistance;
         }
 
         public bool LightLevelOk()

@@ -9,6 +9,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class StepParentElementTo : ModelTransform
@@ -20,12 +22,22 @@ namespace Vintagestory.GameContent
     public interface IAttachableToEntity
     {
         bool IsAttachable(Entity toEntity, ItemStack itemStack);
+
+        /// <summary>
+        /// Add textures necessary to correctly tesselate this attachable. Be aware, if you put stuff in intoDict, you must prefix it correctly
+        /// </summary>
+        /// <param name="stack"></param>
+        /// <param name="shape"></param>
+        /// <param name="texturePrefixCode"></param>
+        /// <param name="intoDict"></param>
         void CollectTextures(ItemStack stack, Shape shape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict);
         string GetCategoryCode(ItemStack stack);
         CompositeShape GetAttachedShape(ItemStack stack, string slotCode);
         string[] GetDisableElements(ItemStack stack);
         string[] GetKeepElements(ItemStack stack);
         string GetTexturePrefixCode(ItemStack stack);
+
+        int RequiresBehindSlots { get; set; }
 
         public static IAttachableToEntity FromCollectible(CollectibleObject cobj)
         {
@@ -41,9 +53,9 @@ namespace Vintagestory.GameContent
             {
                 return new AttributeAttachableToEntity()
                 {
-                    CategoryCode = cobj.Attributes["clothescategory"].AsString(),
-                    KeepElements = cobj.Attributes["keepElements"].AsStringArray(),
-                    DisableElements = cobj.Attributes["disableElements"].AsStringArray()
+                    CategoryCode = cobj.Attributes["clothescategory"].AsString() ?? cobj.Attributes?["attachableToEntity"]["categoryCode"].AsString(),
+                    KeepElements = cobj.Attributes["keepElements"].AsArray<string>(),
+                    DisableElements = cobj.Attributes["disableElements"].AsArray<string>()
                 };
             }
 
@@ -72,8 +84,13 @@ namespace Vintagestory.GameContent
         public string[] KeepElements { get; set; }
         public string TexturePrefixCode { get; set; }
         public string GetTexturePrefixCode(ItemStack stack) => TexturePrefixCode;
-        public OrderedDictionary<string, CompositeShape> AttachedShapeBySlotCode { get; set; }
+        public API.Datastructures.OrderedDictionary<string, CompositeShape> AttachedShapeBySlotCode { get; set; }
         public void CollectTextures(ItemStack stack, Shape gearShape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict) => IAttachableToEntity.CollectTexturesFromCollectible(stack, texturePrefixCode, gearShape, intoDict);
+
+        /// <summary>
+        /// Occupy additional space behind this slot
+        /// </summary>
+        public int RequiresBehindSlots { get; set; }
 
 
         public CompositeShape GetAttachedShape(ItemStack stack, string slotCode)
@@ -168,7 +185,7 @@ namespace Vintagestory.GameContent
                 }
             }
         }
-        protected void Inventory_SlotModified(int slotid)
+        protected virtual void Inventory_SlotModified(int slotid)
         {
             entity.MarkShapeModified();
         }

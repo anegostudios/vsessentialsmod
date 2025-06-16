@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -8,6 +9,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
+
+#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -37,6 +40,32 @@ namespace Vintagestory.GameContent
             set { healthTree.SetFloat("currenthealth", value); entity.WatchedAttributes.MarkPathDirty("health"); }
         }
 
+        public float? FutureHealth
+        {
+            get { return healthTree.GetFloat("futureHealth"); }
+            set {
+                if (value == null) healthTree.RemoveAttribute("futureHealth");
+                else healthTree.SetFloat("futureHealth", (float)value); 
+
+                entity.WatchedAttributes.MarkPathDirty("health");
+            }
+        }
+
+        public float PreviousHealth
+        {
+            get { return healthTree.GetFloat("previousHealthValue"); }
+            set {
+                healthTree.SetFloat("previousHealthValue", (float)value); 
+                entity.WatchedAttributes.MarkPathDirty("health"); 
+            }
+        }
+
+        public float HealthChangeVelocity
+        {
+            get { return healthTree.GetFloat("healthChangeVelocity"); }
+            set { healthTree.SetFloat("healthChangeVelocity", value); entity.WatchedAttributes.MarkPathDirty("health"); }
+        }
+
         public float BaseMaxHealth
         {
             get { return healthTree.GetFloat("basemaxhealth"); }
@@ -56,22 +85,25 @@ namespace Vintagestory.GameContent
             }
         }
 
-        [Obsolete("This is nullable. Please call SetMaxHealthModifiers() instead of writing to it directly.")]
-        public Dictionary<string, float> MaxHealthModifiers = null;
+        [Obsolete("Please call SetMaxHealthModifiers() instead of writing to it directly.")]
+        public Dictionary<string, float> MaxHealthModifiers { get; set; }
+       
+        protected Dictionary<string, float> maxHealthModifiers = null;
+
 
         public void SetMaxHealthModifiers(string key, float value)
         {
             bool dirty = true;
-            if (MaxHealthModifiers == null)
+            if (maxHealthModifiers == null)
             {
-                MaxHealthModifiers = new Dictionary<string, float>();
+                maxHealthModifiers = new Dictionary<string, float>();
                 if (value == 0f) dirty = false;
             }
-            else if (MaxHealthModifiers.TryGetValue(key, out float oldvalue) && oldvalue == value)
+            else if (maxHealthModifiers.TryGetValue(key, out float oldvalue) && oldvalue == value)
             {
                 dirty = false;
             }
-            MaxHealthModifiers[key] = value;
+            maxHealthModifiers[key] = value;
             if (dirty) MarkDirty();              // Only markDirty if it actually changed
         }
 
@@ -87,7 +119,7 @@ namespace Vintagestory.GameContent
         public void UpdateMaxHealth()
         {
             float totalMaxHealth = BaseMaxHealth;
-            var MaxHealthModifiers = this.MaxHealthModifiers;
+            var MaxHealthModifiers = this.maxHealthModifiers;
             if (MaxHealthModifiers != null)
             {
                 foreach (var val in MaxHealthModifiers) totalMaxHealth += val.Value;
@@ -114,6 +146,7 @@ namespace Vintagestory.GameContent
 
                 BaseMaxHealth = typeAttributes["maxhealth"].AsFloat(20);
                 Health = typeAttributes["currenthealth"].AsFloat(BaseMaxHealth);
+                PreviousHealth = Health;
                 MarkDirty();
                 return;
             }
@@ -254,6 +287,7 @@ namespace Vintagestory.GameContent
                     player.Player.PlayerName, entity.Pos.AsBlockPos, damage, damageBeforeArmor, damageSource.Type.ToString().ToLowerInvariant(), weapon, otherPlayer.GetName());
             }
 
+            PreviousHealth = Health;
             Health -= damage;
             entity.OnHurt(damageSource, damage);
             UpdateMaxHealth();
@@ -277,7 +311,6 @@ namespace Vintagestory.GameContent
                 {
                     entity.PlayEntitySound("hurt");
                 }
-
             }
         }
 
@@ -345,17 +378,22 @@ namespace Vintagestory.GameContent
         {
             if (IsHealable(player.Entity))
             {
-                var ichc = player.InventoryManager.ActiveHotbarSlot?.Itemstack.Collectible as ICanHealCreature;
-                return ichc.GetHealInteractionHelp(world, es, player).Append(base.GetInteractionHelp(world, es, player, ref handled));
+                ICanHealCreature canHealCreature = player.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible?.GetCollectibleInterface<ICanHealCreature>();
+
+                if (canHealCreature != null)
+                {
+                    return canHealCreature.GetHealInteractionHelp(world, es, player).Append(base.GetInteractionHelp(world, es, player, ref handled));
+                }
             }
 
             return base.GetInteractionHelp(world, es, player, ref handled);
         }
 
-        public bool IsHealable(EntityAgent eagent)
+        public bool IsHealable(EntityAgent eagent, ItemSlot slot = null)
         {
-            var ichc = eagent.RightHandItemSlot?.Itemstack?.Collectible as ICanHealCreature;
-            return Health < MaxHealth && ichc?.CanHeal(this.entity) == true;
+            ICanHealCreature canHealCreature = (slot ?? eagent.RightHandItemSlot)?.Itemstack?.Collectible?.GetCollectibleInterface<ICanHealCreature>();
+
+            return Health < MaxHealth && canHealCreature?.CanHeal(entity) == true;
         }
 
         public override string PropertyName()

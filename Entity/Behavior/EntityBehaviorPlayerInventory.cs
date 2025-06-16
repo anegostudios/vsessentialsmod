@@ -5,6 +5,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorPlayerInventory : EntityBehaviorTexturedClothing
@@ -77,7 +79,7 @@ namespace Vintagestory.GameContent
             {
                 ItemSlot slot = backPackInv[i];
                 if (slot.Empty) continue;
-                uniqueGear["" + slot.Itemstack.Class + slot.Itemstack.Collectible.Id] = slot;
+                uniqueGear[(slot.Itemstack.ItemAttributes?["attachableToEntity"]?["categoryCode"]?.AsString(null) ?? ("" + slot.Itemstack.Class + slot.Itemstack.Collectible.Id))] = slot;
             }
 
             foreach (var val in uniqueGear)

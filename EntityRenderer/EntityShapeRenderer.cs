@@ -9,6 +9,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class MessageTexture
@@ -145,7 +147,6 @@ namespace Vintagestory.GameContent
         {
             if (data != null && data.Contains("from:") && entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 20 * 20 && message.Length > 0)
             {
-                int entityid;
                 string[] parts = data.Split(new char[] { ',' }, 2);
                 if (parts.Length < 2) return;
 
@@ -153,7 +154,7 @@ namespace Vintagestory.GameContent
                 string[] parttwo = parts[1].Split(new char[] { ':' }, 2);
                 if (partone[0] != "from") return;
 
-                int.TryParse(partone[1], out entityid);
+                int.TryParse(partone[1], out int entityid);
                 if (entity.EntityId == entityid)
                 {
                     message = parttwo[1];
@@ -718,7 +719,11 @@ namespace Vintagestory.GameContent
             if (thisMount?.MountSupplier != null && thisMount.MountSupplier == selfMount?.MountSupplier)
             {
                 var mpos = thisMount.SeatPosition.XYZ - selfMount.SeatPosition.XYZ;
-                aboveHeadPos = new Vec3d(entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z);
+                aboveHeadPos = new Vec3d(
+                    entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, 
+                    entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, 
+                    entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z
+                );
                 aboveHeadPos.Add(mpos);
             }
             else
@@ -757,9 +762,10 @@ namespace Vintagestory.GameContent
             {
                 seat = eagent?.MountedOn;
                 // If this entity itself is riding something, render it as offset of that entity
-                if (ims != null && seat != null)
+                if (/*ims != null && - why is this condition here? It prevents jitter avoidance! */ seat != null)
                 {
-                    if (entityPlayer.MountedOn?.Entity == eagent.MountedOn.Entity)
+                    // If both the player and the entity is sitting on the same mount
+                    if (entityPlayer.MountedOn != null && entityPlayer.MountedOn.Entity == eagent.MountedOn.Entity)
                     {
                         var selfMountPos = entityPlayer.MountedOn.SeatPosition;
                         Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - selfMountPos.X), (float)(seat.SeatPosition.InternalY - selfMountPos.Y), (float)(seat.SeatPosition.Z - selfMountPos.Z));

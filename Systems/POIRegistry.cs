@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design.Serialization;
+using System.Runtime.Serialization;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+
+#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -22,6 +25,12 @@ namespace Vintagestory.GameContent
         string Type { get; }
     }
 
+    public class WeightedFoodTag
+    {
+        public string Code;
+        public float Weight;
+    }
+
     public class CreatureDiet
     {
         /// <summary>
@@ -31,14 +40,31 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Tags as defined in the individual items/blocks attributes
         /// </summary>
-        public string[] FoodTags;
+        protected string[] FoodTags;
+        /// <summary>
+        /// Tags as defined in the individual items/blocks attributes
+        /// </summary>
+        public WeightedFoodTag[] WeightedFoodTags;
+
         /// <summary>
         /// Tested first: Blacklist of certain foods
         /// </summary>
         public string[] SkipFoodTags;
 
 
-        public bool Matches(EnumFoodCategory foodSourceCategory, params string[] foodSourceTags)
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext ctx)
+        {
+            if (FoodTags != null)
+            {
+                List<WeightedFoodTag> wfoodTags = new(WeightedFoodTags ?? []);
+                foreach (var tag in FoodTags) wfoodTags.Add(new WeightedFoodTag() { Code = tag, Weight = 1 });
+                WeightedFoodTags = wfoodTags.ToArray();
+            }
+        }
+
+
+        public bool Matches(EnumFoodCategory foodSourceCategory, string[] foodSourceTags, float foodTagMinWeight = 0)
         {
             if (SkipFoodTags != null && foodSourceTags != null)
             {
@@ -50,24 +76,31 @@ namespace Vintagestory.GameContent
 
             if (FoodCategories != null && FoodCategories.Contains(foodSourceCategory)) return true;
 
-            if (this.FoodTags != null && foodSourceTags != null)
+            if (this.WeightedFoodTags != null && foodSourceTags != null)
             {
                 for (int i = 0; i < foodSourceTags.Length; i++)
                 {
-                    if (FoodTags.Contains(foodSourceTags[i])) return true;
+                    for (int j = 0; j < WeightedFoodTags.Length; j++)
+                    {
+                        var wFoodTag = WeightedFoodTags[j];
+                        if (wFoodTag.Weight >= foodTagMinWeight && wFoodTag.Code == foodSourceTags[i])
+                        {
+                            return true;
+                        }
+                    }
                 }
             }
 
             return false;
         }
 
-        public bool Matches(ItemStack itemstack)
+        public bool Matches(ItemStack itemstack, bool checkCategory = true, float foodTagMinWeight = 0)
         {
             var cobj = itemstack.Collectible;
-            var foodCat = cobj.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition;
-            var foodTags = cobj.Attributes?["foodTags"].AsArray<string>();
+            var foodCat = checkCategory ? (cobj?.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition) : EnumFoodCategory.NoNutrition;
+            var foodTags = cobj?.Attributes?["foodTags"].AsArray<string>();
 
-            return Matches(foodCat, foodTags);
+            return Matches(foodCat, foodTags, foodTagMinWeight);
         }
     }
 
@@ -137,9 +170,8 @@ namespace Vintagestory.GameContent
             {
                 for (int cz = mincz; cz < maxcz; cz++)
                 {
-                    List<IPointOfInterest> pois = null;
                     tmp.Set(cx, cz);
-                    PoisByChunkColumn.TryGetValue(tmp, out pois);
+                    PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
                     if (pois == null) continue;
 
                     for (int i = 0; i < pois.Count; i++)
@@ -170,9 +202,8 @@ namespace Vintagestory.GameContent
             {
                 for (int cz = mincz; cz <= maxcz; cz++)
                 {
-                    List<IPointOfInterest> pois;
                     tmp.Set(cx, cz);
-                    PoisByChunkColumn.TryGetValue(tmp, out pois);
+                    PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
                     if (pois == null) continue;
 
                     for (int i = 0; i < pois.Count; i++)
@@ -218,9 +249,8 @@ namespace Vintagestory.GameContent
                     else if ((cz + 1) * chunksize < centerPos.Z) cdistZ = centerPos.Z - (cz + 1) * chunksize;
                     if (chunkDistX * chunkDistX + cdistZ * cdistZ > nearestDistSq) continue;  // skip the search if this whole chunk is further than the nearest found so far
 
-                    List<IPointOfInterest> pois = null;
                     tmp.Set(cx, cz);
-                    PoisByChunkColumn.TryGetValue(tmp, out pois);
+                    PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
                     if (pois == null) continue;
 
                     for (int i = 0; i < pois.Count; i++)
@@ -249,8 +279,7 @@ namespace Vintagestory.GameContent
         {
             tmp.Set((int)poi.Position.X / chunksize, (int)poi.Position.Z / chunksize);
 
-            List<IPointOfInterest> pois = null;
-            PoisByChunkColumn.TryGetValue(tmp, out pois);
+            PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
             if (pois == null) PoisByChunkColumn[tmp] = pois = new List<IPointOfInterest>();
 
             if (!pois.Contains(poi))
@@ -264,8 +293,7 @@ namespace Vintagestory.GameContent
         {
             tmp.Set((int)poi.Position.X / chunksize, (int)poi.Position.Z / chunksize);
 
-            List<IPointOfInterest> pois = null;
-            PoisByChunkColumn.TryGetValue(tmp, out pois);
+            PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
             if (pois != null) pois.Remove(poi);
         }
 

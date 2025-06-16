@@ -5,6 +5,8 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
@@ -39,8 +41,7 @@ namespace Vintagestory.GameContent
 
         private void Event_OnEntityDespawn(Entity entity, EntityDespawnData reasonData)
         {
-            EntityMapComponent mp;
-            if (MapComps.TryGetValue(entity.EntityId, out mp))
+            if (MapComps.TryGetValue(entity.EntityId, out EntityMapComponent mp))
             {
                 mp.Dispose();
                 MapComps.Remove(entity.EntityId);
@@ -81,11 +82,10 @@ namespace Vintagestory.GameContent
 
             foreach (var val in capi.World.LoadedEntities)
             {
-                EntityMapComponent cmp;
 
                 if (val.Value is EntityPlayer) continue;
 
-                if (MapComps.TryGetValue(val.Value.EntityId, out cmp))
+                if (MapComps.TryGetValue(val.Value.EntityId, out EntityMapComponent cmp))
                 {
                     cmp?.Dispose();
                     MapComps.Remove(val.Value.EntityId);

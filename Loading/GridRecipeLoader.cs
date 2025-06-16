@@ -4,132 +4,138 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
-namespace Vintagestory.ServerMods
+#nullable disable
+
+namespace Vintagestory.ServerMods;
+
+public class GridRecipeLoader : ModSystem
 {
-    public class GridRecipeLoader : ModSystem
+    private ICoreServerAPI api;
+    private bool classExclusiveRecipes = true;
+
+    public override double ExecuteOrder() => 1;
+
+    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
+
+    public override void AssetsLoaded(ICoreAPI api)
     {
-        ICoreServerAPI api;
-
-        public override double ExecuteOrder()
+        if (api is ICoreServerAPI serverApi)
         {
-            return 1;
+            this.api = serverApi;
+
+            classExclusiveRecipes = serverApi.World.Config.GetBool("classExclusiveRecipes", true);
+
+            LoadGridRecipes();
         }
+    }
 
-        public override bool ShouldLoad(EnumAppSide side)
+    public void LoadGridRecipes()
+    {
+        Dictionary<AssetLocation, JToken> files = api.Assets.GetMany<JToken>(api.Server.Logger, "recipes/grid");
+        int recipeQuantity = 0;
+
+        foreach ((AssetLocation location, JToken content) in files)
         {
-            return side == EnumAppSide.Server;
-        }
-
-
-        bool classExclusiveRecipes = true;
-        public override void AssetsLoaded(ICoreAPI api)
-        {
-            if (api is ICoreServerAPI sapi)
+            if (content is JObject)
             {
-                this.api = sapi;
-
-                classExclusiveRecipes = sapi.World.Config.GetBool("classExclusiveRecipes", true);
-
-                LoadGridRecipes();
+                LoadRecipe(location, content.ToObject<GridRecipe>(location.Domain));
+                recipeQuantity++;
             }
-        }
-
-
-        public void LoadGridRecipes()
-        {
-            Dictionary<AssetLocation, JToken> files = api.Assets.GetMany<JToken>(api.Server.Logger, "recipes/grid");
-            int recipeQuantity=0;
-
-            foreach (var val in files)
+            if (content is JArray)
             {
-                if (val.Value is JObject)
+                foreach (JToken token in (content as JArray))
                 {
-                    LoadRecipe(val.Key, val.Value.ToObject<GridRecipe>(val.Key.Domain));
+                    LoadRecipe(location, token.ToObject<GridRecipe>(location.Domain));
                     recipeQuantity++;
                 }
-                if (val.Value is JArray)
-                {
-                    foreach (var token in (val.Value as JArray))
-                    {
-                        LoadRecipe(val.Key, token.ToObject<GridRecipe>(val.Key.Domain));
-                        recipeQuantity++;
-                    }
-                }
             }
-
-            api.World.Logger.Event("{0} crafting recipes loaded from {1} files", recipeQuantity, files.Count);
-            api.World.Logger.StoryEvent(Lang.Get("Grand inventions..."));
         }
 
+        api.World.Logger.Event($"{recipeQuantity} crafting recipes loaded from {files.Count} files");
+        api.World.Logger.StoryEvent(Lang.Get("Grand inventions..."));
+    }
 
-        public void LoadRecipe(AssetLocation loc, GridRecipe recipe)
+    public void LoadRecipe(AssetLocation assetLocation, GridRecipe recipe)
+    {
+        if (!recipe.Enabled) return;
+        if (!classExclusiveRecipes) recipe.RequiresTrait = null;
+
+        if (recipe.Name == null) recipe.Name = assetLocation;
+
+        Dictionary<string, string[]> nameToCodeMapping = recipe.GetNameToCodeMapping(api.World);
+
+        if (nameToCodeMapping.Count <= 0)
         {
-            if (!recipe.Enabled) return;
-            if (!classExclusiveRecipes) recipe.RequiresTrait = null;
-
-            if (recipe.Name == null) recipe.Name = loc;
-
-            Dictionary<string, string[]> nameToCodeMapping = recipe.GetNameToCodeMapping(api.World);
-
-            if (nameToCodeMapping.Count > 0)
+            if (recipe.ResolveIngredients(api.World))
             {
-                List<GridRecipe> subRecipes = new List<GridRecipe>();
-
-                int qCombs = 0;
-                bool first = true;
-                foreach (var val2 in nameToCodeMapping)
-                {
-                    if (first) qCombs = val2.Value.Length;
-                    else qCombs *= val2.Value.Length;
-                    first = false;
-                }
-
-                first = true;
-                foreach (var val2 in nameToCodeMapping)
-                {
-                    string variantCode = val2.Key;
-                    string[] variants = val2.Value;
-
-                    for (int i = 0; i < qCombs; i++)
-                    {
-                        GridRecipe rec;
-
-                        if (first) subRecipes.Add(rec = recipe.Clone());
-                        else rec = subRecipes[i];
-
-                        foreach (CraftingRecipeIngredient ingred in rec.Ingredients.Values)
-                        {
-                            if (ingred.Name == variantCode)
-                            {
-                                ingred.FillPlaceHolder(variantCode, variants[i % variants.Length]);
-                                ingred.Code.Path = ingred.Code.Path.Replace("*", variants[i % variants.Length]);
-                            }
-
-                            if (ingred.ReturnedStack?.Code != null)
-                            {
-                                ingred.ReturnedStack.Code.Path = ingred.ReturnedStack.Code.Path.Replace("{" + variantCode + "}", variants[i % variants.Length]);
-                            }
-                        }
-
-                        rec.Output.FillPlaceHolder(variantCode, variants[i % variants.Length]);
-                    }
-
-                    first = false;
-                }
-
-                foreach (GridRecipe subRecipe in subRecipes)
-                {
-                    if (!subRecipe.ResolveIngredients(api.World)) continue;
-                    api.RegisterCraftingRecipe(subRecipe);
-                }
-
-            }
-            else
-            {
-                if (!recipe.ResolveIngredients(api.World)) return;
                 api.RegisterCraftingRecipe(recipe);
             }
+
+            return;
+        }
+
+        List<GridRecipe> subRecipes = new();
+
+        int variantsCombinations = 1;
+        foreach ((_, string[] mapping) in nameToCodeMapping)
+        {
+            variantsCombinations *= mapping.Length;
+        }
+
+        bool first = true;
+        int variantCodeIndexDivider = 1;
+        foreach ((string variantCode, string[] variants) in nameToCodeMapping)
+        {
+            if (variants.Length == 0) continue;
             
+            for (int i = 0; i < variantsCombinations; i++)
+            {
+                GridRecipe currentRecipe;
+                string currentVariant = variants[i / variantCodeIndexDivider % variants.Length];
+
+                if (first)
+                {
+                    currentRecipe = recipe.Clone();
+                    subRecipes.Add(currentRecipe);
+                }
+                else
+                {
+                    currentRecipe = subRecipes[i];
+                }
+
+                foreach (CraftingRecipeIngredient ingredient in currentRecipe.Ingredients.Values)
+                {
+                    if (ingredient.IsBasicWildCard)
+                    {
+                        if (ingredient.Name == variantCode)
+                        {
+                            ingredient.FillPlaceHolder(variantCode, currentVariant);
+                            ingredient.Code.Path = ingredient.Code.Path.Replace("*", currentVariant);
+                            ingredient.IsBasicWildCard = false;
+                        }
+                    }
+                    else if (ingredient.IsAdvancedWildCard)
+                    {
+                        ingredient.FillPlaceHolder(variantCode, currentVariant);
+                        ingredient.IsAdvancedWildCard = false;
+                    }
+
+                    if (ingredient.ReturnedStack?.Code != null)
+                    {
+                        ingredient.ReturnedStack.Code.Path = ingredient.ReturnedStack.Code.Path.Replace("{" + variantCode + "}", currentVariant);
+                    }
+                }
+
+                currentRecipe.Output.FillPlaceHolder(variantCode, currentVariant);
+            }
+            variantCodeIndexDivider *= variants.Length;
+            first = false;
+        }
+
+        foreach (GridRecipe subRecipe in subRecipes)
+        {
+            if (!subRecipe.ResolveIngredients(api.World)) continue;
+            api.RegisterCraftingRecipe(subRecipe);
         }
     }
 }

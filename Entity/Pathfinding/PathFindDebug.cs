@@ -7,6 +7,8 @@ using Vintagestory.API.Common.CommandAbbr;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.Essentials
 {
     public class PathFindDebug : ModSystem

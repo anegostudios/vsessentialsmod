@@ -4,6 +4,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class DayTimeFrame
@@ -36,7 +38,7 @@ namespace Vintagestory.GameContent
         public DayTimeFrame[] duringDayTimeFrames;
 
         string[] stopOnNearbyEntityCodesExact = null;
-        string[] stopOnNearbyEntityCodesBeginsWith = new string[0];
+        string[] stopOnNearbyEntityCodesBeginsWith = Array.Empty<string>();
         string targetEntityFirstLetters = "";
         float stopRange =0;
         bool stopOnHurt = false;
@@ -101,7 +103,7 @@ namespace Vintagestory.GameContent
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
-            if (whenInEmotionState != null) fearReductionFactor = 1;
+            if (WhenInEmotionState != null) fearReductionFactor = 1;
 
             stopRange *= fearReductionFactor;
 

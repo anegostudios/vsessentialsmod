@@ -1,5 +1,8 @@
-﻿using Vintagestory.API.Common;
+﻿using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+
+#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -40,7 +43,12 @@ namespace Vintagestory.GameContent
             return beh.entity.World.Rand.NextDouble() < 0.005;
         }
 
-        
-
+        public override void OnBeforeRender(ItemRenderInfo renderInfo)
+        {
+            var tf = renderInfo.Transform.Clone();
+            if (itemstack.Collectible.Code.Path.Contains("berry")) tf.Translation.Add(-0.15f, -0.15f, 0.5f);
+            else tf.Translation.Add(0f, -0.1f, -0.12f);
+            renderInfo.Transform = tf;
+        }
     }
 }

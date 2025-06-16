@@ -5,6 +5,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class BEBehaviorAnimatable : BlockEntityBehavior
@@ -100,7 +102,6 @@ namespace Vintagestory.GameContent
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
             ICoreClientAPI capi = api as ICoreClientAPI;
-            MeshData meshdata;
             Block block = api.World.BlockAccessor.GetBlock(be.Pos);
 
             if (texSource == null)
@@ -137,7 +138,7 @@ namespace Vintagestory.GameContent
             };
 
 
-            capi.Tesselator.TesselateShape(meta, shape, out meshdata);
+            capi.Tesselator.TesselateShape(meta, shape, out MeshData meshdata);
             OnAfterTesselate?.Invoke(meshdata);
 
             resultingShape = shape;

@@ -6,6 +6,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public enum RenderMode
@@ -297,9 +299,9 @@ namespace Vintagestory.GameContent
 
         static ModelTransform DefaultTongTransform = new ModelTransform()
         {
-            Translation = new Vec3f(-0.68f, -0.52f, -0.6f),
-            Rotation = new Vec3f(-26, -13, -88),
-            Origin = new Vec3f(0.5f, 0, 0.5f),
+            Translation = new FastVec3f(-0.68f, -0.52f, -0.6f),
+            Rotation = new FastVec3f(-26, -13, -88),
+            Origin = new FastVec3f(0.5f, 0, 0.5f),
             Scale = 0.7f
         };
 
@@ -400,6 +402,7 @@ namespace Vintagestory.GameContent
             float bodyPitch = entityPlayer == null ? 0 : entityPlayer.WalkPitch;
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
             Mat4f.RotateY(ModelMat, ModelMat, smoothedBodyYaw + (90 + rotY) * GameMath.DEG2RAD);
+
             var selfSwimming = isSelf && eagent.Swimming && renderMode == RenderMode.FirstPerson;
 
             if (!selfSwimming && ((selfEplr?.Controls.Gliding != true && selfEplr.MountedOn == null) || renderMode != RenderMode.FirstPerson))

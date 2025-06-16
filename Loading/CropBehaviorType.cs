@@ -3,6 +3,8 @@ using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
     /// <summary>

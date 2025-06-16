@@ -4,6 +4,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.Essentials;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class EntityBehaviorGoalAI : EntityBehavior
@@ -33,8 +35,7 @@ namespace Vintagestory.GameContent
             foreach (JsonObject goalConfig in goals)
             {
                 string goalCode = goalConfig["code"]?.AsString();
-                Type goalType = null;
-                if (!AiGoalRegistry.GoalTypes.TryGetValue(goalCode, out goalType))
+                if (!AiGoalRegistry.GoalTypes.TryGetValue(goalCode, out Type goalType))
                 {
                     entity.World.Logger.Error("Goal with code {0} for entity {1} does not exist. Ignoring.", goalCode, entity.Code);
                     continue;

@@ -6,6 +6,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
+#nullable disable
+
 namespace Vintagestory.Essentials
 {
     public class WaypointsTraverser : PathTraverserBase
@@ -491,12 +493,6 @@ namespace Vintagestory.Essentials
             }
 
             return sqDistToTarget < TargetDistance * TargetDistance;
-        }
-
-        private float DiffSquared(double y1, double y2)
-        {
-            double diff = y1 - y2;
-            return (float)(diff * diff);
         }
 
         public override void Stop()

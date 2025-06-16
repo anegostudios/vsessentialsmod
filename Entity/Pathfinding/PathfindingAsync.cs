@@ -4,6 +4,8 @@ using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.Essentials
 {
     public class PathfindingAsync : ModSystem, IAsyncServerSystem
@@ -103,8 +105,7 @@ namespace Vintagestory.Essentials
         /// </summary>
         protected PathfinderTask Next()
         {
-            PathfinderTask task = null;
-            if (!PathfinderTasks.TryDequeue(out task)) task = null;
+            if (!PathfinderTasks.TryDequeue(out PathfinderTask task)) task = null;
             return task;
         }
 

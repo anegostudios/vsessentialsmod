@@ -3,6 +3,8 @@ using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class CloudRendererBase
@@ -121,9 +123,9 @@ namespace Vintagestory.GameContent
 
             
             capi.Settings.AddWatcher<int>("viewDistance", OnViewDistanceChanged);
-            capi.Settings.AddWatcher<bool>("renderClouds", (val) => renderClouds = val);
 
-            renderClouds = capi.Settings.Bool["renderClouds"];
+            capi.Settings.AddWatcher<int>("cloudRenderMode", (val) => renderClouds = val == 2);
+            renderClouds = capi.Settings.Int.Get("cloudRenderMode") == 2;
 
             InitCustomDataBuffers(updateMesh);
 
@@ -259,7 +261,7 @@ namespace Vintagestory.GameContent
 
                 if (requireTileRebuild)
                 {
-                    InitCloudTiles((8 * capi.World.Player.WorldData.DesiredViewDistance));
+                    InitCloudTiles(8 * capi.World.Player.WorldData.DesiredViewDistance);
                     UpdateCloudTiles();
                     LoadCloudModel();
                     InitCustomDataBuffers(updateMesh);

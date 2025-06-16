@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -7,6 +8,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+
+#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -135,9 +138,9 @@ namespace Vintagestory.GameContent
                 if (entity.IsCreature)
                 {
                     if (entity.touchDistance > largestTouchDistance) largestTouchDistance = entity.touchDistance;
-                }
+        }
 
-                EntityPos pos = entity.SidedPos;
+            EntityPos pos = entity.SidedPos;
 
                 int x = (int)pos.X;
                 int z = (int)pos.Z;
@@ -146,14 +149,14 @@ namespace Vintagestory.GameContent
 
                 long nowInChunkIndex3d = MapUtil.Index3dL(x / chunkSize, (int)pos.Y / chunkSize, z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
 
-                if (!Partitions.TryGetValue(nowInChunkIndex3d, out EntityPartitionChunk partition))
-                {
-                    Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
-                }
-
-                var list = partition.Add(entity, gridIndex);
-                if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
+            if (!Partitions.TryGetValue(nowInChunkIndex3d, out EntityPartitionChunk partition))
+            {
+                Partitions[nowInChunkIndex3d] = partition = new EntityPartitionChunk();
             }
+
+            var list = partition.Add(entity, gridIndex);
+            if (entity is EntityPlayer ep) ep.entityListForPartitioning = list;
+        }
 
             this.LargestTouchDistance = largestTouchDistance;   // Only write to the field when we finished the operation, there could be 10k entities
         }
@@ -238,7 +241,7 @@ namespace Vintagestory.GameContent
         {
             var ePos = e.ServerPos;
             double dx = ePos.X - posX;
-            double dy = ePos.Y - posY;
+            double dy = ePos.InternalY - posY;
             double dz = ePos.Z - posZ;
 
             return (dx * dx + dy * dy + dz * dz) < radiusSq;
@@ -248,7 +251,7 @@ namespace Vintagestory.GameContent
         {
             var ePos = e.Pos;
             double dx = ePos.X - posX;
-            double dy = ePos.Y - posY;
+            double dy = ePos.InternalY - posY;
             double dz = ePos.Z - posZ;
 
             return (dx * dx + dy * dy + dz * dz) < radiusSq;

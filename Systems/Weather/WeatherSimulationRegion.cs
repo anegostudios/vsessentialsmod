@@ -6,6 +6,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     // Epiphany!
@@ -616,6 +618,7 @@ namespace Vintagestory.GameContent
         public double GetBlendedCloudBrightness(float b)
         {
             float w = weatherData.Ambient.CloudBrightness.Weight;
+            if (IsDummy) w = 0;
 
             float bc = weatherData.Ambient.CloudBrightness.Value * weatherData.Ambient.SceneBrightness.Value;
 
@@ -640,7 +643,7 @@ namespace Vintagestory.GameContent
             OldWePattern.EnsureCloudTileCacheIsFresh(tilePos);
         }
 
-
+        
         public byte[] ToBytes()
         {
             using FastMemoryStream ms = new ();

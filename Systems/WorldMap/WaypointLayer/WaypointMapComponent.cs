@@ -6,6 +6,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class WaypointMapComponent : MapComponent
@@ -55,11 +57,10 @@ namespace Vintagestory.GameContent
             prog.Uniform("applyColor", 0);
             prog.Uniform("noTexture", 0f);
 
-            LoadedTexture tex;
 
             float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ZoomLevel);
 
-            if (!wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out tex))
+            if (!wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out LoadedTexture tex))
             {
                 wpLayer.texturesByIcon.TryGetValue("circle", out tex);
             }

@@ -4,6 +4,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods
 {
     public class Core : ModSystem
@@ -136,7 +138,8 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("hunger", typeof(EntityBehaviorHunger));
             api.RegisterEntityBehaviorClass("drunktyping", typeof(EntityBehaviorDrunkTyping));
             api.RegisterEntityBehaviorClass("breathe", typeof(EntityBehaviorBreathe));
-            
+            api.RegisterEntityBehaviorClass("damageovertime", typeof(BehaviorDamageOverTime));
+
             api.RegisterEntityBehaviorClass("playerphysics", typeof(EntityBehaviorPlayerPhysics));
             api.RegisterEntityBehaviorClass("controlledphysics", typeof(EntityBehaviorControlledPhysics));
             
@@ -164,6 +167,8 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("openablecontainer", typeof(EntityBehaviorOpenableContainer));
 
             api.RegisterEntityBehaviorClass("playerinventory", typeof(EntityBehaviorPlayerInventory));
+
+
         }
 
 

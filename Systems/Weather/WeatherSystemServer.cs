@@ -6,6 +6,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class WeatherSystemServer : WeatherSystemBase
@@ -93,7 +95,7 @@ namespace Vintagestory.GameContent
             var dictWeatherPatterns = api.Assets.GetMany<WeatherPatternConfig[]>(api.World.Logger, "config/weatherpatterns/");
             var orderedWeatherPatterns = dictWeatherPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
 
-            WeatherConfigs = new WeatherPatternConfig[0];
+            WeatherConfigs = Array.Empty<WeatherPatternConfig>();
             foreach (var val in orderedWeatherPatterns)
             {
                 WeatherConfigs = WeatherConfigs.Append(val);
@@ -102,7 +104,7 @@ namespace Vintagestory.GameContent
             var dictWindPatterns = api.Assets.GetMany<WindPatternConfig[]>(api.World.Logger, "config/windpatterns/");
             var orderedWindPatterns = dictWindPatterns.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
 
-            WindConfigs = new WindPatternConfig[0];
+            WindConfigs = Array.Empty<WindPatternConfig>();
             foreach (var val in orderedWindPatterns)
             {
                 WindConfigs = WindConfigs.Append(val);
@@ -111,7 +113,7 @@ namespace Vintagestory.GameContent
             var dictweatherEventConfigs = api.Assets.GetMany<WeatherEventConfig[]>(api.World.Logger, "config/weatherevents/");
             var orderedweatherEventConfigs = dictweatherEventConfigs.OrderBy(val => val.Key.ToString()).Select(val => val.Value).ToArray();
 
-            WeatherEventConfigs = new WeatherEventConfig[0];
+            WeatherEventConfigs = Array.Empty<WeatherEventConfig>();
             foreach (var val in orderedweatherEventConfigs)
             {
                 WeatherEventConfigs = WeatherEventConfigs.Append(val);

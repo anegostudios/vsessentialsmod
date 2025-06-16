@@ -7,6 +7,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -140,8 +142,7 @@ namespace Vintagestory.GameContent
 
         private void OnPlrJoin(IServerPlayer byPlayer)
         {
-            string val = "0";
-            byPlayer.ServerData.CustomPlayerData.TryGetValue("errorReporting", out val);
+            byPlayer.ServerData.CustomPlayerData.TryGetValue("errorReporting", out string val);
             if (val == "1" && logEntries.Count > 0)
             {
                 lock (logEntiresLock)

@@ -7,6 +7,8 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 public struct PositionSnapshot
 {
     public double x;
@@ -301,6 +303,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         int signY = Math.Sign(pDiff);
         current += 0.6f * Math.Clamp(GameMath.AngleRadDistance(current, target), -signY * pDiff, signY * pDiff);
         current %= GameMath.TWOPI;
+        
         return current;
     }
 

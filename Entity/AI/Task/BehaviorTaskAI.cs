@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.Essentials;
+
+#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -79,8 +82,7 @@ namespace Vintagestory.GameContent
                     continue;
                 }
 
-                Type taskType = null;
-                if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out taskType))
+                if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out Type taskType))
                 {
                     entity.World.Logger.Error("Task with code {0} for entity {1} does not exist. Ignoring.", taskCode, entity.Code);
                     continue;
@@ -117,6 +119,7 @@ namespace Vintagestory.GameContent
 
             entity.World.FrameProfiler.Mark("ai-pathfinding");
 
+            //Trace.WriteLine(TaskManager.ActiveTasksBySlot[0]?.Id);
 
             entity.World.FrameProfiler.Enter("ai-tasks");
 

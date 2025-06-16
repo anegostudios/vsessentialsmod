@@ -2,6 +2,8 @@
 using System.Text;
 using Vintagestory.API.Client;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public abstract class MapComponent : IDisposable

@@ -5,6 +5,8 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public interface IMeleeAttackListener
@@ -77,7 +79,7 @@ namespace Vintagestory.GameContent
             bool fullyTamed = generation >= tamingGenerations;
 
             float fearReductionFactor = Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
-            if (whenInEmotionState != null) fearReductionFactor = 1;
+            if (WhenInEmotionState != null) fearReductionFactor = 1;
 
             if (fearReductionFactor <= 0) return false;
 
@@ -85,7 +87,7 @@ namespace Vintagestory.GameContent
             {
                 attackedByEntity = null;
             }
-            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, 15, true) && hasDirectContact(attackedByEntity, minDist, minVerDist))
+            if (retaliateAttacks && attackedByEntity != null && attackedByEntity.Alive && attackedByEntity.IsInteractable && IsTargetableEntity(attackedByEntity, 15, true) && hasDirectContact(attackedByEntity, minDist, minVerDist) && !entity.ToleratesDamageFrom(attackedByEntity))
             {
                 targetEntity = attackedByEntity;
             }
@@ -93,7 +95,7 @@ namespace Vintagestory.GameContent
             {
                 targetEntity = entity.World.GetNearestEntity(pos, attackRange * fearReductionFactor, attackRange * fearReductionFactor, (e) =>
                 {
-                    if (fullyTamed && isNonAttackingPlayer(e)) return false;
+                    if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
                     return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
                 });
             }

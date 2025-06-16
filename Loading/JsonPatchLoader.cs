@@ -7,58 +7,175 @@ using JsonPatch.Operations.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Tavis;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.ServerMods.NoObf
 {
+    /// <summary>
+    /// A set of operations that define what a patch will do.
+    /// See https://datatracker.ietf.org/doc/html/rfc6902#section-4.1 for more information on each operation type.
+    /// </summary>
+    [DocumentAsJson]
     public enum EnumJsonPatchOp
     {
+        /// <summary>
+        /// Add an element to a json property at a specific path. Please consider using <see cref="AddMerge"/> for improved mod compatability.
+        /// </summary>
         Add,
+
+        /// <summary>
+        /// Add a set of objects to an array. Will not work if used on other data types.
+        /// </summary>
         AddEach,
+
+        /// <summary>
+        /// Remove a json property at a specific path. Does not require a value to be set.
+        /// </summary>
         Remove,
+
+        /// <summary>
+        /// Replaces a json property with one of a different value. Identical to a remove and then add.
+        /// </summary>
         Replace,
+
+        /// <summary>
+        /// Copies a json property from one place and adds it to another. Requires the <see cref="JsonPatch.FromPath"/> property.
+        /// </summary>
         Copy,
+
+        /// <summary>
+        /// Removes a json property from one place and adds it to another. Identical to removing from one place and adding it to another. Requires the <see cref="JsonPatch.FromPath"/> property.
+        /// </summary>
         Move,
+
+        /// <summary>
+        /// Add merge is similar to <see cref="Add"/>, however if the target is an array, then the current value and patched value will merge together for improved compatibility.
+        /// </summary>
         AddMerge
     }
 
+    /// <summary>
+    /// A condition for a json patch. Conditions are based on the currently loaded worldconfig.
+    /// </summary>
+    [DocumentAsJson]
     public class PatchCondition
     {
-        public string When;
-        public string IsValue;
-        public bool useValue;
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// The key for the world config that this condition relies on.
+        /// </summary>
+        [DocumentAsJson] public string When;
+
+        /// <summary>
+        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>None</jsondefault>-->
+        /// What value does the world config need to be for this patch to happen? Required if not using <see cref="useValue"/>. Will be ignored if using <see cref="useValue"/>.
+        /// </summary>
+        [DocumentAsJson] public string IsValue;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>False</jsondefault>-->
+        /// If true, then this will replace the <see cref="JsonPatch.Value"/> with the value in the world config. Can be used to create more complex patches. Required if not using <see cref="IsValue"/>.
+        /// </summary>
+        [DocumentAsJson] public bool useValue;
     }
 
+    /// <summary>
+    /// A mod-dependence for a json patch. If your patch depends on another mod, you need to use this.
+    /// </summary>
+    [DocumentAsJson]
     public class PatchModDependence
     {
-        public string modid;
-        public bool invert = false;
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// The mod ID that this patch relies on.
+        /// </summary>
+        [DocumentAsJson] public string modid;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>False</jsondefault>-->
+        /// If true, then the patch will only occur if the specified mod is *not* installed.
+        /// </summary>
+        [DocumentAsJson] public bool invert = false;
     }
 
+    /// <summary>
+    /// Defines a patch for a json asset. This allows modifying json files through mods without directly editing them.
+    /// To help with creating patches, it is highly recommended to learn how to use the in-built modmaker program.
+    /// See <see cref="https://wiki.vintagestory.at/Modding:Inbuilt_ModMaker"/> for more info.
+    /// </summary>
+    [DocumentAsJson]
     public class JsonPatch
     {
-        public EnumJsonPatchOp Op;
-        public AssetLocation File;
-        public string FromPath;
-        public string Path;
-        public PatchModDependence[] DependsOn;
-        public bool Enabled = true;
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// The operation for the patch. Essentially controls what the patch actually does.
+        /// </summary>
+        [DocumentAsJson] public EnumJsonPatchOp Op;
 
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// The asset location of the file where the patch should be applied.
+        /// </summary>
+        [DocumentAsJson] public AssetLocation File;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional>-->
+        /// If using <see cref="EnumJsonPatchOp.Move"/> or <see cref="EnumJsonPatchOp.Copy"/>, this is the path to the json property to move or copy from.
+        /// </summary>
+        [DocumentAsJson] public string FromPath;
+
+        /// <summary>
+        /// <!--<jsonoptional>Required</jsonoptional>-->
+        /// This is the path to the json property where the operation will take place.
+        /// </summary>
+        [DocumentAsJson] public string Path;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A list of mod dependencies for the patch. Can be used to create patches that are specific on certain mods being installed. Useful for compatibility!
+        /// </summary>
+        [DocumentAsJson] public PatchModDependence[] DependsOn;
+
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>True</jsondefault>-->
+        /// Should this patch be applied or not?
+        /// </summary>
+        [DocumentAsJson] public bool Enabled = true;
+
+        /// <summary>
+        /// <!--<jsonoptional>Obsolete</jsonoptional>-->
+        /// The app side that the patch should be loaded on. Obsolete, please use <see cref="Side"/> instead.
+        /// </summary>
         [Obsolete("Use Side instead")]
+        [DocumentAsJson]
         public EnumAppSide? SideType
         {
             get { return Side; }
             set { Side = value; }
         }
 
-        public EnumAppSide? Side = EnumAppSide.Universal;
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Universal</jsondefault>-->
+        /// The app side that the patch should be loaded on.
+        /// </summary>
+        [DocumentAsJson] public EnumAppSide? Side = EnumAppSide.Universal;
 
+        /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// A condition that this patch must satisfy to be applied. Uses specific values from the world config. Useful in conjunction with code mods.
+        /// </summary>
+        [DocumentAsJson] public PatchCondition Condition;
 
-        public PatchCondition Condition;
-
+        /// <summary>
+        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>None</jsondefault>-->
+        /// If adding, this is the value (or values) that will be added.
+        /// </summary>
         [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
         public JsonObject Value;
     }

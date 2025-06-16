@@ -10,6 +10,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -34,8 +36,10 @@ namespace Vintagestory.GameContent
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class OnViewChangedPacket
     {
-        public List<Vec2i> NowVisible = new List<Vec2i>();
-        public List<Vec2i> NowHidden = new List<Vec2i>();
+        public int X1;
+        public int Z1;
+        public int X2;
+        public int Z2;
     }
 
     public class WorldMapManager : ModSystem, IWorldMapManager
@@ -336,8 +340,7 @@ namespace Vintagestory.GameContent
             {
                 if (!tabs.ContainsKey(layer.LayerGroupCode))
                 {
-                    double pos;
-                    if (!LayerGroupPositions.TryGetValue(layer.LayerGroupCode, out pos)) pos = 1;   
+                    if (!LayerGroupPositions.TryGetValue(layer.LayerGroupCode, out double pos)) pos = 1;
                     tabs[layer.LayerGroupCode] = pos;
                 }
             }
@@ -347,7 +350,6 @@ namespace Vintagestory.GameContent
 
         private void onViewChangedClient(List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
         {
-            if (nowHidden.Count > 0) { int aa = 0; }
             foreach (MapLayer layer in MapLayers)
             {
                 layer.OnViewChangedClient(nowVisible, nowHidden);
@@ -356,7 +358,7 @@ namespace Vintagestory.GameContent
 
         private void syncViewChange(int x1, int z1, int x2, int z2)
         {
-            clientChannel.SendPacket(new OnViewChangedPacket());
+            clientChannel.SendPacket(new OnViewChangedPacket() { X1 = x1, Z1 = z1, X2 = x2, Z2 = z2 });
         }
         
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
@@ -430,8 +432,7 @@ namespace Vintagestory.GameContent
             {
                 if (layer.DataSide == EnumMapAppSide.Client) continue;
 
-                var pos = fromPlayer.Entity.ServerPos;
-                layer.OnViewChangedServer(fromPlayer, (int)pos.X - 128, (int)pos.X + 128, (int)pos.Z - 128, (int)pos.Z + 128);
+                layer.OnViewChangedServer(fromPlayer, networkMessage.X1, networkMessage.Z1, networkMessage.X2, networkMessage.Z2);
             }
         }
 

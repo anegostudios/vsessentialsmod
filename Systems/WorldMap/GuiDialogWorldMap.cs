@@ -6,6 +6,8 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public delegate void OnViewChangedDelegate(List<FastVec2i> nowVisibleChunks, List<FastVec2i> nowHiddenChunks);

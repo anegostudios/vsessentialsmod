@@ -4,6 +4,8 @@ using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
@@ -26,8 +28,7 @@ namespace Vintagestory.GameContent
 
         private void Event_PlayerDespawn(IClientPlayer byPlayer)
         {
-            EntityMapComponent mp;
-            if (MapComps.TryGetValue(byPlayer, out mp))
+            if (MapComps.TryGetValue(byPlayer, out EntityMapComponent mp))
             {
                 mp.Dispose();
                 MapComps.Remove(byPlayer);
@@ -92,14 +93,13 @@ namespace Vintagestory.GameContent
 
             foreach (IPlayer player in capi.World.AllOnlinePlayers)
             {
-                EntityMapComponent cmp;
 
-                if (MapComps.TryGetValue(player, out cmp))
+                if (MapComps.TryGetValue(player, out EntityMapComponent cmp))
                 {
                     cmp?.Dispose();
                     MapComps.Remove(player);
                 }
-                
+
 
                 if (player.Entity == null)
                 {

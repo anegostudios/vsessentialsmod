@@ -11,6 +11,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
 
@@ -40,7 +42,7 @@ namespace Vintagestory.GameContent
             { EnumBlockMaterial.Lava, "lava" }
         };
 
-        public static OrderedDictionary<string, string> hexColorsByCode = new OrderedDictionary<string, string>()
+        public static API.Datastructures.OrderedDictionary<string, string> hexColorsByCode = new ()
         {
             { "ink", "#483018" },
             { "settlement", "#856844" },
@@ -56,7 +58,7 @@ namespace Vintagestory.GameContent
             { "devastation", "#755c3c" }
         };
 
-        public OrderedDictionary<string, int> colorsByCode = new OrderedDictionary<string, int>() {};
+        public API.Datastructures.OrderedDictionary<string, int> colorsByCode = new () {};
         int[] colors;
 
         public byte[] block2Color;
@@ -351,10 +353,9 @@ namespace Vintagestory.GameContent
 
         public override void OnTick(float dt)
         {
-            int count = readyMapPieces.Count;
-            if (count > 0)
+            if (!readyMapPieces.IsEmpty)
             {
-                int q = Math.Min(count, 200);
+                int q = Math.Min(readyMapPieces.Count, 200);
                 List<MultiChunkMapComponent> modified = new();
                 while (q-- > 0)
                 {
@@ -363,8 +364,7 @@ namespace Vintagestory.GameContent
                         FastVec2i mcord = new FastVec2i(mappiece.Cord.X / MultiChunkMapComponent.ChunkLen, mappiece.Cord.Y / MultiChunkMapComponent.ChunkLen);
                         FastVec2i baseCord = new FastVec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
 
-                        MultiChunkMapComponent mccomp;
-                        if (!loadedMapData.TryGetValue(mcord, out mccomp))
+                        if (!loadedMapData.TryGetValue(mcord, out MultiChunkMapComponent mccomp))
                         {
                             loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
                         }

@@ -13,6 +13,8 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
+#nullable disable
+
 namespace Vintagestory.GameContent
 {
     public class WeatherSystemCommands : ModSystem
@@ -217,9 +219,8 @@ namespace Vintagestory.GameContent
             var regionX = pos.X / api.World.BlockAccessor.RegionSize;
             var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
 
-            WeatherSimulationRegion weatherSim;
             long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out WeatherSimulationRegion weatherSim);
             if (weatherSim == null)
             {
                 return TextCommandResult.Success("Weather sim not loaded (yet) for this region");
@@ -294,15 +295,14 @@ namespace Vintagestory.GameContent
             var regionX = pos.X / api.World.BlockAccessor.RegionSize;
             var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
 
-            WeatherSimulationRegion weatherSim;
 
             if (arg == "setevr")
             {
                 var index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+                wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out WeatherSimulationRegion weatherSim);
                 if (weatherSim == null)
                 {
-                   return TextCommandResult.Success("Weather sim not loaded (yet) for this region");
+                    return TextCommandResult.Success("Weather sim not loaded (yet) for this region");
                 }
 
                 if (weatherSim.SetWeatherEvent(code, true))
@@ -638,8 +638,7 @@ namespace Vintagestory.GameContent
 
             WeatherSystemServer wsysServer = sapi.ModLoader.GetModSystem<WeatherSystemServer>();
             long index2d = wsysServer.MapRegionIndex2D(regionX, regionZ);
-            WeatherSimulationRegion simregion;
-            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out simregion);
+            wsysServer.weatherSimByMapRegion.TryGetValue(index2d, out WeatherSimulationRegion simregion);
 
             int reso = WeatherSimulationRegion.snowAccumResolution;
 
@@ -793,9 +792,8 @@ namespace Vintagestory.GameContent
             int regionX = pos.X / api.World.BlockAccessor.RegionSize;
             int regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
 
-            WeatherSimulationRegion weatherSim;
             long index2d = wsys.MapRegionIndex2D(regionX, regionZ);
-            wsys.weatherSimByMapRegion.TryGetValue(index2d, out weatherSim);
+            wsys.weatherSimByMapRegion.TryGetValue(index2d, out WeatherSimulationRegion weatherSim);
             if (weatherSim == null)
             {
                 return "weatherSim is null. No idea what to do here";
