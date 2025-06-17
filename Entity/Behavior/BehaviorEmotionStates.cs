@@ -109,7 +109,7 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            if (damageSource.Source == EnumDamageSource.Fall && _enumCreatureHostility == EnumCreatureHostility.Passive && _enumCreatureHostility == EnumCreatureHostility.NeverHostile)
+            if (damageSource.Source == EnumDamageSource.Fall || _enumCreatureHostility == EnumCreatureHostility.Passive || _enumCreatureHostility == EnumCreatureHostility.NeverHostile)
             {
                 return;
             }
