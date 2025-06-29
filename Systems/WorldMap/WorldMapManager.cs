@@ -12,35 +12,7 @@ using Vintagestory.API.Util;
 
 #nullable disable
 
-namespace Vintagestory.GameContent
-{
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-    public class MapLayerUpdate
-    {
-        public MapLayerData[] Maplayers;
-    }
-
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-    public class MapLayerData
-    {
-        public string ForMapLayer;
-        public byte[] Data;
-    }
-
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-    public class OnMapToggle
-    {
-        public bool OpenOrClose;
-    }
-
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
-    public class OnViewChangedPacket
-    {
-        public int X1;
-        public int Z1;
-        public int X2;
-        public int Z2;
-    }
+namespace Vintagestory.GameContent;
 
     public class WorldMapManager : ModSystem, IWorldMapManager
     {
