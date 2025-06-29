@@ -58,8 +58,10 @@ namespace Vintagestory.GameContent
 
         // Client and Server side stuff
         public List<MapLayer> MapLayers = new List<MapLayer>();
-        Thread mapLayerGenThread;
+        private Thread mapLayerGenThread;
         public bool IsShuttingDown { get; set; }
+        private readonly object _mapLayerThreadLock = new();
+        private const float _tickInterval = 20 / 1000f;
 
         // Server side stuff
         IServerNetworkChannel serverChannel;
@@ -98,11 +100,12 @@ namespace Vintagestory.GameContent
             base.StartClientSide(api);
 
             capi = api;
-            capi.Event.LevelFinalize += OnLvlFinalize;
-            
+            capi.Event.LevelFinalize += OnLevelFinaliseClient;
+
             capi.Event.RegisterGameTickListener(OnClientTick, 20);
 
-            capi.Settings.AddWatcher<bool>("showMinimapHud", (on) => {
+            capi.Settings.AddWatcher<bool>("showMinimapHud", (on) =>
+            {
                 ToggleMap(EnumDialogType.HUD);
             });
 
@@ -178,54 +181,6 @@ namespace Vintagestory.GameContent
             {
                 layer.OnTick(dt);
             }
-        }
-
-        private void OnLvlFinalize()
-        {
-            if (capi != null && mapAllowedClient())
-            {
-                capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
-                capi.Input.RegisterHotKey("minimapposition", Lang.Get("keycontrol-minimap-position"), GlKeys.F6, HotkeyType.HelpAndOverlays, false, true, false);
-                capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
-                capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
-                capi.Input.SetHotKeyHandler("minimapposition", OnHotKeyMinimapPosition);
-                capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
-                capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
-            }
-
-            foreach (var val in MapLayerRegistry)
-            {   
-                if (val.Key == "entities" && !api.World.Config.GetAsBool("entityMapLayer")) continue;
-                MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));
-            }
-
-
-            foreach (MapLayer layer in MapLayers)
-            {
-                layer.OnLoaded();
-            }
-
-            mapLayerGenThread = new Thread(new ThreadStart(() =>
-            {
-                while (!IsShuttingDown)
-                {
-                    foreach (MapLayer layer in MapLayers)
-                    {
-                        layer.OnOffThreadTick(20 / 1000f);
-                    }
-
-                    Thread.Sleep(20);
-                }
-            }));
-
-            mapLayerGenThread.IsBackground = true;
-            mapLayerGenThread.Start();
-
-            if (capi != null && (capi.Settings.Bool["showMinimapHud"] || !capi.Settings.Bool.Exists("showMinimapHud")) && (worldMapDlg == null || !worldMapDlg.IsOpened()))
-            {
-                ToggleMap(EnumDialogType.HUD);
-            }
-
         }
 
         private void OnMapLayerDataReceivedClient(MapLayerUpdate msg)
@@ -311,7 +266,7 @@ namespace Vintagestory.GameContent
                         worldMapDlg.Open(EnumDialogType.HUD);
                         return;
                     }
-                                
+
                 }
 
                 worldMapDlg.TryClose();
@@ -319,10 +274,11 @@ namespace Vintagestory.GameContent
             }
 
             worldMapDlg = new GuiDialogWorldMap(onViewChangedClient, syncViewChange, capi, getTabsOrdered());
-            worldMapDlg.OnClosed += () => {
+            worldMapDlg.OnClosed += () =>
+            {
                 foreach (MapLayer layer in MapLayers) layer.OnMapClosedClient();
                 clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = false });
-                
+
             };
 
             worldMapDlg.Open(asType);
@@ -360,7 +316,7 @@ namespace Vintagestory.GameContent
         {
             clientChannel.SendPacket(new OnViewChangedPacket() { X1 = x1, Z1 = z1, X2 = x2, Z2 = z2 });
         }
-        
+
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
             worldMapDlg.TranslateWorldPosToViewPos(worldPos, ref viewPos);
@@ -385,7 +341,7 @@ namespace Vintagestory.GameContent
         #region Server Side
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLvlFinalize);;
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, OnLevelFinaliseServer);
             sapi.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => IsShuttingDown = true);
 
             serverChannel =
@@ -397,7 +353,7 @@ namespace Vintagestory.GameContent
                .SetMessageHandler<OnViewChangedPacket>(OnViewChangedServer)
                .SetMessageHandler<MapLayerUpdate>(OnMapLayerDataReceivedServer)
             ;
-            
+
         }
 
         private void OnMapLayerDataReceivedServer(IServerPlayer fromPlayer, MapLayerUpdate msg)
@@ -453,5 +409,89 @@ namespace Vintagestory.GameContent
         }
 
         #endregion
+
+        private void OnLevelFinaliseClient()
+        {
+            if (capi is null) return;
+            RegisterClientHotkeys();
+            LoadMapLayersFromRegistry();
+            CreateMapLayerGenerationThread();
+            OpenMiniMap();
+        }
+
+        private void OnLevelFinaliseServer()
+        {
+            LoadMapLayersFromRegistry();
+            CreateMapLayerGenerationThread();
+        }
+
+        private void RegisterClientHotkeys()
+        {
+            if (capi is null) return;
+            if (!mapAllowedClient()) return;
+
+            capi.Input.RegisterHotKey("worldmaphud", Lang.Get("Show/Hide Minimap"), GlKeys.F6, HotkeyType.HelpAndOverlays);
+            capi.Input.RegisterHotKey("minimapposition", Lang.Get("keycontrol-minimap-position"), GlKeys.F6, HotkeyType.HelpAndOverlays, false, true, false);
+            capi.Input.RegisterHotKey("worldmapdialog", Lang.Get("Show World Map"), GlKeys.M, HotkeyType.HelpAndOverlays);
+            capi.Input.SetHotKeyHandler("worldmaphud", OnHotKeyWorldMapHud);
+            capi.Input.SetHotKeyHandler("minimapposition", OnHotKeyMinimapPosition);
+            capi.Input.SetHotKeyHandler("worldmapdialog", OnHotKeyWorldMapDlg);
+
+            capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
+        }
+
+        private void OpenMiniMap()
+        {
+            if (!(worldMapDlg is null) && worldMapDlg.IsOpened()) return;
+            if (!capi.Settings.Bool["showMinimapHud"] && capi.Settings.Bool.Exists("showMinimapHud")) return;
+            ToggleMap(EnumDialogType.HUD);
+        }
+
+        private void CreateMapLayerGenerationThread()
+        {
+            if (mapLayerGenThread is { IsAlive: true }) return;
+            mapLayerGenThread = new Thread(new ThreadStart(() =>
+            {
+                while (!IsShuttingDown)
+                {
+                    lock (_mapLayerThreadLock)
+                    {
+                        var mapLayersSnapshot = MapLayers.ToList();
+                        foreach (var layer in mapLayersSnapshot)
+                        {
+                            layer.OnOffThreadTick(_tickInterval);
+                        }
+                    }
+
+                    Thread.Sleep(20);
+                }
+            }))
+            {
+                IsBackground = true
+            };
+            mapLayerGenThread.Start();
+        }
+
+        private void LoadMapLayersFromRegistry()
+        {
+            lock (_mapLayerThreadLock)
+            {
+                MapLayers.Clear();
+
+                var mapLayerRegistrySnapshot = MapLayerRegistry.ToDictionary(k => k.Key, v => v.Value);
+                foreach (var val in mapLayerRegistrySnapshot)
+                {
+                    if (val.Key == "entities" && !api.World.Config.GetAsBool("entityMapLayer")) continue;
+                    var instance = (MapLayer)Activator.CreateInstance(val.Value, api, this);
+                    MapLayers.Add(instance);
+                }
+
+                var mapLayersSnapshot = MapLayers.ToList();
+                foreach (var layer in mapLayersSnapshot)
+                {
+                    layer.OnLoaded();
+                }
+            }
+        }
     }
 }
