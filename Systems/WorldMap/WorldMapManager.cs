@@ -25,11 +25,11 @@ namespace Vintagestory.GameContent;
         // Client side stuff
         private ICoreClientAPI _capi;
         private IClientNetworkChannel _clientChannel;
-        public GuiDialogWorldMap _worldMapDialogue;
-        public bool IsOpened => _worldMapDialogue?.IsOpened() == true;
+        public GuiDialogWorldMap worldMapDlg { get; set; }
+        public bool IsOpened => worldMapDlg?.IsOpened() == true;
 
         // Client and Server side stuff
-        public List<MapLayer> MapLayers = new List<MapLayer>();
+        public List<MapLayer> MapLayers { get; set; } = new List<MapLayer>();
         private Thread _mapLayerGenThread;
         private readonly object _mapLayerThreadLock = new();
         private const float _tickInterval = 20 / 1000f;
@@ -144,7 +144,7 @@ namespace Vintagestory.GameContent;
                 i++;
             }
 
-            _worldMapDialogue?.Dispose();
+            worldMapDlg?.Dispose();
 
             foreach (var layer in MapLayers)
             {
@@ -161,13 +161,13 @@ namespace Vintagestory.GameContent;
             int z = xyzstr[3].ToInt();
             string text = xyzstr.Length >= 5 ? xyzstr[4] : "";
 
-            if (_worldMapDialogue == null || !_worldMapDialogue.IsOpened() || (_worldMapDialogue.IsOpened() && _worldMapDialogue.DialogType == EnumDialogType.HUD))
+            if (worldMapDlg == null || !worldMapDlg.IsOpened() || (worldMapDlg.IsOpened() && worldMapDlg.DialogType == EnumDialogType.HUD))
             {
                 ToggleMap(EnumDialogType.Dialog);
             }
 
             bool exists = false;
-            var elem = _worldMapDialogue.SingleComposer.GetElement("mapElem") as GuiElementMap;
+            var elem = worldMapDlg.SingleComposer.GetElement("mapElem") as GuiElementMap;
             var wml = elem?.mapLayers.FirstOrDefault(ml => ml is WaypointMapLayer) as WaypointMapLayer;
             Vec3d pos = new Vec3d(x, y, z);
             if (wml != null)
@@ -224,12 +224,12 @@ namespace Vintagestory.GameContent;
             int prev = _capi.Settings.Int["minimapHudPosition"];
             _capi.Settings.Int["minimapHudPosition"] = (prev + 1) % 4;
 
-            if (_worldMapDialogue == null || !_worldMapDialogue.IsOpened()) ToggleMap(EnumDialogType.HUD);
+            if (worldMapDlg == null || !worldMapDlg.IsOpened()) ToggleMap(EnumDialogType.HUD);
             else
             {
-                if (_worldMapDialogue.DialogType == EnumDialogType.HUD)
+                if (worldMapDlg.DialogType == EnumDialogType.HUD)
                 {
-                    _worldMapDialogue.Recompose();
+                    worldMapDlg.Recompose();
                 }
             }
             return true;
@@ -244,21 +244,21 @@ namespace Vintagestory.GameContent;
 
         public void ToggleMap(EnumDialogType asType)
         {
-            bool isDlgOpened = _worldMapDialogue != null && _worldMapDialogue.IsOpened();
+            bool isDlgOpened = worldMapDlg != null && worldMapDlg.IsOpened();
 
             if (!mapAllowedClient())
             {
-                if (isDlgOpened) _worldMapDialogue.TryClose();
+                if (isDlgOpened) worldMapDlg.TryClose();
                 return;
             }
 
-            if (_worldMapDialogue != null)
+            if (worldMapDlg != null)
             {
                 if (!isDlgOpened)
                 {
                     if (asType == EnumDialogType.HUD) _capi.Settings.Bool.Set("showMinimapHud", true, false);
 
-                    _worldMapDialogue.Open(asType);
+                    worldMapDlg.Open(asType);
                     foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
                     _clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
 
@@ -266,9 +266,9 @@ namespace Vintagestory.GameContent;
                 }
                 else
                 {
-                    if (_worldMapDialogue.DialogType != asType)
+                    if (worldMapDlg.DialogType != asType)
                     {
-                        _worldMapDialogue.Open(asType);
+                        worldMapDlg.Open(asType);
                         return;
                     }
 
@@ -278,25 +278,25 @@ namespace Vintagestory.GameContent;
                     }
                     else if (_capi.Settings.Bool["showMinimapHud"])
                     {
-                        _worldMapDialogue.Open(EnumDialogType.HUD);
+                        worldMapDlg.Open(EnumDialogType.HUD);
                         return;
                     }
 
                 }
 
-                _worldMapDialogue.TryClose();
+                worldMapDlg.TryClose();
                 return;
             }
 
-            _worldMapDialogue = new GuiDialogWorldMap(OnViewChangedClient, SyncViewChange, _capi, GetTabsOrdered());
-            _worldMapDialogue.OnClosed += () =>
+            worldMapDlg = new GuiDialogWorldMap(OnViewChangedClient, SyncViewChange, _capi, GetTabsOrdered());
+            worldMapDlg.OnClosed += () =>
             {
                 foreach (MapLayer layer in MapLayers) layer.OnMapClosedClient();
                 _clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = false });
 
             };
 
-            _worldMapDialogue.Open(asType);
+            worldMapDlg.Open(asType);
             foreach (MapLayer layer in MapLayers) layer.OnMapOpenedClient();
             _clientChannel.SendPacket(new OnMapToggle() { OpenOrClose = true });
 
@@ -334,7 +334,7 @@ namespace Vintagestory.GameContent;
 
         public void TranslateWorldPosToViewPos(Vec3d worldPos, ref Vec2f viewPos)
         {
-            _worldMapDialogue.TranslateWorldPosToViewPos(worldPos, ref viewPos);
+            worldMapDlg.TranslateWorldPosToViewPos(worldPos, ref viewPos);
         }
 
         public void SendMapDataToServer(MapLayer forMapLayer, byte[] data)
@@ -378,7 +378,7 @@ namespace Vintagestory.GameContent;
 
         private void OpenMiniMap()
         {
-            if (!(_worldMapDialogue is null) && _worldMapDialogue.IsOpened()) return;
+            if (!(worldMapDlg is null) && worldMapDlg.IsOpened()) return;
             if (!_capi.Settings.Bool["showMinimapHud"] && _capi.Settings.Bool.Exists("showMinimapHud")) return;
             ToggleMap(EnumDialogType.HUD);
         }
