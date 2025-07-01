@@ -118,7 +118,7 @@ namespace Vintagestory.GameContent
 
     public interface IAnimalNest : IPointOfInterest
     {
-        bool IsSuitableFor(Entity entity);
+        bool IsSuitableFor(Entity entity, string[] nestTypes);
 
         /// <summary>
         /// Return true if occupied by an entity, which is not the same as the entity specified in the parameter
@@ -130,7 +130,7 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Returns true if an egg was successfully added
         /// </summary>
-        bool TryAddEgg(Entity entity, string chickCode, double incubationTime);
+        bool TryAddEgg(ItemStack egg);
 
         float DistanceWeighting { get; }
     }
