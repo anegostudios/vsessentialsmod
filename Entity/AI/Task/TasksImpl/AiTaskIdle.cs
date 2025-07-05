@@ -35,8 +35,6 @@ namespace Vintagestory.GameContent
         bool entityWasInRange;
         long lastEntityInRangeTestTotalMs;
 
-        public DayTimeFrame[] duringDayTimeFrames;
-
         string[] stopOnNearbyEntityCodesExact = null;
         string[] stopOnNearbyEntityCodesBeginsWith = Array.Empty<string>();
         string targetEntityFirstLetters = "";
@@ -66,7 +64,6 @@ namespace Vintagestory.GameContent
 
             stopRange = taskConfig["stopRange"].AsFloat(0f);
             stopOnHurt = taskConfig["stopOnHurt"].AsBool(false);
-            duringDayTimeFrames = taskConfig["duringDayTimeFrames"].AsObject<DayTimeFrame[]>(null);
 
 
             string[] codes = taskConfig["stopOnNearbyEntityCodes"].AsArray<string>(new string[] { "player" });
@@ -131,17 +128,7 @@ namespace Vintagestory.GameContent
 
                 if (entityWasInRange) return false;
 
-                if (duringDayTimeFrames != null)
-                {
-                    bool match = false;
-                    // introduce a bit of randomness so that (e.g.) hens do not all wake up simultaneously at 06:00, which looks artificial
-                    double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * 24f + (entity.World.Rand.NextDouble() * 0.3f - 0.15f);
-                    for (int i = 0; !match && i < duringDayTimeFrames.Length; i++)
-                    {
-                        match |= duringDayTimeFrames[i].Matches(hourOfDay);
-                    }
-                    if (!match) return false;
-                }
+                
 
                 Block belowBlock = entity.World.BlockAccessor.GetBlockRaw((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY - 1, (int)entity.ServerPos.Z, BlockLayersAccess.Solid);
                 // Only with a solid block below (and here not lake ice: entities should not idle on lake ice!)
@@ -181,16 +168,9 @@ namespace Vintagestory.GameContent
                 if (entityWasInRange) return false;
 
 
-                if (duringDayTimeFrames != null)
-                {
-                    bool match = false;
-                    double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * 24f;
-                    for (int i = 0; !match && i < duringDayTimeFrames.Length; i++)
-                    {
-                        match |= duringDayTimeFrames[i].Matches(hourOfDay);
-                    }
-                    if (!match) return false;
-                }
+                //Check if time is still valid for task.
+                if (!IsInValidDayTimeHours(false)) return false;
+
             }
 
             return !stopNow && (idleUntilMs < 0 || entity.World.ElapsedMilliseconds < idleUntilMs);

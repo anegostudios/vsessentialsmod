@@ -379,10 +379,14 @@ namespace Vintagestory.GameContent
             float bodyYaw;
             float mdt = Math.Min(0.05f, dt);
 
-            if (!isSelf || capi.World.Player.CameraMode != EnumCameraMode.FirstPerson)
+            if (!isSelf && entityPlayer.MountedOn != null)
+            {
+                smoothedBodyYaw = bodyYawLerped = entityPlayer.MountedOn.Entity.Pos.Yaw;
+            }
+            else if (capi.World.Player.CameraMode != EnumCameraMode.FirstPerson)
             {
                 float yawDist = GameMath.AngleRadDistance(bodyYawLerped, eagent.BodyYaw);
-                
+
                 bodyYawLerped += GameMath.Clamp(yawDist, -mdt * 8, mdt * 8);
                 bodyYaw = bodyYawLerped;
 

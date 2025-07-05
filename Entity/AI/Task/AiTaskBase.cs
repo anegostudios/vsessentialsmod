@@ -54,6 +54,8 @@ namespace Vintagestory.API.Common
 
         protected EntityBehaviorEmotionStates bhEmo;
 
+        public DayTimeFrame[] duringDayTimeFrames;
+
         protected double defaultTimeoutSec = 30;
         protected TimeSpan timeout;
         protected long executeStartTimeMs;
@@ -139,6 +141,8 @@ namespace Vintagestory.API.Common
                 finishSound = AssetLocation.Create(finishSoundCfg.AsString(), entity.Code.Domain).WithPathPrefixOnce("sounds/");
             }
 
+            duringDayTimeFrames = taskConfig["duringDayTimeFrames"].AsObject<DayTimeFrame[]>(null);
+
             cooldownUntilMs = entity.World.ElapsedMilliseconds + initialmincooldown + entity.World.Rand.Next(initialmaxcooldown - initialmincooldown);
         }
 
@@ -147,6 +151,27 @@ namespace Vintagestory.API.Common
             if (WhenSwimming != null && WhenSwimming != entity.Swimming) return false;
             if (WhenInEmotionState != null && IsInEmotionState(WhenInEmotionState) != true) return false;
             if (WhenNotInEmotionState != null && IsInEmotionState(WhenNotInEmotionState) == true) return false;
+            if (!IsInValidDayTimeHours(true)) return false;
+            return true;
+        }
+
+        protected bool IsInValidDayTimeHours(bool initialRandomness)
+        {
+            if (duringDayTimeFrames != null)
+            {
+                // introduce a bit of randomness so that (e.g.) hens do not all wake up simultaneously at 06:00, which looks artificial
+                double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * 24f;
+                if (initialRandomness)
+                {
+                    hourOfDay += entity.World.Rand.NextDouble() * 0.3f - 0.15f;
+                }
+                for (int i = 0; i < duringDayTimeFrames.Length; i++)
+                {
+                    if (duringDayTimeFrames[i].Matches(hourOfDay)) return true;
+                }
+                return false;
+            }
+            //If there's no specified time frames, then any time is valid.
             return true;
         }
 
@@ -222,6 +247,9 @@ namespace Vintagestory.API.Common
                 entity.World.PlaySoundAt(sound, entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z, null, true, soundRange);
                 lastSoundTotalMs = entity.World.ElapsedMilliseconds;
             }
+
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
 
             return true;
         }

@@ -124,6 +124,9 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             if (initialTargetPos.DistanceTo(targetEntity.ServerPos.XYZ) > 3)
             {
                 initialTargetPos = targetEntity.ServerPos.XYZ;

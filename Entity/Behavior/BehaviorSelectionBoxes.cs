@@ -231,6 +231,7 @@ namespace Vintagestory.GameContent
             int foundIndex = -1;
             double foundDistance = double.MaxValue;
 
+            var rayLengthSq = pickingray.Length * pickingray.Length;
             for (int i = 0; i < selectionBoxes.Length; i++)
             {
                 var apap = selectionBoxes[i];
@@ -248,7 +249,7 @@ namespace Vintagestory.GameContent
                     var tf = mvmat.TransformVector(new Vec4d(hitPositionOBBSpace.X, hitPositionOBBSpace.Y, hitPositionOBBSpace.Z, 1));
 
                     double dist = (tf.XYZ - pickingray.origin).LengthSq();
-                    if (foundIndex >= 0 && foundDistance < dist) continue;
+                    if (foundIndex >= 0 && foundDistance < dist || rayLengthSq < dist) continue;
 
                     hitPositionAABBSpace = tf.XYZ;
                     foundDistance = dist;

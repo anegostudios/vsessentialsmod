@@ -120,6 +120,9 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             EntityPos own = entity.ServerPos;
             EntityPos his = targetEntity.ServerPos;
             if (own.Dimension != his.Dimension) return false;   // One or other changed dimension, no further attack processing

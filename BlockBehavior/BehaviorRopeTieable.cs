@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Common;
+﻿using Vintagestory.API;
+using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -7,6 +8,17 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    /// <summary>
+    /// Allows rope to be tied to this block. This behavior does not have any specific JSON properties.
+    /// This block behavior uses the code "RopeTieable".
+    /// </summary>
+    /// <example>
+    /// <code lang="json">
+    ///"behaviors": [
+	///	{ "name": "RopeTieable" }
+	///],
+    /// </code></example>
+    [DocumentAsJson] 
     public class BlockBehaviorRopeTieable : BlockBehavior
     {
 

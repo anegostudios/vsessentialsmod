@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -11,49 +12,53 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskSeekBlockAndLay : AiTaskBase
     {
-        POIRegistry porregistry;
-        IAnimalNest targetPoi;
+        protected POIRegistry porregistry;
+        protected IAnimalNest targetPoi;
 
-        float moveSpeed = 0.02f;
-        bool nowStuck = false;
-        bool laid = false;
+        protected float moveSpeed = 0.02f;
+        protected bool nowStuck = false;
+        protected bool laid = false;
 
         /// <summary>
         /// Time in (game) days for the creature to sit on the nest (i.e. incubating eggs) before switching tasks (e.g. to feed)
         /// </summary>
-        float sitDays = 1f;
+        protected float sitDays = 1f;
         /// <summary>
         /// Time in (real) seconds for the creature to remain on the nest when laying a single egg
         /// </summary>
-        float layTime = 1f;
+        protected float layTime = 1f;
         /// <summary>
         /// Cumulative time in (game) days for which a creature must sit before any fertile eggs will hatch
         /// </summary>
-        double incubationDays = 5;
+        protected double incubationDays = 5;
         /// <summary>
-        /// Code for the chick to hatch from an egg laid by this creature
+        /// Codes for the chicks to hatch from eggs laid by this creature
         /// </summary>
-        string chickCode = null;
+        protected string[] chickCodes = null;
+        /// <summary>
+        /// Types of nest this creature lays eggs in
+        /// </summary>
+        protected string[] nestTypes = null;
         /// <summary>
         /// Chance that an egg will be laid on the ground, if a search for the nest fails
         /// </summary>
-        double onGroundChance = 0.3;
-        AssetLocation failBlockCode;
+        protected double onGroundChance = 0.3;
+        protected AssetLocation failBlockCode;
 
-        float sitTimeNow = 0;
-        double sitEndDay = 0;
-        bool sitAnimStarted = false;
-        float PortionsEatenForLay;
-        string requiresNearbyEntityCode;
-        float requiresNearbyEntityRange = 5;
+        protected float sitTimeNow = 0;
+        protected double sitEndDay = 0;
+        protected bool sitAnimStarted = false;
+        protected float PortionsEatenForLay;
+        protected string requiresNearbyEntityCode;
+        protected float requiresNearbyEntityRange = 5;
 
-        AnimationMetaData sitAnimMeta;
+        protected AnimationMetaData sitAnimMeta;
 
         Dictionary<IAnimalNest, FailedAttempt> failedSeekTargets = new Dictionary<IAnimalNest, FailedAttempt>();
 
-        long lastPOISearchTotalMs;
+        protected long lastPOISearchTotalMs;
 
-        double attemptLayEggTotalHours;
+        protected double attemptLayEggTotalHours;
 
         public AiTaskSeekBlockAndLay(EntityAgent entity) : base(entity)
         {
@@ -84,7 +89,11 @@ namespace Vintagestory.GameContent
                 }.Init();
             }
 
-            chickCode = taskConfig["chickCode"].AsString(null);
+            // Check for an array of chickCodes or an individual chickCode. If neither is found, eggs will be infertile.
+            chickCodes = taskConfig["chickCodes"].AsArray<string>();
+            chickCodes ??= new string[] { taskConfig["chickCode"].AsString(null) };
+
+            nestTypes = taskConfig["nestTypes"].AsArray<string>();
             PortionsEatenForLay = taskConfig["portionsEatenForLay"].AsFloat(3);
             requiresNearbyEntityCode = taskConfig["requiresNearbyEntityCode"].AsString(null);
             requiresNearbyEntityRange = taskConfig["requiresNearbyEntityRange"].AsFloat(5);
@@ -131,9 +140,9 @@ namespace Vintagestory.GameContent
             return porregistry.GetWeightedNearestPoi(entity.ServerPos.XYZ, radius, (poi) =>
             {
                 if (poi.Type != "nest") return false;
-                IAnimalNest nestPoi;
+                IAnimalNest nestPoi = poi as IAnimalNest;
 
-                if ((nestPoi = poi as IAnimalNest)?.IsSuitableFor(entity) == true && !nestPoi.Occupied(entity))
+                if (nestPoi?.Occupied(entity) == false && nestPoi.IsSuitableFor(entity, nestTypes))
                 {
                     failedSeekTargets.TryGetValue(nestPoi, out FailedAttempt attempt);
                     if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000))
@@ -173,8 +182,48 @@ namespace Vintagestory.GameContent
             return pathTraverser.Ready;
         }
 
+        protected virtual ItemStack MakeEggItem(string chickCode)
+        {
+            ICoreAPI api = entity.Api;
+            ItemStack eggStack;
+            JsonItemStack[] eggTypes = entity?.Properties.Attributes?["eggTypes"].AsArray<JsonItemStack>();
+            if (eggTypes == null)
+            {
+                string fallbackCode = "egg-chicken-raw";
+                if (entity != null) api.Logger.Warning("No egg type specified for entity " + entity.Code + ", falling back to " + fallbackCode);
+                eggStack = new ItemStack(api.World.GetItem(fallbackCode));
+            }
+            else
+            {
+                JsonItemStack jsonEgg = eggTypes[api.World.Rand.Next(eggTypes.Length)];
+                if (!jsonEgg.Resolve(api.World, null, false))
+                {
+                    api.Logger.Warning("Failed to resolve egg " + jsonEgg.Type + " with code " + jsonEgg.Code + " for entity " + entity.Code);
+                    return null;
+                }
+                eggStack = new ItemStack(jsonEgg.ResolvedItemstack.Collectible);
+            }
+
+            if (chickCode != null)
+            {
+                TreeAttribute chickTree = new TreeAttribute();
+                chickCode = AssetLocation.Create(chickCode, entity?.Code.Domain ?? GlobalConstants.DefaultDomain);
+                chickTree.SetString("code", chickCode);
+                chickTree.SetInt("generation", entity?.WatchedAttributes.GetInt("generation", 0) + 1 ?? 0);
+                chickTree.SetDouble("incubationDays", incubationDays);
+                EntityAgent eagent = entity as EntityAgent;
+                if (eagent != null) chickTree.SetLong("herdID", eagent.HerdId);
+                eggStack.Attributes["chick"] = chickTree;
+            }
+
+            return eggStack;
+        }
+
         public override bool ContinueExecute(float dt)
         {
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             if (targetPoi.Occupied(entity))
             {
                 onBadTarget();
@@ -203,7 +252,7 @@ namespace Vintagestory.GameContent
 
                 EntityBehaviorMultiply bh = entity.GetBehavior<EntityBehaviorMultiply>();
 
-                if (targetPoi.IsSuitableFor(entity) != true)
+                if (targetPoi.IsSuitableFor(entity, nestTypes) != true)
                 {
                     onBadTarget();
                     return false;
@@ -227,7 +276,12 @@ namespace Vintagestory.GameContent
 
                     // Potential gameplay/realism issue: the rooster has to be nearby at the exact moment the egg is laid, instead of looking to see whether there was a rooster / hen interaction ;) recently ...
                     // To mitigate this issue, we increase the rooster search range to 9 blocks in the JSON
-                    if (targetPoi.TryAddEgg(entity, GetRequiredEntityNearby() == null ? null : chickCode, incubationDays))
+                    string chickCode = null;
+                    if (GetRequiredEntityNearby() != null && chickCodes.Length > 0)
+                    {
+                        chickCode = chickCodes[entity.World.Rand.Next(chickCodes.Length)];
+                    }
+                    if (targetPoi.TryAddEgg(MakeEggItem(chickCode)))
                     {
                         ConsumeFood(PortionsEatenForLay);
                         attemptLayEggTotalHours = -1;

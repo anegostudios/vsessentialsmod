@@ -153,8 +153,7 @@ namespace Vintagestory.GameContent
         private bool suitableFoodSource(ItemStack itemStack)
         {
             EnumFoodCategory cat = itemStack?.Collectible?.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition;
-            var attr = itemStack?.ItemAttributes;
-            var tags = attr["foodTags"].AsArray<string>();
+            var tags = itemStack?.ItemAttributes?["foodTags"].AsArray<string>() ?? [];
 
             return Diet.Matches(cat, tags, 0f);
         }
@@ -183,6 +182,9 @@ namespace Vintagestory.GameContent
 
         public override bool ContinueExecute(float dt)
         {
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             Vec3d pos = targetPoi.Position;
 
             pathTraverser.CurrentTarget.X = pos.X;

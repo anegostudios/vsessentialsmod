@@ -181,6 +181,9 @@ namespace Vintagestory.GameContent
                 pathTraverser.Retarget();
             }
 
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             //entity.World.SpawnParticles(1, ColorUtil.WhiteArgb, tmpTargetPos, tmpTargetPos, new Vec3f(), new Vec3f(), 1, 0, 2, EnumParticleModel.Quad);
 
             if (targetEntity != null && entity.ServerPos.SquareDistanceTo(targetEntity.ServerPos) > nowFleeingDistance * nowFleeingDistance)

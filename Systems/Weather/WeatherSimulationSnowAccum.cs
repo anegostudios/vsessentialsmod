@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -24,6 +24,7 @@ namespace Vintagestory.GameContent
         UniqueQueue<Vec2i> chunkColsstoCheckQueue = new UniqueQueue<Vec2i>();
 
         UniqueQueue<UpdateSnowLayerChunk> updateSnowLayerQueue = new UniqueQueue<UpdateSnowLayerChunk>();
+        BlockPos tmpPos = new BlockPos(Dimensions.NormalWorld);
 
         const int chunksize = GlobalConstants.ChunkSize;
         int regionsize;
@@ -156,18 +157,21 @@ namespace Vintagestory.GameContent
             double lastSnowAccumUpdateTotalHours = updateChunk.LastSnowAccumUpdateTotalHours;
 
             Vec2i tmpVec = new Vec2i();
+            int cx = updateChunk.Coords.X;
+            int cz = updateChunk.Coords.Y;
 
             foreach (var sval in setblocks)
             {
                 Block newblock = sval.Value.Block;
                 float snowLevel = sval.Value.SnowLevel;
+                tmpPos.SetFromColumnIndex3d(sval.Key, cx, cz);
 
-                Block hereblock = ba.GetBlock(sval.Key);
+                Block hereblock = ba.GetBlock(tmpPos);
 
-                tmpVec.Set(sval.Key.X, sval.Key.Z);
+                tmpVec.Set(tmpPos.X, tmpPos.Z);
                 if (snowLevel > 0 && !mc.SnowAccum.ContainsKey(tmpVec)) continue; // Must have gotten removed since we last checked in our seperate thread
 
-                hereblock.PerformSnowLevelUpdate(ba, sval.Key, newblock, snowLevel);
+                hereblock.PerformSnowLevelUpdate(ba, tmpPos, newblock, snowLevel);
             }
 
             mc.SetModdata("lastSnowAccumUpdateTotalHours", SerializerUtil.Serialize<double>(lastSnowAccumUpdateTotalHours));
@@ -512,10 +516,12 @@ namespace Vintagestory.GameContent
 
             int regionBasePosX = regionX * regionsize;
             int regionBasePosZ = regionZ * regionsize;
+            int seaLevel = sapi.World.SeaLevel;
+            int snowBlocksCount = ws.GeneralConfig.SnowLayerBlocks.Count;
 
-            BlockPos pos = new BlockPos();
-            BlockPos placePos = new BlockPos();
-            float aboveSeaLevelHeight = sapi.World.BlockAccessor.MapSizeY - sapi.World.SeaLevel;
+            BlockPos pos = new BlockPos(Dimensions.NormalWorld);
+            BlockPos placePos = new BlockPos(Dimensions.NormalWorld);
+            float aboveSeaLevelHeight = sapi.World.BlockAccessor.MapSizeY - seaLevel;
 
             int[] posIndices = randomShuffles[sapi.World.Rand.Next(randomShuffles.Length)];
 
@@ -544,7 +550,7 @@ namespace Vintagestory.GameContent
                 if (chunk == null) return null;
 
                 float relx = (pos.X - regionBasePosX) / (float)regionsize;
-                float rely = GameMath.Clamp((pos.Y - sapi.World.SeaLevel) / aboveSeaLevelHeight, 0, 1);
+                float rely = GameMath.Clamp((pos.Y - seaLevel) / aboveSeaLevelHeight, 0, 1);
                 float relz = (pos.Z - regionBasePosZ) / (float)regionsize;
 
 
@@ -597,11 +603,11 @@ namespace Vintagestory.GameContent
 
                 float nowAccum = hereAccum + sumsnapshot.GetAvgSnowAccumByRegionCorner(relx, rely, relz);
 
-                mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, ws.GeneralConfig.SnowLayerBlocks.Count + 0.6f);
+                mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, snowBlocksCount + 0.6f);
 
                 float hereShouldLevel = nowAccum - GameMath.MurmurHash3Mod(pos.X, 0, pos.Z, 150) / 300f;
 
-                float shouldIndexf = GameMath.Clamp(hereShouldLevel - 1.1f, -1, ws.GeneralConfig.SnowLayerBlocks.Count - 1);
+                float shouldIndexf = GameMath.Clamp(hereShouldLevel - 1.1f, -1, snowBlocksCount - 1);
                 int shouldIndex = shouldIndexf < 0 ? -1 : (int)shouldIndexf;
 
                 placePos.Set(pos.X, Math.Min(pos.Y + 1, sapi.World.BlockAccessor.MapSizeY - 1), pos.Z);
@@ -630,7 +636,7 @@ namespace Vintagestory.GameContent
                 {
                     if (block.Id != newblock.Id && upBlock.Replaceable > 6000)
                     {
-                        updateChunk.SetBlocks[placePos.Copy()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);
+                        updateChunk.SetBlocks[placePos.ToColumnIndex3d()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);
                     }
                 }
                 // Case 2: We have a solid block that can have snow on top
@@ -643,7 +649,7 @@ namespace Vintagestory.GameContent
                         newblock = upBlock.GetSnowCoveredVariant(placePos, hereShouldLevel);
                         if (newblock != null && upBlock.Id != newblock.Id)
                         {
-                            updateChunk.SetBlocks[placePos.Copy()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);
+                            updateChunk.SetBlocks[placePos.ToColumnIndex3d()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);
                         }
 
                         continue;
@@ -652,7 +658,7 @@ namespace Vintagestory.GameContent
                     if (shouldIndex >= 0)
                     {
                         Block toPlaceBlock = layers.GetKeyAtIndex(shouldIndex);
-                        updateChunk.SetBlocks[placePos.Copy()] = new BlockIdAndSnowLevel(toPlaceBlock, hereShouldLevel);
+                        updateChunk.SetBlocks[placePos.ToColumnIndex3d()] = new BlockIdAndSnowLevel(toPlaceBlock, hereShouldLevel);
                     }
                 }
             }

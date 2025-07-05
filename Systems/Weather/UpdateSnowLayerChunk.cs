@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -11,7 +11,7 @@ namespace Vintagestory.GameContent
     {
         public Vec2i Coords;
         public double LastSnowAccumUpdateTotalHours;
-        public Dictionary<BlockPos, BlockIdAndSnowLevel> SetBlocks = new Dictionary<BlockPos, BlockIdAndSnowLevel>();
+        public Dictionary<int, BlockIdAndSnowLevel> SetBlocks = new ();
 
         public bool Equals(UpdateSnowLayerChunk other)
         {

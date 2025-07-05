@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Xml.Linq;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -8,10 +9,43 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    /// <summary>
+    /// Allows this block to be placed on the side of another block, as a decorational shape/texture. Uses the code "decor".
+    /// </summary>
+    /// <example>
+    /// <code lang="json">
+    ///"behaviors": [
+	///	{
+	///		"name": "Decor",
+	///		"properties": {
+	///			"sides": [ "north", "east", "south", "west", "up", "down" ],
+	///			"notFullFace": true,
+	///			"thickness": 0.0
+	///		}
+	///	}
+	///],
+    /// </code></example>
+    [AddDocumentationProperty("Sides", "A list of sides that this decor block can be placed on.", "System.String[]", "Required", "")]
+    [AddDocumentationProperty("DrawIfCulled", "If true, do not cull even if parent face was culled (used e.g. for medium carpet, which stick out beyond the parent face)", "System.Boolean", "Optional", "False")]
+    [AddDocumentationProperty("AlternateZOffset", "If true, alternates z-offset vertexflag by 1 in odd/even XZ positions to reduce z-fighting (used e.g. for medium carpets overlaying neighbours)", "System.Boolean", "Optional", "False")]
+    [AddDocumentationProperty("NotFullFace", "If true, this decor is NOT (at least) a full opaque face so that the parent block face still needs to be drawn", "System.Boolean", "Optional", "False")]
+    [AddDocumentationProperty("Removable", "If true, this decor is removable using the players hands, without breaking the parent block", "System.Boolean", "Optional", "False")]
+    [AddDocumentationProperty("Thickness", "The thickness of this decor block. Used to adjust selection box of the parent block.", "System.Single", "Optional", "0.03125")]
+    [DocumentAsJson]
     public class BlockBehaviorDecor : BlockBehavior
     {
         BlockFacing[] sides;
+
+        /// <summary>
+        /// If true, this decor supplies its own different models for NSEWUD placement, if false the code will auto-rotate the model.
+        /// </summary>
+        [DocumentAsJson("Optional", "False")]
         bool sidedVariants;
+
+        /// <summary>
+        /// If true, this decor will automatically pick a variant based on rotation.
+        /// </summary>
+        [DocumentAsJson("Optional", "False")]
         bool nwOrientable;
 
         public BlockBehaviorDecor(Block block) : base(block)

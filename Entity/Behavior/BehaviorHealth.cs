@@ -254,12 +254,10 @@ namespace Vintagestory.GameContent
             {
                 if (damageSource.Source != EnumDamageSource.Revive)
                 {
-                    damage *= Math.Max(0, entity.Stats.GetBlended("healingeffectivness"));
                     Health = Math.Min(Health + damage, MaxHealth);
                 } else
                 {
                     damage = Math.Min(damage, MaxHealth);
-                    damage *= Math.Max(0.33f, entity.Stats.GetBlended("healingeffectivness"));
                     Health = damage;
                 }
 

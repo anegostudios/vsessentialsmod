@@ -63,6 +63,9 @@ namespace Vintagestory.GameContent
         {
             currentFollowTime += dt;
 
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
             pathTraverser.CurrentTarget.X = targetEntity.ServerPos.X;
             pathTraverser.CurrentTarget.Y = targetEntity.ServerPos.Y;
             pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;

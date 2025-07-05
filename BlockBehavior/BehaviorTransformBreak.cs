@@ -1,4 +1,5 @@
 ﻿using System;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -7,10 +8,34 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    /// <summary>
+    /// When a block with this behavior is broken. it will turn into another specified block instead of air.
+    /// This block behavior uses the code "TransformBreak".
+    /// </summary>
+    /// <example>
+    /// <code lang="json">
+    ///"behaviors": [
+	///	{
+	///		"name": "TransformBreak",
+	///		"properties": {
+	///			"transformIntoBlock": "termitemound-harvested-{rock}-{size}",
+	///			"withDrops": true
+	///		}
+	///	}
+	///]
+    /// </code></example>
+    [DocumentAsJson]
+    [AddDocumentationProperty("TransformIntoBlock", "The asset location of the block to replace this one with.", "Vintagestory.API.Common.AssetLocation", "Required", "")]
     public class BlockBehaviorTransformBreak : BlockBehavior
     {
+        
         Block transformIntoBlock;
         JsonObject properties;
+
+        /// <summary>
+        /// When mined/destroyed, should this block drop its normal drops?
+        /// </summary>
+        [DocumentAsJson("Optional", "False")]
         bool withDrops;
 
         public BlockBehaviorTransformBreak(Block block) : base(block)

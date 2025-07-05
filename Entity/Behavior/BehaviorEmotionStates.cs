@@ -109,24 +109,25 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            if (damageSource.Source == EnumDamageSource.Fall && _enumCreatureHostility == EnumCreatureHostility.Passive && _enumCreatureHostility == EnumCreatureHostility.NeverHostile)
+            var beh = entity.GetBehavior<EntityBehaviorHealth>();
+            healthRel = beh == null ? 1 : beh.Health / beh.MaxHealth;
+
+            if (damageSource.Source is EnumDamageSource.Fall or EnumDamageSource.Drown || _enumCreatureHostility == EnumCreatureHostility.NeverHostile)
             {
                 return;
             }
-            var beh = entity.GetBehavior<EntityBehaviorHealth>();
-            healthRel = beh == null ? 1 : beh.Health / beh.MaxHealth;
 
             var damagedBy = damageSource.GetCauseEntity();
             long sourceEntityId = damagedBy?.EntityId ?? 0;
 
-
-            if (TryTriggerState("alarmherdondamage", sourceEntityId) && damagedBy != null && (entity as EntityAgent).HerdId > 0)
+            long herdId = (entity as EntityAgent).HerdId;
+            if (TryTriggerState("alarmherdondamage", sourceEntityId) && damagedBy != null && herdId > 0)
             {
                 EmotionState state = availableStates.First((s) => s.Code == "alarmherdondamage");
                 entity.World.GetNearestEntity(entity.ServerPos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
                 {
                     EntityAgent agent = e as EntityAgent;
-                    if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == (entity as EntityAgent).HerdId)
+                    if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == herdId)
                     {
                         agent.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState("aggressiveondamage", sourceEntityId);
                     }

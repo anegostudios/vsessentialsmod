@@ -1,4 +1,5 @@
 ﻿using System;
+using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -7,10 +8,61 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    /// <summary>
+    /// Turns this block into a multiblock, allowing it to be larger than a single block.
+    /// By default, all blocks will have the same properties. If you need different properties or functionality for each block section, you will need to use a new block class.
+    /// Uses the code "Multiblock".
+    /// </summary>
+    /// <example>
+    /// <code lang="json">
+    ///"behaviors": [
+	///	{
+	///		"name": "Multiblock",
+	///		"properties": {
+	///			"sizex": 1,
+	///			"sizey": 3,
+	///			"sizez": 1,
+	///			"cposition": {
+	///				"x": 0,
+	///				"y": 0,
+	///				"z": 0
+	///			}
+	///		}
+	///	}
+	///],
+    /// </code></example>
+    [DocumentAsJson]
     public class BlockBehaviorMultiblock : BlockBehavior
     {
-        int SizeX, SizeY, SizeZ;
+        /// <summary>
+        /// The size in blocks, in the X axis, of the multiblock. Maximum of 5.
+        /// </summary>
+        [DocumentAsJson("Recommended", "3")]
+        int SizeX;
+
+        /// <summary>
+        /// The size in blocks, in the Y axis, of the multiblock. Maximum of 5.
+        /// </summary>
+        [DocumentAsJson("Recommended", "3")]
+        int SizeY;
+
+        /// <summary>
+        /// The size in blocks, in the Z axis, of the multiblock. Maximum of 5.
+        /// </summary>
+        [DocumentAsJson("Recommended", "3")]
+        int SizeZ;
+
+
+        /// <summary>
+        /// <!--<jsonalias>cposition</jsonalias>-->
+        /// The controller position of the multiblock. This is the primary placed location of the multiblock.
+        /// </summary>
+        [DocumentAsJson("Recommended", "(1, 0, 1)")]
         Vec3i ControllerPositionRel;
+
+        /// <summary>
+        /// The type of the multiblock. Usually monolithic.
+        /// </summary>
         string type;
                
         public BlockBehaviorMultiblock(Block block) : base(block) { }

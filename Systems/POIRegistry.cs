@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.Design.Serialization;
 using System.Runtime.Serialization;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -40,9 +39,9 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Tags as defined in the individual items/blocks attributes
         /// </summary>
-        protected string[] FoodTags;
+        public string[] FoodTags;
         /// <summary>
-        /// Tags as defined in the individual items/blocks attributes
+        /// Weighted tags as defined in the individual items/blocks attributes
         /// </summary>
         public WeightedFoodTag[] WeightedFoodTags;
 
@@ -118,7 +117,7 @@ namespace Vintagestory.GameContent
 
     public interface IAnimalNest : IPointOfInterest
     {
-        bool IsSuitableFor(Entity entity);
+        bool IsSuitableFor(Entity entity, string[] nestTypes);
 
         /// <summary>
         /// Return true if occupied by an entity, which is not the same as the entity specified in the parameter
@@ -130,7 +129,7 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Returns true if an egg was successfully added
         /// </summary>
-        bool TryAddEgg(Entity entity, string chickCode, double incubationTime);
+        bool TryAddEgg(ItemStack egg);
 
         float DistanceWeighting { get; }
     }
