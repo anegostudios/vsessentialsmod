@@ -23,15 +23,8 @@ namespace Vintagestory.GameContent
         protected bool isEdible;
 
 
-        public AiTaskUseInventory(EntityAgent entity) : base(entity)
+        public AiTaskUseInventory(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             JsonObject soundCfg = taskConfig["useSound"];
             if (soundCfg.Exists)
             {

@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -138,7 +138,6 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("hunger", typeof(EntityBehaviorHunger));
             api.RegisterEntityBehaviorClass("drunktyping", typeof(EntityBehaviorDrunkTyping));
             api.RegisterEntityBehaviorClass("breathe", typeof(EntityBehaviorBreathe));
-            api.RegisterEntityBehaviorClass("damageovertime", typeof(BehaviorDamageOverTime));
 
             api.RegisterEntityBehaviorClass("playerphysics", typeof(EntityBehaviorPlayerPhysics));
             api.RegisterEntityBehaviorClass("controlledphysics", typeof(EntityBehaviorControlledPhysics));
@@ -151,6 +150,8 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("grow", typeof(EntityBehaviorGrow));
             api.RegisterEntityBehaviorClass("multiply", typeof(EntityBehaviorMultiply));
             api.RegisterEntityBehaviorClass("multiplybase", typeof(EntityBehaviorMultiplyBase));
+            api.RegisterEntityBehaviorClass("gait", typeof(EntityBehaviorGait));
+
             api.RegisterEntityBehaviorClass("aimingaccuracy", typeof(EntityBehaviorAimingAccuracy));
             api.RegisterEntityBehaviorClass("emotionstates", typeof(EntityBehaviorEmotionStates));
             api.RegisterEntityBehaviorClass("repulseagents", typeof(EntityBehaviorRepulseAgents));
@@ -167,8 +168,7 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("openablecontainer", typeof(EntityBehaviorOpenableContainer));
 
             api.RegisterEntityBehaviorClass("playerinventory", typeof(EntityBehaviorPlayerInventory));
-
-
+            api.RegisterEntityBehaviorClass("entitystatetags", typeof(EntityBehaviorEntityStateTags));
         }
 
 

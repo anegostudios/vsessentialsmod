@@ -1,172 +1,299 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
-#nullable disable
+namespace Vintagestory.GameContent;
 
-namespace Vintagestory.GameContent
+public static class ApiTaskAdditions
 {
-    public static class ApiTaskAdditions
+    public static void RegisterAiTask<TTask>(this ICoreServerAPI serverAPI, string code) where TTask : IAiTask
     {
-        public static void RegisterAiTask(this ICoreServerAPI sapi, string code, Type type)
-        {
-            AiTaskRegistry.Register(code, type);
-        }
+        AiTaskRegistry.Register<TTask>(code);
+    }
+}
 
-        public static void RegisterAiTask<T>(this ICoreServerAPI sapi, string code) where T : AiTaskBase
-        {
-            AiTaskRegistry.Register<T>(code);
-        }
+public static class AiTaskRegistry
+{
+    public static readonly Dictionary<string, Type> TaskTypes = [];
+    public static readonly Dictionary<Type, string> TaskCodes = [];
+
+    public static void Register<TTask>(string code) where TTask : IAiTask
+    {
+        TaskTypes[code] = typeof(TTask);
+        TaskCodes[typeof(TTask)] = code;
     }
 
-
-    public static class AiTaskRegistry
+    static AiTaskRegistry()
     {
-        public static Dictionary<string, Type> TaskTypes = new Dictionary<string, Type>();
-        public static Dictionary<Type, string> TaskCodes = new Dictionary<Type, string>();
+        Register<AiTaskWander>("wander");
+        Register<AiTaskLookAround>("lookaround");
+        Register<AiTaskMeleeAttack>("meleeattack");
+        Register<AiTaskSeekEntity>("seekentity");
+        Register<AiTaskFleeEntity>("fleeentity");
+        Register<AiTaskStayCloseToEntity>("stayclosetoentity");
+        Register<AiTaskGetOutOfWater>("getoutofwater");
+        Register<AiTaskIdle>("idle");
+        Register<AiTaskSeekFoodAndEat>("seekfoodandeat");
+        Register<AiTaskSeekBlockAndLay>("seekblockandlay");
+        Register<AiTaskUseInventory>("useinventory");
 
-        public static void Register(string code, Type type)
-        {
-            TaskTypes[code] = type;
-            TaskCodes[type] = code;
-        }
+        Register<AiTaskMeleeAttackTargetingEntity>("meleeattacktargetingentity");
+        Register<AiTaskSeekTargetingEntity>("seektargetingentity");
+        Register<AiTaskStayCloseToGuardedEntity>("stayclosetoguardedentity");
 
-        public static void Register<T>(string code) where T : AiTaskBase
-        {
-            TaskTypes[code] = typeof(T);
-            TaskCodes[typeof(T)] = code;
-        }   
+        Register<AiTaskJealousMeleeAttack>("jealousmeleeattack");
+        Register<AiTaskJealousSeekEntity>("jealousseekentity");
 
-        static AiTaskRegistry()
-        {
-            Register("wander", typeof(AiTaskWander));
-            Register("lookaround", typeof(AiTaskLookAround));
-            Register("meleeattack", typeof(AiTaskMeleeAttack));
-            Register("seekentity", typeof(AiTaskSeekEntity));
-            Register("fleeentity", typeof(AiTaskFleeEntity));
-            Register("stayclosetoentity", typeof(AiTaskStayCloseToEntity));
-            Register("getoutofwater", typeof(AiTaskGetOutOfWater));
-            Register("idle", typeof(AiTaskIdle));
-            Register("seekfoodandeat", typeof(AiTaskSeekFoodAndEat));
-            Register("seekblockandlay", typeof(AiTaskSeekBlockAndLay));
-            Register("useinventory", typeof(AiTaskUseInventory));
+        Register<AiTaskLookAtEntity>("lookatentity");
+        Register<AiTaskGotoEntity>("gotoentity");
 
-            Register("meleeattacktargetingentity", typeof(AiTaskMeleeAttackTargetingEntity));
-            Register("seektargetingentity", typeof(AiTaskSeekTargetingEntity));
-            Register("stayclosetoguardedentity", typeof(AiTaskStayCloseToGuardedEntity));
+        // Refactored
+        Register<AiTaskWanderR>("wander-r");
+        Register<AiTaskBellAlarmR>("bellalarm-r");
+        Register<AiTaskComeToOwnerR>("cometoowner-r");
+        Register<AiTaskEatHeldItemR>("eathelditem-r");
+        //Register<AiTaskFishMoveFastR>("fishmovefast-r"); // WIP
+        //Register<AiTaskFishOutOfWaterR>("fishoutofwater-r"); // WIP
+        Register<AiTaskFleeEntityR>("fleeentity-r");
+        Register<AiTaskGetOutOfWaterR>("getoutofwater-r");
+        Register<AiTaskIdleR>("idle-r");
+        //Register<AiTaskJealousMeleeAttackR>("jealousmeleeattack-r"); // WIP
+        //Register<AiTaskJealousSeekEntityR>("jealousseekentity-r"); // WIP
+        Register<AiTaskLookAroundR>("lookaround-r");
+        Register<AiTaskLookAtEntityR>("lookatentity-r");
+        Register<AiTaskSeekFoodAndEatR>("seekfoodandeat-r");
+        //Register<AiTaskSeekTargetingEntityR>("seektargetingentity-r"); // WIP
+        Register<AiTaskShootAtEntityR>("shootatentity-r");
+        Register<AiTaskStayCloseToEntityR>("stayclosetoentity-r");
+        //Register<AiTaskStayCloseToGuardedEntityR>("stayclosetoguardedentity-r"); // WIP
+        Register<AiTaskStayInRangeR>("stayinrange-r");
+        Register<AiTaskTurretModeR>("turretmode-r");
+        Register<AiTaskWanderR>("wander-r");
+    }
+}
 
-            Register("jealousmeleeattack", typeof(AiTaskJealousMeleeAttack));
-            Register("jealousseekentity", typeof(AiTaskJealousSeekEntity));
+public class AiRuntimeConfig : ModSystem
+{
+    public static bool RunAiTasks = true;
+    public static bool RunAiActivities = true;
 
-            Register("gotoentity", typeof(AiTaskGotoEntity));
-            Register("lookatentity", typeof(AiTaskLookAtEntity));
-        }
+    public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
+
+    public override void StartServerSide(ICoreServerAPI api)
+    {
+        serverApi = api;
+        api.Event.RegisterGameTickListener(onTick250ms, 250, 31);
     }
 
-    public class AiRuntimeConfig : ModSystem
+    private ICoreServerAPI? serverApi;
+    private void onTick250ms(float obj)
     {
-        public static bool RunAiTasks = true;
-        public static bool RunAiActivities = true;
-        ICoreServerAPI sapi;
-        public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Server;
-
-        public override void StartServerSide(ICoreServerAPI api)
-        {
-            sapi = api;
-            api.Event.RegisterGameTickListener(onTick250ms, 250, 31);
-        }
-
-        private void onTick250ms(float obj)
-        {
-            RunAiTasks = sapi.World.Config.GetAsBool("runAiTasks", true);
-            RunAiActivities = sapi.World.Config.GetAsBool("runAiActivities", true);
-        }
+        RunAiTasks = serverApi?.World.Config.GetAsBool("runAiTasks", true) ?? true;
+        RunAiActivities = serverApi?.World.Config.GetAsBool("runAiActivities", true) ?? true;
     }
+}
 
 
-    public class AiTaskManager
+public sealed class AiTaskManager(Entity entity)
+{
+    public event Action<IAiTask>? OnTaskStarted;
+    public event Action<IAiTask>? OnTaskStopped;
+    /// <summary>
+    /// All delegates must return true to execute the task
+    /// </summary>
+    public event ActionBoolReturn<IAiTask>? OnShouldExecuteTask;
+
+    public const int ActiveTasksSlotsNumber = 8;
+
+    public bool Shuffle { get; set; }
+    public IAiTask?[] ActiveTasksBySlot => activeTasksBySlot;
+    public List<IAiTask> AllTasks => tasks;
+
+
+    public void OnGameTick(float dt)
     {
-        public event Action<IAiTask> OnTaskStarted;
-        public event Action<IAiTask> OnTaskStopped;
-        /// <summary>
-        /// All delegates must return true to execute the task
-        /// </summary>
-        public event ActionBoolReturn<IAiTask> OnShouldExecuteTask;
-
-        Entity entity;
-        List<IAiTask> tasks = new List<IAiTask>();
-        IAiTask[] activeTasksBySlot = new IAiTask[8];
-        public bool Shuffle;
-
-        public IAiTask[] ActiveTasksBySlot => activeTasksBySlot;
-        public List<IAiTask> AllTasks => tasks;
-
-        public AiTaskManager(Entity entity)
+        if (!AiRuntimeConfig.RunAiTasks)
         {
-            this.entity = entity;
-        }
-
-        public void AddTask(IAiTask task)
-        {
-            tasks.Add(task);
-            task.ProfilerName = "task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()];
-        }
-
-        public void RemoveTask(IAiTask task)
-        {
-            tasks.Remove(task);
-        }
-
-        public void AfterInitialize()
-        {
-            foreach (IAiTask task in tasks)
+            if (wasRunAiTasks)
             {
-                task.AfterInitialize();
-            }
-        }
-
-        public void ExecuteTask(IAiTask task, int slot)
-        {
-            task.StartExecute();
-            activeTasksBySlot[slot] = task;
-
-            if (entity.World.FrameProfiler.Enabled)
-            {
-                entity.World.FrameProfiler.Mark("task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()]);
-            }
-        }
-
-        public T GetTask<T>() where T : IAiTask
-        {
-            foreach (IAiTask task in tasks)
-            {
-                if (task is T)
+                foreach (IAiTask? task in activeTasksBySlot)
                 {
-                    return (T)task;
+                    task?.FinishExecute(true);
                 }
             }
+            wasRunAiTasks = false;
+            return;
+        }
+        wasRunAiTasks = true;
 
-            return default(T);
+        if (Shuffle)
+        {
+            tasks.Shuffle(entity.World.Rand);
         }
 
-        public IAiTask GetTask(string id)
-        {
-            return tasks.FirstOrDefault(t => t.Id == id);
-        }
+        StartNewTasks();
 
-        public void ExecuteTask<T>() where T : IAiTask
+        ProcessRunningTasks(dt);
+
+        LogRunningTasks();
+    }
+
+    public void AddTask(IAiTask task)
+    {
+        tasks.Add(task);
+        task.ProfilerName = "task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()];
+    }
+
+    public void RemoveTask(IAiTask task)
+    {
+        tasks.Remove(task);
+    }
+
+    public void AfterInitialize()
+    {
+        foreach (IAiTask task in tasks)
         {
-            foreach (IAiTask task in tasks)
+            task.AfterInitialize();
+        }
+    }
+
+    public void ExecuteTask(IAiTask task, int slot)
+    {
+        task.StartExecute();
+        activeTasksBySlot[slot] = task;
+
+        if (entity.World.FrameProfiler.Enabled)
+        {
+            entity.World.FrameProfiler.Mark("task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()]);
+        }
+    }
+
+    public void ExecuteTask<TTask>() where TTask : IAiTask
+    {
+        foreach (TTask task in tasks.OfType<TTask>())
+        {
+            int slot = task.Slot;
+            IAiTask? activeTask = activeTasksBySlot[slot];
+            if (activeTask != null)
             {
-                if (task is T)
+                activeTask.FinishExecute(true);
+                OnTaskStopped?.Invoke(activeTask);
+            }
+
+            activeTasksBySlot[slot] = task;
+            task.StartExecute();
+            OnTaskStarted?.Invoke(task);
+            entity.World.FrameProfiler.Mark(task.ProfilerName);
+        }
+    }
+
+    public TTask? GetTask<TTask>() where TTask : IAiTask => (TTask?)tasks.Find(task => task is TTask);
+
+    public IAiTask? GetTask(string id) => tasks.Find(task => task.Id == id);
+
+    public IEnumerable<TTask> GetTasks<TTask>() where TTask : IAiTask => tasks.OfType<TTask>();
+
+    public void StopTask(Type taskType)
+    {
+        foreach (IAiTask? task in activeTasksBySlot)
+        {
+            if (task?.GetType() == taskType)
+            {
+                task.FinishExecute(true);
+                OnTaskStopped?.Invoke(task);
+                activeTasksBySlot[task.Slot] = null;
+            }
+        }
+
+        entity.World.FrameProfiler.Mark("finishexecute");
+    }
+
+    public void StopTask<TTask>() where TTask : IAiTask
+    {
+        foreach (TTask task in activeTasksBySlot.OfType<TTask>())
+        {
+            task.FinishExecute(true);
+            OnTaskStopped?.Invoke(task);
+            activeTasksBySlot[task.Slot] = null;
+        }
+
+        entity.World.FrameProfiler.Mark("finishexecute");
+    }
+
+    public void StopTasks()
+    {
+        foreach (IAiTask? task in activeTasksBySlot)
+        {
+            if (task == null) continue;
+            task.FinishExecute(true);
+            OnTaskStopped?.Invoke(task);
+            activeTasksBySlot[task.Slot] = null;
+        }
+    }
+
+    public bool IsTaskActive(string id)
+    {
+        foreach (IAiTask? task in activeTasksBySlot)
+        {
+            if (task != null && task.Id == id) return true;
+        }
+
+        return false;
+    }
+
+
+    internal void Notify(string key, object data)
+    {
+        if (key == "starttask")
+        {
+            string taskId = (string)data;
+
+            if (activeTasksBySlot.FirstOrDefault(task => task?.Id == taskId) != null) return;
+
+            IAiTask? task = GetTask(taskId);
+            if (task == null) return;
+
+            IAiTask? activeTask = activeTasksBySlot[task.Slot];
+            if (activeTask != null)
+            {
+                activeTask.FinishExecute(true);
+                OnTaskStopped?.Invoke(activeTask);
+            }
+            activeTasksBySlot[task.Slot] = null;
+            ExecuteTask(task, task.Slot);
+            return;
+        }
+
+        if (key == "stoptask")
+        {
+            string taskId = (string)data;
+
+            IAiTask? task = activeTasksBySlot.FirstOrDefault(task => task?.Id == taskId);
+            if (task == null) return;
+
+            task.FinishExecute(true);
+            OnTaskStopped?.Invoke(task);
+            activeTasksBySlot[task.Slot] = null;
+            return;
+        }
+
+        for (int taskIndex = 0; taskIndex < tasks.Count; taskIndex++)
+        {
+            IAiTask task = tasks[taskIndex];
+
+            if (task.Notify(key, data))
+            {
+                int slot = tasks[taskIndex].Slot;
+
+                IAiTask? activeTask = activeTasksBySlot[slot];
+
+                if (activeTask == null || task.Priority > activeTask.PriorityForCancel)
                 {
-                    int slot = task.Slot;
-                    var activeTask = activeTasksBySlot[slot];
                     if (activeTask != null)
                     {
                         activeTask.FinishExecute(true);
@@ -176,241 +303,138 @@ namespace Vintagestory.GameContent
                     activeTasksBySlot[slot] = task;
                     task.StartExecute();
                     OnTaskStarted?.Invoke(task);
-
-                    entity.World.FrameProfiler.Mark(task.ProfilerName);
                 }
             }
         }
+    }
 
-        
-
-        public void StopTask(Type taskType)
+    internal void OnStateChanged(EnumEntityState beforeState)
+    {
+        foreach (IAiTask task in tasks)
         {
-            foreach (IAiTask task in activeTasksBySlot)
+            task.OnStateChanged(beforeState);
+        }
+    }
+
+    internal void OnEntitySpawn()
+    {
+        foreach (IAiTask task in tasks)
+        {
+            task.OnEntitySpawn();
+        }
+    }
+
+    internal void OnEntityLoaded()
+    {
+        foreach (IAiTask task in tasks)
+        {
+            task.OnEntityLoaded();
+        }
+    }
+
+    internal void OnEntityDespawn(EntityDespawnData reason)
+    {
+        foreach (IAiTask task in tasks)
+        {
+            task.OnEntityDespawn(reason);
+        }
+    }
+
+    internal void OnEntityHurt(DamageSource source, float damage)
+    {
+        foreach (IAiTask task in tasks)
+        {
+            task.OnEntityHurt(source, damage);
+        }
+    }
+
+
+
+    private readonly Entity entity = entity;
+    private readonly List<IAiTask> tasks = [];
+    private readonly IAiTask?[] activeTasksBySlot = new IAiTask[ActiveTasksSlotsNumber];
+    private bool wasRunAiTasks;
+
+    private void StartNewTasks()
+    {
+        foreach (IAiTask task in tasks)
+        {
+            if (task.Priority < 0) continue;
+
+            int slot = task.Slot;
+            IAiTask? oldTask = activeTasksBySlot[slot];
+            if ((oldTask == null || task.Priority > oldTask.PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
             {
-                if (task?.GetType() == taskType)
+                oldTask?.FinishExecute(true);
+                if (oldTask != null)
                 {
-                    task.FinishExecute(true);
-                    OnTaskStopped?.Invoke(task);
-                    activeTasksBySlot[task.Slot] = null;
+                    OnTaskStopped?.Invoke(oldTask);
                 }
+                activeTasksBySlot[slot] = task;
+                task.StartExecute();
+                OnTaskStarted?.Invoke(task);
             }
 
-            entity.World.FrameProfiler.Mark("finishexecute");
+            if (entity.World.FrameProfiler.Enabled)
+            {
+                entity.World.FrameProfiler.Mark(task.ProfilerName);
+            }
+        }
+    }
+
+    private bool ShouldExecuteTask(IAiTask task)
+    {
+        if (OnShouldExecuteTask == null) return true;
+
+        bool exec = true;
+        foreach (ActionBoolReturn<IAiTask> dele in OnShouldExecuteTask.GetInvocationList())
+        {
+            exec &= dele(task);
         }
 
-        public void StopTasks()
+        return exec;
+    }
+
+    private void ProcessRunningTasks(float dt)
+    {
+        for (int index = 0; index < activeTasksBySlot.Length; index++)
         {
-            foreach (IAiTask task in activeTasksBySlot)
+            IAiTask? task = activeTasksBySlot[index];
+            if (task == null) continue;
+            if (!task.CanContinueExecute()) continue;
+
+            if (!task.ContinueExecute(dt))
             {
-                if (task == null) continue;
-                task.FinishExecute(true);
+                task.FinishExecute(false);
                 OnTaskStopped?.Invoke(task);
-                activeTasksBySlot[task.Slot] = null;
+                activeTasksBySlot[index] = null;
+            }
+
+            if (entity.World.FrameProfiler.Enabled)
+            {
+                entity.World.FrameProfiler.Mark("task-continueexec-" + AiTaskRegistry.TaskCodes[task.GetType()]);
             }
         }
+    }
 
-        bool wasRunAiTasks;
-        public void OnGameTick(float dt)
+    private void LogRunningTasks()
+    {
+        if (!entity.World.EntityDebugMode) return;
+
+        StringBuilder tasksInfo = new();
+
+        int taskIndex = 0;
+        for (int slotIndex = 0; slotIndex < activeTasksBySlot.Length; slotIndex++)
         {
-            if (!AiRuntimeConfig.RunAiTasks)
-            {
-                if (wasRunAiTasks)
-                {
-                    foreach (var task in activeTasksBySlot) task?.FinishExecute(true);
-                }
-                wasRunAiTasks = false;
-                return;
-            }
-            wasRunAiTasks = AiRuntimeConfig.RunAiTasks;
+            IAiTask? task = activeTasksBySlot[slotIndex];
+            if (task == null) continue;
+            if (taskIndex++ > 0) tasksInfo.Append(", ");
 
-            if (Shuffle)
-            {
-                tasks.Shuffle(entity.World.Rand);
-            }
+            AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out string code);
 
-            foreach (IAiTask task in tasks)
-            {
-                if (task.Priority < 0) continue;
-
-                int slot = task.Slot;
-                IAiTask oldTask = activeTasksBySlot[slot];
-                if ((oldTask == null || task.Priority > oldTask.PriorityForCancel) && task.ShouldExecute() && ShouldExecuteTask(task))
-                {
-                    oldTask?.FinishExecute(true);
-                    if (oldTask != null) OnTaskStopped?.Invoke(oldTask);
-                    activeTasksBySlot[slot] = task;
-                    task.StartExecute();
-                    OnTaskStarted?.Invoke(task);
-                }
-
-                if (entity.World.FrameProfiler.Enabled)
-                {
-                    entity.World.FrameProfiler.Mark(task.ProfilerName);
-                }
-            }
-
-
-            for (int i = 0; i < activeTasksBySlot.Length; i++)
-            {
-                IAiTask task = activeTasksBySlot[i];
-                if (task == null) continue;
-                if (!task.CanContinueExecute()) continue;
-
-                if (!task.ContinueExecute(dt))
-                {
-                    task.FinishExecute(false);
-                    OnTaskStopped?.Invoke(task);
-                    activeTasksBySlot[i] = null;
-                }
-
-                if (entity.World.FrameProfiler.Enabled)
-                {
-                    entity.World.FrameProfiler.Mark("task-continueexec-" + AiTaskRegistry.TaskCodes[task.GetType()]);
-                }
-            }
-
-
-            if (entity.World.EntityDebugMode)
-            {
-                string tasks = "";
-                int j = 0;
-                for (int i = 0; i < activeTasksBySlot.Length; i++)
-                {
-                    IAiTask task = activeTasksBySlot[i];
-                    if (task == null) continue;
-                    if (j++ > 0) tasks += ", ";
-
-                    AiTaskRegistry.TaskCodes.TryGetValue(task.GetType(), out string code);
-
-                    tasks += code + "(p"+task.Priority+", pc"+task.PriorityForCancel+")";
-#if DEBUG
-                    // temporary for debugging
-                    if (entity.Properties.Habitat == EnumHabitat.Underwater && task is AiTaskWander wand)
-                    {
-                        tasks += String.Format(" Heading to: {0:0.00},{1:0.00},{2:0.00}", wand.MainTarget.X - 500000, wand.MainTarget.Y, wand.MainTarget.Z - 500000);
-                    }
-#endif
-
-                }
-                entity.DebugAttributes.SetString("AI Tasks", tasks.Length > 0 ? tasks : "-");
-            }
+            tasksInfo.Append($"{code}(p{task.Priority}, pc {task.PriorityForCancel})");
         }
-
-        private bool ShouldExecuteTask(IAiTask task)
-        {
-            if (OnShouldExecuteTask == null) return true;
-            bool exec = true;
-            foreach (ActionBoolReturn<IAiTask> dele in OnShouldExecuteTask.GetInvocationList())
-            {
-                exec &= dele(task);
-            }
-
-            return exec;
-        }
-
-        public bool IsTaskActive(string id)
-        {
-            foreach (var val in activeTasksBySlot)
-            {
-                if (val != null && val.Id == id) return true;
-            }
-
-            return false;
-        }
-
-        internal void Notify(string key, object data)
-        {
-            if (key == "starttask")
-            {
-                if (activeTasksBySlot.FirstOrDefault(t => t?.Id == (string)data) != null) return;
-                var task = GetTask((string)data);
-                var activeTask = activeTasksBySlot[task.Slot];
-                if (activeTask != null)
-                {
-                    activeTask.FinishExecute(true);
-                    OnTaskStopped?.Invoke(activeTask);
-                }
-                activeTasksBySlot[task.Slot] = null;
-                ExecuteTask(task, task.Slot);
-                return;
-            }
-
-            if (key == "stoptask")
-            {
-                var task = activeTasksBySlot.FirstOrDefault(t => t?.Id == (string)data);
-                if (task == null) return;
-
-                task.FinishExecute(true);
-                OnTaskStopped?.Invoke(task);
-                activeTasksBySlot[task.Slot] = null;
-                return;
-            }
-
-            for (int i = 0; i < tasks.Count; i++)
-            {
-                IAiTask task = tasks[i];
-
-                if (task.Notify(key, data))
-                {
-                    int slot = tasks[i].Slot;
-
-                    if ((activeTasksBySlot[slot] == null || task.Priority > activeTasksBySlot[slot].PriorityForCancel))
-                    {
-                        if (activeTasksBySlot[slot] != null)
-                        {
-                            activeTasksBySlot[slot].FinishExecute(true);
-                            OnTaskStopped?.Invoke(activeTasksBySlot[slot]);
-                        }
-
-                        activeTasksBySlot[slot] = task;
-                        task.StartExecute();
-                        OnTaskStarted?.Invoke(task);
-                    }
-                }
-            }
-        }
-
-        internal void OnStateChanged(EnumEntityState beforeState)
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnStateChanged(beforeState);
-            }
-        }
-
-        internal void OnEntitySpawn()
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnEntitySpawn();
-            }
-        }
-
-        internal void OnEntityLoaded()
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnEntityLoaded();
-            }
-        }
-
-        internal void OnEntityDespawn(EntityDespawnData reason)
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnEntityDespawn(reason);
-            }
-        }
-
-
-        internal void OnEntityHurt(DamageSource source, float damage)
-        {
-            foreach (IAiTask task in tasks)
-            {
-                task.OnEntityHurt(source, damage);
-            }
-        }
+        entity.DebugAttributes.SetString("AI Tasks", tasksInfo.Length > 0 ? tasksInfo.ToString() : "-");
 
     }
 }

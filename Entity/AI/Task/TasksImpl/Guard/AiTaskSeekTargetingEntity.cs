@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 
 #nullable disable
 
@@ -12,7 +13,7 @@ namespace Vintagestory.GameContent
         Entity lastattackingEntity;
         long lastattackingEntityFoundMs;
 
-        public AiTaskSeekTargetingEntity(EntityAgent entity) : base(entity)
+        public AiTaskSeekTargetingEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             searchWaitMs = 1000;
         }

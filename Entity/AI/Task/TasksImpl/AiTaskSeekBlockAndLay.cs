@@ -60,16 +60,11 @@ namespace Vintagestory.GameContent
 
         protected double attemptLayEggTotalHours;
 
-        public AiTaskSeekBlockAndLay(EntityAgent entity) : base(entity)
+        public AiTaskSeekBlockAndLay(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             porregistry = entity.Api.ModLoader.GetModSystem<POIRegistry>();
 
             entity.WatchedAttributes.SetBool("doesSit", true);
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
 
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
 

@@ -41,31 +41,14 @@ namespace Vintagestory.GameContent
         }
 
 
-        public AiTaskWander(EntityAgent entity) : base(entity)
+        public AiTaskWander(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-        }
-
-        public override void OnEntityLoaded()
-        {
-            if (SpawnPosition == null && !entity.Attributes.HasAttribute("spawnX"))
-            {
-                OnEntitySpawn();
-            }
-        }
-
-        public override void OnEntitySpawn()
-        {
-            entity.Attributes.SetDouble("spawnX", entity.ServerPos.X);
-            entity.Attributes.SetDouble("spawnY", entity.ServerPos.Y);
-            entity.Attributes.SetDouble("spawnZ", entity.ServerPos.Z);
-            SpawnPosition = entity.ServerPos.XYZ;
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             SpawnPosition = new Vec3d(entity.Attributes.GetDouble("spawnX"), entity.Attributes.GetDouble("spawnY"), entity.Attributes.GetDouble("spawnZ"));
+            var importOffset = entity.WatchedAttributes.GetBlockPos("importOffset");
+            if (importOffset != null)
+            {
+                SpawnPosition.Add(importOffset);
+            }
 
             float wanderRangeMin=3, wanderRangeMax=30;
 
@@ -87,6 +70,22 @@ namespace Vintagestory.GameContent
             if (preferredLightLevel < 0) preferredLightLevel = null;
         }
 
+        public override void OnEntityLoaded()
+        {
+            if (SpawnPosition == null && !entity.Attributes.HasAttribute("spawnX"))
+            {
+                OnEntitySpawn();
+            }
+        }
+
+        public override void OnEntitySpawn()
+        {
+            entity.Attributes.SetDouble("spawnX", entity.ServerPos.X);
+            entity.Attributes.SetDouble("spawnY", entity.ServerPos.Y);
+            entity.Attributes.SetDouble("spawnZ", entity.ServerPos.Z);
+            SpawnPosition = entity.ServerPos.XYZ;
+        }
+
 
         // Requirements:
         // - ✔ Try to not move a lot vertically
@@ -102,8 +101,6 @@ namespace Vintagestory.GameContent
         public Vec3d loadNextWanderTarget()
         {
             EnumHabitat habitat = entity.Properties.Habitat;
-            bool canFallDamage = entity.Properties.FallDamage;
-            bool territorial = StayCloseToSpawn;
             int tries = 9;
             Vec4d bestTarget = null;
             Vec4d curTarget = new Vec4d();
@@ -199,7 +196,7 @@ namespace Vintagestory.GameContent
                             });
 
                             if (willFall) curTarget.W = 0;
-                            
+
                         }
                         break;
 
@@ -341,25 +338,25 @@ namespace Vintagestory.GameContent
 
         float tryStartAnimAgain = 0.1f;
 
-        public override bool 
+        public override bool
             ContinueExecute(float dt)
         {
 
             base.ContinueExecute(dt);
-            
+
             //Check if time is still valid for task.
             if (!IsInValidDayTimeHours(false)) return false;
 
             // We have a bug with the animation sync server->client where the wander right after spawn is not synced. this is a workaround
-            if (animMeta != null && tryStartAnimAgain > 0 && (tryStartAnimAgain -= dt) <= 0) 
+            if (animMeta != null && tryStartAnimAgain > 0 && (tryStartAnimAgain -= dt) <= 0)
             {
                 entity.AnimManager.StartAnimation(animMeta);
             }
 
             /*entity.World.SpawnParticles(
-                1, 
-                ColorUtil.WhiteArgb, 
-                MainTarget.AddCopy(new Vec3f(-0.1f, -0.1f, -0.1f)), 
+                1,
+                ColorUtil.WhiteArgb,
+                MainTarget.AddCopy(new Vec3f(-0.1f, -0.1f, -0.1f)),
                 MainTarget.AddCopy(new Vec3f(0.1f, 0.1f, 0.1f)), new Vec3f(), new Vec3f(), 1f, 0f
             );*/
 
@@ -416,6 +413,6 @@ namespace Vintagestory.GameContent
             failedWanders = 0;
         }
 
-        
+
     }
 }

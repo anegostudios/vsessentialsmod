@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using Vintagestory.API.Util;
 using Vintagestory.API.Server;
 using Vintagestory.API;
+using System.Linq;
 
 #nullable disable
 
@@ -466,6 +467,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.LiquidSelectable = this.LiquidSelectable;
             block.LiquidCode = this.LiquidCode;
             block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? Array.Empty<BlockEntityBehaviorType>();
+
+            block.Tags = api.TagRegistry.BlockTagsToTagArray(this.Tags);
 
             if (block.EntityClass == null && block.BlockEntityBehaviors != null && block.BlockEntityBehaviors.Length > 0)
             {

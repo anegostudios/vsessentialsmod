@@ -21,16 +21,8 @@ namespace Vintagestory.GameContent
         float maxTurnAngleRad = GameMath.TWOPI;
         float spawnAngleRad;
 
-        public AiTaskLookAtEntity(EntityAgent entity) : base(entity)
+        public AiTaskLookAtEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
-
             maxTurnAngleRad = taskConfig["maxTurnAngleDeg"].AsFloat(360) * GameMath.DEG2RAD;
             spawnAngleRad = entity.Attributes.GetFloat("spawnAngleRad");
         }

@@ -67,14 +67,9 @@ namespace Vintagestory.GameContent
         protected Dictionary<long, int> futilityCounters;
         float executionChance;
 
-        public AiTaskSeekEntity(EntityAgent entity) : base(entity)
+        public AiTaskSeekEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             Id = "seekentity";
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
 
             tamingGenerations = taskConfig["tamingGenerations"].AsFloat(10f);
             JsonObject leapCodeRaw = taskConfig["leapAnimation"];

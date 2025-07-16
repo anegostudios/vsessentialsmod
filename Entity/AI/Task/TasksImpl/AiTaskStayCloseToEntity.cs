@@ -36,14 +36,8 @@ namespace Vintagestory.GameContent
         int stuckCounter;
         long cooldownUntilTotalMs;
 
-        public AiTaskStayCloseToEntity(EntityAgent entity) : base(entity)
+        public AiTaskStayCloseToEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             moveSpeed = taskConfig["movespeed"].AsFloat(0.03f);
             range = taskConfig["searchRange"].AsFloat(8f);
             maxDistance = taskConfig["maxDistance"].AsFloat(3f);

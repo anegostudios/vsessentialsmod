@@ -359,6 +359,7 @@ namespace Vintagestory.GameContent
         {
             return epartSys.GetNearestEntity(entity.ServerPos.XYZ, newstate.NotifyRange, (e) =>
             {
+                if (newstate.EntityCodeLocs == null) return false;
                 for (int i = 0; i < newstate.EntityCodeLocs.Length; i++)
                 {
                     if (newstate.EntityCodeLocs[i].Equals(e.Code)) return e.IsInteractable;

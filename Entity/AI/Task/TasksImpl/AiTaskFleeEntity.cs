@@ -37,14 +37,8 @@ namespace Vintagestory.GameContent
         public override bool AggressiveTargeting => false;
 
 
-        public AiTaskFleeEntity(EntityAgent entity) : base(entity)
+        public AiTaskFleeEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
             seekingRange = taskConfig["seekingRange"].AsFloat(25);
             executionChance = taskConfig["executionChance"].AsFloat(0.1f);

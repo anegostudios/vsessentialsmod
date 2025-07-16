@@ -109,6 +109,13 @@ namespace Vintagestory.ServerMods.NoObf
         public string Class;
 
         /// <summary>
+        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
+        /// List of tags that this type belongs to. Used for categorizing objects.
+        /// </summary>
+        [JsonProperty]
+        public string[] Tags = Array.Empty<string>();
+
+        /// <summary>
         /// Returns true if any given wildcard matches the blocks code. E.g. water-* will match all water blocks
         /// </summary>
         /// <param name="wildcards"></param>

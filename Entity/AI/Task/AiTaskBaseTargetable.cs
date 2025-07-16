@@ -1,4 +1,5 @@
-﻿using System;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
@@ -16,6 +17,19 @@ namespace Vintagestory.GameContent
 
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
+        protected EntityTagRule[] EntityTags = [];
+
+        protected EntityTagRule[] SkipEntityTags = [];
+
+        protected bool noTags = true;
+
+        protected bool reverseTagsCheck = false;
+
+
+        protected float MinTargetWeight = 0;
+
+        protected float MaxTargetWeight = 0;
+
         protected string[] targetEntityCodesBeginsWith = Array.Empty<string>();
         protected string[] targetEntityCodesExact;
 
@@ -46,14 +60,8 @@ namespace Vintagestory.GameContent
 
         protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < 30000;
 
-        protected AiTaskBaseTargetable(EntityAgent entity) : base(entity)
+        protected AiTaskBaseTargetable(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
             creatureHostility = entity.World.Config.GetString("creatureHostility") switch
@@ -76,6 +84,26 @@ namespace Vintagestory.GameContent
 
             string[] codes = taskConfig["entityCodes"].AsArray<string>(new string[] { "player" });
             InitializeTargetCodes(codes, ref targetEntityCodesExact, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
+
+            List<List<string>> entityTags = taskConfig["entityTags"].AsObject<List<List<string>>>([]);
+
+            List<List<string>> skipEntityTags = taskConfig["skipEntityTags"].AsObject<List<List<string>>>([]);
+
+            if (entityTags != null)
+            {
+                EntityTags = [.. entityTags.Select(tagList => new EntityTagRule(entity.Api, tagList))];
+            }
+            if (skipEntityTags != null)
+            {
+                SkipEntityTags = [.. skipEntityTags.Select(tagList => new EntityTagRule(entity.Api, tagList))];
+            }
+
+            reverseTagsCheck = taskConfig["reverseTagsCheck"].AsBool(false);
+
+            noTags = EntityTags.Length == 0 && SkipEntityTags.Length == 0;
+
+            MinTargetWeight = taskConfig["MinTargetWeight"].AsFloat(0);
+            MaxTargetWeight = taskConfig["MaxTargetWeight"].AsFloat(float.MaxValue);
         }
 
         /// <summary>
@@ -145,12 +173,58 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected virtual bool CheckTargetWeight(float weight)
+        {
+            float weightFraction = entity.Properties.Weight > 0 ? weight / entity.Properties.Weight : float.MaxValue;
+            if (MinTargetWeight > 0 && weightFraction < MinTargetWeight) return false;
+            if (MaxTargetWeight > 0 && weightFraction > MaxTargetWeight) return false;
+            return true;
+        }
+
+        protected virtual bool CheckTargetTags(EntityTagArray tags)
+        {
+            if (!reverseTagsCheck)
+            {
+                if (EntityTagRule.IntersectsWithEach(tags, EntityTags))
+                {
+                    if (SkipEntityTags.Length == 0) return true;
+
+                    if (!reverseTagsCheck)
+                    {
+                        if (!EntityTagRule.IntersectsWithEach(tags, SkipEntityTags)) return true;
+                    }
+                    else
+                    {
+                        if (!EntityTagRule.ContainsAllFromAtLeastOne(tags, SkipEntityTags)) return true;
+                    }
+                }
+            }
+            else
+            {
+                if (EntityTagRule.ContainsAllFromAtLeastOne(tags, EntityTags))
+                {
+                    if (SkipEntityTags.Length == 0) return true;
+
+                    if (!reverseTagsCheck)
+                    {
+                        if (!EntityTagRule.IntersectsWithEach(tags, SkipEntityTags)) return true;
+                    }
+                    else
+                    {
+                        if (!EntityTagRule.ContainsAllFromAtLeastOne(tags, SkipEntityTags)) return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
 
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
             if (!e.Alive) return false;
             if (ignoreEntityCode) return CanSense(e, range);
-
+            if (!noTags && CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return CanSense(e, range);
             if (IsTargetEntity(e.Code.Path)) return CanSense(e, range);
 
             return false;

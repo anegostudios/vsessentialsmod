@@ -11,6 +11,8 @@ using Vintagestory.Essentials;
 
 namespace Vintagestory.API.Common
 {
+    
+    
     public abstract class AiTaskBase : IAiTask
     {
         [ThreadStatic]
@@ -63,7 +65,7 @@ namespace Vintagestory.API.Common
         private string profilerName;
         public string ProfilerName { get => profilerName; set => profilerName = value; }
 
-        public AiTaskBase(EntityAgent entity)
+        public AiTaskBase(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig)
         {
             this.entity = entity;
             this.world = entity.World;
@@ -71,10 +73,7 @@ namespace Vintagestory.API.Common
 
             this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser;
             bhEmo = entity.GetBehavior<EntityBehaviorEmotionStates>();
-        }
 
-        public virtual void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
             this.priority = taskConfig["priority"].AsFloat();
             this.priorityForCancel = taskConfig["priorityForCancel"].AsFloat(priority);
 

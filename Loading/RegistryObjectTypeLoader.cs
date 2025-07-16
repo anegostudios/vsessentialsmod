@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Vintagestory.API.Common;
@@ -165,6 +166,8 @@ namespace Vintagestory.ServerMods.NoObf
             LoadEntities(entityVariants);
             api.Logger.VerboseDebug("Parsed and loaded entities");
 
+            api.TagRegistry.LoadTagsFromAssets(api);
+
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
 
             FreeRam();
@@ -225,7 +228,8 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (EntityType type in variants)
                 {
-                    api.RegisterEntityClass(type.Class, type.CreateProperties());
+                    api.TagRegistry.RegisterEntityTags(type.Tags);
+                    api.RegisterEntityClass(type.Class, type.CreateProperties(api));
                 }
             });
         }
@@ -240,6 +244,8 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (ItemType type in variants)
                 {
+                    api.TagRegistry.RegisterItemTags(type.Tags);
+
                     Item item = type.CreateItem(api);
 
                     try
@@ -264,6 +270,8 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (BlockType type in variants)
                 {
+                    api.TagRegistry.RegisterBlockTags(type.Tags);
+
                     Block block = type.CreateBlock(api);
 
                     try

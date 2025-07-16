@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
     // Monolithic, Simple: The controller block takes care of the block shape, the other blocks are invisible and have full block hitboxes. Simply forwards all interaction and info events to the controller block
     // Monolithic, Configurable: The controller block takes care of the block shape and implements IMultiBlockMonolithic for custom hitboxes and interaction events. The other blocks are still invisible
     // Modular, Configurable: The controller block implements IMultiBlockModular, most events are forwarded to the controller block.
-    public class BlockMultiblock : Block
+    public class BlockMultiblock : Block, IMultiblockOffset
     {
         public Vec3i Offset;
         public Vec3i OffsetInv;
@@ -440,6 +440,11 @@ namespace Vintagestory.GameContent
             if (x == 0) return "-0";
             if (x < 0) return "-n" + (-x).ToString();
             return "-p" + x.ToString();
+        }
+
+        public virtual BlockPos GetControlBlockPos(BlockPos pos)
+        {
+            return pos.AddCopy(OffsetInv);
         }
     }
 }

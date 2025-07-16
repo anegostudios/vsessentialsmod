@@ -1,155 +1,134 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
-using Vintagestory.API.MathTools;
 using Vintagestory.Essentials;
 
-#nullable disable
+namespace Vintagestory.GameContent;
 
-namespace Vintagestory.GameContent
+public class EntityBehaviorTaskAI(Entity entity) : EntityBehavior(entity)
 {
-    public class EntityBehaviorTaskAI : EntityBehavior
+    public AiTaskManager TaskManager = new(entity);
+    public WaypointsTraverser? PathTraverser;
+
+    public override string PropertyName() => "taskai";
+
+    public override void OnEntitySpawn()
     {
-        public AiTaskManager TaskManager;
-        public WaypointsTraverser PathTraverser;
+        base.OnEntitySpawn();
 
-        public EntityBehaviorTaskAI(Entity entity) : base(entity)
+        TaskManager.OnEntitySpawn();
+    }
+
+    public override void OnEntityLoaded()
+    {
+        base.OnEntityLoaded();
+
+        TaskManager.OnEntityLoaded();
+    }
+
+    public override void OnEntityDespawn(EntityDespawnData despawn)
+    {
+        base.OnEntityDespawn(despawn);
+
+        TaskManager.OnEntityDespawn(despawn);
+    }
+
+    public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
+    {
+        base.OnEntityReceiveDamage(damageSource, ref damage);
+
+        TaskManager.OnEntityHurt(damageSource, damage);
+    }
+
+    public override void Initialize(EntityProperties properties, JsonObject attributes)
+    {
+        ILogger logger = entity.World.Logger;
+
+        if (entity is not EntityAgent entityAgent)
         {
-            TaskManager = new AiTaskManager(entity);
+            logger.Error($"The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {entity.Code}.");
+            return;
         }
 
-        public override void OnEntitySpawn()
-        {
-            base.OnEntitySpawn();
+        TaskManager.Shuffle = attributes["shuffle"].AsBool();
 
-            TaskManager.OnEntitySpawn();
+        string creatureTypeStr = attributes["aiCreatureType"].AsString("Default");
+        if (!Enum.TryParse(creatureTypeStr, out EnumAICreatureType creatureType))
+        {
+            creatureType = EnumAICreatureType.Default;
+            logger.Warning($"Entity {entity.Code} Task AI, invalid aiCreatureType '{creatureTypeStr}'. Will default to 'Default'.");
         }
+        PathTraverser = new WaypointsTraverser(entityAgent, creatureType);
 
-        public override void OnEntityLoaded()
+        JsonObject[]? tasks = attributes["aitasks"]?.AsArray();
+        if (tasks == null) return;
+
+        foreach (JsonObject taskConfig in tasks)
         {
-            base.OnEntityLoaded();
-
-            TaskManager.OnEntityLoaded();
-        }
-
-        public override void OnEntityDespawn(EntityDespawnData reason)
-        {
-            base.OnEntityDespawn(reason);
-
-            TaskManager.OnEntityDespawn(reason);
-        }
-
-        public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
-        {
-            base.OnEntityReceiveDamage(damageSource, ref damage);
-
-            TaskManager.OnEntityHurt(damageSource, damage);
-        }
-
-        public override void Initialize(EntityProperties properties, JsonObject aiconfig)
-        {
-            if (!(entity is EntityAgent))
+            bool enabled = taskConfig["enabled"]?.AsBool(true) ?? true;
+            if (!enabled)
             {
-                entity.World.Logger.Error("The task ai currently only works on entities inheriting from EntityAgent. Will ignore loading tasks for entity {0} ", entity.Code);
-                return;
+                continue;
             }
 
-            TaskManager.Shuffle = aiconfig["shuffle"].AsBool();
-
-            EnumAICreatureType ect = EnumAICreatureType.Default;
-            var typestr = aiconfig["aiCreatureType"].AsString("Default");
-            if (!Enum.TryParse(typestr, out ect))
+            string? taskCode = taskConfig["code"]?.AsString();
+            if (taskCode == null)
             {
-                ect = EnumAICreatureType.Default;
-                entity.World.Logger.Warning("Entity {0} Task AI, invalid aiCreatureType {1}. Will default to 'Default'", entity.Code, typestr);
+                logger.Error($"Task does not have 'code' specified, for entity '{entity.Code}', will skip it.");
+                continue;
             }
 
-            PathTraverser = new WaypointsTraverser(entity as EntityAgent, ect);
-
-
-            JsonObject[] tasks = aiconfig["aitasks"]?.AsArray();
-            if (tasks == null) return;
-
-            foreach (JsonObject taskConfig in tasks) 
+            if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out Type? taskType))
             {
-                string taskCode = taskConfig["code"]?.AsString();
-                bool enabled = taskConfig["enabled"].AsBool(true);
-                if (!enabled)
-                {
-                    continue;
-                }
+                logger.Error($"Task with code {taskCode} for entity {entity.Code} does not exist, will skip it.");
+                continue;
+            }
 
-                if (!AiTaskRegistry.TaskTypes.TryGetValue(taskCode, out Type taskType))
-                {
-                    entity.World.Logger.Error("Task with code {0} for entity {1} does not exist. Ignoring.", taskCode, entity.Code);
-                    continue;
-                }
+            IAiTask? task;
+            try
+            {
+                task = (IAiTask?)Activator.CreateInstance(taskType, entityAgent, taskConfig, attributes);
+            }
+            catch
+            {
+                logger.Error($"Task with code '{taskCode}' for entity '{entity.Code}': failed to instantiate task, possible error in task config json.");
+                throw;
+            }
 
-                IAiTask task = (IAiTask)Activator.CreateInstance(taskType, (EntityAgent)entity);
-
-                try
-                {
-                    task.LoadConfig(taskConfig, aiconfig);
-                } catch (Exception)
-                {
-                    entity.World.Logger.Error("Task with code {0} for entity {1}: Unable to load json code.", taskCode, entity.Code);
-                    throw;
-                }
-
+            if (task != null)
+            {
                 TaskManager.AddTask(task);
             }
-        }
-
-        public override void AfterInitialized(bool onSpawn)
-        {
-            TaskManager.AfterInitialize();
-        }
-
-
-        public override void OnGameTick(float deltaTime)
-        {
-            // AI is only running for active entities
-            if (entity.State != EnumEntityState.Active || !entity.Alive) return;
-            entity.World.FrameProfiler.Mark("ai-init");
-
-            PathTraverser.OnGameTick(deltaTime);
-
-            entity.World.FrameProfiler.Mark("ai-pathfinding");
-
-            //Trace.WriteLine(TaskManager.ActiveTasksBySlot[0]?.Id);
-
-            entity.World.FrameProfiler.Enter("ai-tasks");
-
-            TaskManager.OnGameTick(deltaTime);
-
-            entity.World.FrameProfiler.Leave();
-        }
-
-
-        public override void OnStateChanged(EnumEntityState beforeState, ref EnumHandling handled)
-        {
-            TaskManager.OnStateChanged(beforeState);
-        }
-
-
-        
-
-        public override void Notify(string key, object data)
-        {
-            TaskManager.Notify(key, data);
-        }
-
-        public override void GetInfoText(StringBuilder infotext)
-        {
-            base.GetInfoText(infotext);
-        }
-
-        public override string PropertyName()
-        {
-            return "taskai";
+            else
+            {
+                logger.Error($"Task with code {taskCode} for entity {entity.Code}: failed to instantiate task.");
+            }
         }
     }
+
+    public override void AfterInitialized(bool onFirstSpawn) => TaskManager.AfterInitialize();
+
+    public override void OnGameTick(float deltaTime)
+    {
+        // AI is only running for active entities
+        if (entity.State != EnumEntityState.Active || !entity.Alive) return;
+        entity.World.FrameProfiler.Mark("ai-init");
+
+        PathTraverser?.OnGameTick(deltaTime);
+
+        entity.World.FrameProfiler.Mark("ai-pathfinding");
+
+        //Trace.WriteLine(TaskManager.ActiveTasksBySlot[0]?.Id);
+
+        entity.World.FrameProfiler.Enter("ai-tasks");
+
+        TaskManager.OnGameTick(deltaTime);
+
+        entity.World.FrameProfiler.Leave();
+    }
+
+    public override void OnStateChanged(EnumEntityState beforeState, ref EnumHandling handling) => TaskManager.OnStateChanged(beforeState);
+
+    public override void Notify(string key, object data) => TaskManager.Notify(key, data);
 }

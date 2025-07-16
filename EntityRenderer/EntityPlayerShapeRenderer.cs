@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Transactions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -366,11 +365,15 @@ namespace Vintagestory.GameContent
                     ModelMat = Mat4f.Mul(ModelMat, ModelMat, tf.Values);
                 }
             }
-
-            if (!isSelf)
+            else
             {
                 var off = GetOtherPlayerRenderOffset();
                 Mat4f.Translate(ModelMat, ModelMat, off.X, off.Y, off.Z);
+                var tf = entityPlayer.MountedOn?.RenderTransform;
+                if (tf != null)
+                {
+                    ModelMat = Mat4f.Mul(ModelMat, ModelMat, tf.Values);
+                }
             }
 
             float rotX = entity.Properties.Client.Shape != null ? entity.Properties.Client.Shape.rotateX : 0;
@@ -396,7 +399,7 @@ namespace Vintagestory.GameContent
             {
                 bodyYaw = renderMode != RenderMode.ThirdPerson ? eagent.BodyYaw : eagent.Pos.Yaw;
 
-                if (!isShadowPass)
+                if (!isShadowPass && isSelf)
                 {
                     smoothCameraTurning(bodyYaw, mdt);
                 }
@@ -448,6 +451,7 @@ namespace Vintagestory.GameContent
         {
             float yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, bodyYaw);
             smoothedBodyYaw += Math.Max(0, Math.Abs(yawDist) - 0.6f) * Math.Sign(yawDist);
+
             yawDist = GameMath.AngleRadDistance(smoothedBodyYaw, eagent.BodyYaw);
             smoothedBodyYaw += yawDist * mdt * 25f;
         }

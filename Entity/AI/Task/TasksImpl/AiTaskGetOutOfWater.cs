@@ -16,15 +16,8 @@ namespace Vintagestory.GameContent
         float moveSpeed = 0.03f;
         int searchattempts = 0;
 
-        public AiTaskGetOutOfWater(EntityAgent entity) : base(entity)
+        public AiTaskGetOutOfWater(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
-
             moveSpeed = taskConfig["movespeed"].AsFloat(0.06f);
         }
 

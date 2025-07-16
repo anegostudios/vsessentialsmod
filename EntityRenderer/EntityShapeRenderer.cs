@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -720,8 +720,8 @@ namespace Vintagestory.GameContent
             {
                 var mpos = thisMount.SeatPosition.XYZ - selfMount.SeatPosition.XYZ;
                 aboveHeadPos = new Vec3d(
-                    entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X, 
-                    entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y, 
+                    entityPlayer.CameraPos.X + entityPlayer.LocalEyePos.X,
+                    entityPlayer.CameraPos.Y + 0.4 + entityPlayer.LocalEyePos.Y,
                     entityPlayer.CameraPos.Z + entityPlayer.LocalEyePos.Z
                 );
                 aboveHeadPos.Add(mpos);
@@ -948,17 +948,6 @@ namespace Vintagestory.GameContent
             {
                 double dx = entity.Pos.X - prevPosXSwing;
                 double dz = entity.Pos.Z - prevPosZSwing;
-
-                var im = eagent?.GetInterface<IMountable>();
-                if (im?.Controller != null)
-                {
-                    var seat = im.GetSeatOfMountedEntity(im.Controller);
-                    if (seat != null && (!seat.Controls.Left && !seat.Controls.Right))
-                    {
-                        dx = 0;
-                        dz = 0;
-                    }
-                }
 
                 double nowAngle = Math.Atan2(dz, dx);
                 double speed = Math.Sqrt(dx * dx + dz * dz);

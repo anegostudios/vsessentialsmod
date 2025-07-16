@@ -36,14 +36,8 @@ namespace Vintagestory.GameContent
         protected float attackRange = 3f;
         protected bool turnToTarget = true;
 
-        public AiTaskMeleeAttack(EntityAgent entity) : base(entity)
-        {            
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
+        public AiTaskMeleeAttack(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            base.LoadConfig(taskConfig, aiConfig);
-
             this.damage = taskConfig["damage"].AsFloat(2);
             this.knockbackStrength = taskConfig["knockbackStrength"].AsFloat(GameMath.Sqrt(damage / 4f));
             this.attackAngleRangeDeg = taskConfig["attackAngleRangeDeg"].AsFloat(20);

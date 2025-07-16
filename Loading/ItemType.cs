@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -142,6 +143,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.Textures = this.Textures;
             item.MaterialDensity = this.MaterialDensity;
 
+            item.Tags = api.TagRegistry.ItemTagsToTagArray(this.Tags);
 
             item.GuiTransform = this.GuiTransform;
             item.FpHandTransform = this.FpHandTransform;

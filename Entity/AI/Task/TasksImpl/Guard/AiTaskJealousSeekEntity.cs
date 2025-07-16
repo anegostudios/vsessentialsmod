@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 
 #nullable disable
 
@@ -10,7 +11,7 @@ namespace Vintagestory.GameContent
     {
         Entity guardedEntity;
 
-        public AiTaskJealousSeekEntity(EntityAgent entity) : base(entity)
+        public AiTaskJealousSeekEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
         }
 

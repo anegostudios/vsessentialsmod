@@ -21,10 +21,6 @@ namespace Vintagestory.GameContent
 
     public class AiTaskIdle : AiTaskBase
     {
-        public AiTaskIdle(EntityAgent entity) : base(entity)
-        {
-        }
-
         public int minduration;
         public int maxduration;
         public float chance;
@@ -38,7 +34,7 @@ namespace Vintagestory.GameContent
         string[] stopOnNearbyEntityCodesExact = null;
         string[] stopOnNearbyEntityCodesBeginsWith = Array.Empty<string>();
         string targetEntityFirstLetters = "";
-        float stopRange =0;
+        float stopRange = 0;
         bool stopOnHurt = false;
         EntityPartitioning partitionUtil;
 
@@ -46,7 +42,7 @@ namespace Vintagestory.GameContent
 
         float tamingGenerations = 10f;
 
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
+        public AiTaskIdle(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
 
@@ -103,8 +99,6 @@ namespace Vintagestory.GameContent
             if (WhenInEmotionState != null) fearReductionFactor = 1;
 
             stopRange *= fearReductionFactor;
-
-            base.LoadConfig(taskConfig, aiConfig);
 
             lastEntityInRangeTestTotalMs = entity.World.ElapsedMilliseconds - entity.World.Rand.Next(1500);   // randomise time for first expensive tick
         }

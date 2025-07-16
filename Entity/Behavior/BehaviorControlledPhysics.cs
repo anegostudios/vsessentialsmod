@@ -308,7 +308,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
             if (canClimbAnywhere && controls.WalkVector.LengthSq() > 0.00001)
             {
-                BlockFacing walkIntoFace = BlockFacing.FromVector(controls.WalkVector);
+                BlockFacing walkIntoFace = BlockFacing.FromVector(controls.WalkVector.X, controls.WalkVector.Y, controls.WalkVector.Z);
                 if (walkIntoFace != null)
                 {
                     tmpPos.Set((int)pos.X + walkIntoFace.Normali.X, (int)pos.Y + walkIntoFace.Normali.Y, (int)pos.Z + walkIntoFace.Normali.Z);
@@ -406,9 +406,11 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 }
             }
 
-            if (blockAccessor.IsNotTraversable((int)nextX, y, z, pos.Dimension)) newPos.X = pos.X;
+            // The halfWidth adjustment should prevent entities clipping into blocks in unloaded chunks
+            float halfWidth = entity.CollisionBox.Width / 2;
+            if (blockAccessor.IsNotTraversable((int)(nextX + halfWidth * Math.Sign(motion.X)), y, z, pos.Dimension)) newPos.X = pos.X;
             if (blockAccessor.IsNotTraversable(x, (int)nextY, z, pos.Dimension)) newPos.Y = pos.Y;
-            if (blockAccessor.IsNotTraversable(x, y, (int)nextZ, pos.Dimension)) newPos.Z = pos.Z;
+            if (blockAccessor.IsNotTraversable(x, y, (int)(nextZ + halfWidth * Math.Sign(motion.Z)), pos.Dimension)) newPos.Z = pos.Z;
 
             pos.SetPos(newPos);
 
@@ -440,7 +442,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
         entity.InLava = blockFluid.LiquidCode == "lava";
 
-            if (!feetInLiquidBefore && entity.FeetInLiquid) entity.OnCollideWithLiquid();
+            if (!feetInLiquidBefore && entity.FeetInLiquid && !entity.IsFirstTick()) entity.OnCollideWithLiquid();
         }
         else
         {

@@ -48,17 +48,12 @@ namespace Vintagestory.GameContent
 
         ICoreAPI api;
 
-        public AiTaskSeekFoodAndEat(EntityAgent entity) : base(entity)
+        public AiTaskSeekFoodAndEat(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             api = entity.Api;
             porregistry = api.ModLoader.GetModSystem<POIRegistry>();
 
             entity.WatchedAttributes.SetBool("doesEat", true);
-        }
-
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
-        {
-            base.LoadConfig(taskConfig, aiConfig);
 
             string eatsoundstring = taskConfig["eatSound"].AsString(null);
             if (eatsoundstring != null) eatSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");

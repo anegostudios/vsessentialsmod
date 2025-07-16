@@ -9,26 +9,19 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskLookAround : AiTaskBase
     {
-        public AiTaskLookAround(EntityAgent entity) : base(entity)
-        {
-        }
-
-
         public int minduration;
         public int maxduration;
         public float turnSpeedMul = 0.75f;
 
         public long idleUntilMs;
 
-        public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
+        public AiTaskLookAround(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             this.minduration = (int)taskConfig["minduration"]?.AsInt(2000);
             this.maxduration = (int)taskConfig["maxduration"]?.AsInt(4000);
             this.turnSpeedMul = (float)taskConfig["turnSpeedMul"]?.AsFloat(0.75f);
 
             idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
-
-            base.LoadConfig(taskConfig, aiConfig);
         }
 
         public override bool ShouldExecute()

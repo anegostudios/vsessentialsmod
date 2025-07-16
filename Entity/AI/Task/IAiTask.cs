@@ -56,13 +56,6 @@ namespace Vintagestory.API.Common
         void FinishExecute(bool cancelled);
 
         /// <summary>
-        /// Called when a behaviors has been loaded via entityconfig
-        /// </summary>
-        /// <param name="taskConfig">AI Task Specific config</param>
-        /// <param name="aiConfig">All of the AI config</param>
-        void LoadConfig(JsonObject taskConfig, JsonObject aiConfig);
-
-        /// <summary>
         /// Called after all the entity behaviors have been initialized, in case we need to refer to another behavior
         /// </summary>
         void AfterInitialize();

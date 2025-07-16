@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Vintagestory.API.Client;
@@ -268,6 +268,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
                         currentRoll = entity.Pos.Roll;
                         return;
                     }
+                    else entity.OnGround = entity.Pos.Motion.Y == 0;    // Not an ideal test but good enough, needed mainly for the "swivel" system when rendering turning. Another player's mount has no physics ticks client-side, so this is the only place where we can set OnGround correctly. (One day we might need to set other states such as swimming here also?)
                 }
             }
         }

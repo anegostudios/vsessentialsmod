@@ -208,7 +208,7 @@ namespace Vintagestory.ServerMods.NoObf
         public BlockDropItemStack[] Drops;
 
 
-        public EntityProperties CreateProperties()
+        public EntityProperties CreateProperties(ICoreAPI api)
         {
             BlockDropItemStack[] DropsCopy;
             if (Drops == null)
@@ -224,6 +224,7 @@ namespace Vintagestory.ServerMods.NoObf
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
+                Tags = api.TagRegistry.EntityTagsToTagArray(Tags),
                 Variant = new (Variant),
                 Class = Class,
                 Habitat = Habitat,
