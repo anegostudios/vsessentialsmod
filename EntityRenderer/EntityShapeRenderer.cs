@@ -95,7 +95,7 @@ namespace Vintagestory.GameContent
             glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
             frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
             shouldSwivelFromMotion = entity.Properties.Attributes?["shouldSwivelFromMotion"].AsBool(true) ?? true;
-            maxSwivelAngle = entity.Properties.Attributes?["maxSwivelAngle"].AsFloat(0.4f);
+            maxSwivelAngle = entity.Properties.Attributes?["maxSwivelAngle"].AsFloat(GameMath.RAD2DEG * 0.4f);
             frostAlphaAccum = (float)api.World.Rand.NextDouble();
 
 
@@ -927,7 +927,7 @@ namespace Vintagestory.GameContent
         public long LastJumpMs;
 
         public bool shouldSwivelFromMotion = true;
-        public float maxSwivelAngle = 0.4f;
+        public float maxSwivelAngle = GameMath.RAD2DEG * 0.4f;
 
         protected virtual void determineSidewaysSwivel(float dt)
         {
