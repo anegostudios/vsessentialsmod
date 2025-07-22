@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Client;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -12,7 +12,7 @@ namespace Vintagestory.GameContent
         public override string Type => "grassHopper";
 
         public EntityParticleGrasshopper(ICoreClientAPI capi, double x, double y, double z) : base(capi, x,y , z) {
-            var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
+            var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z);
             if (block.BlockMaterial == EnumBlockMaterial.Plant)
             {
                 var col = block.GetColor(capi, new BlockPos((int)x, (int)y, (int)z));

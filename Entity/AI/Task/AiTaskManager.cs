@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -67,6 +67,7 @@ public static class AiTaskRegistry
         Register<AiTaskLookAroundR>("lookaround-r");
         Register<AiTaskLookAtEntityR>("lookatentity-r");
         Register<AiTaskSeekFoodAndEatR>("seekfoodandeat-r");
+        Register<AiTaskSeekEntityR>("seekentity-r");
         //Register<AiTaskSeekTargetingEntityR>("seektargetingentity-r"); // WIP
         Register<AiTaskShootAtEntityR>("shootatentity-r");
         Register<AiTaskStayCloseToEntityR>("stayclosetoentity-r");

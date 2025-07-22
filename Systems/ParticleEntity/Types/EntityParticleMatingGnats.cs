@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
 
             if (sqdist > 10*10)
             {
-                var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)Position.Y, (int)Position.Z, BlockLayersAccess.Fluid);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)Position.X, (int)Position.Y, (int)Position.Z, BlockLayersAccess.Fluid);
                 if (block.IsLiquid() || GlobalConstants.CurrentWindSpeedClient.Length() > 0.35f)
                 {
                     dieAccum += dt;
@@ -94,7 +94,7 @@ namespace Vintagestory.GameContent
                 var vec = npe.Pos.XYZ.Sub(Position).Normalize();
                 Velocity.Add(-(float)vec.X/2f, 0, -(float)vec.Z/2f);
 
-                var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)Position.Y - 1, (int)Position.Z, BlockLayersAccess.Solid);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)Position.X, (int)Position.Y - 1, (int)Position.Z, BlockLayersAccess.Solid);
                 if (block.Replaceable < 6000) Velocity.Add(0, 0.5f, 1);
             }
         }

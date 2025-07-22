@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Common;
+using System.Runtime.CompilerServices;
+using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 
@@ -22,8 +23,6 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
             UpdatePeriodSec = attributes["updatePeriodSec"].AsFloat(UpdatePeriodSec);
         }
 
-        GetTagsIds();
-
         EntityTagArray tags = entity.Tags;
 
         TagsInitialUpdate(ref tags);
@@ -33,6 +32,8 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
             entity.Tags = tags;
             entity.MarkTagsDirty();
         }
+
+        TimeSinceUpdateSec = (float)entity.World.Rand.NextDouble() * UpdatePeriodSec;
     }
 
     public override void OnGameTick(float deltaTime)
@@ -52,6 +53,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
             entity.Tags = tags;
             entity.MarkTagsDirty();
         }
+        entity.World.FrameProfiler.Mark("statetagsupdate");
     }
 
     // Previous entity state
@@ -70,54 +72,54 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
     protected bool HoldingOpenFire = false;
 
     // Assigned entity tags, filled in GetTagsIds() in Initialize()
-    protected EntityTagArray TagSwimming = EntityTagArray.Empty;
-    protected EntityTagArray TagFeetInLiquid = EntityTagArray.Empty;
-    protected EntityTagArray TagFlying = EntityTagArray.Empty;
-    protected EntityTagArray TagOnGround = EntityTagArray.Empty;
-    protected EntityTagArray TagMoving = EntityTagArray.Empty;
-    protected EntityTagArray TagAlive = EntityTagArray.Empty;
-    protected EntityTagArray TagAiming = EntityTagArray.Empty;
-    protected EntityTagArray TagSprinting = EntityTagArray.Empty;
-    protected EntityTagArray TagSneaking = EntityTagArray.Empty;
-    protected EntityTagArray TagArmed = EntityTagArray.Empty;
-    protected EntityTagArray TagArmedMelee = EntityTagArray.Empty;
-    protected EntityTagArray TagArmedRanged = EntityTagArray.Empty;
-    protected EntityTagArray TagHoldingOpenFire = EntityTagArray.Empty;
+    protected static EntityTagArray TagSwimming = EntityTagArray.Empty;
+    protected static EntityTagArray TagFeetInLiquid = EntityTagArray.Empty;
+    protected static EntityTagArray TagFlying = EntityTagArray.Empty;
+    protected static EntityTagArray TagOnGround = EntityTagArray.Empty;
+    protected static EntityTagArray TagMoving = EntityTagArray.Empty;
+    protected static EntityTagArray TagAlive = EntityTagArray.Empty;
+    protected static EntityTagArray TagAiming = EntityTagArray.Empty;
+    protected static EntityTagArray TagSprinting = EntityTagArray.Empty;
+    protected static EntityTagArray TagSneaking = EntityTagArray.Empty;
+    protected static EntityTagArray TagArmed = EntityTagArray.Empty;
+    protected static EntityTagArray TagArmedMelee = EntityTagArray.Empty;
+    protected static EntityTagArray TagArmedRanged = EntityTagArray.Empty;
+    protected static EntityTagArray TagHoldingOpenFire = EntityTagArray.Empty;
 
     // Checked item tags, filled in GetTagsIds() in Initialize()
-    protected ItemTagArray ItemTagWeapon = ItemTagArray.Empty;
-    protected ItemTagArray ItemTagWeaponMelee = ItemTagArray.Empty;
-    protected ItemTagArray ItemTagWeaponRanged = ItemTagArray.Empty;
-    protected ItemTagArray ItemTagHasOpenFire = ItemTagArray.Empty;
+    protected static ItemTagArray ItemTagWeapon = ItemTagArray.Empty;
+    protected static ItemTagArray ItemTagWeaponMelee = ItemTagArray.Empty;
+    protected static ItemTagArray ItemTagWeaponRanged = ItemTagArray.Empty;
+    protected static ItemTagArray ItemTagHasOpenFire = ItemTagArray.Empty;
 
     // Checked block tags, filled in GetTagsIds() in Initialize()
-    protected BlockTagArray BlockTagHasOpenFire = BlockTagArray.Empty;
+    protected static BlockTagArray BlockTagHasOpenFire = BlockTagArray.Empty;
 
     protected float TimeSinceUpdateSec = 0;
     protected float UpdatePeriodSec = 1;
 
 
-    protected virtual void GetTagsIds()
+    public static void GetTagsIds(ITagRegistry registry)
     {
-        TagSwimming = new(entity.Api.TagRegistry.EntityTagToTagId("state-swimming"));
-        TagFeetInLiquid = new(entity.Api.TagRegistry.EntityTagToTagId("state-feet-in-liquid"));
-        TagFlying = new(entity.Api.TagRegistry.EntityTagToTagId("state-flying"));
-        TagOnGround = new(entity.Api.TagRegistry.EntityTagToTagId("state-on-ground"));
-        TagMoving = new(entity.Api.TagRegistry.EntityTagToTagId("state-moving"));
-        TagAlive = new(entity.Api.TagRegistry.EntityTagToTagId("state-alive"));
-        TagAiming = new(entity.Api.TagRegistry.EntityTagToTagId("state-aiming"));
-        TagSprinting = new(entity.Api.TagRegistry.EntityTagToTagId("state-sprinting"));
-        TagSneaking = new(entity.Api.TagRegistry.EntityTagToTagId("state-sneaking"));
-        TagArmed = new(entity.Api.TagRegistry.EntityTagToTagId("state-armed"));
-        TagArmedMelee = new(entity.Api.TagRegistry.EntityTagToTagId("state-armed-melee"));
-        TagArmedRanged = new(entity.Api.TagRegistry.EntityTagToTagId("state-armed-ranged"));
+        TagSwimming = new(registry.EntityTagToTagId("state-swimming"));
+        TagFeetInLiquid = new(registry.EntityTagToTagId("state-feet-in-liquid"));
+        TagFlying = new(registry.EntityTagToTagId("state-flying"));
+        TagOnGround = new(registry.EntityTagToTagId("state-on-ground"));
+        TagMoving = new(registry.EntityTagToTagId("state-moving"));
+        TagAlive = new(registry.EntityTagToTagId("state-alive"));
+        TagAiming = new(registry.EntityTagToTagId("state-aiming"));
+        TagSprinting = new(registry.EntityTagToTagId("state-sprinting"));
+        TagSneaking = new(registry.EntityTagToTagId("state-sneaking"));
+        TagArmed = new(registry.EntityTagToTagId("state-armed"));
+        TagArmedMelee = new(registry.EntityTagToTagId("state-armed-melee"));
+        TagArmedRanged = new(registry.EntityTagToTagId("state-armed-ranged"));
 
-        ItemTagWeapon = new(entity.Api.TagRegistry.ItemTagToTagId("weapon"));
-        ItemTagWeaponMelee = new(entity.Api.TagRegistry.ItemTagToTagId("weapon-melee"));
-        ItemTagWeaponRanged = new(entity.Api.TagRegistry.ItemTagToTagId("weapon-ranged"));
-        ItemTagHasOpenFire = new(entity.Api.TagRegistry.ItemTagToTagId("has-open-fire"));
+        ItemTagWeapon = new(registry.ItemTagToTagId("weapon"));
+        ItemTagWeaponMelee = new(registry.ItemTagToTagId("weapon-melee"));
+        ItemTagWeaponRanged = new(registry.ItemTagToTagId("weapon-ranged"));
+        ItemTagHasOpenFire = new(registry.ItemTagToTagId("has-open-fire"));
 
-        BlockTagHasOpenFire = new(entity.Api.TagRegistry.BlockTagToTagId("has-open-fire"));
+        BlockTagHasOpenFire = new(registry.BlockTagToTagId("has-open-fire"));
     }
 
     protected virtual void TagsInitialUpdate(ref EntityTagArray tags)
@@ -144,347 +146,113 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
 
     protected virtual void EntityTagsInitialUpdate(ref EntityTagArray tags)
     {
-        Swimming = entity.Swimming;
-        if (Swimming)
-        {
-            tags |= TagSwimming;
-        }
-        else
-        {
-            tags &= ~TagSwimming;
-        }
+        tags = tags.Remove(TagSwimming);
+        tags = tags.Remove(TagFeetInLiquid);
+        tags = tags.Remove(TagOnGround);
+        tags = tags.Remove(TagAlive);
 
-        FeetInLiquid = entity.FeetInLiquid && !Swimming;
-        if (FeetInLiquid)
-        {
-            tags |= TagFeetInLiquid;
-        }
-        else
-        {
-            tags &= ~TagFeetInLiquid;
-        }
-
-        OnGround = entity.OnGround;
-        if (OnGround)
-        {
-            tags |= TagOnGround;
-        }
-        else
-        {
-            tags &= ~TagOnGround;
-        }
-
-        Alive = entity.Alive;
-        if (Alive)
-        {
-            tags |= TagAlive;
-        }
-        else
-        {
-            tags &= ~TagAlive;
-        }
+        EntityTagsUpdate(ref tags);
     }
 
     protected virtual void EntityAgentTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
     {
-        bool moving = entityAgent.Controls.Forward || entityAgent.Controls.Backward || entityAgent.Controls.Right || entityAgent.Controls.Left || entityAgent.Controls.Jump || entityAgent.Controls.Gliding;
-        Moving = moving;
-        if (Moving)
-        {
-            tags |= TagMoving;
-        }
-        else
-        {
-            tags &= ~TagMoving;
-        }
+        tags = tags.Remove(TagMoving);
+        tags = tags.Remove(TagAiming);
+        tags = tags.Remove(TagFlying);
+        tags = tags.Remove(TagSneaking);
+        tags = tags.Remove(TagSprinting);
 
-        bool aiming = entityAgent.Controls.IsAiming;
-        Aiming = aiming;
-        if (Aiming)
-        {
-            tags |= TagAiming;
-        }
-        else
-        {
-            tags &= ~TagAiming;
-        }
-
-        bool flying = entityAgent.Controls.IsFlying;
-        Flying = flying;
-        if (Flying)
-        {
-            tags |= TagFlying;
-        }
-        else
-        {
-            tags &= ~TagFlying;
-        }
-
-        bool sneaking = entityAgent.Controls.Sneak;
-        Sneaking = sneaking;
-        if (Sneaking)
-        {
-            tags |= TagSneaking;
-        }
-        else
-        {
-            tags &= ~TagSneaking;
-        }
-
-        bool sprinting = entityAgent.Controls.Sprint;
-        Sprinting = sprinting;
-        if (Sprinting)
-        {
-            tags |= TagSprinting;
-        }
-        else
-        {
-            tags &= ~TagSprinting;
-        }
+        EntityAgentTagsUpdate(entityAgent, ref tags);
     }
 
     protected virtual void EntityAgentHandItemsTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
     {
-        ItemTagArray itemTags = entityAgent.RightHandItemSlot?.Itemstack?.Item?.Tags ?? ItemTagArray.Empty;
-        BlockTagArray blockTags = entityAgent.RightHandItemSlot?.Itemstack?.Block?.Tags ?? BlockTagArray.Empty;
-        itemTags |= entityAgent.LeftHandItemSlot?.Itemstack?.Item?.Tags ?? ItemTagArray.Empty;
-        blockTags |= entityAgent.LeftHandItemSlot?.Itemstack?.Block?.Tags ?? BlockTagArray.Empty;
+        ItemStack? handStack = entityAgent.RightHandItemSlot?.Itemstack;
+        ItemTagArray itemTags = handStack?.Item?.Tags ?? ItemTagArray.Empty;
+        BlockTagArray blockTags = handStack?.Block?.Tags ?? BlockTagArray.Empty;
 
-        bool weapon = itemTags.ContainsAll(ItemTagWeapon);
-        bool weaponMelee = itemTags.ContainsAll(ItemTagWeaponMelee);
-        bool weaponRanged = itemTags.ContainsAll(ItemTagWeaponRanged);
-        bool hasOpenFire = itemTags.ContainsAll(ItemTagHasOpenFire) || blockTags.ContainsAll(BlockTagHasOpenFire);
+        handStack = entityAgent.LeftHandItemSlot?.Itemstack;
+        if (handStack?.Item != null) itemTags |= handStack.Item.Tags;
+        if (handStack?.Block != null) blockTags |= handStack.Block.Tags;
 
-        Armed = weapon;
-        ArmedMelee = weaponMelee;
-        ArmedRanged = weaponRanged;
-        HoldingOpenFire = hasOpenFire;
+        InitializeTag(ref tags, Armed = itemTags.ContainsAll(ItemTagWeapon), TagArmed);
+        InitializeTag(ref tags, ArmedMelee = itemTags.ContainsAll(ItemTagWeaponMelee), TagArmedMelee);
+        InitializeTag(ref tags, ArmedRanged = itemTags.ContainsAll(ItemTagWeaponRanged), TagArmedRanged);
+        InitializeTag(ref tags, HoldingOpenFire = itemTags.ContainsAll(ItemTagHasOpenFire) || blockTags.ContainsAll(BlockTagHasOpenFire), TagHoldingOpenFire);
+    }
 
-        if (Armed)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected virtual void UpdateTag(ref EntityTagArray tags, ref bool storedValue, EntityTagArray mask, bool newValue)
+    {
+        if (storedValue == newValue) return;
+
+        storedValue = newValue;
+
+        if (newValue)
         {
-            tags |= TagArmed;
+            tags |= mask;
         }
         else
         {
-            tags &= ~TagArmed;
+            tags &= ~mask;
         }
+    }
 
-        if (ArmedMelee)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected virtual void InitializeTag(ref EntityTagArray tags, bool newValue, EntityTagArray mask)
+    {
+        if (newValue)
         {
-            tags |= TagArmedMelee;
+            tags |= mask;
         }
         else
         {
-            tags &= ~TagArmedMelee;
-        }
-
-        if (ArmedRanged)
-        {
-            tags |= TagArmedRanged;
-        }
-        else
-        {
-            tags &= ~TagArmedRanged;
-        }
-
-        if (HoldingOpenFire)
-        {
-            tags |= TagHoldingOpenFire;
-        }
-        else
-        {
-            tags &= ~TagHoldingOpenFire;
+            tags &= ~mask;
         }
     }
 
     protected virtual void EntityTagsUpdate(ref EntityTagArray tags)
     {
-        if (entity.Swimming != Swimming)
-        {
-            Swimming = entity.Swimming;
-            if (Swimming)
-            {
-                tags |= TagSwimming;
-            }
-            else
-            {
-                tags &= ~TagSwimming;
-            }
-        }
-
-        if (FeetInLiquid != entity.FeetInLiquid && !Swimming)
-        {
-            FeetInLiquid = entity.FeetInLiquid && !Swimming;
-            if (FeetInLiquid)
-            {
-                tags |= TagFeetInLiquid;
-            }
-            else
-            {
-                tags &= ~TagFeetInLiquid;
-            }
-        }
-
-        if (OnGround != entity.OnGround)
-        {
-            OnGround = entity.OnGround;
-            if (OnGround)
-            {
-                tags |= TagOnGround;
-            }
-            else
-            {
-                tags &= ~TagOnGround;
-            }
-        }
-
-        if (entity.Alive != Alive)
-        {
-            Alive = entity.Alive;
-            if (Alive)
-            {
-                tags |= TagAlive;
-            }
-            else
-            {
-                tags &= ~TagAlive;
-            }
-        }
+        UpdateTag(ref tags, ref Swimming, TagSwimming, entity.Swimming);
+        UpdateTag(ref tags, ref FeetInLiquid, TagFeetInLiquid, entity.FeetInLiquid && !Swimming);
+        UpdateTag(ref tags, ref OnGround, TagOnGround, entity.OnGround);
+        UpdateTag(ref tags, ref Alive, TagAlive, entity.Alive);
     }
 
     protected virtual void EntityAgentTagsUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
     {
-        bool moving = entityAgent.Controls.Forward || entityAgent.Controls.Backward || entityAgent.Controls.Right || entityAgent.Controls.Left || entityAgent.Controls.Jump || entityAgent.Controls.Gliding;
-        if (moving != Moving)
-        {
-            Moving = moving;
-            if (Moving)
-            {
-                tags |= TagMoving;
-            }
-            else
-            {
-                tags &= ~TagMoving;
-            }
-        }
+        EntityControls controls = entityAgent.Controls;
 
-        bool aiming = entityAgent.Controls.IsAiming;
-        if (aiming != Aiming)
-        {
-            Aiming = aiming;
-            if (Aiming)
-            {
-                tags |= TagAiming;
-            }
-            else
-            {
-                tags &= ~TagAiming;
-            }
-        }
-
-        bool flying = entityAgent.Controls.IsFlying;
-        if (flying != Flying)
-        {
-            Flying = flying;
-            if (Flying)
-            {
-                tags |= TagFlying;
-            }
-            else
-            {
-                tags &= ~TagFlying;
-            }
-        }
-
-        bool sneaking = entityAgent.Controls.Sneak;
-        if (sneaking != Sneaking)
-        {
-            Sneaking = sneaking;
-            if (Sneaking)
-            {
-                tags |= TagSneaking;
-            }
-            else
-            {
-                tags &= ~TagSneaking;
-            }
-        }
-
-        bool sprinting = entityAgent.Controls.Sprint;
-        if (sprinting != Sprinting)
-        {
-            Sprinting = sprinting;
-            if (Sprinting)
-            {
-                tags |= TagSprinting;
-            }
-            else
-            {
-                tags &= ~TagSprinting;
-            }
-        }
+        UpdateTag(ref tags, ref Moving, TagMoving,
+            controls.Forward || controls.Backward || controls.Right || controls.Left || controls.Jump || controls.Gliding
+        );
+        UpdateTag(ref tags, ref Aiming, TagAiming, controls.IsAiming);
+        UpdateTag(ref tags, ref Flying, TagFlying, controls.IsFlying);
+        UpdateTag(ref tags, ref Sneaking, TagSneaking, controls.Sneak);
+        UpdateTag(ref tags, ref Sprinting, TagSprinting, controls.Sprint);
     }
 
     protected virtual void EntityAgentHandItemsTagsUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
     {
-        ItemTagArray itemTags = entityAgent.ActiveHandItemSlot?.Itemstack?.Item?.Tags ?? ItemTagArray.Empty;
-        BlockTagArray blockTags = entityAgent.ActiveHandItemSlot?.Itemstack?.Block?.Tags ?? BlockTagArray.Empty;
-
-        bool weapon = itemTags.ContainsAll(ItemTagWeapon);
-        bool weaponMelee = itemTags.ContainsAll(ItemTagWeaponMelee);
-        bool weaponRanged = itemTags.ContainsAll(ItemTagWeaponRanged);
-        bool hasOpenFire = itemTags.ContainsAll(ItemTagHasOpenFire) || blockTags.ContainsAll(BlockTagHasOpenFire);
-
-        if (Armed != weapon)
+        ItemStack? handStack = entityAgent.ActiveHandItemSlot?.Itemstack;
+        Item? item = handStack?.Item;
+        if (item == null) // This will be the case for 99% of entities, which do not hold anything in their hands
         {
-            Armed = weapon;
-            if (Armed)
-            {
-                tags |= TagArmed;
-            }
-            else
-            {
-                tags &= ~TagArmed;
-            }
+            UpdateTag(ref tags, ref Armed, TagArmed, false);
+            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, false);
+            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, false);
+        }
+        else
+        {
+            UpdateTag(ref tags, ref Armed, TagArmed, ItemTagWeapon.isPresentIn(ref item.Tags));
+            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, ItemTagWeaponMelee.isPresentIn(ref item.Tags));
+            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, ItemTagWeaponRanged.isPresentIn(ref item.Tags));
         }
 
-        if (ArmedMelee != weaponMelee)
-        {
-            ArmedMelee = weaponMelee;
-            if (ArmedMelee)
-            {
-                tags |= TagArmedMelee;
-            }
-            else
-            {
-                tags &= ~TagArmedMelee;
-            }
-        }
-
-        if (ArmedRanged != weaponRanged)
-        {
-            ArmedRanged = weaponRanged;
-            if (ArmedRanged)
-            {
-                tags |= TagArmedRanged;
-            }
-            else
-            {
-                tags &= ~TagArmedRanged;
-            }
-        }
-
-        if (HoldingOpenFire != hasOpenFire)
-        {
-            HoldingOpenFire = hasOpenFire;
-            if (HoldingOpenFire)
-            {
-                tags |= TagHoldingOpenFire;
-            }
-            else
-            {
-                tags &= ~TagHoldingOpenFire;
-            }
-        }
+        Block? block = handStack?.Block;
+        UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire,
+            item != null && ItemTagHasOpenFire.isPresentIn(ref item.Tags) ||
+            block != null && BlockTagHasOpenFire.isPresentIn(ref block.Tags)
+        );
     }
 }

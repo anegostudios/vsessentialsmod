@@ -21,7 +21,9 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorEllipsoidalRepulseAgents(Entity entity) : base(entity)
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             entity.customRepulseBehavior = true;
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
@@ -223,7 +225,7 @@ namespace Vintagestory.GameContent
             double minDistSq = ourEntity.touchDistanceSq + e.touchDistanceSq;
 
             if (distSq >= minDistSq) return true;
-            
+
             double pushForce = (1 - distSq / minDistSq) / Math.Max(0.001f, GameMath.Sqrt(distSq));
             double px = dx * pushForce;
             double py = dy * pushForce;
@@ -234,7 +236,7 @@ namespace Vintagestory.GameContent
             float pushDiff = GameMath.Clamp(theirSize / mySize, 0, 1);
 
             if (ourEntity.OnGround) pushDiff *= 3;
-            
+
             pushVector.Add(px * pushDiff, py * pushDiff * 0.75, pz * pushDiff);
 
             return true;

@@ -84,6 +84,11 @@ namespace Vintagestory.ServerMods
             api.RegisterCollectibleBehaviorClass("HeldBag", typeof(CollectibleBehaviorHeldBag));
         }
 
+        public override void AssetsFinalize(ICoreAPI api)
+        {
+            EntityBehaviorEntityStateTags.GetTagsIds(api.TagRegistry);
+        }
+
 
         private void RegisterDefaultBlocks()
         {

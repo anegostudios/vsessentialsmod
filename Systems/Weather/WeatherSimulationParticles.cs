@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -506,7 +506,7 @@ namespace Vintagestory.GameContent
                     double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
-                    Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid);
+                    Block block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz, BlockLayersAccess.Fluid);
                     if (!block.IsLiquid()) continue;
 
                     stormWaterParticles.MinPos.Set(px, py + block.TopMiddlePos.Y, pz);
@@ -589,7 +589,7 @@ namespace Vintagestory.GameContent
 
                 int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
-                Block block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz, BlockLayersAccess.Fluid);
+                Block block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz, BlockLayersAccess.Fluid);
 
                 if (block.IsLiquid())
                 {
@@ -600,7 +600,7 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    if (block.BlockId == 0) block = capi.World.BlockAccessor.GetBlock((int)px, py, (int)pz);   // block read from LiquidsLayer could be ice, in which case no need to read from the physical blocks layer
+                    if (block.BlockId == 0) block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz);   // block read from LiquidsLayer could be ice, in which case no need to read from the physical blocks layer
 
                     double b = 0.75 + 0.25 * rand.NextDouble();
                     int ca = 230 - rand.Next(100);

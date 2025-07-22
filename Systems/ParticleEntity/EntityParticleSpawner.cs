@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -173,7 +173,7 @@ namespace Vintagestory.GameContent
                     }
                     if (type == "ws")
                     {
-                        var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
+                        var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
                         if (block.LiquidCode == "water" && block.PushVector == null)
                         {
                             var ws = new EntityParticleWaterStrider(capi, x, y+block.LiquidLevel/8f, z);
@@ -184,7 +184,7 @@ namespace Vintagestory.GameContent
                     {
                         x = pos.X + (rand.NextDouble() - 0.5) * 2;
                         z = pos.Z + (rand.NextDouble() - 0.5) * 2;
-                        var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
+                        var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
                         if (block.LiquidCode == "saltwater" && block.PushVector == null)
                         {
                             var ws = new EntityParticleFish(capi, x, y - block.LiquidLevel, z, new Vec3f(0.4f), 0, 0.3f);
@@ -225,6 +225,8 @@ namespace Vintagestory.GameContent
             {
                 accum = 0;
                 var pos = capi.World.Player.Entity.Pos;
+                if (pos.Dimension != Dimensions.NormalWorld) return;   // EntityParticles system currently only supports dimension 0
+
                 var climate = capi.World.BlockAccessor.GetClimateAt(pos.AsBlockPos);
 
                 if (!disabledInsects.Contains("grasshopper")) spawnGrasshoppers(pos, climate);
@@ -254,9 +256,9 @@ namespace Vintagestory.GameContent
 
                 if (pos.HorDistanceTo(x, z) < 3) continue;
 
-                var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
-                var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y - 1, (int)z);
-                var aboveblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
+                var belowblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y - 1, (int)z);
+                var aboveblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 1, (int)z);
                 if (block.LiquidCode == "water" && block.PushVector == null && belowblock.Replaceable < 6000 && aboveblock.Id == 0)
                 {
                     var ws = new EntityParticleWaterStrider(capi, x, y + block.LiquidLevel / 8f, z);
@@ -269,7 +271,7 @@ namespace Vintagestory.GameContent
         {
             if (climate.Temperature > 40 || climate.Temperature < 0) return;
 
-            var bpos = new BlockPos();
+            var bpos = new BlockPos(Dimensions.NormalWorld);
 
             if (sys.Count["fish"] > 500) return;
 
@@ -342,8 +344,8 @@ namespace Vintagestory.GameContent
 
                 if (pos.HorDistanceTo(x, z) < 3) continue;
 
-                var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
-                var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 1, (int)z);
+                var belowblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z);
                 if (block.BlockMaterial == EnumBlockMaterial.Plant && belowblock.BlockMaterial == EnumBlockMaterial.Soil)
                 {
                     var gh = new EntityParticleGrasshopper(capi, x, y + 1.01 + rand.NextDouble() * 0.25, z);
@@ -368,15 +370,15 @@ namespace Vintagestory.GameContent
 
                 if (pos.HorDistanceTo(x, z) < 2) continue;
 
-                var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
-                var blockbelow = capi.World.BlockAccessor.GetBlock((int)x, (int)y-1, (int)z);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z);
+                var blockbelow = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y-1, (int)z);
                 if (block.BlockMaterial == EnumBlockMaterial.Wood && block.Variant["type"] == "grown" && blockbelow.Id == block.Id)
                 {
                     var face = BlockFacing.HORIZONTALS[rand.Next(4)].Normalf;
                     double sx = (int)x + 0.5f + face.X * 0.52f;
                     double sy = y + 0.1 + rand.NextDouble() * 0.8;
                     double sz = (int)z + 0.5f + face.Z * 0.52f;
-                    var sblock = capi.World.BlockAccessor.GetBlock((int)sx, (int)sy, (int)sz);
+                    var sblock = capi.World.BlockAccessor.GetBlockRaw((int)sx, (int)sy, (int)sz);
                     if (sblock.Replaceable >= 6000)
                     {
                         var gh = new EntityParticleCicada(capi, sx, sy, sz);
@@ -385,7 +387,7 @@ namespace Vintagestory.GameContent
                     {
                         sx += face.X;
                         sz += face.Z;
-                        if (capi.World.BlockAccessor.GetBlock((int)sx, (int)sy, (int)sz).Replaceable >= 6000)
+                        if (capi.World.BlockAccessor.GetBlockRaw((int)sx, (int)sy, (int)sz).Replaceable >= 6000)
                         {
                             var gh = new EntityParticleCicada(capi, sx, sy, sz);
                             sys.SpawnParticle(gh);
@@ -412,8 +414,8 @@ namespace Vintagestory.GameContent
 
                 if (pos.HorDistanceTo(x, z) < 3) continue;
 
-                var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
-                var belowblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 1, (int)z);
+                var belowblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z);
                 if (block.BlockMaterial == EnumBlockMaterial.Plant && belowblock.BlockMaterial == EnumBlockMaterial.Soil)
                 {
                     var gh = new EntityParticleCoqui(capi, x, y + 1.01 + rand.NextDouble() * 0.25, z);
@@ -441,10 +443,10 @@ namespace Vintagestory.GameContent
 
                 if (pos.HorDistanceTo(x, z) < 2) continue;
 
-                var ab2block = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 2, (int)z);
-                var abblock = capi.World.BlockAccessor.GetBlock((int)x, (int)y + 1, (int)z);
-                var block = capi.World.BlockAccessor.GetBlock((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
-                var belowf2block = capi.World.BlockAccessor.GetBlock((int)x, (int)y - 2, (int)z, BlockLayersAccess.Fluid);
+                var ab2block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 2, (int)z);
+                var abblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 1, (int)z);
+                var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
+                var belowf2block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y - 2, (int)z, BlockLayersAccess.Fluid);
 
                 if (block.LiquidCode == "water" && abblock.Id==0 && ab2block.Id == 0 && belowf2block.Id == 0)
                 {

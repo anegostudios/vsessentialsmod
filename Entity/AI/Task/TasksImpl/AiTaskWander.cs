@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Datastructures;
@@ -104,7 +104,7 @@ namespace Vintagestory.GameContent
             int tries = 9;
             Vec4d bestTarget = null;
             Vec4d curTarget = new Vec4d();
-            BlockPos tmpPos = new BlockPos();
+            BlockPos tmpPos = new BlockPos(entity.Pos.Dimension);
 
             if (FailedConsecutivePathfinds > 10)
             {
@@ -127,7 +127,7 @@ namespace Vintagestory.GameContent
                 dz = wanderRangeHorizontal.nextFloat() * (rand.Next(2) * 2 - 1) * wRangeMul;
 
                 curTarget.X = entity.ServerPos.X + dx;
-                curTarget.Y = entity.ServerPos.Y + dy;
+                curTarget.Y = entity.ServerPos.InternalY + dy;
                 curTarget.Z = entity.ServerPos.Z + dz;
                 curTarget.W = 1;
 
@@ -149,7 +149,7 @@ namespace Vintagestory.GameContent
                         curTarget.Y = Math.Min(curTarget.Y, rainMapY + maxHeight);
 
                         // Cannot be in water
-                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
@@ -160,7 +160,7 @@ namespace Vintagestory.GameContent
                         else
                         {
                             // Does not like water
-                            waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
+                            waterorIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                             if (waterorIceBlock.IsLiquid()) curTarget.W /= 2;
 
                             // Lets make a straight line plot to see if we would fall off a cliff
@@ -201,12 +201,12 @@ namespace Vintagestory.GameContent
                         break;
 
                     case EnumHabitat.Sea:
-                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         break;
 
                     case EnumHabitat.Underwater:
-                        waterorIceBlock = entity.World.BlockAccessor.GetBlock((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
+                        waterorIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)curTarget.X, (int)curTarget.Y, (int)curTarget.Z, BlockLayersAccess.Fluid);
                         if (!waterorIceBlock.IsLiquid()) curTarget.W = 0;
                         else curTarget.W = 1 / (Math.Abs(dy) + 1);  //prefer not too much vertical change when underwater
 

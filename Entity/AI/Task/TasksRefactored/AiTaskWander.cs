@@ -307,7 +307,7 @@ public class AiTaskWanderR : AiTaskBaseR
             dz = Config.WanderRangeHorizontal.nextFloat() * (Rand.Next(2) * 2 - 1) * wRangeMul;
 
             currentTarget.X = entity.ServerPos.X + dx;
-            currentTarget.Y = entity.ServerPos.Y + dy;
+            currentTarget.Y = entity.ServerPos.InternalY + dy;
             currentTarget.Z = entity.ServerPos.Z + dz;
             currentTarget.W = 1;
 
@@ -328,7 +328,7 @@ public class AiTaskWanderR : AiTaskBaseR
                     currentTarget.Y = Math.Min(currentTarget.Y, rainMapY + Config.MaxHeight);
 
                     // Cannot be in water
-                    waterOrIceBlock = entity.World.BlockAccessor.GetBlock((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
+                    waterOrIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
                     if (waterOrIceBlock.IsLiquid()) currentTarget.W = 0;
                     break;
 
@@ -342,7 +342,7 @@ public class AiTaskWanderR : AiTaskBaseR
                     else
                     {
                         // Does not like water
-                        waterOrIceBlock = entity.World.BlockAccessor.GetBlock((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
+                        waterOrIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
                         if (waterOrIceBlock.IsLiquid()) currentTarget.W /= 2;
 
                         // Lets make a straight line plot to see if we would fall off a cliff
@@ -384,12 +384,12 @@ public class AiTaskWanderR : AiTaskBaseR
                     break;
 
                 case EnumHabitat.Sea:
-                    waterOrIceBlock = entity.World.BlockAccessor.GetBlock((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
+                    waterOrIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
                     if (!waterOrIceBlock.IsLiquid()) currentTarget.W = 0;
                     break;
 
                 case EnumHabitat.Underwater:
-                    waterOrIceBlock = entity.World.BlockAccessor.GetBlock((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
+                    waterOrIceBlock = entity.World.BlockAccessor.GetBlockRaw((int)currentTarget.X, (int)currentTarget.Y, (int)currentTarget.Z, BlockLayersAccess.Fluid);
                     if (!waterOrIceBlock.IsLiquid()) currentTarget.W = 0;
                     else currentTarget.W = 1 / (Math.Abs(dy) + 1);  //prefer not too much vertical change when underwater
 

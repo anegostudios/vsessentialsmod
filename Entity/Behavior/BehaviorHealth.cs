@@ -250,10 +250,11 @@ public class EntityBehaviorHealth : EntityBehavior
 
         secondsSinceLastUpdate += deltaTime;
         if (secondsSinceLastUpdate < HealthUpdateCooldownSec) return;
-        secondsSinceLastUpdate = 0;
 
         ApplyRegenAndHunger();
         ApplyHailDamage();
+
+        secondsSinceLastUpdate = 0;
     }
 
     public override void OnEntityDeath(DamageSource damageSourceForDeath)
@@ -356,7 +357,8 @@ public class EntityBehaviorHealth : EntityBehavior
         entity.ReceiveDamage(new DamageSource()
         {
             Source = EnumDamageSource.Fall,
-            Type = EnumDamageType.Gravity
+            Type = EnumDamageType.Gravity,
+            IgnoreInvFrames = true
         }, (float)fallDamage);
     }
 
@@ -541,10 +543,8 @@ public class EntityBehaviorHealth : EntityBehavior
         {
             EntityBehaviorHunger? hungerBehavior = entity.GetBehavior<EntityBehaviorHunger>();
 
-            if (hungerBehavior != null)
+            if (hungerBehavior != null && player.Player.WorldData.CurrentGameMode != EnumGameMode.Creative)
             {
-                if (player.Player.WorldData.CurrentGameMode == EnumGameMode.Creative) return;
-
                 // When below 75% satiety, autoheal starts dropping
                 healthRegenPerGameSecond = GameMath.Clamp(healthRegenPerGameSecond * hungerBehavior.Saturation / hungerBehavior.MaxSaturation * 1 / AutoRegenSaturationThreshold, 0, healthRegenPerGameSecond);
 

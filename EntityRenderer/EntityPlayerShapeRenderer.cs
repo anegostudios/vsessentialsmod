@@ -399,7 +399,7 @@ namespace Vintagestory.GameContent
             {
                 bodyYaw = renderMode != RenderMode.ThirdPerson ? eagent.BodyYaw : eagent.Pos.Yaw;
 
-                if (!isShadowPass && isSelf)
+                if (!isShadowPass)
                 {
                     smoothCameraTurning(bodyYaw, mdt);
                 }

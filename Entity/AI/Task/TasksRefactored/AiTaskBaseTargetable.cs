@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -86,7 +87,7 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     /// In meleeAttack tasks it affects detection range and whether this entity is fully tamed and should attack player<br/>
     /// In seekEntity it affects whether this entity is fully tamed and should seek player
     /// </summary>
-    [JsonProperty] public float TamingGenerations = 10; // @TODO refactor taming system
+    [JsonProperty] public float TamingGenerations = 10;
 
     /// <summary>
     /// Is set to 'true' seeking range will be reduced proportionally to taming generation. At <see cref="TamingGenerations"/> this factor will be equal to 0.
@@ -143,12 +144,6 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     [JsonProperty] public bool TargetEntitiesWithDifferentHerdId = false;
 
     /// <summary>
-    /// Determines how long ago last attack should be for this task to consider being recently attacked.<br/>
-    /// Is used to clear attacked-by entity.
-    /// </summary>
-    [JsonProperty] public int RecentlyAttackedTimeoutMs = 30000;
-
-    /// <summary>
     /// If set to true all entities with 'IsInteractable' flag set to false will be ignored.
     /// </summary>
     [JsonProperty] public bool TargetOnlyInteractableEntities = true;
@@ -164,9 +159,9 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     [JsonProperty] public int[] TargetLightLevels = [0, 0, 32, 32];
 
     /// <summary>
-    /// Light level type that will be used for <see cref="TargetLightLevels"/>. See <see cref="EnumLightLevelType"/> for description of each light level type. Case sensitive.
+    /// Light level type that will be used for <see cref="TargetLightLevels"/>. See <see cref="EnumLightLevelType"/> for description of each light level type. Case sensitive.<br/>
     /// </summary>
-    [JsonProperty] public EnumLightLevelType TargetLightLevelType = EnumLightLevelType.OnlyBlockLight;
+    [JsonProperty] public EnumLightLevelType TargetLightLevelType = EnumLightLevelType.MaxTimeOfDayLight;
 
     /// <summary>
     /// Cooldown for target search check. This check is expensive, so it is better to have a cooldown for better performance.<br/>
@@ -196,7 +191,7 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     public bool NoEntityCodes => TargetEntityCodesExact.Length == 0 && TargetEntityCodesBeginsWith.Length == 0;
     public bool NoTags => EntityTags.Length == 0 && SkipEntityTags.Length == 0;
     public bool TargetEverything => NoEntityCodes && NoTags && NoEntityWeight;
-    public bool NoEntityWeight => MaxTargetWeight <= 0;
+    public bool NoEntityWeight => MaxTargetWeight <= 0 && MinTargetWeight <= 0;
     public bool IgnoreTargetLightLevel => TargetLightLevels[0] == 0 && TargetLightLevels[1] == 0 && TargetLightLevels[2] == maxLightLevel && TargetLightLevels[3] == maxLightLevel;
 
 
@@ -297,7 +292,6 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
 public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSupplier
 {
     public Entity? TargetEntity => targetEntity;
-    public Entity? AttackedByEntity => attackedByEntity;
     public virtual bool AggressiveTargeting => true;
 
     #region IWorldIntersectionSupplier
@@ -310,7 +304,6 @@ public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSup
     public Entity[] GetEntitiesAround(Vec3d position, float horRange, float vertRange, ActionConsumable<Entity>? matches = null) => [];
     #endregion
 
-    protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < Config.RecentlyAttackedTimeoutMs;
     protected bool RecentlySearchedForTarget => entity.World.ElapsedMilliseconds - lastTargetSearchMs < Config.TargetSearchCooldownMs;
     protected virtual string[] HostileEmotionStates => ["aggressiveondamage", "aggressivearoundentities"];
 
@@ -318,8 +311,6 @@ public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSup
     private AiTaskBaseTargetableConfig Config => GetConfig<AiTaskBaseTargetableConfig>();
 
     protected Entity? targetEntity;
-    protected Entity? attackedByEntity;
-    protected long attackedByEntityMs;
     protected long lastTargetSearchMs;
 
     #region Variables to reduce heap allocations because we dont use structs
@@ -375,17 +366,6 @@ public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSup
         {
             entity.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState(Config.TriggerEmotionState, 1, targetEntity?.EntityId ?? 0);
         }
-    }
-
-    public override void OnEntityHurt(DamageSource source, float damage)
-    {
-        attackedByEntity = source.GetCauseEntity();
-        if (attackedByEntity != null)
-        {
-            attackedByEntityMs = entity.World.ElapsedMilliseconds;
-        }
-        
-        base.OnEntityHurt(source, damage);
     }
 
     public virtual void ClearAttacker()
@@ -510,12 +490,12 @@ public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSup
 
         if (targetLightLevel <= Config.TargetLightLevels[1] && Config.TargetLightLevels[0] != Config.TargetLightLevels[1])
         {
-            return (targetLightLevel - Config.TargetLightLevels[1]) / (float)(Config.TargetLightLevels[0] - Config.TargetLightLevels[1]);
+            return (targetLightLevel - Config.TargetLightLevels[0]) / (float)(Config.TargetLightLevels[1] - Config.TargetLightLevels[0]);
         }
 
         if (targetLightLevel >= Config.TargetLightLevels[2] && Config.TargetLightLevels[2] != Config.TargetLightLevels[3])
         {
-            return 1f - (targetLightLevel - Config.TargetLightLevels[2]) / (Config.TargetLightLevels[2] - Config.TargetLightLevels[3]);
+            return 1f - (targetLightLevel - Config.TargetLightLevels[2]) / (Config.TargetLightLevels[3] - Config.TargetLightLevels[2]);
         }
 
         return 1;

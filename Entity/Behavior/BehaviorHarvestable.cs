@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -542,7 +542,7 @@ namespace Vintagestory.GameContent
                 }
                 if (GotAcidified)
                 {
-                    infotext.AppendLine(Lang.Get("Looks partially dissolved, likely due to high acidity."));
+                    infotext.AppendLine(Lang.Get("deadcreature-aciddissolved"));
                 }
 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");

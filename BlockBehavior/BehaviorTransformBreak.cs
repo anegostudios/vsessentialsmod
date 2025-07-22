@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -79,7 +79,7 @@ namespace Vintagestory.GameContent
                     spawnDrops(world, pos, byPlayer);
                 }
 
-                block.SpawnBlockBrokenParticles(pos);
+                block.SpawnBlockBrokenParticles(pos, byPlayer);
             }
         }
 

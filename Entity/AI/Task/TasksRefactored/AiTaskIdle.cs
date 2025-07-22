@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System;
+using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
@@ -18,7 +19,6 @@ namespace Vintagestory.GameContent;
 /// - MaxDuration => MaxDurationMs<br/>
 /// - MinDuration default value: 2000 => 0<br/>
 /// - MaxDuration default value: 4000 => 0<br/>
-/// - ChanceToCheckTargetAndDayFrame: 0.3 => 1.0
 /// </summary>
 [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
 public class AiTaskIdleConfig : AiTaskBaseTargetableConfig
@@ -50,16 +50,15 @@ public class AiTaskIdleConfig : AiTaskBaseTargetableConfig
     [JsonProperty] public bool CheckForSolidUpSide = true;
 
     /// <summary>
-    /// If any of checks for specific blocks is specified and entity is stating on top of a block passed this checks, block above it should have its 'Replaceable' value above or equal to this value.
+    /// If entity is inside block with Replaceable bigger than this value, block below will be checked, else block that entity is inside will be checked instead.
     /// </summary>
-    [JsonProperty] public int MinBlockBelowReplaceable = 6000;
+    [JsonProperty] public int MinBlockInsideReplaceable = 6000;
 
     /// <summary>
     /// Chance for each tick to check for entities around and day time frames. If one of these checks fails, task will be stopped.<br/>
     /// This spreads out these expensive entity search check and adds randomness to entity reactions on day time changes and entities appearing in sight.
     /// </summary>
-    [JsonProperty] public float ChanceToCheckTargetAndDayFrame = 1.0f;
-
+    [JsonProperty] public float ChanceToCheckTarget = 0.3f;
 
 
 
@@ -116,10 +115,9 @@ public class AiTaskIdleR : AiTaskBaseTargetableR
     {
         if (!base.ContinueExecute(dt)) return false;
 
-        if (Rand.NextDouble() <= Config.ChanceToCheckTargetAndDayFrame)
+        if (Rand.NextDouble() <= Config.ChanceToCheckTarget && CheckForTargetToStop())
         {
-            if (CheckForTargetToStop()) return false;
-            if (!CheckDayTimeFrames()) return false;
+            return false;
         }
 
         return true;
@@ -154,7 +152,14 @@ public class AiTaskIdleR : AiTaskBaseTargetableR
 
         Block block = entity.World.BlockAccessor.GetBlockRaw((int)entity.ServerPos.X, (int)entity.ServerPos.InternalY, (int)entity.ServerPos.Z);
 
-        return CheckForBlock(block) || (block.Replaceable >= Config.MinBlockBelowReplaceable && CheckForBlock(belowBlock));
+        if (block.Replaceable >= Config.MinBlockInsideReplaceable)
+        {
+            return CheckForBlock(belowBlock);
+        }
+        else
+        {
+            return CheckForBlock(block);
+        }
     }
 
     protected virtual bool CheckForBlock(Block block)

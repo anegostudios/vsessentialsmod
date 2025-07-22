@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
         {
             base.doSlowTick(physicsSim, dt);
 
-            var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)Position.Y, (int)Position.Z, BlockLayersAccess.Fluid);
+            var block = capi.World.BlockAccessor.GetBlockRaw((int)Position.X, (int)Position.Y, (int)Position.Z, BlockLayersAccess.Fluid);
             if (block.IsLiquid())
             {
                 dieAccum += dt;

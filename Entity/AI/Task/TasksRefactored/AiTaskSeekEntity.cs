@@ -1,6 +1,7 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -154,7 +155,7 @@ public class AiTaskSeekEntityConfig : AiTaskBaseTargetableConfig
     /// <summary>
     /// This entity velocity during jump will be multiplied by this factor.
     /// </summary>
-    [JsonProperty] public float JumpSpeedFactor = 0.033f;
+    [JsonProperty] public float JumpSpeedFactor = 1;
 
     /// <summary>
     /// How much this entity velocity will be reduced after jump is landed.
@@ -165,6 +166,13 @@ public class AiTaskSeekEntityConfig : AiTaskBaseTargetableConfig
     /// Entity will flee if unable to reach or circle around target.
     /// </summary>
     [JsonProperty] public bool FleeIfCantReach = true;
+
+    /// <summary>
+    /// If set to true and this entity is fully tamed, this ai task will ignore player. If player attacked the entity, it will ignore player only if can tolerate damage from them.
+    /// </summary>
+    [JsonProperty] public bool IgnorePlayerIfFullyTamed = false;
+
+    [JsonProperty] public float MaxVerticalJumpSpeed = 0.13f;
 
     public override void Init(EntityAgent entity)
     {
@@ -199,6 +207,8 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
     protected readonly Dictionary<long, int> futilityCounters = [];
     protected readonly Vec3d targetPosition = new();
     protected readonly Vec3d previousPosition = new();
+    protected bool updatedPathAfterLanding = true;
+    protected Vec3d jumpHorizontalVelocity = new();
 
     #region Variables to reduce heap allocations in HasDirectContact methods cause we dont use structs
     private readonly Vec3d posBuffer = new();
@@ -282,7 +292,21 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
         currentFollowTimeSec += dt;
         lastPathUpdateSecondsSec += dt;
 
-        UpdatePath();
+        if (Config.JumpAtTarget && !updatedPathAfterLanding && entity.OnGround && entity.Collided)
+        {
+            pathTraverser.NavigateTo(targetPosition, Config.MoveSpeed, MinDistanceToTarget(Config.ExtraTargetDistance), OnGoalReached, OnStuck, null, false, updatePathDepth, 1, Config.AiCreatureType);
+            lastPathUpdateSecondsSec = 0;
+            updatedPathAfterLanding = true;
+        }
+        if (!Config.JumpAtTarget || entity.OnGround || updatedPathAfterLanding)
+        {
+            UpdatePath();
+        }
+        if (Config.JumpAtTarget && !updatedPathAfterLanding && !entity.OnGround)
+        {
+            entity.ServerPos.Motion.X = jumpHorizontalVelocity.X;
+            entity.ServerPos.Motion.Z = jumpHorizontalVelocity.Z;
+        }
 
         RestoreMainAnimation();
 
@@ -293,16 +317,21 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
             pathTraverser.CurrentTarget.Z = targetEntity.ServerPos.Z;
         }
 
-        PerformJump();
+        if (PerformJump())
+        {
+            updatedPathAfterLanding = false;
+            pathTraverser.Stop();
+        }
 
         double distance = GetDistanceToTarget();
-        bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
+        bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative && !Config.TargetPlayerInAllGameModes;
         float minDistance = MinDistanceToTarget(Config.ExtraTargetDistance);
+        bool pathTraverserActive = pathTraverser.Active || !updatedPathAfterLanding;
 
         return
             targetEntity.Alive &&
             !inCreativeMode &&
-            pathTraverser.Active &&
+            pathTraverserActive &&
             currentFollowTimeSec < Config.MaxFollowTimeSec &&
             distance < currentSeekingRange &&
             (distance > minDistance || targetEntity is EntityAgent entityAgent && entityAgent.ServerControls.TriesToMove);
@@ -372,8 +401,7 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
         posBuffer.SetWithDimension(entity.ServerPos);
         targetEntity = partitionUtil.GetNearestEntity(posBuffer, currentSeekingRange, potentialTarget =>
         {
-
-            if (fullyTamed && (IsNonAttackingPlayer(potentialTarget) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
+            if (Config.IgnorePlayerIfFullyTamed && fullyTamed && (IsNonAttackingPlayer(potentialTarget) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
 
             return IsTargetableEntity(potentialTarget, currentSeekingRange);
         }, Config.SearchType);
@@ -516,22 +544,33 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
         }
     }
 
-    protected virtual void PerformJump()
+    protected virtual bool PerformJump()
     {
-        if (targetEntity == null) return;
+        if (targetEntity == null) return false;
 
         double distance = GetDistanceToTarget();
-        bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
+        bool inCreativeMode = (targetEntity as EntityPlayer)?.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative && !Config.TargetPlayerInAllGameModes;
 
-        if (inCreativeMode || !Config.JumpAtTarget || Rand.NextDouble() > Config.JumpChance) return;
+        if (inCreativeMode || !Config.JumpAtTarget || Rand.NextDouble() > Config.JumpChance) return false;
 
         bool recentlyJumped = entity.World.ElapsedMilliseconds - jumpedMs < Config.JumpCooldownMs;
+        bool jumpedJustNow = false;
 
         if (distance >= Config.DistanceToTargetToJump[0] && distance <= Config.DistanceToTargetToJump[1] && !recentlyJumped && Config.MaxHeightDifferenceToJump >= entity.ServerPos.Y - targetEntity.ServerPos.Y)
         {
-            double dx = (targetEntity.ServerPos.X - entity.ServerPos.X + targetEntity.ServerPos.Motion.X * Config.JumpMotionAnticipationFactor) * Config.JumpSpeedFactor;
-            double dz = (targetEntity.ServerPos.Z - entity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * Config.JumpMotionAnticipationFactor) * Config.JumpSpeedFactor;
-            double dy = Config.JumpHeightFactor * GameMath.Max(0.13, (targetEntity.ServerPos.Y - entity.ServerPos.Y) * Config.JumpSpeedFactor);
+            Vec3d horizontalMotion = new(entity.ServerPos.Motion.X, 0, entity.ServerPos.Motion.Z);
+            double horizontalSpeed = horizontalMotion.Length();
+
+            double dx = (targetEntity.ServerPos.X - entity.ServerPos.X + targetEntity.ServerPos.Motion.X * Config.JumpMotionAnticipationFactor) * Config.JumpSpeedFactor * 0.033f * 0.5f;
+            double dz = (targetEntity.ServerPos.Z - entity.ServerPos.Z + targetEntity.ServerPos.Motion.Z * Config.JumpMotionAnticipationFactor) * Config.JumpSpeedFactor * 0.033f * 0.5f;
+            double dy = Config.JumpHeightFactor * GameMath.Max(Config.MaxVerticalJumpSpeed, (targetEntity.ServerPos.Y - entity.ServerPos.Y) * 0.033f);
+
+            horizontalMotion.Set(dx, 0, dz).Normalize().Mul(horizontalSpeed);
+
+            jumpHorizontalVelocity.Set(dx + entity.ServerPos.Motion.X, 0, dz + entity.ServerPos.Motion.Z);
+
+            entity.ServerPos.Motion.X = horizontalMotion.X;
+            entity.ServerPos.Motion.Z = horizontalMotion.Z;
 
             entity.ServerPos.Motion.Add(dx, dy, dz);
 
@@ -542,12 +581,15 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
 
             jumpedMs = entity.World.ElapsedMilliseconds;
             finishedMs = entity.World.ElapsedMilliseconds;
+            jumpedJustNow = true;
         }
 
         if (recentlyJumped && !entity.Collided && distance < Config.DistanceToTargetToJump[0])
         {
             entity.ServerPos.Motion *= Config.AfterJumpSpeedReduction;
         }
+
+        return jumpedJustNow;
     }
 
     protected virtual void AlarmHerd()

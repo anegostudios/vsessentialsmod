@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -13,7 +14,7 @@ namespace Vintagestory.API.Common;
 /// Base parameters of all AI tasks that can be specified in JSON.<br/>
 /// Parameters names are not case sensitive.<br/>
 /// <br/>
-/// Changes 1.21.0-pre.1 => 1.21.0-pre.2<br/>
+/// Changes 1.20.12 => 1.21.0-pre.3<br/>
 /// - mincooldown => minCooldownMs<br/>
 /// - maxcooldown => maxCooldownMs<br/>
 /// - initialMinCoolDown => initialMinCooldownMs<br/>
@@ -21,7 +22,7 @@ namespace Vintagestory.API.Common;
 /// - whenInEmotionState: string => string[]<br/>
 /// - whenNotInEmotionState: string => string[]<br/>
 /// - dayTimeFrameInaccuracy default value: 0.3 => 0<br/>
-/// - executionChance default value: 0.1 => 1.0
+/// - executionChance default value: ~ => 0.1
 /// </summary>
 [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
 public class AiTaskBaseConfig
@@ -60,7 +61,6 @@ public class AiTaskBaseConfig
     /// <summary>
     /// Minimal cooldown before task can be run again, in milliseconds.<br/>
     /// There are two types of cooldown: short and long. This parameters sets short cooldown.<br/>
-    /// In most tasks only short one is used, that relies on <see cref="IWorldAccessor.ElapsedMilliseconds"/>.
     /// Long cooldown is set in hours and relies on <see cref="IWorldAccessor.Calendar.TotalHours"/>.
     /// </summary>
     [JsonProperty] public int MinCooldownMs = 0;
@@ -68,7 +68,6 @@ public class AiTaskBaseConfig
     /// <summary>
     /// Maximum cooldown before task can be run again, in milliseconds.<br/>
     /// There are two types of cooldown: short and long. This parameters sets short cooldown.<br/>
-    /// In most tasks only short one is used, that relies on <see cref="IWorldAccessor.ElapsedMilliseconds"/>.
     /// Long cooldown is set in hours and relies on <see cref="IWorldAccessor.Calendar.TotalHours"/>.
     /// </summary>
     [JsonProperty] public int MaxCooldownMs = 100;
@@ -76,7 +75,6 @@ public class AiTaskBaseConfig
     /// <summary>
     /// Minimum cooldown before task can be run again, in hours.<br/>
     /// There are two types of cooldown: short and long. This parameters sets long cooldown.<br/>
-    /// In most tasks only short one is used, that relies on <see cref="IWorldAccessor.ElapsedMilliseconds"/>.
     /// Long cooldown is set in hours and relies on <see cref="IWorldAccessor.Calendar.TotalHours"/>.
     /// </summary>
     [JsonProperty] public double MinCooldownHours = 0;
@@ -84,7 +82,6 @@ public class AiTaskBaseConfig
     /// <summary>
     /// Maximum cooldown before task can be run again, in hours.<br/>
     /// There are two types of cooldown: short and long. This parameters sets long cooldown.<br/>
-    /// In most tasks only short one is used, that relies on <see cref="IWorldAccessor.ElapsedMilliseconds"/>.
     /// Long cooldown is set in hours and relies on <see cref="IWorldAccessor.Calendar.TotalHours"/>.
     /// </summary>
     [JsonProperty] public double MaxCooldownHours = 0;
@@ -187,23 +184,28 @@ public class AiTaskBaseConfig
     [JsonProperty] public int[] EntityLightLevels = [0, 32];
 
     /// <summary>
-    /// Light level type that will be used for <see cref="EntityLightLevels"/>. See <see cref="EnumLightLevelType"/> for description of each light level type. Case sensitive.
+    /// Light level type that will be used for <see cref="EntityLightLevels"/>. See <see cref="EnumLightLevelType"/> for description of each light level type. Case sensitive.<br/>
     /// </summary>
-    [JsonProperty] public EnumLightLevelType EntityLightLevelType = EnumLightLevelType.OnlyBlockLight;
+    [JsonProperty] public EnumLightLevelType EntityLightLevelType = EnumLightLevelType.MaxTimeOfDayLight;
 
     /// <summary>
     /// A list of day-time-frames in which AI task can start. If no frames specified, day time is ignored.<br/>
-    /// Each frame is a pair of day hours: { fromHour: 0.5, toHour: 2.9 }.<br/>
+    /// Each frame is a pair of day hours: [0.5, 2.9].<br/>
     /// In hours. Assumes 24 hours per day.
     /// </summary>
-    [JsonProperty] private DayTimeFrameJson[]? duringDayTimeFrames = [];
+    [JsonProperty] private float[][]? duringDayTimeFramesHours = [];
 
     /// <summary>
     /// A random value from [-DayTimeFrameInaccuracy/2, DayTimeFrameInaccuracy/2] will be added to current day hour when checking for <see cref="DuringDayTimeFrames"/>.<br/>
     /// In hours. Assumes 24 hours per day. Can be fractional.<br/>
     /// For all entities with same schedule to not act in the same moment (which can feel robotic) set it some small value, 0.3 for example.
     /// </summary>
-    [JsonProperty] public float DayTimeFrameInaccuracy = 0;
+    [JsonProperty] public float DayTimeFrameInaccuracy = 3;
+
+    /// <summary>
+    /// AI tasks will stop when current time is out of <see cref="AiTaskBaseConfig.duringDayTimeFramesHours"/>.
+    /// </summary>
+    [JsonProperty] public bool StopIfOutOfDayTimeFrames = false;
 
     /// <summary>
     /// At what temperature range AI task should start. In degrees Celsius.<br/>
@@ -214,7 +216,7 @@ public class AiTaskBaseConfig
     /// <summary>
     /// Chance for this task to be executed each tick.
     /// </summary>
-    [JsonProperty] public float ExecutionChance = 1;
+    [JsonProperty] public float ExecutionChance = 0.1f;
 
     /// <summary>
     /// Stops task if entity is hurt
@@ -231,6 +233,17 @@ public class AiTaskBaseConfig
     /// If less or equal to 0, duration will be ignored.
     /// </summary>
     [JsonProperty] public int MaxDurationMs = 0;
+
+    /// <summary>
+    /// Determines how long ago last attack should be for this task to consider being recently attacked.<br/>
+    /// Is used to clear attacked-by entity.
+    /// </summary>
+    [JsonProperty] public int RecentlyAttackedTimeoutMs = 30000;
+
+    /// <summary>
+    /// If entity was recently attacked, task wont be executed.
+    /// </summary>
+    [JsonProperty] public bool DontExecuteIfRecentlyAttacked = false;
 
 
     public float PriorityForCancel => priorityForCancel ?? Priority;
@@ -254,9 +267,12 @@ public class AiTaskBaseConfig
     public virtual void Init(EntityAgent entity)
     {
         if (tagsAppliedToEntity != null) TagsAppliedToEntity = entity.Api.TagRegistry.EntityTagsToTagArray(tagsAppliedToEntity);
-        if (duringDayTimeFrames != null) DuringDayTimeFrames = [.. duringDayTimeFrames.Select(frame => frame.ToStruct())];
+        if (duringDayTimeFramesHours != null)
+        {
+            DuringDayTimeFrames = [.. duringDayTimeFramesHours.Select(frame => new DayTimeFrame(frame[0], frame[1]))];
+        }
 
-        duringDayTimeFrames = null;
+        duringDayTimeFramesHours = null;
         tagsAppliedToEntity = null;
 
         if (animation != "")
@@ -330,6 +346,7 @@ public abstract class AiTaskBaseR : IAiTask
     /// Is exclusively used by <see cref="EntityBehaviorSemiTamed"/>, looks like a crutch.
     /// </summary>
     public string[] WhenInEmotionState => Config.WhenInEmotionState;
+    public Entity? AttackedByEntity => attackedByEntity;
 
     protected AiTaskBaseConfig baseConfig;
 
@@ -340,6 +357,8 @@ public abstract class AiTaskBaseR : IAiTask
     [ThreadStatic]
     private static Random? randThreadStatic;
     protected Random Rand => randThreadStatic ??= new Random();
+
+    protected bool RecentlyAttacked => entity.World.ElapsedMilliseconds - attackedByEntityMs < Config.RecentlyAttackedTimeoutMs;
 
     protected readonly EntityAgent entity;
     protected readonly IWorldAccessor world;
@@ -352,6 +371,9 @@ public abstract class AiTaskBaseR : IAiTask
     protected bool stopTask = false;
     protected bool active = false;
     protected long durationUntilMs = 0;
+    protected float currentDayTimeInaccuracy = 0;
+    protected Entity? attackedByEntity;
+    protected long attackedByEntityMs;
 
     /// <summary>
     /// Last value of <see cref="IWorldAccessor.ElapsedMilliseconds"/> when sound was played.
@@ -403,6 +425,8 @@ public abstract class AiTaskBaseR : IAiTask
         }
 
         cooldownUntilMs = entity.World.ElapsedMilliseconds + initialMinCooldown + entity.World.Rand.Next(initialMaxCooldown - initialMinCooldown);
+
+        attackedByEntityMs = -Config.RecentlyAttackedTimeoutMs;
     }
 
     protected AiTaskBaseR(EntityAgent entity)
@@ -536,6 +560,12 @@ public abstract class AiTaskBaseR : IAiTask
     public virtual void OnEntityHurt(DamageSource source, float damage)
     {
         if (Config.StopOnHurt) stopTask = true;
+
+        attackedByEntity = source.GetCauseEntity();
+        if (attackedByEntity != null)
+        {
+            attackedByEntityMs = entity.World.ElapsedMilliseconds;
+        }
     }
 
     public virtual void OnNoPath(Vec3d target) { }
@@ -601,8 +631,12 @@ public abstract class AiTaskBaseR : IAiTask
         if (!CheckEntityState()) return false;
         if (!CheckEmotionStates()) return false;
         if (!CheckEntityLightLevel()) return false;
+
+        currentDayTimeInaccuracy = (float)entity.World.Rand.NextDouble() * Config.DayTimeFrameInaccuracy - Config.DayTimeFrameInaccuracy / 2;
+
         if (!CheckDayTimeFrames()) return false;
         if (!CheckTemperature()) return false;
+        if (Config.DontExecuteIfRecentlyAttacked && RecentlyAttacked) return false;
         return true;
     }
 
@@ -628,7 +662,7 @@ public abstract class AiTaskBaseR : IAiTask
     {
         if (Config.EntityLightLevels[0] == 0 && Config.EntityLightLevels[1] == 32) return true;
 
-        int lightLevel = entity.World.BlockAccessor.GetLightLevel(entity.Pos.AsBlockPos, Config.EntityLightLevelType);
+        int lightLevel = entity.World.BlockAccessor.GetLightLevel((int)entity.Pos.X, (int)entity.Pos.InternalY, (int)entity.Pos.Z, Config.EntityLightLevelType);
 
         return Config.EntityLightLevels[0] <= lightLevel && lightLevel <= Config.EntityLightLevels[1];
     }
@@ -639,7 +673,7 @@ public abstract class AiTaskBaseR : IAiTask
 
         // introduce a bit of randomness so that (e.g.) hens do not all wake up simultaneously at 06:00, which looks artificial
         // essentially works in fractions of a day, instead of hours, but for convinience scaled to use 24 hours per day scale
-        double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * standardHoursPerDay + (entity.World.Rand.NextDouble() * Config.DayTimeFrameInaccuracy - Config.DayTimeFrameInaccuracy / 2);
+        double hourOfDay = entity.World.Calendar.HourOfDay / entity.World.Calendar.HoursPerDay * standardHoursPerDay + currentDayTimeInaccuracy;
         foreach (DayTimeFrame frame in Config.DuringDayTimeFrames)
         {
             if (frame.Matches(hourOfDay)) return true;
@@ -653,6 +687,8 @@ public abstract class AiTaskBaseR : IAiTask
         if (Config.TemperatureRange == null) return true;
         
         float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
+
+        Debug.WriteLine($"temperature: {temperature}");
 
         return Config.TemperatureRange[0] <= temperature && temperature <= Config.TemperatureRange[1];
     }
@@ -701,6 +737,11 @@ public abstract class AiTaskBaseR : IAiTask
         {
             entity.World.PlaySoundAt(Config.Sound, entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z, null, Config.RandomizePitch, Config.SoundRange, Config.SoundVolume);
             lastSoundTotalMs = entity.World.ElapsedMilliseconds;
+        }
+
+        if (Config.StopIfOutOfDayTimeFrames && !CheckDayTimeFrames())
+        {
+            return false;
         }
 
         return true;

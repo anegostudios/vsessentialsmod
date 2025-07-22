@@ -269,8 +269,6 @@ public class AiTaskFleeEntityR : AiTaskBaseTargetableR
         }
     }
 
-
-
     protected override bool CheckEntityLightLevel()
     {
         // This code section controls drifter behavior - they retreat (flee slowly) from the player in the daytime, this is "switched off" below ground or at night, also switched off in temporal storms
@@ -314,8 +312,6 @@ public class AiTaskFleeEntityR : AiTaskBaseTargetableR
     {
         pathTraverser.Retarget();
     }
-
-    
 
     protected void UpdateTargetPosFleeMode(Vec3d targetPos, float yaw)
     {
@@ -361,5 +357,4 @@ public class AiTaskFleeEntityR : AiTaskBaseTargetableR
             !world.CollisionTester.IsColliding(world.BlockAccessor, entity.SelectionBox, tmpVec2.Set(pos).Add(0, Math.Min(1, stepHeight), 0), false)
         ;
     }
-
 }

@@ -98,7 +98,7 @@ public class EntityParticleFish : EntityParticle
             DoSchool();
         }
 
-        var block = capi.World.BlockAccessor.GetBlock((int)Position.X, (int)(Position.Y + 0.4f), (int)Position.Z, BlockLayersAccess.Fluid);
+        var block = capi.World.BlockAccessor.GetBlockRaw((int)Position.X, (int)(Position.Y + 0.4f), (int)Position.Z, BlockLayersAccess.Fluid);
         if (!block.IsLiquid())
         {
             Velocity.Y -= 0.1f;
