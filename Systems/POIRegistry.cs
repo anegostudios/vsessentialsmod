@@ -293,7 +293,11 @@ namespace Vintagestory.GameContent
             tmp.Set((int)poi.Position.X / chunksize, (int)poi.Position.Z / chunksize);
 
             PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
-            if (pois != null) pois.Remove(poi);
+            if (pois != null)
+            {
+                pois.Remove(poi);
+                if (pois.Count == 0) PoisByChunkColumn.Remove(tmp);
+            }
         }
 
     }
