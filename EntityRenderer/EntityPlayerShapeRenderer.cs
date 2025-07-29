@@ -382,7 +382,7 @@ namespace Vintagestory.GameContent
             float bodyYaw;
             float mdt = Math.Min(0.05f, dt);
 
-            if (!isSelf && entityPlayer.MountedOn != null)
+            if (!isSelf && entityPlayer.MountedOn?.Entity != null)
             {
                 smoothedBodyYaw = bodyYawLerped = entityPlayer.MountedOn.Entity.Pos.Yaw;
             }
