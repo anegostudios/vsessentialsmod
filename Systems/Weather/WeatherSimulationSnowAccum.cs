@@ -284,7 +284,7 @@ namespace Vintagestory.GameContent
                     if (mc != null && sim != null)
                     {
                         UpdateSnowLayerOffThread(sim, mc, chunkCoord);
-                        FrameProfiler.Mark("update " + chunkCoord);
+                        FrameProfiler.Mark("update ", chunkCoord);
                     }
                 }
 

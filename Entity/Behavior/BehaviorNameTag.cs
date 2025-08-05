@@ -1,8 +1,8 @@
-﻿using System;
-using System.Numerics;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -93,7 +93,7 @@ namespace Vintagestory.GameContent
             TriggeredNameReveal = attributes["triggeredNameReveal"].AsBool(false);
             RenderRange = attributes["renderRange"].AsInt(999);
             ShowOnlyWhenTargeted = attributes["showtagonlywhentargeted"].AsBool(false);
-            UnrevealedDisplayName = attributes["unrevealedDisplayName"].AsString("Stranger");
+            UnrevealedDisplayName = Lang.Get(attributes["unrevealedDisplayName"].AsString("nametag-default-unrevealedname"));
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
             OnNameChanged();

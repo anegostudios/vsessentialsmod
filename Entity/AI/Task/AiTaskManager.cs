@@ -57,24 +57,18 @@ public static class AiTaskRegistry
         Register<AiTaskBellAlarmR>("bellalarm-r");
         Register<AiTaskComeToOwnerR>("cometoowner-r");
         Register<AiTaskEatHeldItemR>("eathelditem-r");
-        //Register<AiTaskFishMoveFastR>("fishmovefast-r"); // WIP
-        //Register<AiTaskFishOutOfWaterR>("fishoutofwater-r"); // WIP
         Register<AiTaskFleeEntityR>("fleeentity-r");
         Register<AiTaskGetOutOfWaterR>("getoutofwater-r");
         Register<AiTaskIdleR>("idle-r");
-        //Register<AiTaskJealousMeleeAttackR>("jealousmeleeattack-r"); // WIP
-        //Register<AiTaskJealousSeekEntityR>("jealousseekentity-r"); // WIP
         Register<AiTaskLookAroundR>("lookaround-r");
         Register<AiTaskLookAtEntityR>("lookatentity-r");
+        Register<AiTaskMeleeAttackR>("meleeattack-r");
         Register<AiTaskSeekFoodAndEatR>("seekfoodandeat-r");
         Register<AiTaskSeekEntityR>("seekentity-r");
-        //Register<AiTaskSeekTargetingEntityR>("seektargetingentity-r"); // WIP
         Register<AiTaskShootAtEntityR>("shootatentity-r");
         Register<AiTaskStayCloseToEntityR>("stayclosetoentity-r");
-        //Register<AiTaskStayCloseToGuardedEntityR>("stayclosetoguardedentity-r"); // WIP
         Register<AiTaskStayInRangeR>("stayinrange-r");
         Register<AiTaskTurretModeR>("turretmode-r");
-        Register<AiTaskWanderR>("wander-r");
     }
 }
 
@@ -170,7 +164,7 @@ public sealed class AiTaskManager(Entity entity)
 
         if (entity.World.FrameProfiler.Enabled)
         {
-            entity.World.FrameProfiler.Mark("task-startexecute-" + AiTaskRegistry.TaskCodes[task.GetType()]);
+            entity.World.FrameProfiler.Mark("task-startexecute-", AiTaskRegistry.TaskCodes[task.GetType()]);
         }
     }
 
@@ -413,7 +407,7 @@ public sealed class AiTaskManager(Entity entity)
 
             if (entity.World.FrameProfiler.Enabled)
             {
-                entity.World.FrameProfiler.Mark("task-continueexec-" + AiTaskRegistry.TaskCodes[task.GetType()]);
+                entity.World.FrameProfiler.Mark("task-continueexec-", AiTaskRegistry.TaskCodes[task.GetType()]);
             }
         }
     }

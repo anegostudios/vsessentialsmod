@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Vintagestory.API.Client;
@@ -67,6 +67,9 @@ namespace Vintagestory.GameContent
         ICoreClientAPI capi;
         ICoreServerAPI sapi;
 
+        /// <summary>
+        /// The key is the chunkIndex3d (including dimension Y value) so that different dimensions are partitioned into separate EntityPartitionChunk
+        /// </summary>
         public Dictionary<long, EntityPartitionChunk> Partitions = new Dictionary<long, EntityPartitionChunk>();
 
         const int chunkSize = GlobalConstants.ChunkSize;
@@ -138,16 +141,16 @@ namespace Vintagestory.GameContent
                 if (entity.IsCreature)
                 {
                     if (entity.touchDistance > largestTouchDistance) largestTouchDistance = entity.touchDistance;
-        }
+                }
 
-            EntityPos pos = entity.SidedPos;
+                EntityPos pos = entity.SidedPos;
 
                 int x = (int)pos.X;
                 int z = (int)pos.Z;
                 int gridIndex = (z / gridSizeInBlocks) % partitionsLength * partitionsLength + (x / gridSizeInBlocks) % partitionsLength;
                 if (gridIndex < 0) continue;    // entities could be outside the map edge
 
-                long nowInChunkIndex3d = MapUtil.Index3dL(x / chunkSize, (int)pos.Y / chunkSize, z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
+                long nowInChunkIndex3d = MapUtil.Index3dL(x / chunkSize, (int)pos.InternalY / chunkSize, z / chunkSize, chunkMapSizeX, chunkMapSizeZ);
 
             if (!Partitions.TryGetValue(nowInChunkIndex3d, out EntityPartitionChunk partition))
             {
@@ -204,16 +207,18 @@ namespace Vintagestory.GameContent
             {
                 WalkEntities(position.X, position.Y, position.Z, radius, (e) =>
                 {
-                    double distSq = e.Pos.SquareDistanceTo(position);
-
-                    if (distSq < nearestDistanceSq && matches(e))
+                    if (matches(e))
                     {
-                        nearestDistanceSq = distSq;
-                        nearestEntity = e;
+                        double distSq = e.Pos.SquareDistanceTo(position);
+                        if (distSq < nearestDistanceSq)
+                        {
+                            nearestDistanceSq = distSq;
+                            nearestEntity = e;
+                        }
                     }
 
                     return true;
-                }, onIsInRangePartition, searchType);
+                }, null, searchType);
             } else
             {
                 WalkEntities(position.X, position.Y, position.Z, radius, (e) =>
@@ -227,7 +232,7 @@ namespace Vintagestory.GameContent
                     }
 
                     return true;
-                }, onIsInRangePartition, searchType);
+                }, null, searchType);
             }
 
             return nearestEntity;
@@ -255,11 +260,6 @@ namespace Vintagestory.GameContent
             double dz = ePos.Z - posZ;
 
             return (dx * dx + dy * dy + dz * dz) < radiusSq;
-        }
-
-        private bool onIsInRangePartition(Entity e, double posX, double posY, double posZ, double radiusSq)
-        {
-            return true;
         }
 
 
@@ -304,7 +304,7 @@ namespace Vintagestory.GameContent
         /// <param name="callback"></param>
         public void WalkEntityPartitions(Vec3d centerPos, double radius, ActionConsumable<Entity> callback)
         {
-            WalkEntities(centerPos.X, centerPos.Y, centerPos.Z, radius, callback, onIsInRangePartition, EnumEntitySearchType.Creatures);
+            WalkEntities(centerPos.X, centerPos.Y, centerPos.Z, radius, callback, null, EnumEntitySearchType.Creatures);
         }
 
 
@@ -314,9 +314,6 @@ namespace Vintagestory.GameContent
             long chunkMapSizeX = blockAccessor.MapSizeX / chunkSize;
             long chunkMapSizeZ = blockAccessor.MapSizeZ / chunkSize;
 
-            int dimension = (int)centerPosY / BlockPos.DimensionBoundary;
-            double trueY = centerPosY - dimension * BlockPos.DimensionBoundary;
-
             int gridXMax = blockAccessor.MapSizeX / gridSizeInBlocks - 1;
             int cyTop = blockAccessor.MapSizeY / chunkSize - 1;
             int gridZMax = blockAccessor.MapSizeZ / gridSizeInBlocks - 1;
@@ -324,8 +321,8 @@ namespace Vintagestory.GameContent
             int mingx = (int)GameMath.Clamp((centerPosX - radius) / gridSizeInBlocks, 0, gridXMax);
             int maxgx = (int)GameMath.Clamp((centerPosX + radius) / gridSizeInBlocks, 0, gridXMax);
 
-            int mincy = (int)GameMath.Clamp((trueY - radius) / chunkSize, 0, cyTop);
-            int maxcy = (int)GameMath.Clamp((trueY + radius) / chunkSize, 0, cyTop);
+            int mincy = (int)GameMath.Clamp((centerPosY - radius) / chunkSize, 0, cyTop);
+            int maxcy = (int)GameMath.Clamp((centerPosY + radius) / chunkSize, 0, cyTop);
 
             int mingz = (int)GameMath.Clamp((centerPosZ - radius) / gridSizeInBlocks, 0, gridZMax);
             int maxgz = (int)GameMath.Clamp((centerPosZ + radius) / gridSizeInBlocks, 0, gridZMax);
@@ -334,38 +331,44 @@ namespace Vintagestory.GameContent
 
             var Partitions = this.Partitions;
             EntityPartitionChunk partitionChunk = null;
-            long index3d;
             long lastIndex3d = -1;
+            const int partitionsPerChunk = (chunkSize / gridSizeInBlocks);
 
             for (int cy = mincy; cy <= maxcy; cy++)
             {
-                for (int gridX = mingx; gridX <= maxgx; gridX++)
+                for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
                 {
-                    int cx = gridX * gridSizeInBlocks / chunkSize;
-                    int lgx = gridX % partitionsLength;
+                    int cz = gridZ / partitionsPerChunk;
+                    int indexBase = (gridZ % partitionsLength) * partitionsLength;
+                    long index3d = MapUtil.Index3dL(0, cy, cz, chunkMapSizeX, chunkMapSizeZ);
 
-                    for (int gridZ = mingz; gridZ <= maxgz; gridZ++)
+                    for (int gridX = mingx; gridX <= maxgx; gridX++)
                     {
-                        int cz = gridZ * gridSizeInBlocks / chunkSize;
-
-                        index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
-                        if (index3d != lastIndex3d)
+                        if (index3d + gridX / partitionsPerChunk != lastIndex3d)
                         {
-                            lastIndex3d = index3d;
-                            Partitions.TryGetValue(index3d, out partitionChunk);
+                            lastIndex3d = index3d + gridX / partitionsPerChunk;
+                            Partitions.TryGetValue(lastIndex3d, out partitionChunk);
                         }
                         if (partitionChunk == null) continue;
 
-                        int index = (gridZ % partitionsLength) * partitionsLength + lgx;
-                        List<Entity> entities = searchType == EnumEntitySearchType.Creatures ? partitionChunk.Entities[index] : partitionChunk.InanimateEntities?[index];
+                        List<Entity> entities = searchType == EnumEntitySearchType.Creatures ? partitionChunk.Entities[indexBase + gridX % partitionsLength] : partitionChunk.InanimateEntities?[indexBase + gridX % partitionsLength];
                         if (entities == null) continue;
 
-                        foreach (Entity entity in entities)
+                        if (onRangeTest == null)
                         {
-                            if (entity.Pos.Dimension != dimension) continue;
-                            if (onRangeTest(entity, centerPosX, centerPosY, centerPosZ, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
+                            foreach (Entity entity in entities)
                             {
-                                return;
+                                if (!callback(entity)) return;  // continues looping entities and calling the callback, but stops if the callback returns false
+                            }
+                        }
+                        else
+                        {
+                            foreach (Entity entity in entities)
+                            {
+                                if (onRangeTest(entity, centerPosX, centerPosY, centerPosZ, radiusSq) && !callback(entity))   // continues looping entities and calling the callback, but stops if the callback returns false
+                                {
+                                    return;
+                                }
                             }
                         }
                     }

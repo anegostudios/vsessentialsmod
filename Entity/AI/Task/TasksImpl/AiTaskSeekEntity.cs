@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
@@ -134,10 +134,21 @@ namespace Vintagestory.GameContent
                 bool fullyTamed = GetOwnGeneration() >= tamingGenerations;
 
                 ownPos.SetWithDimension(entity.ServerPos);
-                targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange, (e) => {
-                    if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
-                    return IsTargetableEntity(e, NowSeekRange);
-                }, EnumEntitySearchType.Creatures);
+                targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange,
+                    noTags ? targetEntityFirstLetters.Length == 0 ? (e) =>
+                    {
+                        if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
+                        return IsTargetableEntityNoTagsAll(e, NowSeekRange);
+                    } : (e) =>
+                    {
+                        if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
+                        return IsTargetableEntityNoTagsNoAll(e, NowSeekRange);
+                    } : (e) =>
+                    {
+                        if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
+                        return IsTargetableEntityWithTags(e, NowSeekRange);
+                    }
+                , EnumEntitySearchType.Creatures);
 
                 if (targetEntity != null)
                 {

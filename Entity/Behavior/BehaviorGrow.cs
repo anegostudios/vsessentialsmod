@@ -12,28 +12,19 @@ namespace Vintagestory.GameContent
     public class EntityBehaviorGrow : EntityBehavior
     {
         ITreeAttribute growTree;
-        JsonObject typeAttributes;
         long callbackId = 0;
 
         public float HoursToGrow { get; set; }
         public float OrPortionsEatenForGrowing { get; set; }
 
-        internal AssetLocation[] AdultEntityCodes
-        {
-            get { return AssetLocation.toLocations(typeAttributes["adultEntityCodes"].AsArray<string>(System.Array.Empty<string>())); }
-        }
-        internal AssetLocation[] FedAdultEntityCodes
-        {
-            get { return AssetLocation.toLocations(typeAttributes["fedAdultEntityCodes"].AsArray<string>(System.Array.Empty<string>())); }
-        }
+        public AssetLocation[] AdultEntityCodes;
+        public AssetLocation[] FedAdultEntityCodes;
 
-        internal double TimeSpawned
+        protected double SpawnedTotalHours
         {
             get { return growTree.GetDouble("timeSpawned"); }
             set { growTree.SetDouble("timeSpawned", value); }
         }
-
-
 
         public EntityBehaviorGrow(Entity entity) : base(entity)
         {
@@ -43,24 +34,27 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(properties, typeAttributes);
 
-            this.typeAttributes = typeAttributes;
+            AdultEntityCodes = AssetLocation.toLocations(typeAttributes["adultEntityCodes"].AsArray<string>(System.Array.Empty<string>()));
+            FedAdultEntityCodes = AssetLocation.toLocations(typeAttributes["fedAdultEntityCodes"].AsArray<string>(System.Array.Empty<string>()));
             HoursToGrow = typeAttributes["hoursToGrow"].AsFloat(96);
             OrPortionsEatenForGrowing = typeAttributes["orPortionsEatenForGrowing"].AsFloat(12);
 
             growTree = entity.WatchedAttributes.GetTreeAttribute("grow");
 
-            if (growTree == null)
+            if (growTree == null && entity.Api.Side == EnumAppSide.Server)
             {
                 entity.WatchedAttributes.SetAttribute("grow", growTree = new TreeAttribute());
-                TimeSpawned = entity.World.Calendar.TotalHours;
+                SpawnedTotalHours = entity.World.Calendar.TotalHours;
             }
 
-            // Animals released from a cage/trap will stop growing for a year. 
-            // Needed for elk taming, also a nice way to keep juvenil animals around - just catch and release em from time to time
-            var cal = entity.World.Calendar;
-            var totalDaysReleased = entity.Attributes.GetDouble("totalDaysReleased", -cal.DaysPerYear);
-            TimeSpawned = Math.Max(TimeSpawned, (totalDaysReleased + cal.DaysPerYear) * cal.HoursPerDay);
-
+            // On release from a crate trap or other trap, delay growth to make sure the player has time to tame the animal
+            double? totalDaysReleased;
+            if (FedAdultEntityCodes.Length != 0 && (totalDaysReleased = entity.Attributes.TryGetDouble("totalDaysReleased")) != null)
+            {
+                double tamingHours = 216 * (OrPortionsEatenForGrowing - (entity.WatchedAttributes.GetTreeAttribute("hunger")?.TryGetFloat("saturation") ?? 0));
+                double minSpawnedHours = (double)totalDaysReleased * entity.World.Calendar.HoursPerDay + tamingHours - HoursToGrow;
+                if (SpawnedTotalHours < minSpawnedHours) SpawnedTotalHours = minSpawnedHours;
+            }
 
             callbackId = entity.World.RegisterCallback(CheckGrowth, 3000);
         }
@@ -72,9 +66,9 @@ namespace Vintagestory.GameContent
             if (!entity.Alive) return;
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-            bool wasFedToAdulthood = (tree != null && tree.GetFloat("saturation") >= OrPortionsEatenForGrowing);
+            bool wasFedToAdulthood = FedAdultEntityCodes.Length > 0 && (tree != null && tree.GetFloat("saturation") >= OrPortionsEatenForGrowing);
                 
-            if (entity.World.Calendar.TotalHours >= TimeSpawned + HoursToGrow || wasFedToAdulthood)
+            if (entity.World.Calendar.TotalHours >= SpawnedTotalHours + HoursToGrow || wasFedToAdulthood)
             {
                 AssetLocation[] entityCodes = wasFedToAdulthood ? FedAdultEntityCodes : AdultEntityCodes;
                 if (entityCodes.Length == 0) return;
@@ -110,7 +104,7 @@ namespace Vintagestory.GameContent
             } else
             {
                 callbackId = entity.World.RegisterCallback(CheckGrowth, 3000);
-                double age = entity.World.Calendar.TotalHours - TimeSpawned;
+                double age = entity.World.Calendar.TotalHours - SpawnedTotalHours;
                 if (age >=  0.1 * HoursToGrow)
                 {
                     float newAge = (float)(age / HoursToGrow - 0.1);

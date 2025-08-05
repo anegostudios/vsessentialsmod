@@ -1,12 +1,12 @@
 using Newtonsoft.Json;
 using System;
+using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent;
 
-// @TODO write description
 /// <summary>
 /// Wanders<br/><br/>
 /// 
@@ -57,7 +57,7 @@ public class AiTaskWanderConfig : AiTaskBaseConfig
     /// <summary>
     /// Type of light level used for <see cref="PreferredLightLevel"/>.
     /// </summary>
-    [JsonProperty] public EnumLightLevelType PreferredLightLevelType = EnumLightLevelType.MaxLight;
+    [JsonProperty] public EnumLightLevelType PreferredLightLevelType = EnumLightLevelType.MaxTimeOfDayLight;
 
     /// <summary>
     /// Min horizontal range to search for wander target.
@@ -79,7 +79,16 @@ public class AiTaskWanderConfig : AiTaskBaseConfig
     /// </summary>
     [JsonProperty] private float wanderVerticalRangeMax = 10;
 
+    /// <summary>
+    /// If set to true, wander range will have 5% to be multiplied by 3, and additional 5% chance to be multiplied by another 1.5.
+    /// Ask Tyron for why it is needed and is hardcoded. It will be turned this off by default.
+    /// </summary>
+    [JsonProperty] public bool DoRandomWanderRangeChanges = false;
 
+    /// <summary>
+    /// Max blocks checked before best one is selected. Block are selected at random, so you might want to increase this number for <see cref="PreferredLightLevel"/> check to be more accurate.
+    /// </summary>
+    [JsonProperty] public int MaxBlocksChecked = 9;
 
 
     public NatFloat WanderRangeHorizontal = new(0, 0, EnumDistribution.UNIFORM);
@@ -96,8 +105,8 @@ public class AiTaskWanderConfig : AiTaskBaseConfig
     {
         base.Init(entity);
 
-        WanderRangeHorizontal = NatFloat.createInvexp(wanderRangeMin, wanderRangeMax);
-        WanderRangeVertical = NatFloat.createInvexp(wanderVerticalRangeMin, wanderVerticalRangeMax);
+        WanderRangeHorizontal = new NatFloat(wanderRangeMin, wanderRangeMax, EnumDistribution.INVEXP);
+        WanderRangeVertical = new NatFloat(wanderVerticalRangeMin, wanderVerticalRangeMax, EnumDistribution.INVEXP);
         StayCloseToSpawn = MaxDistanceToSpawn > 0;
         IgnoreLightLevel = PreferredLightLevel < 0;
     }
@@ -149,21 +158,21 @@ public class AiTaskWanderR : AiTaskBaseR
 
         failedWanders = 0;
         needsToTeleport = false;
-        
+
         if (!Config.StayCloseToSpawn)
         {
             return LoadNextWanderTarget();
         }
-        
+
         long currentTimeMs = entity.World.ElapsedMilliseconds;
         double distanceToSpawnSquared = entity.ServerPos.XYZ.SquareDistanceTo(spawnPosition.X, spawnPosition.Y, spawnPosition.Z);
-        
+
         if (distanceToSpawnSquared <= Config.MaxDistanceToSpawn * Config.MaxDistanceToSpawn)
         {
             lastTimeInRangeMs = currentTimeMs;
             return false;
         }
-      
+
         // If after 2 minutes still not at spawn and no player nearby, teleport
         if (currentTimeMs - lastTimeInRangeMs > Config.TeleportToSpawnTimeout && entity.World.GetNearestEntity(entity.ServerPos.XYZ, Config.NoPlayersRange, Config.NoPlayersRange, target => target is EntityPlayer) == null)
         {
@@ -282,25 +291,27 @@ public class AiTaskWanderR : AiTaskBaseR
     {
         EnumHabitat habitat = entity.Properties.Habitat;
 
-        int tries = 9;
-
         bool targetFound = false;
 
         if (FailedConsecutivePathfinds > 10)
         {
             WanderRangeMul = Math.Max(0.1f, WanderRangeMul * 0.9f);
-        } else
+        }
+        else
         {
             WanderRangeMul = Math.Min(1, WanderRangeMul * 1.1f);
-            if (Rand.NextDouble() < 0.05) WanderRangeMul = Math.Min(1, WanderRangeMul * 1.5f);
+            if (Config.DoRandomWanderRangeChanges && Rand.NextDouble() < 0.05)
+            {
+                WanderRangeMul = Math.Min(1, WanderRangeMul * 1.5f);
+            }
         }
 
         float wRangeMul = WanderRangeMul;
         double dx, dy, dz;
 
-        if (Rand.NextDouble() < 0.05) wRangeMul *= 3;
+        if (Config.DoRandomWanderRangeChanges && Rand.NextDouble() < 0.05) wRangeMul *= 3;
 
-        while (tries-- > 0)
+        for (int check = 0; check < Config.MaxBlocksChecked; check++)
         {
             dx = Config.WanderRangeHorizontal.nextFloat() * (Rand.Next(2) * 2 - 1) * wRangeMul;
             dy = Config.WanderRangeVertical.nextFloat() * (Rand.Next(2) * 2 - 1) * wRangeMul;
@@ -379,7 +390,7 @@ public class AiTaskWanderR : AiTaskBaseR
                         });
 
                         if (willFall) currentTarget.W = 0;
-                        
+
                     }
                     break;
 
@@ -416,6 +427,8 @@ public class AiTaskWanderR : AiTaskBaseR
                 int lightDiff = Math.Abs(Config.PreferredLightLevel - entity.World.BlockAccessor.GetLightLevel(blockPosBuffer, Config.PreferredLightLevelType));
 
                 currentTarget.W /= Math.Max(1, lightDiff);
+
+                //Debug.WriteLine($"{check}: {entity.World.BlockAccessor.GetLightLevel(blockPosBuffer, Config.PreferredLightLevelType)}  ({entity.World.BlockAccessor.GetBlock(blockPosBuffer).Code}) - {currentTarget} - {Config.PreferredLightLevelType}");
             }
 
             if (!targetFound || currentTarget.W > bestTarget.W)
@@ -428,6 +441,9 @@ public class AiTaskWanderR : AiTaskBaseR
 
         if (bestTarget.W > 0)
         {
+            //blockPosBuffer.Set((int)bestTarget.X, (int)bestTarget.Y, (int)bestTarget.Z);
+            //Debug.WriteLine($"Best: {entity.World.BlockAccessor.GetLightLevel(blockPosBuffer, Config.PreferredLightLevelType)} ({entity.World.BlockAccessor.GetBlock(blockPosBuffer).Code}) - {bestTarget}");
+
             FailedConsecutivePathfinds = Math.Max(FailedConsecutivePathfinds - 3, 0);
 
             mainTarget.Set(bestTarget.X, bestTarget.Y, bestTarget.Z);

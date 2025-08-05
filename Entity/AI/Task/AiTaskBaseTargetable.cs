@@ -220,29 +220,57 @@ namespace Vintagestory.GameContent
         }
 
 
+        public virtual bool IsTargetableEntityWithTags(Entity e, float range)
+        {
+            if (CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return e.Alive && CanSense(e, range);
+            if (targetEntityFirstLetters.Length == 0 || IsTargetEntity(e.Code.Path)) return e.Alive && CanSense(e, range);
+
+            return false;
+        }
+
+        /// <summary>
+        /// Optimised code path for most common case in inner search loop
+        /// </summary>
+        public virtual bool IsTargetableEntityNoTagsNoAll(Entity e, float range)
+        {
+            if (IsTargetEntity(e.Code.Path)) return e.Alive && CanSense(e, range);
+
+            return false;
+        }
+
+        /// <summary>
+        /// Optimised code path for simplified case in inner search loop
+        /// </summary>
+        public virtual bool IsTargetableEntityNoTagsAll(Entity e, float range)
+        {
+            return e.Alive && CanSense(e, range);
+        }
+
         public virtual bool IsTargetableEntity(Entity e, float range, bool ignoreEntityCode = false)
         {
             if (!e.Alive) return false;
             if (ignoreEntityCode) return CanSense(e, range);
             if (!noTags && CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return CanSense(e, range);
-            if (IsTargetEntity(e.Code.Path)) return CanSense(e, range);
+            // targetEntityFirstLetters.Length == 0 means target everything (there was a universal wildcard "*", for example BeeMob)
+            if (targetEntityFirstLetters.Length == 0 || IsTargetEntity(e.Code.Path)) return CanSense(e, range);
 
             return false;
         }
 
         protected bool IsTargetEntity(string testPath)
         {
-            if (targetEntityFirstLetters.Length == 0) return true;     // target everything (there was a universal wildcard "*", for example BeeMob)
             if (targetEntityFirstLetters.IndexOf(testPath[0]) < 0) return false;   // early exit if we don't have the first letter
 
-            for (int i = 0; i < targetEntityCodesExact.Length; i++)
+            var targetEntityCodes = this.targetEntityCodesExact;
+            for (int i = 0; i < targetEntityCodes.Length; i++)
             {
-                if (testPath == targetEntityCodesExact[i]) return true;
+                if (testPath == targetEntityCodes[i]) return true;
             }
 
-            for (int i = 0; i < targetEntityCodesBeginsWith.Length; i++)
+            targetEntityCodes = this.targetEntityCodesBeginsWith;
+            for (int i = 0; i < targetEntityCodes.Length; i++)
             {
-                if (testPath.StartsWithFast(targetEntityCodesBeginsWith[i])) return true;
+                if (testPath.StartsWithFast(targetEntityCodes[i])) return true;
             }
 
             return false;

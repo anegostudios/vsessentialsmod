@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Vintagestory.API.Common;
@@ -64,7 +64,7 @@ namespace Vintagestory.Essentials
                     task.waypoints = astar_mainthread.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
                     task.Finished = true;
                     if (isShuttingDown) break;
-                    api.World.FrameProfiler.Mark("path d:" + task.searchDepth + " r:" + (task.waypoints == null ? "fail" : task.waypoints.Count.ToString()) + " s:" + task.startBlockPos + " e:" + task.targetBlockPos + " w:" + task.collisionBox.Width);
+                    if (api.World.FrameProfiler.Enabled) api.World.FrameProfiler.Mark("path d:" + task.searchDepth + " r:" + (task.waypoints == null ? "fail" : task.waypoints.Count.ToString()) + " s:" + task.startBlockPos + " e:" + task.targetBlockPos + " w:" + task.collisionBox.Width);
                 }
                 api.World.FrameProfiler.Leave();
             }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -101,7 +101,17 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntity(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                if (noTags)
+                {
+                    if (targetEntityFirstLetters.Length == 0)
+                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsAll(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                    else
+                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsNoAll(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                }
+                else
+                {
+                    targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityWithTags(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                }
             }
 
             nowFleeingDistance = fleeingDistance;

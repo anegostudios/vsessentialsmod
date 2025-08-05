@@ -252,7 +252,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             // Attempt to stop gliding/flying.
             if (controls.Gliding)
             {
-                if (entity.Collided || entity.FeetInLiquid || !entity.Alive || player.WorldData.FreeMove)
+                if (entity.Collided || entity.FeetInLiquid || !entity.Alive || player.WorldData.FreeMove || controls.IsClimbing)
                 {
                     controls.GlideSpeed = 0;
                     controls.Gliding = false;
@@ -281,11 +281,11 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     public void SetPlayerControls(EntityPos pos, EntityControls controls, float dt)
     {
         IClientWorldAccessor clientWorld = entity.World as IClientWorldAccessor;
-        controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId);
+        controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) && !controls.IsClimbing;
         controls.NoClip = player.WorldData.NoClip;
         controls.MovespeedMultiplier = player.WorldData.MoveSpeedMultiplier;
 
-        if (controls.Gliding)
+        if (controls.Gliding && !controls.IsClimbing)
         {
             controls.IsFlying = true;
         }

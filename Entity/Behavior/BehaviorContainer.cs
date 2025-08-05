@@ -251,7 +251,7 @@ namespace Vintagestory.GameContent
         {
             if (gearslot.Empty || entityShape == null) return entityShape;
             var iatta = IAttachableToEntity.FromCollectible(gearslot.Itemstack.Collectible);
-            if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack)) return entityShape;
+            if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack) || !entity.HasBehavior("dressable")) return entityShape;
 
             if (!shapeIsCloned)
             {
@@ -320,11 +320,11 @@ namespace Vintagestory.GameContent
                 iatta.CollectTextures(stack, gearShape, texturePrefixCode, intoDict);
             }
 
-            applyStepParentOverrides(overrideStepParent, gearShape);
 
+            applyStepParentOverrides(overrideStepParent, gearShape);
             entityShape.StepParentShape(
                 gearShape,
-                (compGearShape?.Base.ToString() ?? "Custom texture from ItemWearableShapeSupplier ") + string.Format("defined in {0} {1}", stack.Class, stack.Collectible.Code),
+                (compGearShape?.Base.ToString() ?? "Custom texture from ItemWearableShapeSupplier") + string.Format(" defined in {0} {1}", stack.Class, stack.Collectible.Code),
                 shapePathForLogging,
                 Api.World.Logger,
                 (texcode, tloc) => addTexture(texcode, tloc, textures, texturePrefixCode, capi)
