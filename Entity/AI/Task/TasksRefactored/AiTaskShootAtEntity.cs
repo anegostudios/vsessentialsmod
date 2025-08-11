@@ -424,7 +424,7 @@ public class AiTaskShootAtEntityR : AiTaskBaseTargetableR
 
         targetPos += targetEntity.ServerPos.Motion * approximateTime;
 
-        entity.World.SpawnParticles(1, ColorUtil.ColorFromRgba(0, 0, 255, 255), targetPos, targetPos, new Vec3f(), new Vec3f(), 3, 0, 1);
+        //entity.World.SpawnParticles(1, ColorUtil.ColorFromRgba(0, 0, 255, 255), targetPos, targetPos, new Vec3f(), new Vec3f(), 3, 0, 1);
 
         FastVec3d start = new(pos.X, pos.Y, pos.Z);
         FastVec3d target = new(targetPos.X, targetPos.Y, targetPos.Z);

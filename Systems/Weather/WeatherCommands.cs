@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -39,7 +39,6 @@ namespace Vintagestory.GameContent
         {
             this.sapi = sapi;
 
-#if DEBUG
             sapi.ChatCommands.GetOrCreate("debug")
             .BeginSubCommand("prectest")
                 .WithDescription("recipitation test export")
@@ -93,7 +92,6 @@ namespace Vintagestory.GameContent
                 .EndSubCommand()
             .EndSubCommand()
             ;
-#endif
 
             sapi.Event.ServerRunPhase(EnumServerRunPhase.GameReady, () =>
             {

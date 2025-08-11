@@ -740,7 +740,7 @@ namespace Vintagestory.GameContent
 
 
 
-        double stepPitch;
+        public double stepPitch;
         double prevY;
         double prevYAccum;
         public float xangle = 0, yangle = 0, zangle = 0;

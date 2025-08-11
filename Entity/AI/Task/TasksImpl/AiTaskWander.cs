@@ -43,19 +43,19 @@ namespace Vintagestory.GameContent
 
         public AiTaskWander(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            SpawnPosition = new Vec3d(entity.Attributes.GetDouble("spawnX"), entity.Attributes.GetDouble("spawnY"), entity.Attributes.GetDouble("spawnZ"));
-            var importOffset = entity.WatchedAttributes.GetBlockPos("importOffset");
-            if (importOffset != null)
-            {
-                SpawnPosition.Add(importOffset);
-            }
-
             float wanderRangeMin=3, wanderRangeMax=30;
 
             if (taskConfig["maxDistanceToSpawn"].Exists)
             {
                 StayCloseToSpawn = true;
                 MaxDistanceToSpawn = taskConfig["maxDistanceToSpawn"].AsDouble(10);
+
+                SpawnPosition = new Vec3d(entity.Attributes.GetDouble("spawnX"), entity.Attributes.GetDouble("spawnY"), entity.Attributes.GetDouble("spawnZ"));
+                var importOffset = entity.WatchedAttributes.GetBlockPos("importOffset");
+                if (importOffset != null)
+                {
+                    SpawnPosition.Add(importOffset);
+                }
             }
 
             targetDistance = taskConfig["targetDistance"].AsFloat(0.12f);
@@ -72,9 +72,12 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityLoaded()
         {
-            if (SpawnPosition == null && !entity.Attributes.HasAttribute("spawnX"))
+            if (StayCloseToSpawn)
             {
-                OnEntitySpawn();
+                if (SpawnPosition == null || (SpawnPosition.X == 0 && SpawnPosition.Z == 0) || !entity.Attributes.HasAttribute("spawnX"))
+                {
+                    OnEntitySpawn();
+                }
             }
         }
 
@@ -293,9 +296,9 @@ namespace Vintagestory.GameContent
 
             needsToTele = false;
 
-            double dist = entity.ServerPos.XYZ.SquareDistanceTo(SpawnPosition);
             if (StayCloseToSpawn)
             {
+                double dist = entity.ServerPos.XYZ.SquareDistanceTo(SpawnPosition);
                 long ellapsedMs = entity.World.ElapsedMilliseconds;
 
                 if (dist > MaxDistanceToSpawn * MaxDistanceToSpawn)
@@ -323,7 +326,7 @@ namespace Vintagestory.GameContent
         {
             base.StartExecute();
 
-            if (needsToTele)
+            if (needsToTele && StayCloseToSpawn)
             {
                 entity.TeleportTo(SpawnPosition);
                 done = true;

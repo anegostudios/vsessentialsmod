@@ -407,6 +407,7 @@ namespace Vintagestory.GameContent
 
 
             float bodyPitch = entityPlayer == null ? 0 : entityPlayer.WalkPitch;
+            float seatPitch = entityPlayer.MountedOn?.SeatPosition?.Pitch ?? 0;
             Mat4f.RotateX(ModelMat, ModelMat, entity.Pos.Roll + rotX * GameMath.DEG2RAD);
             Mat4f.RotateY(ModelMat, ModelMat, smoothedBodyYaw + (90 + rotY) * GameMath.DEG2RAD);
 
@@ -415,6 +416,12 @@ namespace Vintagestory.GameContent
             if (!selfSwimming && ((selfEplr?.Controls.Gliding != true && selfEplr.MountedOn == null) || renderMode != RenderMode.FirstPerson))
             {
                 Mat4f.RotateZ(ModelMat, ModelMat, bodyPitch + rotZ * GameMath.DEG2RAD);
+                if (seatPitch != 0)
+                {
+                    Mat4f.Translate(ModelMat, ModelMat, 0, -0.5f, 0);
+                    Mat4f.RotateZ(ModelMat, ModelMat, seatPitch);
+                    Mat4f.Translate(ModelMat, ModelMat, 0, 0.5f, 0);
+                }
             }
 
             Mat4f.RotateX(ModelMat, ModelMat, nowSwivelRad);

@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Client;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
@@ -45,10 +45,14 @@ namespace Vintagestory.GameContent
 
         public override void OnBeforeRender(ItemRenderInfo renderInfo)
         {
-            var tf = renderInfo.Transform.Clone();
-            if (itemstack.Collectible.Code.Path.Contains("berry")) tf.Translation.Add(-0.15f, -0.15f, 0.5f);
-            else tf.Translation.Add(0f, -0.1f, -0.12f);
-            renderInfo.Transform = tf;
+            string tfName = "in" + beh.entity.Code.FirstCodePart() + "mouthtransform";
+            var attr = itemstack.Collectible.Attributes;
+            if (attr == null) return;
+            ModelTransform mouthTransform = attr[tfName]?.AsObject<ModelTransform>();
+            if (mouthTransform != null)
+            {
+                renderInfo.Transform = mouthTransform;
+            }
         }
     }
 }

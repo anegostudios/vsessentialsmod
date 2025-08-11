@@ -251,7 +251,7 @@ namespace Vintagestory.GameContent
         {
             if (gearslot.Empty || entityShape == null) return entityShape;
             var iatta = IAttachableToEntity.FromCollectible(gearslot.Itemstack.Collectible);
-            if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack) || !entity.HasBehavior("dressable")) return entityShape;
+            if (iatta == null || !iatta.IsAttachable(entity, gearslot.Itemstack) || entity.Code.Path.StartsWith("armorstand")) return entityShape;
 
             if (!shapeIsCloned)
             {
