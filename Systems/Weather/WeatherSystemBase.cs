@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -287,16 +287,16 @@ namespace Vintagestory.GameContent
 
         public long MapRegionIndex2D(int regionX, int regionZ)
         {
-            return ((long)regionZ) * api.World.BlockAccessor.RegionMapSizeX + regionX;
+            return ((long)regionZ) << 32 + regionX;
         }
 
 
         public Vec3i MapRegionPosFromIndex2D(long index)
         {
             return new Vec3i(
-                (int)(index % api.World.BlockAccessor.RegionMapSizeX),
+                (int)index,
                 0,
-                (int)(index / api.World.BlockAccessor.RegionMapSizeX)
+                (int)(index >> 32)
             );
         }
 

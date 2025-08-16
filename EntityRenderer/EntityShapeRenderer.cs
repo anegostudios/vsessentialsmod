@@ -454,7 +454,7 @@ namespace Vintagestory.GameContent
             AttachmentPoint ap = apap.AttachPoint;
             IShaderProgram prog = null;
 
-            if (renderInfo?.Transform == null) return; // Happens with unknown items/blocks
+            if (renderInfo?.Transform == null || renderInfo.ModelRef == null) return; // Happens with unknown items/blocks
 
             var itemTransform = renderInfo.Transform.EnsureDefaultValues();
             var itemOrigin = itemTransform.Origin;

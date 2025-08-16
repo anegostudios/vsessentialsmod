@@ -45,9 +45,10 @@ namespace Vintagestory.GameContent
 
         public override void OnBeforeRender(ItemRenderInfo renderInfo)
         {
-            string tfName = "in" + beh.entity.Code.FirstCodePart() + "mouthtransform";
+            string tfName = "inMouthTransform";
             var attr = itemstack.Collectible.Attributes;
             if (attr == null) return;
+            // Potential optimization: Could read and set this on item change instead of every frame
             ModelTransform mouthTransform = attr[tfName]?.AsObject<ModelTransform>();
             if (mouthTransform != null)
             {
