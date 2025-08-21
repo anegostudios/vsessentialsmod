@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Client;
@@ -30,7 +30,6 @@ namespace Vintagestory.GameContent
         protected List<GuiTab> tabs;
 
         List<string> tabnames;
-        HashSet<string> renderLayerGroups = new HashSet<string>();
 
         public GuiDialogWorldMap(OnViewChangedDelegate viewChanged, OnViewChangedSyncDelegate viewChangedSync, ICoreClientAPI capi, List<string> tabnames) : base("", capi)
         {
@@ -113,7 +112,7 @@ namespace Vintagestory.GameContent
                 {
                     Name = Lang.Get("maplayer-" + tabnames[i]),
                     DataInt = i,
-                    Active = true,
+                    Active = MapLayers?.FirstOrDefault(layer => layer.LayerGroupCode == tabnames[i])?.Active ?? true,
                 });
             }
 
@@ -137,6 +136,9 @@ namespace Vintagestory.GameContent
                 .EndChildElements()
                 .Compose()
             ;
+
+            // For some reason this is forced on during the creation of the vertical tabs component, perhaps that should be disabled?
+            tabs[0].Active = MapLayers?.FirstOrDefault(layer => layer.LayerGroupCode == tabnames[0])?.Active ?? true;
 
             compo.OnComposed += OnRecomposed;
 
@@ -191,14 +193,6 @@ namespace Vintagestory.GameContent
         private void OnTabClicked(int arg1, GuiTab tab)
         {
             string layerGroupCode = tabnames[arg1];
-
-            if (tab.Active) 
-            {
-                renderLayerGroups.Remove(layerGroupCode);
-            } else
-            {
-                renderLayerGroups.Add(layerGroupCode);
-            }
 
             foreach (var ml in MapLayers)
             {
@@ -300,7 +294,7 @@ namespace Vintagestory.GameContent
             hudDialog.Dispose();
         }
 
-        public List<MapLayer> MapLayers => (SingleComposer.GetElement("mapElem") as GuiElementMap)?.mapLayers;
+        public List<MapLayer> MapLayers => (SingleComposer?.GetElement("mapElem") as GuiElementMap)?.mapLayers;
 
         Vec3d hoveredWorldPos = new Vec3d();
         public override void OnMouseMove(MouseEvent args)

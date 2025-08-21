@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -21,9 +21,9 @@ namespace Vintagestory.GameContent
         protected float SizeZ { get; set; } = 1f;
         protected float GravityStrength { get; set; } = 1f;
 
-        float dirNormalizedX;
-        float dirNormalizedY;
-        float dirNormalizedZ;
+        protected float dirNormalizedX;
+        protected float dirNormalizedY;
+        protected float dirNormalizedZ;
 
 
         protected bool SwimOnLiquid;
@@ -70,30 +70,39 @@ namespace Vintagestory.GameContent
         public override void UpdateBuffers(MeshData buffer, Vec3d cameraPos, ref int posPosition, ref int rgbaPosition, ref int flagPosition)
         {
             float f = 1 - prevPosAdvance;
-            buffer.CustomFloats.Values[posPosition++] = (float)(Position.X - prevPosDeltaX * f - cameraPos.X);
-            buffer.CustomFloats.Values[posPosition++] = (float)(Position.Y - prevPosDeltaY * f - cameraPos.Y);
-            buffer.CustomFloats.Values[posPosition++] = (float)(Position.Z - prevPosDeltaZ * f - cameraPos.Z);
+            float[] CustomFloats = buffer.CustomFloats.Values;
+            CustomFloats[posPosition++] = (float)(Position.X - prevPosDeltaX * f - cameraPos.X);
+            CustomFloats[posPosition++] = (float)(Position.Y - prevPosDeltaY * f - cameraPos.Y);
+            CustomFloats[posPosition++] = (float)(Position.Z - prevPosDeltaZ * f - cameraPos.Z);
 
-            buffer.CustomFloats.Values[posPosition++] = SizeX;
-            buffer.CustomFloats.Values[posPosition++] = SizeY;
-            buffer.CustomFloats.Values[posPosition++] = SizeZ;
+            CustomFloats[posPosition++] = SizeX;
+            CustomFloats[posPosition++] = SizeY;
+            CustomFloats[posPosition++] = SizeZ;
 
-            buffer.CustomFloats.Values[posPosition++] = dirNormalizedX;
-            buffer.CustomFloats.Values[posPosition++] = dirNormalizedY;
-            buffer.CustomFloats.Values[posPosition++] = dirNormalizedZ;
-            posPosition++;  // Padding because we cannot do 3 byte aligned data
+            posPosition = UpdateAngles(CustomFloats, posPosition);
 
-            buffer.CustomBytes.Values[rgbaPosition++] = (byte)lightrgbs;
-            buffer.CustomBytes.Values[rgbaPosition++] = (byte)(lightrgbs >> 8);
-            buffer.CustomBytes.Values[rgbaPosition++] = (byte)(lightrgbs >> 16);
-            buffer.CustomBytes.Values[rgbaPosition++] = (byte)(lightrgbs >> 24);
+            byte[] CustomBytes = buffer.CustomBytes.Values;
+            CustomBytes[rgbaPosition++] = (byte)lightrgbs;
+            CustomBytes[rgbaPosition++] = (byte)(lightrgbs >> 8);
+            CustomBytes[rgbaPosition++] = (byte)(lightrgbs >> 16);
+            CustomBytes[rgbaPosition++] = (byte)(lightrgbs >> 24);
 
-            buffer.CustomBytes.Values[rgbaPosition++] = ColorBlue;
-            buffer.CustomBytes.Values[rgbaPosition++] = ColorGreen;
-            buffer.CustomBytes.Values[rgbaPosition++] = ColorRed;
-            buffer.CustomBytes.Values[rgbaPosition++] = ColorAlpha;
+            CustomBytes[rgbaPosition++] = ColorBlue;
+            CustomBytes[rgbaPosition++] = ColorGreen;
+            CustomBytes[rgbaPosition++] = ColorRed;
+            CustomBytes[rgbaPosition++] = ColorAlpha;
 
             buffer.Flags[flagPosition++] = VertexFlags;
+        }
+
+        public virtual int UpdateAngles(float[] customFloats, int posPosition)
+        {
+            customFloats[posPosition++] = dirNormalizedX;
+            customFloats[posPosition++] = dirNormalizedY;
+            customFloats[posPosition++] = dirNormalizedZ;
+            customFloats[posPosition++] = 0;  // Padding because it's a vec4 on the shader
+
+            return posPosition;
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -117,7 +117,7 @@ public class GridRecipeLoader : ModSystem
                     else if (ingredient.IsAdvancedWildCard)
                     {
                         ingredient.FillPlaceHolder(variantCode, currentVariant);
-                        ingredient.IsAdvancedWildCard = false;
+                        ingredient.IsAdvancedWildCard = GridRecipe.IsAdvancedWildcard(ingredient.Code);
                     }
 
                     if (ingredient.ReturnedStack?.Code != null)

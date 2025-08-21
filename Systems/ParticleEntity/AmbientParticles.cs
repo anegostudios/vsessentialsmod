@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -40,6 +40,7 @@ public class ModSystemAmbientParticles : ModSystem
             ShouldDieInAir = true,
             VertexFlags = 1 << 9
         };
+        liquidParticles.OpacityEvolve = new EvolvingNatFloat(EnumTransformFunction.QUADRATIC, -9);
 
         summerAirParticles = new SimpleParticleProperties()
         {

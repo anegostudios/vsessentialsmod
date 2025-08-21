@@ -287,7 +287,7 @@ namespace Vintagestory.GameContent
 
         public long MapRegionIndex2D(int regionX, int regionZ)
         {
-            return ((long)regionZ) << 32 + regionX;
+            return ((long)regionZ << 32) + regionX;
         }
 
 

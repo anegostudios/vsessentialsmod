@@ -98,7 +98,10 @@ namespace Vintagestory.GameContent
         int chunkMapSizeZ;
 
         ICoreAPI api;
-        ICachingBlockAccessor blockAccess;
+
+        [ThreadStatic]
+        static ICachingBlockAccessor blockAccessor;
+        ICachingBlockAccessor blockAccess { get { return blockAccessor ??= api.World.GetCachingBlockAccessor(false, false); } }
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -111,20 +114,18 @@ namespace Vintagestory.GameContent
             this.api = api;
 
             api.Event.ChunkDirty += Event_ChunkDirty;
-
-            blockAccess = api.World.GetCachingBlockAccessor(false, false);
         }
 
         public override void Dispose()
         {
             blockAccess?.Dispose();
-            blockAccess = null;
         }
 
         public override void StartClientSide(ICoreClientAPI api)
         {
             api.Event.BlockTexturesLoaded += init;
         }
+
         public override void StartServerSide(ICoreServerAPI api)
         {
             api.Event.SaveGameLoaded += init;

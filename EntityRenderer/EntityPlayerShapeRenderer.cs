@@ -163,7 +163,7 @@ namespace Vintagestory.GameContent
 
         private void determineRenderMode()
         {
-            if (IsSelf && capi.Render.CameraType == EnumCameraMode.FirstPerson)
+            if (IsSelf && player?.CameraMode == EnumCameraMode.FirstPerson)
             {
                 if (capi.Settings.Bool["immersiveFpMode"] && !capi.Render.CameraStuck && entity.WatchedAttributes.GetTreeAttribute("tiredness")?.GetInt("isSleeping") != 1)
                 {
@@ -198,7 +198,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender2D(float dt)
         {
-            if (IsSelf && capi.Render.CameraType == EnumCameraMode.FirstPerson) return;
+            if (IsSelf && player?.CameraMode == EnumCameraMode.FirstPerson) return;
 
             base.DoRender2D(dt);
         }
@@ -386,7 +386,7 @@ namespace Vintagestory.GameContent
             {
                 smoothedBodyYaw = bodyYawLerped = entityPlayer.MountedOn.Entity.Pos.Yaw;
             }
-            else if (capi.World.Player.CameraMode != EnumCameraMode.FirstPerson)
+            else if (player?.CameraMode != EnumCameraMode.FirstPerson)
             {
                 float yawDist = GameMath.AngleRadDistance(bodyYawLerped, eagent.BodyYaw);
 

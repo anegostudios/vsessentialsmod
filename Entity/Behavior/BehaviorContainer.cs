@@ -218,11 +218,12 @@ namespace Vintagestory.GameContent
 
             if (inv == null || (!(entity is EntityPlayer) && inv.Empty)) return entityShape;
 
-            foreach (var slot in inv)
+            for (var id = 0; id < inv.Count; id++)
             {
+                var slot = inv[id];
                 if (slot.Empty || hideClothing) continue;
 
-                entityShape = addGearToShape(entityShape, slot, "default", shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
+                entityShape = addGearToShape(entityShape, slot, id.ToString(), shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
             }
 
             // The texture definition in the entity type override all shape specific textures

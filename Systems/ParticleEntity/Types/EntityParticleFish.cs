@@ -20,17 +20,17 @@ public class EntityParticleFish : EntityParticle
     bool flee;
     float maxspeed;
     public FastVec3i StartPos;
+    double wiggle;
 
     public static int[][] Colors =
     [
-        new[] { 224, 221, 26, 255 }, // yellow
-        new[] { 224, 142, 26, 255 }, // orange
-        new[] { 224, 86, 26, 255 }, // orange - red
-        new[] { 224, 53, 26, 255 }, // red
-        //new[] { 160, 191, 187, 255 }, // gray - silver
-        new[] { 41, 148, 206, 255 }, // light blue
-        new[] { 27, 88, 193, 255 }, // dark blue
-        new[] { 157, 88, 193, 255 } // purple
+        new[] { 189, 187, 59, 255 }, // yellow
+        new[] { 192, 135, 53, 255 }, // orange
+        new[] { 184, 88, 26, 255 }, // orange - red
+        new[] { 180, 65, 47, 255 }, // red
+        new[] { 56, 125, 163, 255 }, // light blue
+        new[] { 57, 98, 193, 169}, // dark blue
+        new[] { 126, 90, 145, 255 } // purple
     ];
 
     public EntityParticleFish[] FriendFishes;
@@ -61,6 +61,8 @@ public class EntityParticleFish : EntityParticle
         Velocity.X = GameMath.Clamp(Velocity.X, -maxspeed, maxspeed);
         Velocity.Y = GameMath.Clamp(Velocity.Y, -maxspeed, maxspeed);
         Velocity.Z = GameMath.Clamp(Velocity.Z, -maxspeed, maxspeed);
+
+        wiggle = GameMath.Mod(wiggle + dt * 30 * Velocity.Length(), GameMath.TWOPI);
     }
 
     protected override void doSlowTick(ParticlePhysics physicsSim, float dt)
@@ -125,14 +127,16 @@ public class EntityParticleFish : EntityParticle
 
         var center = new Vec3d();
         var schoolvelocity = new Vec3f();
-        int len = FriendFishes.Length;
 
+        var FriendFishes = this.FriendFishes;
+        int len = FriendFishes.Length;
         for (int i = 0; i < len; i++)
         {
+            var friendPosition = FriendFishes[i].Position;
             center.Add(
-                FriendFishes[i].Position.X / len,
-                FriendFishes[i].Position.Y / len,
-                FriendFishes[i].Position.Z / len
+                friendPosition.X / len,
+                friendPosition.Y / len,
+                friendPosition.Z / len
             );
 
             schoolvelocity.Add(FriendFishes[i].Velocity);
@@ -168,5 +172,15 @@ public class EntityParticleFish : EntityParticle
     private void propel(float dirx, float diry, float dirz)
     {
         Velocity.Add(dirx, diry, dirz);
+    }
+
+    public override int UpdateAngles(float[] customFloats, int posPosition)
+    {
+        customFloats[posPosition++] = dirNormalizedX;
+        customFloats[posPosition++] = dirNormalizedY;
+        customFloats[posPosition++] = dirNormalizedZ;
+        customFloats[posPosition++] = GameMath.Sin((float)wiggle) / 5;
+
+        return posPosition;
     }
 }

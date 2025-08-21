@@ -595,7 +595,7 @@ namespace Vintagestory.GameContent
             if (meshRefOpaque != null)
             {
                 capi.Render.CurrentActiveShader.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
-                capi.Render.CurrentActiveShader.UniformMatrix("modelViewMatrix", Mat4f.Mul(ModelMat, capi.Render.CurrentModelviewMatrix, ModelMat));
+                capi.Render.CurrentActiveShader.UniformMatrix("modelViewMatrix", GetModelMatrixForGui(dt, posX, posY, posZ, yawDelta, size));
                 capi.Render.RenderMultiTextureMesh(meshRefOpaque, "tex2d");
             }
 
@@ -605,7 +605,14 @@ namespace Vintagestory.GameContent
             }
         }
 
-
+        protected virtual float[] GetModelMatrixForGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
+        {
+            Mat4f.Mul(ModelMat, capi.Render.CurrentModelviewMatrix, ModelMat);
+            Mat4f.Translate(ModelMat, ModelMat, [0.5f, 0, 0.5f]);
+            Mat4f.Scale(ModelMat, ModelMat, [1, 1, -1]);
+            Mat4f.Translate(ModelMat, ModelMat, [-0.5f, 0, -0.5f]);
+            return ModelMat;
+        }
 
         public override void DoRender3DOpaqueBatched(float dt, bool isShadowPass)
         {
