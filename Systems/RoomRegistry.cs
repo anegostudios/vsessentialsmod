@@ -100,8 +100,16 @@ namespace Vintagestory.GameContent
         ICoreAPI api;
 
         [ThreadStatic]
-        static ICachingBlockAccessor blockAccessor;
-        ICachingBlockAccessor blockAccess { get { return blockAccessor ??= api.World.GetCachingBlockAccessor(false, false); } }
+        static ICachingBlockAccessor blockAccessor;   // We need a separate blockaccessor per thread, to prevent rare race conditions leading to crashes
+        ICachingBlockAccessor blockAccess { get {
+                if (blockAccessor != null) return blockAccessor;
+
+                blockAccessor = api.World.GetCachingBlockAccessor(false, false);
+                disposableBlockAccessors[System.Threading.Thread.CurrentThread.ManagedThreadId] = blockAccessor;
+                return blockAccessor;
+            }}
+        // Looks a bit heavy, but we write to this only once per game per thread; then later we can ensure that we dispose of all the blockAccessors even if the thread itself is *not* disposed (ThreadPool threads for example are not disposed)
+        private System.Collections.Concurrent.ConcurrentDictionary<int, ICachingBlockAccessor> disposableBlockAccessors = new();
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -118,7 +126,17 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
-            blockAccess?.Dispose();
+            // This entire method designed to prevent memory leaks when the game exits: no thread should retain a CachingBlockAccessor
+
+            blockAccessor?.Dispose();
+            blockAccessor = null;
+
+            foreach (var ba in disposableBlockAccessors.Values)
+            {
+                ba?.Dispose();
+            }
+            disposableBlockAccessors.Clear();
+            disposableBlockAccessors = null;
         }
 
         public override void StartClientSide(ICoreClientAPI api)

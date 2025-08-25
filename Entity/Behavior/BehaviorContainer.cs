@@ -286,7 +286,14 @@ namespace Vintagestory.GameContent
 
             var textures = entity.Properties.Client.Textures;
             string texturePrefixCode = iatta.GetTexturePrefixCode(stack);
-
+            if(texturePrefixCode != null)
+            {
+                texturePrefixCode = texturePrefixCode + "-" + slotCode;
+            }
+            else
+            {
+                texturePrefixCode = slotCode;
+            }
             Shape gearShape = null;
             AssetLocation shapePath = null;
             CompositeShape compGearShape = null;

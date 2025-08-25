@@ -326,29 +326,29 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 for (int i = 0; i < 4; i++)
                 {
                     tmpPos.IterateHorizontalOffsets(i);
-                for (int dy = 0; dy < height; dy++)
-                {
+                    for (int dy = 0; dy < height; dy++)
+                    {
                         tmpPos.Y = baseY + dy;
                         Block inBlock = blockAccessor.GetBlock(tmpPos, searchBlockLayer);        // This is fairly costly, typically 8 GetBlock calls for each climbing entity
                         if (!inBlock.IsClimbable(tmpPos) && !canClimbAnywhere) continue;
 
-                    Cuboidf[] collisionBoxes = inBlock.GetCollisionBoxes(blockAccessor, tmpPos);
-                    if (collisionBoxes == null) continue;
+                        Cuboidf[] collisionBoxes = inBlock.GetCollisionBoxes(blockAccessor, tmpPos);
+                        if (collisionBoxes == null) continue;
 
-                    for (int j = 0; j < collisionBoxes.Length; j++)
-                    {
-                        double distance = entityBox.ShortestDistanceFrom(collisionBoxes[j], tmpPos);
+                        for (int j = 0; j < collisionBoxes.Length; j++)
+                        {
+                            double distance = entityBox.ShortestDistanceFrom(collisionBoxes[j], tmpPos);
 
                             if (distance < touchDistance)
-                        {
+                            {
                                 controls.IsClimbing = true;
                                 entity.ClimbingOnFace = BlockFacing.HORIZONTALS[i];
-                            entity.ClimbingOnCollBox = collisionBoxes[j];
+                                entity.ClimbingOnCollBox = collisionBoxes[j];
                                 goto DoneClimbing;      // break out of all loops
+                            }
                         }
                     }
                 }
-            }
             DoneClimbing:;
             }
         }
@@ -440,9 +440,9 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             Block aboveBlock = blockAccessor.GetBlockRaw(posX, posY + 1, posZ, BlockLayersAccess.Fluid);
             entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
-        entity.InLava = blockFluid.LiquidCode == "lava";
+            entity.InLava = blockFluid.LiquidCode == "lava";
 
-            if (!feetInLiquidBefore && entity.FeetInLiquid && !entity.IsFirstTick()) entity.OnCollideWithLiquid();
+            if (!feetInLiquidBefore && entity.FeetInLiquid && !(entity.IsFirstTick() && prevPos.LengthSq() == 0)) entity.OnCollideWithLiquid();
         }
         else
         {
