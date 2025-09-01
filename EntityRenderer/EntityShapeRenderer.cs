@@ -477,12 +477,12 @@ namespace Vintagestory.GameContent
             if (isShadowPass)
             {
                 samplername = "tex2d";
-                rapi.CurrentActiveShader.BindTexture2D("tex2d", renderInfo.TextureId, 0);
+                prog = rapi.CurrentActiveShader;
                 float[] mvpMat = Mat4f.Mul(ItemModelMat.Values, capi.Render.CurrentModelviewMatrix, ItemModelMat.Values);
                 Mat4f.Mul(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
 
-                capi.Render.CurrentActiveShader.UniformMatrix("mvpMatrix", mvpMat);
-                capi.Render.CurrentActiveShader.Uniform("origin", new Vec3f());
+                prog.UniformMatrix("mvpMatrix", mvpMat);
+                prog.Uniform("origin", new Vec3f());
             }
             else
             {
