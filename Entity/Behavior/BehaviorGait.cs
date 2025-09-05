@@ -8,10 +8,10 @@ namespace Vintagestory.GameContent
     public record GaitMeta
     {
         public required string Code { get; set; } // Unique identifier for the gait, ideally matched with rideable controls
-        public float YawMultiplier { get; set; } = 3.5f;
-        public float MoveSpeed { get; set; } = 0f;
-        public bool Backwards { get; set; } = false;
-        public float StaminaCost { get; set; } = 0f;
+        public virtual float YawMultiplier { get; set; } = 3.5f;
+        public virtual float MoveSpeed { get; set; } = 0f;
+        public virtual bool Backwards { get; set; } = false;
+        public virtual float StaminaCost { get; set; } = 0f;
         public string? FallbackGaitCode { get; set; } // Gait to slow down to such as when fatiguing
         public bool IsSprint { get; set; } // Used to toggle entity.Controls.Sprint from rideable, consider alternatives?
         public required AssetLocation Sound { get; set; }
@@ -24,23 +24,23 @@ namespace Vintagestory.GameContent
             return "gait";
         }
 
-        public readonly FastSmallDictionary<string, GaitMeta> Gaits = new(1);
-        public GaitMeta CurrentGait
+        public virtual readonly FastSmallDictionary<string, GaitMeta> Gaits = new(1);
+        public virtual GaitMeta CurrentGait
         {
             get => Gaits[entity.WatchedAttributes.GetString("currentgait")];
             set => entity.WatchedAttributes.SetString("currentgait", value.Code);
         }
 
-        public GaitMeta IdleGait = null!;
-        public GaitMeta FallbackGait => CurrentGait.FallbackGaitCode is null ? IdleGait : Gaits[CurrentGait.FallbackGaitCode];
+        public virtual GaitMeta IdleGait = null!;
+        public virtual GaitMeta FallbackGait => CurrentGait.FallbackGaitCode is null ? IdleGait : Gaits[CurrentGait.FallbackGaitCode];
 
         public float GetYawMultiplier() => CurrentGait?.YawMultiplier ?? 3.5f; // Default yaw multiplier if not set
 
-        public void SetIdle() => CurrentGait = IdleGait;
-        public bool IsIdle => CurrentGait == IdleGait;
-        public bool IsBackward => CurrentGait.Backwards;
-        public bool IsForward => !CurrentGait.Backwards && CurrentGait != IdleGait;        
-        public GaitMeta CascadingFallbackGait(int n)
+        public virtual void SetIdle() => CurrentGait = IdleGait;
+        public virtual bool IsIdle => CurrentGait == IdleGait;
+        public virtual bool IsBackward => CurrentGait.Backwards;
+        public virtual bool IsForward => !CurrentGait.Backwards && CurrentGait != IdleGait;        
+        public virtual GaitMeta CascadingFallbackGait(int n)
         {
             var result = CurrentGait;
 
