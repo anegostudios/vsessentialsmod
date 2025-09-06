@@ -74,8 +74,6 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetBool("isPregnant", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
-        bool eatAnyway = false;
-
         public override bool ShouldEat
         {
             get

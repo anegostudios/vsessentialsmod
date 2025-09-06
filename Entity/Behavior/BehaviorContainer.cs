@@ -136,10 +136,27 @@ namespace Vintagestory.GameContent
             container = new InWorldContainer(() => Inventory, InventoryClassName);
         }
 
+        public override bool TryEarlyLoadCollectibleMappings(IWorldAccessor worldForCollectibleResolve, Dictionary<int, AssetLocation> oldBlockIdMapping, Dictionary<int, AssetLocation> oldItemIdMapping, bool resolveImports)
+        {
+            // Note: We do not need to call storeInv() after OnLoadCollectibleMappings.
+            //
+            // - The modified ItemStack already exists in the entity’s WatchedAttributes as instance and not serialized
+            // - When a partial chunk is unloaded, it will be saved correctly through the entity’s WatchedAttributes
+            //   when the unloaded chunk calls ToBytes on the entity.
+            // - For a fully generated chunk, when the inventory is initialized,
+            //   it will automatically read the remapped value from the same ItemStack when the new inventory is set up
+            OnLoadCollectibleMappings(worldForCollectibleResolve, oldBlockIdMapping, oldItemIdMapping, resolveImports);
+            return true;
+        }
+
+        public override bool ShouldEarlyLoadCollectibleMappings()
+        {
+            return true;
+        }
+
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
             Api = entity.World.Api;
-
             container.Init(Api, () => entity.Pos.AsBlockPos, () => entity.WatchedAttributes.MarkPathDirty(InventoryClassName));
 
             if (Api.Side == EnumAppSide.Client)
@@ -192,7 +209,14 @@ namespace Vintagestory.GameContent
 
         public override void OnTesselation(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements)
         {
-            addGearToShape(ref entityShape, shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
+            try
+            {
+                addGearToShape(ref entityShape, shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("Error tesselating entity " + entity.Code + " at " + entity.Pos.AsBlockPos, e);
+            }
 
             base.OnTesselation(ref entityShape, shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
 
@@ -218,12 +242,11 @@ namespace Vintagestory.GameContent
 
             if (inv == null || (!(entity is EntityPlayer) && inv.Empty)) return entityShape;
 
-            for (var id = 0; id < inv.Count; id++)
+            foreach (var slot in inv)
             {
-                var slot = inv[id];
                 if (slot.Empty || hideClothing) continue;
 
-                entityShape = addGearToShape(entityShape, slot, id.ToString(), shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
+                entityShape = addGearToShape(entityShape, slot, "default", shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
             }
 
             // The texture definition in the entity type override all shape specific textures
@@ -285,7 +308,7 @@ namespace Vintagestory.GameContent
 
 
             var textures = entity.Properties.Client.Textures;
-            string texturePrefixCode = iatta.GetTexturePrefixCode(stack) ?? slotCode;
+            string texturePrefixCode = iatta.GetTexturePrefixCode(stack);
 
             Shape gearShape = null;
             AssetLocation shapePath = null;

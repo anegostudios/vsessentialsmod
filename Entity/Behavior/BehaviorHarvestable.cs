@@ -347,6 +347,8 @@ namespace Vintagestory.GameContent
 
         public override void OnInteract(EntityAgent byEntity, ItemSlot itemslot, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled)
         {
+            if (mode == EnumInteractMode.Attack) return;
+
             Vec3d centerPos = entity.Pos.XYZ;
 
             var dist = entity.Pos.XYZ.Add(hitPosition).DistanceTo(byEntity.SidedPos.XYZ.Add(byEntity.LocalEyePos));
@@ -460,6 +462,7 @@ namespace Vintagestory.GameContent
                     stack.StackSize -= stack.Collectible.MaxStackSize;
                     todrop.Add(overflow);
                 }
+
                 todrop.Add(stack);
                 if (dstack.LastDrop) break;
             }

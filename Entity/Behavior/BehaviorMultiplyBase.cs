@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetDouble("totalDaysCooldownUntil", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
-        bool eatAnyway = false;
+        protected bool eatAnyway = false;
 
         public virtual bool ShouldEat
         {
