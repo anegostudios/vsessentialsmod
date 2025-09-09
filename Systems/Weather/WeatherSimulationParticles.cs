@@ -282,7 +282,7 @@ namespace Vintagestory.GameContent
                 float sum = sandFinds;
                 float[] sandBlocks = sandCountByBlock;
 
-                if (cnt > 10 && sum > 0)
+                if ((cnt > 10 || cnt < 0) && sum > 0)
                 {
                     sandCountByBlock = new float[indicesBySandBlockId.Count];
                     spawnCount = 0;
@@ -314,8 +314,8 @@ namespace Vintagestory.GameContent
                 
                     float sandRatio = (float)(sum / 30.0 / cnt) * climateWeight * sunlightrel;
                     targetFogDensity = sandRatio;
-
                 }
+
 
                 accum = 0;
             }
@@ -394,6 +394,9 @@ namespace Vintagestory.GameContent
             if (windSpeedIntensity > 0.5f) // && particlePos.Y - rainYPos < 10
             {
                 SpawnDustParticles(manager, weatherData, plrPos, dryness, onwaterSplashParticleColor);
+            } else
+            {
+                spawnCount = -1;
             }
 
             particlePos.Y = capi.World.Player.Entity.Pos.Y;

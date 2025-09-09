@@ -321,13 +321,13 @@ namespace Vintagestory.GameContent
             if (gearShape == null)
             {
                 compGearShape = iatta.GetAttachedShape(stack, slotCode);
-                shapePath = compGearShape.Base.CopyWithPath("shapes/" + compGearShape.Base.Path + ".json");
+                shapePath = compGearShape.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json");
 
                 gearShape = Shape.TryGet(Api, shapePath);
                 if (gearShape == null)
                 {
                     Api.World.Logger.Warning("Entity attachable shape {0} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath);
-                    return null;
+                    return entityShape;
                 }
 
                 gearShape.SubclassForStepParenting(texturePrefixCode, damageEffect);
@@ -359,7 +359,7 @@ namespace Vintagestory.GameContent
             {
                 foreach (var overlay in compGearShape.Overlays)
                 {
-                    Shape oshape = Shape.TryGet(Api, overlay.Base.CopyWithPath("shapes/" + overlay.Base.Path + ".json"));
+                    Shape oshape = Shape.TryGet(Api, overlay.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json"));
                     if (oshape == null)
                     {
                         Api.World.Logger.Warning("Entity attachable shape {0} overlay {4} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath, overlay.Base);

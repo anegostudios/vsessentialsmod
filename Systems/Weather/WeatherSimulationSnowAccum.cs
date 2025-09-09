@@ -24,7 +24,8 @@ namespace Vintagestory.GameContent
         UniqueQueue<Vec2i> chunkColsstoCheckQueue = new UniqueQueue<Vec2i>();
 
         UniqueQueue<UpdateSnowLayerChunk> updateSnowLayerQueue = new UniqueQueue<UpdateSnowLayerChunk>();
-        BlockPos tmpPos = new BlockPos(Dimensions.NormalWorld);
+        [ThreadStatic]
+        static BlockPos tmpPos;
 
         const int chunksize = GlobalConstants.ChunkSize;
         int regionsize;
@@ -160,6 +161,7 @@ namespace Vintagestory.GameContent
             int cx = updateChunk.Coords.X;
             int cz = updateChunk.Coords.Y;
 
+            tmpPos ??= new BlockPos(Dimensions.NormalWorld);
             foreach (var sval in setblocks)
             {
                 Block newblock = sval.Value.Block;
