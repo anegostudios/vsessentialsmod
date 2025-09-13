@@ -17,7 +17,7 @@ namespace Vintagestory.GameContent
         public float ZoomLevel = 1;
 
 
-        internal Vec3d prevPlayerPos = new Vec3d();
+        public Vec3d prevPlayerPos = new Vec3d();
         public Cuboidi chunkViewBoundsBefore = new Cuboidi();
 
         public OnViewChangedDelegate viewChanged;
@@ -363,3 +363,4 @@ namespace Vintagestory.GameContent
         }
     }
 }
+
