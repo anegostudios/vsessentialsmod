@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -169,7 +169,7 @@ namespace Vintagestory.GameContent
         /// <param name="amount"></param>
         public virtual void ConsumeSaturation(float amount)
         {
-            ReduceSaturation(amount / 10f);
+            ReduceSaturation(amount / 10f); // not setting external reduction to false means it won't shorten the hungerCounter
         }
 
         public override void OnEntityReceiveSaturation(float saturation, EnumFoodCategory foodCat = EnumFoodCategory.Unknown, float saturationLossDelay = 10, float nutritionGainMultiplier = 1f)
@@ -214,6 +214,7 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
+            if (hungerCounter < 0) hungerCounter = 0f; // just in case is still somehow negative
             if (entity is EntityPlayer)
             {
                 EntityPlayer plr = (EntityPlayer)entity;
@@ -246,7 +247,7 @@ namespace Vintagestory.GameContent
 
                 satLossMultiplier *= entity.Stats.GetBlended("hungerrate");
 
-                ReduceSaturation(satLossMultiplier * multiplierPerGameSec);
+                ReduceSaturation(satLossMultiplier * multiplierPerGameSec, false);
 
                 hungerCounter = 0;
                 sprintCounter = 0;
@@ -271,7 +272,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private bool ReduceSaturation(float satLossMultiplier)
+        private bool ReduceSaturation(float satLossMultiplier, bool externalReduction = true)
         {
             bool isondelay = false;
 
@@ -329,9 +330,10 @@ namespace Vintagestory.GameContent
 
             UpdateNutrientHealthBoost();
 
-            if (isondelay)
+            if (isondelay && !externalReduction) // external reduction is for normal hunger drain ticks
             {
                 hungerCounter -= 10;
+                if (hungerCounter < 0f) hungerCounter = 0f;
                 return true;
             }
 
