@@ -330,7 +330,7 @@ namespace Vintagestory.GameContent
 
             UpdateNutrientHealthBoost();
 
-            if (isondelay && !externalReduction) // external reduction is for normal hunger drain ticks
+            if (isondelay && !externalReduction) // external reduction is not for normal hunger drain ticks
             {
                 hungerCounter -= 10;
                 if (hungerCounter < 0f) hungerCounter = 0f;
