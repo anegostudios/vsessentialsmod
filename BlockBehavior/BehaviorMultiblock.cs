@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -167,6 +167,9 @@ namespace Vintagestory.GameContent
 
                 return true;
             });
+
+            // This removes the block breaking decal for trunks
+            world.BlockAccessor.MarkBlockModified(pos);
         }
 
     }

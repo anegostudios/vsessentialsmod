@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -35,7 +35,7 @@ namespace Vintagestory.GameContent
 
         public WeatherSimulationSound simSounds;
         public WeatherSimulationParticles simParticles;
-        
+
         public AuroraRenderer auroraRenderer;
 
         public event Action<WeatherDataSnapshot> OnGetBlendedWeatherData;
@@ -163,7 +163,7 @@ namespace Vintagestory.GameContent
 
                 var rainy = capi.World.BlockAccessor.GetRainMapHeightAt(plrPos.X, plrPos.Z);
                 plrPosd.Y = rainy;
-                
+
 
                 var surfacewindspeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd); // WeatherDataAtPlayer.GetWindSpeed(plrPos);
                 surfaceWindSpeedSmoothed.X += ((float)surfacewindspeed.X - surfaceWindSpeedSmoothed.X) * dt;
@@ -193,6 +193,13 @@ namespace Vintagestory.GameContent
 
                     CurrentEnvironmentWetness4h = GameMath.Clamp(rainSum, 0, 1);
                 }
+
+                // Fade out flat fog in deep caves, it breaks stuff
+                var sunlight = capi.World.BlockAccessor.GetLightLevel(capi.World.Player.Entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
+                var weatherflatfogd = WeatherDataAtPlayer.BlendedWeatherData.Ambient.FlatFogDensity.Weight;
+                targetFlatFogd = Math.Min(weatherflatfogd, GameMath.Clamp(sunlight / 5f, 0, 1));
+                flatFogd += (targetFlatFogd - flatFogd) * dt;
+                capi.Ambient.CurrentModifiers["weather"].FlatFogDensity.Weight = flatFogd;
             }
         }
 
@@ -224,6 +231,9 @@ namespace Vintagestory.GameContent
             rainOverlaySnap.SetAmbient(rainOverlayPattern, capi == null ? 0 : capi.Ambient.Base.FogDensity.Value);
         }
 
+        float flatFogd;
+        float targetFlatFogd;
+
 
         Queue<WeatherState> weatherUpdateQueue = new Queue<WeatherState>();
 
@@ -248,12 +258,12 @@ namespace Vintagestory.GameContent
         }
 
         void ProcessWeatherUpdate(WeatherState msg)
-        { 
+        {
             WeatherSimulationRegion weatherSim = getOrCreateWeatherSimForRegion(msg.RegionX, msg.RegionZ);
 
             if (weatherSim == null)
             {
-                Console.WriteLine("weatherSim for region {0}/{1} is null. No idea what to do here", msg.RegionX, msg.RegionZ);
+                api.Logger.Warning("weatherSim for region {0}/{1} is null. No idea what to do here", msg.RegionX, msg.RegionZ);
                 return;
             }
 
@@ -322,7 +332,7 @@ namespace Vintagestory.GameContent
             capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", WeatherDataAtPlayer.BlendedWeatherData.Ambient);
             haveLevelFinalize = true;
 
-            // Pre init the clouds.             
+            // Pre init the clouds.
             capi.Ambient.UpdateAmbient(0.1f);
 
             cloudRenderer.CloudTick(0.1f);

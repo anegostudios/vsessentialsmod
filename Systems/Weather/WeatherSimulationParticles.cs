@@ -282,7 +282,10 @@ namespace Vintagestory.GameContent
                 float sum = sandFinds;
                 float[] sandBlocks = sandCountByBlock;
 
-                if ((cnt > 10 || cnt < 0) && sum > 0)
+                // SpawnDustParticles() only runs above 0.5f, and that method updates spawnCount/sandFinds
+                if (windSpeedIntensity < 0.5f) targetFogDensity = 0;
+
+                if (cnt > 10 && sum > 0)
                 {
                     sandCountByBlock = new float[indicesBySandBlockId.Count];
                     spawnCount = 0;

@@ -201,7 +201,7 @@ namespace Vintagestory.GameContent
 
         public float MinDistanceToTarget()
         {
-            return extraTargetDistance + Math.Max(0.1f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 4);
+            return extraTargetDistance + Math.Max(0.1f, targetEntity.SelectionBox.XSize / 2 + entity.SelectionBox.XSize / 2);
         }
 
         public override void StartExecute()

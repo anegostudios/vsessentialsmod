@@ -414,8 +414,8 @@ namespace Vintagestory.GameContent
         {
             QueueOfInt bfsQueue = new QueueOfInt();
 
-            int halfSize = (ARRAYSIZE - 1) / 2;
-            int maxSize = halfSize + halfSize;
+            const int halfSize = (ARRAYSIZE - 1) / 2;
+            const int maxSize = halfSize + halfSize;
             bfsQueue.Enqueue(halfSize << 10 | halfSize << 5 | halfSize);
 
             int visitedIndex = (halfSize * ARRAYSIZE + halfSize) * ARRAYSIZE + halfSize; // Center node
@@ -437,8 +437,8 @@ namespace Vintagestory.GameContent
             int posX = pos.X - halfSize;
             int posY = pos.Y - halfSize;
             int posZ = pos.Z - halfSize;
-            BlockPos npos = new BlockPos();
-            BlockPos bpos = new BlockPos();
+            BlockPos npos = new BlockPos(pos.dimension);
+            BlockPos bpos = new BlockPos(pos.dimension);
             int dx, dy, dz;
 
             while (bfsQueue.Count > 0)

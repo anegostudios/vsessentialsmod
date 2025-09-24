@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
@@ -84,6 +85,11 @@ namespace Vintagestory.GameContent
         public virtual MeshData InitializeAnimator(string cacheDictKey, Shape shape = null, ITexPositionSource texSource = null, Vec3f rotationDeg = null)
         {
             MeshData meshdata = CreateMesh(cacheDictKey, shape, out Shape resultingShape, texSource);
+            if (renderer != null)
+            {
+                if (Environment.CurrentManagedThreadId != RuntimeEnv.MainThreadId) throw new InvalidOperationException("If the renderer has already been created, then InitializeAnimator() cannot be safely called outside the main thread");
+                // Note, even if we did not throw an exception here, the InitializeAnimator() method would call capi.Event.UnregisterRenderer() which would throw an exception if it is not on the main thread
+            }
             InitializeAnimator(cacheDictKey, meshdata, resultingShape, rotationDeg);
             return meshdata;
         }

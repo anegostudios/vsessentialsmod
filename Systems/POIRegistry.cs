@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using Vintagestory.API.Common;
@@ -279,7 +279,7 @@ namespace Vintagestory.GameContent
             tmp.Set((int)poi.Position.X / chunksize, (int)poi.Position.Z / chunksize);
 
             PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
-            if (pois == null) PoisByChunkColumn[tmp] = pois = new List<IPointOfInterest>();
+            if (pois == null) PoisByChunkColumn[tmp.Copy()] = pois = new List<IPointOfInterest>();
 
             if (!pois.Contains(poi))
             {
@@ -293,7 +293,11 @@ namespace Vintagestory.GameContent
             tmp.Set((int)poi.Position.X / chunksize, (int)poi.Position.Z / chunksize);
 
             PoisByChunkColumn.TryGetValue(tmp, out List<IPointOfInterest> pois);
-            if (pois != null) pois.Remove(poi);
+            if (pois != null)
+            {
+                pois.Remove(poi);
+                if (pois.Count == 0) PoisByChunkColumn.Remove(tmp);
+            }
         }
 
     }

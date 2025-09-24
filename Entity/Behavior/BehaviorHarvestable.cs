@@ -182,6 +182,11 @@ namespace Vintagestory.GameContent
             harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
         }
 
+        public override bool ShouldEarlyLoadCollectibleMappings()
+        {
+            return false;
+        }
+
         public override void AfterInitialized(bool onSpawn)
         {
             if (onSpawn)

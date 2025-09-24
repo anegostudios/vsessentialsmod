@@ -144,7 +144,11 @@ namespace Vintagestory.GameContent
                 thirdPersonMeshRef = null;
             }
 
-            meshRefOpaque = null;
+            if (meshRefOpaque != null)
+            {
+                meshRefOpaque.Dispose();
+                meshRefOpaque = null;
+            }
         }
 
         public override void BeforeRender(float dt)
@@ -470,17 +474,26 @@ namespace Vintagestory.GameContent
             // We use special positioning code for mounted entities that are on the same mount as we are.
             // While this should not be necesssary, because the client side physics does set the entity position accordingly, it does same to create 1-frame jitter if we dont specially handle this
             var selfMountedOn = selfEplr.MountedOn?.MountSupplier;
-            var heMountedOn = (entity as EntityAgent).MountedOn?.MountSupplier;
+            IMountableSeat hisSeat = (entity as EntityAgent).MountedOn;
+            var heMountedOn = hisSeat?.MountSupplier;
 
             if (selfMountedOn != null && selfMountedOn == heMountedOn)
             {
                 var selfMountPos = selfEplr.MountedOn.SeatPosition;
-                var heMountPos = (entity as EntityAgent).MountedOn.SeatPosition;
+                var heMountPos = hisSeat.SeatPosition;
                 return new Vec3f((float)(-selfMountPos.X + heMountPos.X), (float)(-selfMountPos.Y + heMountPos.Y), (float)(-selfMountPos.Z + heMountPos.Z));
             }
             else
             {
-                return new Vec3f((float)(entity.Pos.X - selfEplr.CameraPos.X), (float)(entity.Pos.InternalY - selfEplr.CameraPos.Y), (float)(entity.Pos.Z - selfEplr.CameraPos.Z));
+                // If the other player is riding something, render him as offset of that entity.  (See also similar code in EntityShapeRenderer.loadModelMatrix() for non-player entities)
+                if (hisSeat != null)
+                {
+                    return new Vec3f((float)(hisSeat.SeatPosition.X - selfEplr.CameraPos.X), (float)(hisSeat.SeatPosition.InternalY - selfEplr.CameraPos.Y), (float)(hisSeat.SeatPosition.Z - selfEplr.CameraPos.Z));
+                }
+                else
+                {
+                    return new Vec3f((float)(entity.Pos.X - selfEplr.CameraPos.X), (float)(entity.Pos.InternalY - selfEplr.CameraPos.Y), (float)(entity.Pos.Z - selfEplr.CameraPos.Z));
+                }
             }
         }
 

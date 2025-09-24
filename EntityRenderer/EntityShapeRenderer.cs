@@ -451,10 +451,10 @@ namespace Vintagestory.GameContent
         protected virtual void RenderItem(float dt, bool isShadowPass, ItemStack stack, AttachmentPointAndPose apap, ItemRenderInfo renderInfo)
         {
             IRenderAPI rapi = capi.Render;
-            AttachmentPoint ap = apap.AttachPoint;
+            AttachmentPoint ap = apap?.AttachPoint;
             IShaderProgram prog = null;
 
-            if (renderInfo?.Transform == null || renderInfo.ModelRef == null) return; // Happens with unknown items/blocks
+            if (renderInfo?.Transform == null || renderInfo.ModelRef == null || ap == null) return; // Happens with unknown items/blocks, or perhaps apap is null for other players in some situations (see Github #6783)
 
             var itemTransform = renderInfo.Transform.EnsureDefaultValues();
             var itemOrigin = itemTransform.Origin;
@@ -759,7 +759,7 @@ namespace Vintagestory.GameContent
 
             Mat4f.Identity(ModelMat);
 
-            // If the player is sitting on this entity, simply render it at the offset of the seat to the entity, this prevents jitter.
+            // If our player is sitting on this entity (the mount), simply render the mount at the offset of the mount from its own seat position, this prevents jitter.
             IMountableSeat seat;
             if (ims != null && (seat = ims.GetSeatOfMountedEntity(entityPlayer)) != null)
             {
@@ -768,12 +768,12 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                seat = eagent?.MountedOn;
-                // If this entity itself is riding something, render it as offset of that entity
+                seat = (entity as EntityAgent)?.MountedOn;
+                // If this entity itself is riding something, render it as offset of that entity - radfast 21.9.25: note this method is not called for rendering other players, so hardly ever will we have a situation where seat is not null here. For other players see EntityPlayerShapeRenderer.GetOtherPlayerRenderOffset()
                 if (/*ims != null && - why is this condition here? It prevents jitter avoidance! */ seat != null)
                 {
-                    // If both the player and the entity is sitting on the same mount
-                    if (entityPlayer.MountedOn != null && entityPlayer.MountedOn.Entity == eagent.MountedOn.Entity)
+                    // If both our player and the entity is sitting on the same mount
+                    if (entityPlayer.MountedOn != null && entityPlayer.MountedOn.Entity == seat.Entity)
                     {
                         var selfMountPos = entityPlayer.MountedOn.SeatPosition;
                         Mat4f.Translate(ModelMat, ModelMat, (float)(seat.SeatPosition.X - selfMountPos.X), (float)(seat.SeatPosition.InternalY - selfMountPos.Y), (float)(seat.SeatPosition.Z - selfMountPos.Z));
@@ -897,30 +897,50 @@ namespace Vintagestory.GameContent
 
                 if (eagent == null || entity.Properties.CanClimbAnywhere || !eagent.Alive || entity.Attributes.GetInt("dmgkb", 0) != 0 || !entity.Properties.Client.PitchStep) return;
 
-
                 if (entity.Properties.Habitat == EnumHabitat.Air || eagent.Controls.IsClimbing)
                 {
                     stepPitch = GameMath.Clamp(entity.Pos.Y - prevY + 0.1, 0, 0.3) - GameMath.Clamp(prevY - entity.Pos.Y - 0.1, 0, 0.3);
                     return;
                 }
 
-                double deltaY = entity.Pos.Y - prevY;
+                var mot = entity.ServerPos.Motion;
+                if (mot.X != 0 && mot.Z != 0)    // Ignore perfectly zero motion X or Z as that throws off the calculation (can be 0 for a single frame apparently, due to collisions etc.)
+                {
+                    double deltaY = entity.Pos.Y - prevY;
 
-                bool steppingUp = deltaY > 0.02 && !entity.FeetInLiquid && !entity.Swimming && !entity.OnGround;
-                bool falling = deltaY < 0 && !entity.OnGround && !entity.FeetInLiquid && !entity.Swimming;
+                    // A bit of maths to figure out if the entity is walking backwards (motion vector angle in opposite direction from its yaw angle)
+                    // If we are walking backwards, then invert the deltaY so that stepPitch will still be correct
+                    if (deltaY != 0)
+                    {
+                        var yawAngle = GameMath.PI - entity.ServerPos.Yaw;
+                        var motionAngle = (float)Math.Atan2(mot.Z, mot.X) + GameMath.PIHALF;
+                        // yawAngle is now the angle clockwise from due north: so facing East it will be PI / 2, South is PI, West is 3 * PI / 2  etc.
+                        // likewise, motionAngle here will be the angle of the motion vector clockwise from due north
 
+                        var angleDiff = Math.Abs(GameMath.AngleRadDistance(yawAngle, motionAngle));
+                        if (angleDiff > GameMath.PIHALF)    // Creature's motion vector is more than 90 degrees away form yaw, we must be walking backwards
+                        {
+                            deltaY = -deltaY;
+                        }
+                    }
 
-                stepingAccum = Math.Max(0f, stepingAccum - dt);
-                fallingAccum = Math.Max(0f, fallingAccum - dt);
+                    bool notInWater = !entity.FeetInLiquid && !entity.Swimming;       // We don't need an OnGround test here (and it can be an unreliable test anyhow). If deltaY is non-zero then we know we are not on the ground (or we are on stairs etc.)
+                    bool steppingUp = notInWater && deltaY > 0;
+                    bool falling = notInWater && deltaY < 0 && stepingAccum == 0;     // We check stepingAccum here because client-side, an entity climbing a 1-block step can sometimes "overclimb", e.g. ends up at Y of 3.018 in a Creative world.  It then "falls" down to Y == 3.000 with gravity.  We don't want to detect that fall as a tilt in the reverse direction
 
-                if (steppingUp) stepingAccum = 0.2f;
-                if (falling) fallingAccum = 0.2f;
+                    stepingAccum = Math.Max(0f, stepingAccum - dt);
+                    fallingAccum = Math.Max(0f, fallingAccum - dt);
 
-                if (stepingAccum > 0) targetPitch = -0.5;
-                else if (fallingAccum > 0) targetPitch = 0.5;
+                    if (steppingUp) stepingAccum = 0.2f;
+                    if (falling) fallingAccum = 0.2f;
+
+                    if (stepingAccum > fallingAccum) targetPitch = -0.5;
+                    else if (fallingAccum > stepingAccum) targetPitch = 0.5;
+                }
             }
 
             stepPitch += (targetPitch - stepPitch) * dt * 5;
+            if (Math.Abs(stepPitch) < 0.0000001) stepPitch = 0;
         }
 
 

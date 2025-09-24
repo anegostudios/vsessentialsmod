@@ -136,7 +136,7 @@ namespace Vintagestory.GameContent
             container = new InWorldContainer(() => Inventory, InventoryClassName);
         }
 
-        public override bool TryEarlyLoadCollectibleMappings(IWorldAccessor worldForCollectibleResolve, Dictionary<int, AssetLocation> oldBlockIdMapping, Dictionary<int, AssetLocation> oldItemIdMapping, bool resolveImports)
+        public override bool TryEarlyLoadCollectibleMappings(IWorldAccessor worldForCollectibleResolve, Dictionary<int, AssetLocation> oldBlockIdMapping, Dictionary<int, AssetLocation> oldItemIdMapping, bool resolveImports, EntityProperties entityProperties, JsonObject behaviorConfig)
         {
             // Note: We do not need to call storeInv() after OnLoadCollectibleMappings.
             //

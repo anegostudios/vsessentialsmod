@@ -230,10 +230,13 @@ namespace Vintagestory.GameContent
             if (despawn.Reason == EnumDespawnReason.Death)
             {
                 var contents = GetContents(itemslot.Itemstack, onEntity.World);
-                foreach (var stack in contents)
+                if (contents != null)
                 {
-                    if (stack == null) continue;
-                    onEntity.World.SpawnItemEntity(stack, onEntity.Pos.XYZ);
+                    foreach (var stack in contents)
+                    {
+                        if (stack == null) continue;
+                        onEntity.World.SpawnItemEntity(stack, onEntity.Pos.XYZ);
+                    }
                 }
             }
 

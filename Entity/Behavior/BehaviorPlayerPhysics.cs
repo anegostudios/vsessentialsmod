@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -281,6 +281,8 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     public void SetPlayerControls(EntityPos pos, EntityControls controls, float dt)
     {
         IClientWorldAccessor clientWorld = entity.World as IClientWorldAccessor;
+        // We pretend the entity is flying to disable gravity so that EntityBehaviorInterpolatePosition system 
+        // can work better   (see commit 09003c0c)
         controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) && !controls.IsClimbing;
         controls.NoClip = player.WorldData.NoClip;
         controls.MovespeedMultiplier = player.WorldData.MoveSpeedMultiplier;
@@ -369,9 +371,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
         accum += dt;
 
-        if (accum > 0.5)
+        if (accum > 0.5f)
         {
-            accum = 0;
+            accum = 0.5f;
         }
 
         var mountedEntity = entityPlayer.MountedOn?.Entity;
