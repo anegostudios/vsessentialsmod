@@ -265,7 +265,9 @@ namespace Vintagestory.GameContent
                 float intox = entity.WatchedAttributes.GetFloat("intoxication");
                 if (intox > 0)
                 {
-                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f));
+                    // 60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul) is the default, so we scale according to the default time multiplier
+                    var intoxLoss = 0.005f * entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul / 30;
+                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - intoxLoss));
                 }
                 detoxCounter = 0;
             }
@@ -463,3 +465,4 @@ namespace Vintagestory.GameContent
     }
  
 }
+
