@@ -260,13 +260,9 @@ namespace Vintagestory.GameContent
                 sandCountByBlock = new float[indicesBySandBlockId.Count];
             }
 
-            capi.Event.LevelFinalize += Event_LevelFinalize;
-        }
-
-        private void Event_LevelFinalize()
-        {
             suppressDesertStorm = capi.World.Config.GetAsBool("suppressDesertStorm", false);
         }
+
 
         float accum;
         protected bool suppressDesertStorm = false;

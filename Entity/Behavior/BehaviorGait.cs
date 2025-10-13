@@ -36,12 +36,12 @@ namespace Vintagestory.GameContent
 
         public float GetYawMultiplier() => CurrentGait?.YawMultiplier ?? 3.5f; // Default yaw multiplier if not set
 
-        public void SetIdle() => CurrentGait = IdleGait;
+        public virtual void SetIdle() => CurrentGait = IdleGait;
         public bool IsIdle => IsIdleGait(CurrentGait);
         public bool IsBackward => IsBackwards(CurrentGait);
         public bool IsForward => IsForwards(CurrentGait);
 
-        public bool IsIdleGait(GaitMeta gait)
+        public virtual bool IsIdleGait(GaitMeta gait)
         {
             return gait == IdleGait;
         }

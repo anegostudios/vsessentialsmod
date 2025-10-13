@@ -122,10 +122,10 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             // Player physics is called only client side, but for their mounts we still need to call Block.OnEntityInside and other usual server-side AfterPhysicsTick things
             if (mountableSupplier?.Controller is EntityPlayer p && p.Alive)
-        {
-            callOnEntityInside();
+            {
+                callOnEntityInside();
                 entity.AfterPhysicsTick?.Invoke();
-        }
+            }
 
             return;
         }
@@ -349,7 +349,8 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                         }
                     }
                 }
-            DoneClimbing:;
+
+                DoneClimbing:;
             }
         }
 

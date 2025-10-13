@@ -244,7 +244,7 @@ namespace Vintagestory.GameContent
 
             foreach (var slot in inv)
             {
-                if (slot.Empty || hideClothing) continue;
+                if (slot.Empty || hideClothing || !ShouldAddGearToShape(slot)) continue;
 
                 entityShape = addGearToShape(entityShape, slot, "default", shapePathForLogging, ref shapeIsCloned, ref willDeleteElements);
             }
@@ -266,9 +266,11 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-
+            
             return entityShape;
         }
+
+        protected virtual bool ShouldAddGearToShape(ItemSlot slot) => true;
 
 
         protected virtual Shape addGearToShape(Shape entityShape, ItemSlot gearslot, string slotCode, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)

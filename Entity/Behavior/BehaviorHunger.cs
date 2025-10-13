@@ -230,7 +230,8 @@ namespace Vintagestory.GameContent
             }
 
             if (entityAgent != null && entityAgent.Controls.Sprint) sprintCounter++;
-            
+
+            if (hungerCounter < 0) hungerCounter = 0f;    // just in case is still somehow negative, including from mods
             hungerCounter += deltaTime;
 
             // Once every 10s
@@ -331,7 +332,7 @@ namespace Vintagestory.GameContent
 
             if (isondelay)
             {
-                hungerCounter -= 10;
+                hungerCounter = 0f;
                 return true;
             }
 

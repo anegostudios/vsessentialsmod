@@ -430,69 +430,71 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
         Cuboidd entityCollisionBox = entity.CollisionBox.ToDouble();
 
-        double max = 0.75;
+        const double max = 0.5;
         double searchBoxLength = max + (controls.Sprint ? 0.25 : controls.Sneak ? 0.05 : 0.2);
 
-        Vec2d center = new((entityCollisionBox.X1 + entityCollisionBox.X2) / 2, (entityCollisionBox.Z1 + entityCollisionBox.Z2) / 2);
+        double centerX = (entityCollisionBox.X1 + entityCollisionBox.X2) / 2;
+        double centerZ = (entityCollisionBox.Z1 + entityCollisionBox.Z2) / 2;
         double searchHeight = Math.Max(entityCollisionBox.Y1 + StepHeight, entityCollisionBox.Y2);
-        entityCollisionBox.Translate(pos.X, pos.Y, pos.Z);
 
         Vec3d walkVec = controls.WalkVector.Clone();
         Vec3d walkVecNormalized = walkVec.Clone().Normalize();
 
-        Cuboidd entitySensorBox;
-
         double outerX = walkVecNormalized.X * searchBoxLength;
         double outerZ = walkVecNormalized.Z * searchBoxLength;
-
-        entitySensorBox = new Cuboidd
+        double entityHalfWidth = entityCollisionBox.Width / 2;
+        double entityHalfLength = entityCollisionBox.Length / 2;
+        outerX += Math.Sign(outerX) * entityHalfWidth;
+        outerZ += Math.Sign(outerZ) * entityHalfLength;
+        Cuboidd entitySensorBox = new Cuboidd
         {
-            X1 = Math.Min(0, outerX),
-            X2 = Math.Max(0, outerX),
+            X1 = Math.Min(-entityHalfWidth, outerX),
+            X2 = Math.Max(entityHalfWidth, outerX),
 
-            Z1 = Math.Min(0, outerZ),
-            Z2 = Math.Max(0, outerZ),
+            Z1 = Math.Min(-entityHalfLength, outerZ),
+            Z2 = Math.Max(entityHalfLength, outerZ),
 
             Y1 = entity.CollisionBox.Y1 + 0.01 - (!entity.CollidedVertically && !controls.Jump ? 0.05 : 0),
 
             Y2 = searchHeight
         };
 
-        entitySensorBox.Translate(center.X, 0, center.Y);
+        entitySensorBox.Translate(centerX, 0, centerZ);
         entitySensorBox.Translate(pos.X, pos.Y, pos.Z);
 
-        Vec3d testVec = new();
-        Vec2d testMotion = new();
-
+        entityCollisionBox.Translate(pos.X, pos.Y, pos.Z);
         List<Cuboidd> steppableBoxes = FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBox, moveDelta.Y, walkVec);
 
         if (steppableBoxes != null && steppableBoxes.Count > 0)
         {
+            Vec3d testVec = new();
+            Vec2d testMotion = new();
+
             if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, walkVec.Z), dtFac, steppableBoxes, entityCollisionBox)) return true;
 
-            Cuboidd entitySensorBoxXAligned = entitySensorBox.Clone();
-            if (entitySensorBoxXAligned.Z1 == pos.Z + center.Y)
+            Cuboidd entitySensorBoxXZAligned = entitySensorBox.Clone();
+            if (entitySensorBoxXZAligned.Z1 == pos.Z + centerZ)
             {
-                entitySensorBoxXAligned.Z2 = entitySensorBoxXAligned.Z1;
+                entitySensorBoxXZAligned.Z2 = entitySensorBoxXZAligned.Z1;
             }
             else
             {
-                entitySensorBoxXAligned.Z1 = entitySensorBoxXAligned.Z2;
+                entitySensorBoxXZAligned.Z1 = entitySensorBoxXZAligned.Z2;
             }
 
-            if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, 0), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXAligned, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox)) return true;
+            if (TryStepSmooth(controls, pos, testMotion.Set(walkVec.X, 0), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXZAligned, moveDelta.Y, testVec.Set(walkVec.X, walkVec.Y, 0)), entityCollisionBox)) return true;
 
-            Cuboidd entitySensorBoxZAligned = entitySensorBox.Clone();
-            if (entitySensorBoxZAligned.X1 == pos.X + center.X)
+            entitySensorBoxXZAligned.Set(entitySensorBox);
+            if (entitySensorBoxXZAligned.X1 == pos.X + centerX)
             {
-                entitySensorBoxZAligned.X2 = entitySensorBoxZAligned.X1;
+                entitySensorBoxXZAligned.X2 = entitySensorBoxXZAligned.X1;
             }
             else
             {
-                entitySensorBoxZAligned.X1 = entitySensorBoxZAligned.X2;
+                entitySensorBoxXZAligned.X1 = entitySensorBoxXZAligned.X2;
             }
 
-            if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
+            if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
         }
 
         return false;
