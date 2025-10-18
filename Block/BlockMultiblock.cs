@@ -161,6 +161,17 @@ namespace Vintagestory.GameContent
            );
         }
 
+        public override Cuboidf[] GetParticleCollisionBoxes(IBlockAccessor ba, BlockPos pos)
+        {
+            return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
+                ba,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
+                (block) => new Cuboidf[] { Cuboidf.Default() },
+                (block) => block.GetParticleCollisionBoxes(ba, pos.AddCopy(OffsetInv))
+            );
+        }
+
         public override bool DoParticalSelection(IWorldAccessor world, BlockPos pos)
         {
             return Handle<bool, IMultiBlockInteract>(
