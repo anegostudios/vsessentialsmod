@@ -170,9 +170,10 @@ namespace Vintagestory.GameContent
                     ClothSystem maxcs = null;
                     float stretchWarn =0.4f;
 
-                    foreach (var val in clothSystems)
+                    var systems = clothSystems.Values;
+                    foreach (var val in systems)
                     {
-                        var cs = val.Value;
+                        var cs = val;
                         if (cs.MaxExtension > cs.StretchWarn)
                         {
                             cs.secondsOverStretched += dt;
@@ -211,11 +212,12 @@ namespace Vintagestory.GameContent
             int count = 0;
             updateMesh.CustomFloats.Count = 0;
 
-            foreach (var val in clothSystems)
+            var systems = clothSystems.Values;
+            foreach (var val in systems)
             {
-                if (!val.Value.Active) continue;
+                if (!val.Active) continue;
 
-                count += val.Value.UpdateMesh(updateMesh, dt);
+                count += val.UpdateMesh(updateMesh, dt);
                 updateMesh.CustomFloats.Count = count * (4 + 16);
             }
 
@@ -241,20 +243,22 @@ namespace Vintagestory.GameContent
             }
 
 
-            foreach (var val in clothSystems)
+            var systems2 = clothSystems.Values;
+            foreach (var val in systems2)
             {
-                if (!val.Value.Active) continue;
+                if (!val.Active) continue;
 
-                val.Value.CustomRender(dt);
+                val.CustomRender(dt);
             }
         }
 
         private void tickPhysics(float dt)
         {
-            foreach (var val in clothSystems)
+            var systems = clothSystems.Values;
+            foreach (var val in systems)
             {
-                if (!val.Value.Active) continue;
-                val.Value.updateFixedStep(dt);
+                if (!val.Active) continue;
+                val.updateFixedStep(dt);
             }
 
             if (sapi != null)
