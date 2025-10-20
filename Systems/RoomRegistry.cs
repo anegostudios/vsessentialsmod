@@ -482,7 +482,11 @@ namespace Vintagestory.GameContent
                     }
 
                     Block nBlock = blockAccess.GetBlock(npos);
-                    allChunksLoaded &= blockAccess.LastChunkLoaded;
+                    if (!blockAccess.LastChunkLoaded)
+                    {
+                        allChunksLoaded = false;
+                        break;
+                    }
                     heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
                     // We hit a wall, no need to scan further
@@ -554,6 +558,8 @@ namespace Vintagestory.GameContent
 
                     bfsQueue.Enqueue(dx << 10 | dy << 5 | dz);
                 }
+                
+                if (!allChunksLoaded) break;
             }
 
 
