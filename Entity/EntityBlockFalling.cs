@@ -166,6 +166,8 @@ namespace Vintagestory.GameContent
     {
         private const int packetIdMagicNumber = 1234;
         static HashSet<long> fallingNow = new HashSet<long>();
+        static int cleanupCounter = 0;
+        const int cleanupInterval = 1000; // Cleanup every 1000 despawns
 
         private readonly List<int> fallDirections = new() { 0, 1, 2, 3 };
         private int lastFallDirection = 0;
@@ -433,6 +435,16 @@ namespace Vintagestory.GameContent
             if (Api.World.Side == EnumAppSide.Client)
             {
                 fallingNow.Remove(EntityId);
+                
+                // Periodic cleanup to prevent memory bloat
+                if (++cleanupCounter >= cleanupInterval)
+                {
+                    cleanupCounter = 0;
+                    if (fallingNow.Count > 200)
+                    {
+                        fallingNow.Clear();
+                    }
+                }
                 particleSys.Unregister(this);
             }
         }

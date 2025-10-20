@@ -650,7 +650,12 @@ namespace Vintagestory.GameContent
         private TextCommandResult onClothTestClearServer(TextCommandCallingArgs args)
         {
             int cnt = clothSystems.Count;
-            int[] clothids = clothSystems.Select(s => s.Value.ClothId).ToArray();
+            int[] clothids = new int[cnt];
+            int idx = 0;
+            foreach (var kvp in clothSystems)
+            {
+                clothids[idx++] = kvp.Value.ClothId;
+            }
             if (clothids.Length > 0)
                 clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket()
                     { ClothIds = clothids });

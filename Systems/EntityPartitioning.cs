@@ -134,7 +134,22 @@ namespace Vintagestory.GameContent
             double largestTouchDistance = 0;
 
             var Partitions = this.Partitions;
-            Partitions.Clear();
+            
+            // Clear existing lists instead of recreating dictionary
+            foreach (var partition in Partitions.Values)
+            {
+                for (int i = 0; i < partition.Entities.Length; i++)
+                {
+                    partition.Entities[i]?.Clear();
+                }
+                if (partition.InanimateEntities != null)
+                {
+                    for (int i = 0; i < partition.InanimateEntities.Length; i++)
+                    {
+                        partition.InanimateEntities[i]?.Clear();
+                    }
+                }
+            }
 
             foreach (var entity in entities)
             {
