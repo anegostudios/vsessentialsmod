@@ -175,9 +175,8 @@ namespace Vintagestory.GameContent
 
             string fromCode = props.ConvertFrom;
             if (fromCode == null || toCode == null) return;
-
-            if (fromCode.IndexOf(':') == -1) fromCode = block.Code.Domain + ":" + fromCode;
-            if (toCode.IndexOf(':') == -1) toCode = block.Code.Domain + ":" + toCode;
+            if (fromCode.IndexOf(':') == -1) fromCode = new AssetLocation(block.Code.Domain, fromCode).ToString();
+            if (toCode.IndexOf(':') == -1) toCode = new AssetLocation(block.Code.Domain, toCode).ToString();
 
             AssetLocation blockCode;
             if (fromCode == null || !toCode.Contains('*'))
