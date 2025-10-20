@@ -81,6 +81,12 @@ namespace Vintagestory.GameContent
 
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
         {
+            // Early exit if system is heavily overloaded
+            if (fallingBlocks.Count > 1000)
+            {
+                return true;
+            }
+
             int alive = manager.ParticlesAlive(EnumParticleModel.Quad);
 
             // Reduce particle spawn the more falling blocks there are
