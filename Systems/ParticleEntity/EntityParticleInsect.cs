@@ -72,7 +72,7 @@ namespace Vintagestory.GameContent
 
             if (soundCoolDownLeft <= 0 && shouldPlaySound())
             {
-                playsound();
+                capi.Event.EnqueueMainThreadTask(playsound, "playginsectsound");
                 soundCoolDownLeft = soundCoolDown;
                 return;
             }
@@ -111,7 +111,7 @@ namespace Vintagestory.GameContent
             float volume = 1 * attnRoom;
             if (volume > 0.05f)
             {
-                capi.Event.EnqueueMainThreadTask(() => capi.World.PlaySoundAt(sound, Position.X, Position.Y, Position.Z, null, RandomPitch(), soundRange, volume), "playginsectsound");
+                capi.World.PlaySoundAt(sound, Position.X, Position.Y, Position.Z, null, RandomPitch(), soundRange, volume);
             }
         }
 

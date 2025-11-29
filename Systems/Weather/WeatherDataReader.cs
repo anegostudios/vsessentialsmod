@@ -223,7 +223,7 @@ namespace Vintagestory.GameContent
             rainSnapData = ws.rainOverlaySnap;
 
 
-            if (hereMapRegion == null)
+            if (hereMapRegion?.ClimateMap == null)
             {
                 this.lerpRainCloudOverlay = 0;
                 this.lerpRainOverlay = 0;

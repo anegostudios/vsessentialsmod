@@ -4,7 +4,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Util;
 
 #nullable disable
 
@@ -30,7 +29,7 @@ namespace Vintagestory.GameContent
         bool soundPlayed = false;
         bool doConsumePortion = true;
         bool eatAnimStarted = false;
-        
+
 
         bool eatLooseItems;
         float quantityEaten;
@@ -62,7 +61,7 @@ namespace Vintagestory.GameContent
             eatTime = taskConfig["eatTime"].AsFloat(1.5f);
             doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
             eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
-            
+
             Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>();
             if (Diet == null) api.Logger.Warning("Creature " + entity.Code.ToShortString() + " has SeekFoodAndEat task but no Diet specified");
 
@@ -187,7 +186,7 @@ namespace Vintagestory.GameContent
             pathTraverser.CurrentTarget.Z = pos.Z;
 
             Cuboidd targetBox = entity.SelectionBox.ToDouble().Translate(entity.ServerPos.X, entity.ServerPos.Y, entity.ServerPos.Z);
-            double distance = targetBox.ShortestDistanceFrom(pos);          
+            double distance = targetBox.ShortestDistanceFrom(pos);
 
             float minDist = MinDistanceToTarget();
 
@@ -205,21 +204,20 @@ namespace Vintagestory.GameContent
                 }
 
                 if (targetPoi.IsSuitableFor(entity, Diet) != true) return false;
-                
+
                 if (eatAnimMeta != null && !eatAnimStarted)
                 {
-                    entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);                        
+                    entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);
 
                     eatAnimStarted = true;
                 }
 
                 eatTimeNow += dt;
 
-                if (targetPoi is LooseItemFoodSource foodSource)
+                if (targetPoi is LooseItemFoodSource foodSource && foodSource.ItemStack != null)
                 {
                     entity.World.SpawnCubeParticles(targetPoi.Position, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
                 }
-                
 
                 if (eatTimeNow > eatTime * 0.75f && !soundPlayed)
                 {
@@ -275,7 +273,7 @@ namespace Vintagestory.GameContent
         public override void FinishExecute(bool cancelled)
         {
             // don't call base method, we set the cool down manually
-            // Instead of resetting the cool down to current time + delta, we add it, so that the animal can eat multiple times, to catch up on lost time 
+            // Instead of resetting the cool down to current time + delta, we add it, so that the animal can eat multiple times, to catch up on lost time
             var bh = entity.GetBehavior<EntityBehaviorMultiply>();
             if (bh != null && bh.PortionsLeftToEat > 0 && !bh.IsPregnant)
             {
@@ -327,7 +325,7 @@ namespace Vintagestory.GameContent
 
             attempt.Count++;
             attempt.LastTryMs = world.ElapsedMilliseconds;
-            
+
         }
 
         private void OnGoalReached()

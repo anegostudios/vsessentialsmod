@@ -1,4 +1,4 @@
-﻿using ProtoBuf;
+using ProtoBuf;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
@@ -482,6 +482,7 @@ namespace Vintagestory.GameContent
 
             api.Event.RegisterGameTickListener(tickPhysics, 30);
 
+            api.Event.ChunkColumnLoaded += Event_ChunkColumnLoaded;
             api.Event.MapRegionLoaded += Event_MapRegionLoaded;
             api.Event.MapRegionUnloaded += Event_MapRegionUnloaded;
 
@@ -516,6 +517,11 @@ namespace Vintagestory.GameContent
                         .HandleWith(onClothTestDeleteloaded)
                     .EndSubCommand()
                 .EndSubCommand();
+        }
+
+        private void Event_ChunkColumnLoaded(Vec2i chunkCoord, IWorldChunk[] chunks)
+        {
+            updateActiveState();
         }
 
         private void onNowRunGame()
@@ -602,47 +608,68 @@ namespace Vintagestory.GameContent
             
             if (data != null && data.Length != 0)
             {
-                var rsystems = SerializerUtil.Deserialize<List<ClothSystem>>(data);
-
-                // Don't even try to resolve anything while the server is still starting up
-                if (sapi.Server.CurrentRunPhase < EnumServerRunPhase.RunGame)
-                {
-                    foreach (var system in rsystems)
-                    {
-                        system.Active = false;
-                        system.Init(api, this);
-                        clothSystems[system.ClothId] = system;
-                    }
-                }
-                else
-                {
-                    foreach (var system in clothSystems.Values)
-                    {
-                        system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
-                    }
-
-                    foreach (var system in rsystems)
-                    {
-                        system.Init(api, this);
-                        system.restoreReferences();
-                        clothSystems[system.ClothId] = system;
-                    }
-
-
-                    if (rsystems.Count > 0)
-                    {
-                        clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = rsystems.ToArray() });
-                    }
-                }
-
-            } else
+                loadFromRegion(data);
+            }
+            else
             {
-                if (sapi.Server.CurrentRunPhase >= EnumServerRunPhase.RunGame)
+                updateActiveState();
+            }
+        }
+
+        private void updateActiveState()
+        {
+            if (sapi.Server.CurrentRunPhase >= EnumServerRunPhase.RunGame)
+            {
+                List<ClothSystem> cs = new List<ClothSystem>();
+
+                foreach (var system in clothSystems.Values)
                 {
-                    foreach (var system in clothSystems.Values)
-                    {
-                        system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
+                    bool nowActive = system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
+
+                    if (nowActive) {
+                        cs.Add(system);
                     }
+                }
+
+                if (cs.Count > 0)
+                {
+                    clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = cs.ToArray() });
+                }
+            }
+        }
+
+        private void loadFromRegion(byte[] data)
+        {
+            var rsystems = SerializerUtil.Deserialize<List<ClothSystem>>(data);
+
+            // Don't even try to resolve anything while the server is still starting up
+            if (sapi.Server.CurrentRunPhase < EnumServerRunPhase.RunGame)
+            {
+                foreach (var system in rsystems)
+                {
+                    system.Active = false;
+                    system.Init(api, this);
+                    clothSystems[system.ClothId] = system;
+                }
+            }
+            else
+            {
+                foreach (var system in clothSystems.Values)
+                {
+                    system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
+                }
+
+                foreach (var system in rsystems)
+                {
+                    system.Init(api, this);
+                    system.restoreReferences();
+                    clothSystems[system.ClothId] = system;
+                }
+
+
+                if (rsystems.Count > 0)
+                {
+                    clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = rsystems.ToArray() });
                 }
             }
         }

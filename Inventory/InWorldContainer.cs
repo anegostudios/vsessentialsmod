@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -115,6 +115,7 @@ namespace Vintagestory.GameContent
             room = roomReg.GetRoomForPosition(positionProvider());
             if (room.AnyChunkUnloaded != 0) return;
 
+            bool aSlotWasCleared = false;
             foreach (ItemSlot slot in Inventory)
             {
                 if (slot.Itemstack == null) continue;
@@ -125,9 +126,19 @@ namespace Vintagestory.GameContent
                 if (slot.Itemstack?.Collectible.Code != codeBefore)
                 {
                     onRequireSyncToClient();
+                    if (slot.Itemstack == null) aSlotWasCleared = true;
                 }
             }
+
+            if (aSlotWasCleared && Inventory.Empty) OnInventoryClearedMidTick();
+
             temperatureCached = -1000f;      // reset the cached temperature in case any code needs to call GetPerishRate() between ticks of this entity
+        }
+
+        protected virtual void OnInventoryClearedMidTick()
+        {
+            BlockEntity be = Api.World.BlockAccessor.GetBlockEntity(positionProvider());
+            if (be is IBlockEntityContainer container) container.CheckInventoryClearedMidTick();
         }
 
         protected virtual bool HasTransitionables()
@@ -147,7 +158,7 @@ namespace Vintagestory.GameContent
             float positionAwarePerishRate = Api != null && transType == EnumTransitionType.Perish ? GetPerishRate() : 1;
             if (transType == EnumTransitionType.Dry || transType == EnumTransitionType.Melt) positionAwarePerishRate = 0.25f;
 
-            return baseMul * positionAwarePerishRate;
+            return positionAwarePerishRate;
         }
 
 

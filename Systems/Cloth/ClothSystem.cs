@@ -1,4 +1,4 @@
-﻿using ProtoBuf;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -539,10 +539,10 @@ namespace Vintagestory.GameContent
             }            
         }
 
-        public void updateActiveState(EnumActiveStateChange stateChange)
+        public bool updateActiveState(EnumActiveStateChange stateChange)
         {
-            if (Active && stateChange == EnumActiveStateChange.RegionNowLoaded) return;
-            if (!Active && stateChange == EnumActiveStateChange.RegionNowUnloaded) return;
+            if (Active && stateChange == EnumActiveStateChange.RegionNowLoaded) return false;
+            if (!Active && stateChange == EnumActiveStateChange.RegionNowUnloaded) return false;
 
             bool wasActive = Active;
 
@@ -551,7 +551,13 @@ namespace Vintagestory.GameContent
                 Active &= api.World.BlockAccessor.GetChunkAtBlockPos((int)p.Pos.X, (int)p.Pos.Y, (int)p.Pos.Z) != null;
             });
 
-            if (!wasActive && Active) restoreReferences();
+            if (!wasActive && Active)
+            {
+                restoreReferences();
+                return true;
+            }
+
+            return false;
         }
 
 
