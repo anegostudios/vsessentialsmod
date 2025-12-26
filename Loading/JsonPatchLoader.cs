@@ -12,6 +12,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
+using System.IO;
 
 #nullable disable
 
@@ -180,295 +181,589 @@ namespace Vintagestory.ServerMods.NoObf
         public JsonObject Value;
     }
 
-    public class ModJsonPatchLoader : ModSystem
-    {
-        ICoreAPI api;
-        ITreeAttribute worldConfig;
+   public class ModJsonPatchLoader : ModSystem
+ {
+     ICoreAPI api;
+     ITreeAttribute worldConfig;
 
-        public override bool ShouldLoad(EnumAppSide side)
-        {
-            return true;
-        }
+     // Cache for loaded JSON documents
+     private Dictionary<AssetLocation, (JToken token, IAsset asset)> _jsonCache = new Dictionary<AssetLocation, (JToken, IAsset)>();
 
-        public override double ExecuteOrder() => 0.05;
+     public override bool ShouldLoad(EnumAppSide side)
+     {
+         return true;
+     }
 
-        public override void AssetsLoaded(ICoreAPI api)
-        {
-            this.api = api;
+     public override double ExecuteOrder() => 0.05;
 
-            worldConfig = api.World.Config;
-            if (worldConfig == null)
-            {
-                worldConfig = new TreeAttribute();
-            }
+     public override void AssetsLoaded(ICoreAPI api)
+     {
+         this.api = api;
 
-            ApplyPatches();
-        }
+         worldConfig = api.World.Config;
+         if (worldConfig == null)
+         {
+             worldConfig = new TreeAttribute();
+         }
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="forPartialPath">Only apply patches that patch a file starting with this path.</param>
-        public void ApplyPatches(string forPartialPath = null)
-        {
-            List<IAsset> entries = api.Assets.GetMany("patches/");
-
-            int appliedCount = 0;
-            int notfoundCount = 0;
-            int errorCount = 0;
-            int totalCount = 0;
-            int unmetConditionCount = 0;
-
-            HashSet<string> loadedModIds = new HashSet<string>(api.ModLoader.Mods.Select((m) => m.Info.ModID).ToList());
-
-            foreach (IAsset asset in entries)
-            {
-                JsonPatch[] patches = null;
-                try
-                {
-                    patches = asset.ToObject<JsonPatch[]>();
-                } catch (Exception e)
-                {
-                    api.Logger.Error("Failed loading patches file {0}:", asset.Location);
-                    api.Logger.Error(e);
-                }
-
-                for (int j = 0; patches != null && j < patches.Length; j++)
-                {
-                    JsonPatch patch = patches[j];
-                    if (!patch.Enabled) continue;
-
-                    if (patch.Condition != null)
-                    {
-                        IAttribute attr = worldConfig[patch.Condition.When];
-                        if (attr == null) continue;
-
-                        if (patch.Condition.useValue)
-                        {
-                            patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken()));
-                        }
-                        else
-                        {
-                            if (!patch.Condition.IsValue.Equals(attr.GetValue() + "",
-                                    StringComparison.InvariantCultureIgnoreCase))
-                            {
-                                api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})",
-                                    asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
-                                unmetConditionCount++;
-                                continue;
-                            }
-                        }
-                    }
-
-                    if (patch.DependsOn != null)
-                    {
-                        bool enabled = true;
-
-                        foreach (var dependence in patch.DependsOn)
-                        {
-                            bool loaded = loadedModIds.Contains(dependence.modid);
-                            enabled = enabled && (loaded ^ dependence.invert);
-                        }
-
-                        if (!enabled)
-                        {
-                            unmetConditionCount++;
-                            api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})",
-                                asset.Location, j,
-                                string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
-                            continue;
-                        }
-                    }
-
-                    if(forPartialPath != null && !patch.File.PathStartsWith(forPartialPath)) continue;
-
-                    totalCount++;
-                    ApplyPatch(j, asset.Location, patch, ref appliedCount, ref notfoundCount, ref errorCount);
-                }
-            }
-
-            StringBuilder sb = new StringBuilder();
-            sb.Append("JsonPatch Loader: ");
-
-            if (totalCount == 0)
-            {
-                sb.Append("Nothing to patch");
-            }
-            else
-            {
-
-                sb.Append(string.Format("{0} patches total", totalCount));
-
-                if (appliedCount > 0)
-                {
-                    sb.Append(string.Format(", successfully applied {0} patches", appliedCount));
-                }
-
-                if (notfoundCount > 0)
-                {
-                    sb.Append(string.Format(", missing files on {0} patches", notfoundCount));
-                }
-
-                if (unmetConditionCount > 0)
-                {
-                    sb.Append(string.Format(", unmet conditions on {0} patches", unmetConditionCount));
-                }
-
-                if (errorCount > 0)
-                {
-                    sb.Append(string.Format(", had errors on {0} patches", errorCount));
-                }
-                else
-                {
-                    sb.Append(string.Format(", no errors", errorCount));
-                }
-            }
-
-            api.Logger.Notification(sb.ToString());
-            api.Logger.VerboseDebug("Patchloader finished");
-        }
+         ApplyPatches();
+     }
 
 
-        public void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
-        {
-            EnumAppSide targetSide = jsonPatch.Side == null ? jsonPatch.File.Category.SideType : (EnumAppSide)jsonPatch.Side;
+     /// <summary>
+     ///
+     /// </summary>
+     /// <param name="forPartialPath">Only apply patches that patch a file starting with this path.</param>
+     public void ApplyPatches(string forPartialPath = null)
+     {
+         // Load all patch files
+         List<IAsset> entries = api.Assets.GetMany("patches/");
 
-            if (targetSide != EnumAppSide.Universal && jsonPatch.Side != api.Side) return;
+         int appliedCount = 0;
+         int notfoundCount = 0;
+         int errorCount = 0;
+         int totalCount = 0;
+         int unmetConditionCount = 0;
 
-            if (jsonPatch.File == null)
-            {
-                api.World.Logger.Error("Patch {0} in {1} failed because it is missing the target file property", patchIndex, patchSourcefile);
-                return;
-            }
+         // List of loaded mods for dependency checks
+         HashSet<string> loadedModIds = new HashSet<string>(api.ModLoader.Mods.Select((m) => m.Info.ModID).ToList());
 
-            var loc = jsonPatch.File.Clone();
+         // First collect all valid patches
+         var validPatches = new List<(JsonPatch patch, AssetLocation source, int index)>();
 
-            if (jsonPatch.File.Path.EndsWith('*'))
-            {
-                List<IAsset> assets = api.Assets.GetMany(jsonPatch.File.Path.TrimEnd('*'), jsonPatch.File.Domain, false);
-                foreach (var val in assets)
-                {
-                    jsonPatch.File = val.Location;
-                    ApplyPatch(patchIndex, patchSourcefile, jsonPatch, ref applied, ref notFound, ref errorCount);
-                }
+         // Iterate over all patch files
+         foreach (IAsset asset in entries)
+         {
+             JsonPatch[] patches = null;
+             try
+             {
+                 patches = asset.ToObject<JsonPatch[]>();
+             }
+             catch (Exception e)
+             {
+                 api.Logger.Error("Failed loading patches file {0}:", asset.Location);
+                 api.Logger.Error(e);
+             }
 
-                jsonPatch.File = loc;
+             // Iterate over all patches in the file
+             for (int j = 0; patches != null && j < patches.Length; j++)
+             {
+                 JsonPatch patch = patches[j];
 
-                return;
-            }
+                 // Skip disabled patches
+                 if (!patch.Enabled)
+                     continue;
+
+                 // Immediately check the patch side
+                 EnumAppSide targetSide = patch.Side == null ? patch.File.Category.SideType : (EnumAppSide)patch.Side;
+                 if (targetSide != EnumAppSide.Universal && patch.Side != api.Side)
+                     continue;
+
+                 // Check the patch condition
+                 if (patch.Condition != null)
+                 {
+                     IAttribute attr = worldConfig[patch.Condition.When];
+                     if (attr == null)
+                         continue;
+
+                     if (patch.Condition.useValue)
+                     {
+                         patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken()));
+                     }
+                     else
+                     {
+                         if (!patch.Condition.IsValue.Equals(attr.GetValue() + "",
+                                 StringComparison.InvariantCultureIgnoreCase))
+                         {
+                             api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})",
+                                 asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
+                             unmetConditionCount++;
+                             continue;
+                         }
+                     }
+                 }
+
+                 // Check patch dependencies
+                 if (patch.DependsOn != null)
+                 {
+                     bool enabled = true;
+
+                     foreach (var dependence in patch.DependsOn)
+                     {
+                         bool loaded = loadedModIds.Contains(dependence.modid);
+                         enabled = enabled && (loaded ^ dependence.invert);
+                     }
+
+                     if (!enabled)
+                     {
+                         unmetConditionCount++;
+                         api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet DependsOn condition ({2})",
+                             asset.Location, j,
+                             string.Join(",", patch.DependsOn.Select(pd => (pd.invert ? "!" : "") + pd.modid)));
+                         continue;
+                     }
+                 }
+
+                 // Filter by path if needed
+                 if (forPartialPath != null && !patch.File.PathStartsWith(forPartialPath))
+                     continue;
+
+                 // Add valid patches to processing list
+                 validPatches.Add((patch, asset.Location, j));
+             }
+         }
 
 
-            if (!loc.Path.EndsWithOrdinal(".json")) loc.Path += ".json";
+         totalCount = validPatches.Count;
 
-            var asset = api.Assets.TryGet(loc);
-            if (asset == null)
-            {
-                if (jsonPatch.File.Category == null)
-                {
-                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Wrong asset category", patchIndex, patchSourcefile, loc);
-                }
-                else
-                {
-                    EnumAppSide catSide = jsonPatch.File.Category.SideType;
-                    if (catSide != EnumAppSide.Universal && api.Side != catSide)
-                    {
-                        api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
-                    }
-                    else
-                    {
-                        api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
-                    }
-                }
+         // Process patches in the order they appear in validPatches
+         var processedFiles = new HashSet<AssetLocation>();
+         var filesToSave = new List<AssetLocation>();
+
+         // Iterate over all valid patches in order from the beginning
+         for (int i = 0; i < validPatches.Count; i++)
+         {
+             var (patch, source, index) = validPatches[i];
+             var targetFile = patch.File.Clone();
+
+             // Handle wildcards
+             if (targetFile.Path.EndsWith('*'))
+             {
+                 string basePath = targetFile.Path.TrimEnd('*');
+                 List<IAsset> assets = api.Assets.GetMany(basePath, targetFile.Domain, false);
+
+                 // Apply patch to all found files
+                 for (int j = 0; j < assets.Count; j++)
+                 {
+                     ProcessSinglePatch(assets[j].Location, patch, source, index,
+                         ref appliedCount, ref notfoundCount, ref errorCount,
+                         ref processedFiles, ref filesToSave);
+                 }
+             }
+             else
+             {
+                 // Apply patch to a single file
+                 ProcessSinglePatch(targetFile, patch, source, index,
+                     ref appliedCount, ref notfoundCount, ref errorCount,
+                     ref processedFiles, ref filesToSave);
+             }
+         }
+
+         // Save all modified files
+         foreach (var fileLoc in filesToSave)
+         {
+             // Get modified JSON document from cache
+             if (_jsonCache.TryGetValue(fileLoc, out var cachedData))
+             {
+                 try
+                 {
+                     // Serialize JSON back to string
+                     var sb = StringBuilderCache.Acquire();
+                     using (var writer = new StringWriter(sb))
+                     using (var jsonWriter = new JsonTextWriter(writer))
+                     {
+                         cachedData.token.WriteTo(jsonWriter);
+                     }
+
+                     // Save back to bytes
+                     cachedData.asset.Data = Encoding.UTF8.GetBytes(StringBuilderCache.GetStringAndRelease(sb));
+                     cachedData.asset.IsPatched = true;
+                 }
+                 catch (Exception e)
+                 {
+                     api.World.Logger.Error("Failed to serialize JSON file {0}:", fileLoc);
+                     api.World.Logger.Error(e);
+                     errorCount++;
+                 }
+             }
+         }
+
+         // Clear caches after processing
+         _jsonCache?.Clear();
+         filesToSave?.Clear();
+         processedFiles?.Clear();
+         validPatches?.Clear();
+         entries?.Clear();
+
+         // Log results
+         StringBuilder sbFinal = new StringBuilder();
+         sbFinal.Append("JsonPatch Loader: ");
+
+         if (totalCount == 0)
+         {
+             sbFinal.Append("Nothing to patch");
+         }
+         else
+         {
+             sbFinal.Append(string.Format("{0} patches total", totalCount));
+
+             if (appliedCount > 0)
+             {
+                 sbFinal.Append(string.Format(", successfully applied {0} patches", appliedCount));
+             }
+
+             if (notfoundCount > 0)
+             {
+                 sbFinal.Append(string.Format(", missing files on {0} patches", notfoundCount));
+             }
+
+             if (unmetConditionCount > 0)
+             {
+                 sbFinal.Append(string.Format(", unmet conditions on {0} patches", unmetConditionCount));
+             }
+
+             if (errorCount > 0)
+             {
+                 sbFinal.Append(string.Format(", had errors on {0} patches", errorCount));
+             }
+             else
+             {
+                 sbFinal.Append(", no errors");
+             }
+         }
+
+         api.Logger.Notification(sbFinal.ToString());
+         api.Logger.VerboseDebug("Patchloader finished");
+     }
 
 
-                notFound++;
-                return;
-            }
+     /// <summary>
+     /// Processes a single patch for a single file
+     /// </summary>
+     private void ProcessSinglePatch(AssetLocation fileLoc, JsonPatch patch, AssetLocation source, int index,
+         ref int applied, ref int notFound, ref int errorCount,
+         ref HashSet<AssetLocation> processedFiles, ref List<AssetLocation> filesToSave)
+     {
+         // Fix file extension if necessary
+         if (!fileLoc.Path.EndsWithOrdinal(".json"))
+             fileLoc.Path += ".json";
 
-            Operation op = null;
-            switch (jsonPatch.Op)
-            {
-                case EnumJsonPatchOp.Add:
-                    if (jsonPatch.Value == null)
-                    {
-                        api.World.Logger.Error("Patch {0} in {1} failed probably because it is an add operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
-                        errorCount++;
-                        return;
-                    }
+         // Load or get JSON document from cache
+         if (!_jsonCache.TryGetValue(fileLoc, out var cachedData))
+         {
+             var asset = api.Assets.TryGet(fileLoc);
+             if (asset == null)
+             {
+                 notFound++;
+                 LogFileNotFound(fileLoc, patch, source, index);
+                 return;
+             }
 
-                    op = new AddReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
-                    break;
-                case EnumJsonPatchOp.AddEach:
-                    if (jsonPatch.Value == null)
-                    {
-                        api.World.Logger.Error("Patch {0} in {1} failed probably because it is an add each operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
-                        errorCount++;
-                        return;
-                    }
+             // Parse JSON
+             JToken token;
+             try
+             {
+                 var jsonText = asset.ToText();
+                 token = JToken.Parse(jsonText);
+             }
+             catch (Exception e)
+             {
+                 errorCount++;
+                 api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed probably because the syntax of the value is broken:",
+                     index, source, fileLoc);
+                 api.World.Logger.Error(e);
+                 return;
+             }
 
-                    op = new AddEachOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
-                    break;
-                case EnumJsonPatchOp.Remove:
-                    op = new RemoveOperation() { Path = new JsonPointer(jsonPatch.Path) };
-                    break;
-                case EnumJsonPatchOp.Replace:
-                    if (jsonPatch.Value == null)
-                    {
-                        api.World.Logger.Error("Patch {0} in {1} failed probably because it is a replace operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
-                        errorCount++;
-                        return;
-                    }
+             cachedData = (token, asset);
+             _jsonCache[fileLoc] = cachedData;
+         }
 
-                    op = new ReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
-                    break;
-                case EnumJsonPatchOp.Copy:
-                    op = new CopyOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
-                    break;
-                case EnumJsonPatchOp.Move:
-                    op = new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
-                    break;
-                case EnumJsonPatchOp.AddMerge:
-                    op = new AddMergeOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
-                    break;
-            }
+         // Apply patch (create operation)
+         Operation op = CreateOperation(patch, source, index, ref errorCount);
+         if (op == null)
+             return;
 
-            PatchDocument patchdoc = new PatchDocument(op);
-            JToken token;
-            try
-            {
-                token = JToken.Parse(asset.ToText());
-            }
-            catch (Exception e)
-            {
-                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed probably because the syntax of the value is broken:", patchIndex, patchSourcefile, loc);
-                api.World.Logger.Error(e);
-                errorCount++;
-                return;
-            }
+         // Apply the operation
+         var patchdoc = new PatchDocument(op);
+         try
+         {
+             // Apply patch
+             patchdoc.ApplyTo(cachedData.token);
+             applied++;
 
-            try
-            {
-                patchdoc.ApplyTo(token);
-            }
-            catch (PathNotFoundException p)
-            {
-                api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}", patchIndex, patchSourcefile, jsonPatch.Path, p.Message, loc);
-                errorCount++;
-                return;
-            }
-            catch (Exception e)
-            {
-                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed, following Exception was thrown:", patchIndex, patchSourcefile,loc);
-                api.World.Logger.Error(e);
-                errorCount++;
-                return;
-            }
+             // Mark file to be saved
+             if (!processedFiles.Contains(fileLoc))
+             {
+                 processedFiles.Add(fileLoc);
+                 filesToSave.Add(fileLoc);
+             }
+         }
+         catch (PathNotFoundException p)
+         {
+             api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}",
+                 index, source, patch.Path, p.Message, fileLoc);
+             errorCount++;
+         }
+         catch (Exception e)
+         {
+             api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed:", index, source, fileLoc);
+             api.World.Logger.Error(e);
+             errorCount++;
+         }
+     }
 
-            string text = token.ToString();
-            asset.Data = Encoding.UTF8.GetBytes(text);
-            asset.IsPatched = true;
 
-            applied++;
-        }
-    }
+
+     private void LogFileNotFound(AssetLocation loc, JsonPatch patch, AssetLocation source, int index)
+     {
+         if (patch.File.Category == null)
+         {
+             api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Wrong asset category",
+                 index, source, loc);
+         }
+         else
+         {
+             EnumAppSide catSide = patch.File.Category.SideType;
+             if (catSide != EnumAppSide.Universal && api.Side != catSide)
+             {
+                 api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side",
+                     index, source, loc, catSide);
+             }
+             else
+             {
+                 api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found",
+                     index, source, loc);
+             }
+         }
+     }
+
+
+
+     private Operation CreateOperation(JsonPatch jsonPatch, AssetLocation source, int index, ref int errorCount)
+     {
+         switch (jsonPatch.Op)
+         {
+             case EnumJsonPatchOp.Add:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed: Add operation requires Value", index, source);
+                     errorCount++;
+                     return null;
+                 }
+
+                 return new AddReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+             case EnumJsonPatchOp.AddEach:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed: AddEach operation requires Value", index, source);
+                     errorCount++;
+                     return null;
+                 }
+
+                 return new AddEachOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+             case EnumJsonPatchOp.Remove:
+                 return new RemoveOperation() { Path = new JsonPointer(jsonPatch.Path) };
+
+             case EnumJsonPatchOp.Replace:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed: Replace operation requires Value", index, source);
+                     errorCount++;
+                     return null;
+                 }
+
+                 return new ReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+             case EnumJsonPatchOp.Copy:
+                 return new CopyOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+
+             case EnumJsonPatchOp.Move:
+                 return new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+
+             case EnumJsonPatchOp.AddMerge:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed: AddMerge operation requires Value", index, source);
+                     errorCount++;
+                     return null;
+                 }
+
+                 return new AddMergeOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+             default:
+                 return null;
+         }
+     }
+
+
+
+
+     ///
+     /// For backward compatibility with older calls
+     /// 
+
+     public void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
+     {
+         EnumAppSide targetSide = jsonPatch.Side == null ? jsonPatch.File.Category.SideType : (EnumAppSide)jsonPatch.Side;
+
+         if (targetSide != EnumAppSide.Universal && jsonPatch.Side != api.Side) return;
+
+         if (jsonPatch.File == null)
+         {
+             api.World.Logger.Error("Patch {0} in {1} failed because it is missing the target file property", patchIndex, patchSourcefile);
+             return;
+         }
+
+         var loc = jsonPatch.File.Clone();
+
+         if (jsonPatch.File.Path.EndsWith('*'))
+         {
+             List<IAsset> assets = api.Assets.GetMany(jsonPatch.File.Path.TrimEnd('*'), jsonPatch.File.Domain, false);
+             foreach (var val in assets)
+             {
+                 jsonPatch.File = val.Location;
+                 ApplyPatch(patchIndex, patchSourcefile, jsonPatch, ref applied, ref notFound, ref errorCount);
+             }
+
+             jsonPatch.File = loc;
+
+             return;
+         }
+
+
+         if (!loc.Path.EndsWithOrdinal(".json")) loc.Path += ".json";
+
+         var asset = api.Assets.TryGet(loc);
+         if (asset == null)
+         {
+             if (jsonPatch.File.Category == null)
+             {
+                 api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Wrong asset category", patchIndex, patchSourcefile, loc);
+             }
+             else
+             {
+                 EnumAppSide catSide = jsonPatch.File.Category.SideType;
+                 if (catSide != EnumAppSide.Universal && api.Side != catSide)
+                 {
+                     api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
+                 }
+                 else
+                 {
+                     api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                 }
+             }
+
+
+             notFound++;
+             return;
+         }
+
+         Operation op = null;
+         switch (jsonPatch.Op)
+         {
+             case EnumJsonPatchOp.Add:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed probably because it is an add operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
+                     errorCount++;
+                     return;
+                 }
+
+                 op = new AddReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                 break;
+             case EnumJsonPatchOp.AddEach:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed probably because it is an add each operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
+                     errorCount++;
+                     return;
+                 }
+
+                 op = new AddEachOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                 break;
+             case EnumJsonPatchOp.Remove:
+                 op = new RemoveOperation() { Path = new JsonPointer(jsonPatch.Path) };
+                 break;
+             case EnumJsonPatchOp.Replace:
+                 if (jsonPatch.Value == null)
+                 {
+                     api.World.Logger.Error("Patch {0} in {1} failed probably because it is a replace operation and the value property is not set or misspelled", patchIndex, patchSourcefile);
+                     errorCount++;
+                     return;
+                 }
+
+                 op = new ReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                 break;
+             case EnumJsonPatchOp.Copy:
+                 op = new CopyOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+                 break;
+             case EnumJsonPatchOp.Move:
+                 op = new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+                 break;
+             case EnumJsonPatchOp.AddMerge:
+                 op = new AddMergeOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+                 break;
+         }
+
+         PatchDocument patchdoc = new PatchDocument(op);
+         JToken token;
+         try
+         {
+             token = JToken.Parse(asset.ToText());
+         }
+         catch (Exception e)
+         {
+             api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed probably because the syntax of the value is broken:", patchIndex, patchSourcefile, loc);
+             api.World.Logger.Error(e);
+             errorCount++;
+             return;
+         }
+
+         try
+         {
+             patchdoc.ApplyTo(token);
+         }
+         catch (PathNotFoundException p)
+         {
+             api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}", patchIndex, patchSourcefile, jsonPatch.Path, p.Message, loc);
+             errorCount++;
+             return;
+         }
+         catch (Exception e)
+         {
+             api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed, following Exception was thrown:", patchIndex, patchSourcefile, loc);
+             api.World.Logger.Error(e);
+             errorCount++;
+             return;
+         }
+
+         string text = token.ToString();
+         asset.Data = Encoding.UTF8.GetBytes(text);
+         asset.IsPatched = true;
+
+         applied++;
+     }
+ }
+
+
+ // Simple cache for StringBuilder
+ internal static class StringBuilderCache
+ {
+     [ThreadStatic]
+     private static StringBuilder cachedInstance;
+
+     public static StringBuilder Acquire()
+     {
+         var result = cachedInstance;
+         if (result == null)
+         {
+             return new StringBuilder(4096); // Initial capacity
+         }
+
+         cachedInstance = null;
+         result.Length = 0;
+         return result;
+     }
+
+     public static string GetStringAndRelease(StringBuilder sb)
+     {
+         var result = sb.ToString();
+         cachedInstance = sb;
+         return result;
+     }
+ }
 }
+
