@@ -53,6 +53,9 @@ public class GridRecipeLoader : ModSystem
 
         api.World.Logger.Event($"{recipeQuantity} crafting recipes loaded from {files.Count} files");
         api.World.Logger.StoryEvent(Lang.Get("Grand inventions..."));
+
+        // Clear the cache after loading
+        GridRecipe.ClearCollectibleCache();
     }
 
     public void LoadRecipe(AssetLocation assetLocation, GridRecipe recipe)
@@ -139,4 +142,5 @@ public class GridRecipeLoader : ModSystem
         }
     }
 }
+
 
