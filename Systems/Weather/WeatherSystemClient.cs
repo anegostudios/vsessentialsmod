@@ -141,6 +141,7 @@ namespace Vintagestory.GameContent
 
             if (stage == EnumRenderStage.Before)
             {
+                if (!haveLevelFinalize || WeatherDataAtPlayer == null || capi?.World?.Player?.Entity == null) return;
                 EntityPlayer eplr = capi.World.Player.Entity;
                 plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
                 plrPosd.Set(eplr.Pos.X, eplr.Pos.Y, eplr.Pos.Z);
