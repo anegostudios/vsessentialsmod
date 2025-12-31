@@ -273,7 +273,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
             }
         }
 
-        float delta = dtAccum / pN.interval;
+        float delta = pN.interval > 0 ? dtAccum / pN.interval : 1f;
         if (wait != 0) delta = 1;
 
         entity.Pos.Yaw = LerpRotation(ref currentYaw, targetYaw, dt);
