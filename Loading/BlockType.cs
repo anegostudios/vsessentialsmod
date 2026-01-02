@@ -816,7 +816,11 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 for (int i = 0; i < val.Value.Length; i++)
                 {
-                    string blockCode = RegistryObject.FillPlaceHolder(val.Value[i], searchReplace);
+                    // string blockCode = RegistryObject.FillPlaceHolder(val.Value[i], searchReplace);
+
+                    // Using optimized version of placeholder replacement method
+                    // This is a very hot spot, as it is called during initialization of each block and item
+                    string blockCode = RegistryObject.FillPlaceHolderOptimized(val.Value[i], searchReplace);
 
                     if (WildcardUtil.Match(blockCode, code.Path))
                     //if (WildCardMatch(blockCode, code.Path))
