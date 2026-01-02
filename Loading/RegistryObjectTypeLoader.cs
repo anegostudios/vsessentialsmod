@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,6 +10,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 #nullable disable
 
@@ -25,7 +27,7 @@ namespace Vintagestory.ServerMods.NoObf
 
     public class ResolvedVariant
     {
-        public API.Datastructures.OrderedDictionary<string, string> CodeParts = new ();
+        public API.Datastructures.OrderedDictionary<string, string> CodeParts = new();
 
         public AssetLocation Code;
 
@@ -50,7 +52,7 @@ namespace Vintagestory.ServerMods.NoObf
 
     public class ModRegistryObjectTypeLoader : ModSystem
     {
-        // Dict Key is filename (with .json)
+        // Dictionary key is filename (with .json)
         public Dictionary<AssetLocation, StandardWorldProperty> worldProperties;
         public Dictionary<AssetLocation, VariantEntry[]> worldPropertiesVariants;
 
@@ -76,6 +78,13 @@ namespace Vintagestory.ServerMods.NoObf
             return 0.2;
         }
 
+        private int _threadsCount; // Number of threads for parallel processing
+        private volatile bool _gatheringCompleted = false; // Flag indicating completion of type gathering
+
+
+        /// <summary>
+        /// Start loading assets
+        /// </summary>
         public override void AssetsLoaded(ICoreAPI coreApi)
         {
             if (!(coreApi is ICoreServerAPI api)) return;
@@ -83,18 +92,33 @@ namespace Vintagestory.ServerMods.NoObf
 
             api.Logger.VerboseDebug("Starting to gather blocktypes, itemtypes and entities");
             LoadWorldProperties();
+
+            // Determine number of threads
             int maxThreads = api.Server.IsDedicated ? 3 : 8;
-            int threads = GameMath.Clamp(Environment.ProcessorCount / 2 - 2, 1, maxThreads);
-            if (api.Server.ReducedServerThreads) threads = 1;
+            _threadsCount = GameMath.Clamp(Environment.ProcessorCount / 2 - 2, 1, maxThreads);
+            if (api.Server.ReducedServerThreads) _threadsCount = 1;
 
+            // Load base types
+            LoadBaseTypes();
+
+            // Start one asynchronous thread to gather all types
+            TyronThreadPool.QueueTask(GatherAllTypes_Async, "gatheralltypes");
+
+            // Wait for gathering to complete and load results
+            WaitAndLoadResults();
+        }
+
+
+        /// <summary>
+        /// Load base types from JSON
+        /// </summary>
+        private void LoadBaseTypes()
+        {
+            // Loading itemTypes
             itemTypes = new Dictionary<AssetLocation, RegistryObjectType>();
-            blockTypes = new Dictionary<AssetLocation, RegistryObjectType>();
-            entityTypes = new Dictionary<AssetLocation, RegistryObjectType>();
-
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "itemtypes/"))
             {
                 if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
-
                 try
                 {
                     ItemType et = new ItemType();
@@ -103,38 +127,18 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Item type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
+                    api.World.Logger.Error("Item type {0} could not be loaded. Will ignore. Exception:", entry.Key);
                     api.World.Logger.Error(e);
                     continue;
                 }
             }
             itemVariants = new List<RegistryObjectType>[itemTypes.Count];
-            api.Logger.VerboseDebug("Starting parsing ItemTypes in " + threads + " threads");
-            PrepareForLoading(threads);
 
-            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
-            {
-                if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
-
-                try
-                {
-                    EntityType et = new EntityType();
-                    et.CreateBasetype(api, entry.Key.Path, entry.Key.Domain, entry.Value);
-                    entityTypes.Add(entry.Key, et);
-                }
-                catch (Exception e)
-                {
-                    api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
-                    api.World.Logger.Error(e);
-                    continue;
-                }
-            }
-            entityVariants = new List<RegistryObjectType>[entityTypes.Count];
-
+            // Loading blockTypes
+            blockTypes = new Dictionary<AssetLocation, RegistryObjectType>();
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
             {
                 if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
-                
                 try
                 {
                     BlockType et = new BlockType();
@@ -143,38 +147,157 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 catch (Exception e)
                 {
-                    api.World.Logger.Error("Block type {0} could not be loaded. Will ignore. Exception thrown:", entry.Key);
+                    api.World.Logger.Error("Block type {0} could not be loaded. Will ignore. Exception:", entry.Key);
                     api.World.Logger.Error(e);
                     continue;
                 }
             }
             blockVariants = new List<RegistryObjectType>[blockTypes.Count];
 
-            TyronThreadPool.QueueTask(GatherAllTypes_Async, "gatheralltypes");   // Now we've loaded everything, let's add one more gathering thread :)
+            // Loading entityTypes
+            entityTypes = new Dictionary<AssetLocation, RegistryObjectType>();
+            foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "entities/"))
+            {
+                if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
+                try
+                {
+                    EntityType et = new EntityType();
+                    et.CreateBasetype(api, entry.Key.Path, entry.Key.Domain, entry.Value);
+                    entityTypes.Add(entry.Key, et);
+                }
+                catch (Exception e)
+                {
+                    api.World.Logger.Error("Entity type {0} could not be loaded. Will ignore. Exception:", entry.Key);
+                    api.World.Logger.Error(e);
+                    continue;
+                }
+            }
+            entityVariants = new List<RegistryObjectType>[entityTypes.Count];
+        }
+
+        private void GatherAllTypes_Async()
+        {
+            try
+            {
+                // Using Parallel.For for parallel processing of each data type
+                // Processing itemTypes
+                if (itemTypes != null && itemTypes.Count > 0)
+                {
+                    api.Logger.VerboseDebug($"Starting parallel processing of {itemTypes.Count} item types with {_threadsCount} threads");
+                    ProcessTypesInParallel(itemTypes, itemVariants);
+                }
+
+                // Processing blockTypes
+                if (blockTypes != null && blockTypes.Count > 0)
+                {
+                    api.Logger.VerboseDebug($"Starting parallel processing of {blockTypes.Count} block types with {_threadsCount} threads");
+                    ProcessTypesInParallel(blockTypes, blockVariants);
+                }
+
+                // Processing entityTypes
+                if (entityTypes != null && entityTypes.Count > 0)
+                {
+                    api.Logger.VerboseDebug($"Starting parallel processing of {entityTypes.Count} entity types with {_threadsCount} threads");
+                    ProcessTypesInParallel(entityTypes, entityVariants);
+                }
+            }
+            finally
+            {
+                _gatheringCompleted = true;
+            }
+        }
+
+
+        /// <summary>
+        /// Process all types in parallel threads
+        /// </summary>
+        private void ProcessTypesInParallel(
+            Dictionary<AssetLocation, RegistryObjectType> baseTypes,
+            List<RegistryObjectType>[] resolvedTypeLists)
+        {
+            var baseTypeArray = baseTypes.Values.ToArray();
+            int count = baseTypeArray.Length;
+
+            if (count == 0)
+                return;
+
+            // Using Partitioner with dynamic load distribution
+            // The value _threadsCount * _threadsCount seems to be the most optimal, but changing it doesn't significantly affect performance
+            var partitioner = Partitioner.Create(0, count, Math.Max(1, count / (_threadsCount* _threadsCount)));
+
+
+            // Start parallel processing using Partitioner and threads according to _threadsCount
+            Parallel.ForEach(partitioner, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = _threadsCount
+            }, (range, loopState) =>
+            {
+                // Process each type in the given range
+                for (int i = range.Item1; i < range.Item2; i++)
+                {
+                    var val = baseTypeArray[i];
+
+                    // Skip disabled types
+                    if (!val.Enabled)
+                    {
+                        resolvedTypeLists[i] = new List<RegistryObjectType>();
+                        continue;
+                    }
+
+                    try
+                    {
+                        List<RegistryObjectType> resolvedTypes = new List<RegistryObjectType>();
+                        GatherVariantsAndPopulate(val, resolvedTypes);
+                        resolvedTypeLists[i] = resolvedTypes;
+                    }
+                    catch (Exception e)
+                    {
+                        api.Server.Logger.Error($"Error processing type {val.Code}: {e.Message}");
+                        // Do not interrupt execution for other types
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Wait for gathering to complete and load results
+        /// </summary>
+        private void WaitAndLoadResults()
+        {
+            // Wait for gathering to complete
+            api.Logger.VerboseDebug("Waiting for type gathering to complete...");
+            while (!_gatheringCompleted)
+            {
+                Thread.Sleep(10);
+            }
 
             api.Logger.StoryEvent(Lang.Get("It remembers..."));
             api.Logger.VerboseDebug("Gathered all types, starting to load items");
 
+            // Load results for items
             LoadItems(itemVariants);
             api.Logger.VerboseDebug("Parsed and loaded items");
 
             api.Logger.StoryEvent(Lang.Get("...all that came before"));
 
+            // Load results for blocks
             LoadBlocks(blockVariants);
             api.Logger.VerboseDebug("Parsed and loaded blocks");
 
+            // Load results for entities
             LoadEntities(entityVariants);
             api.Logger.VerboseDebug("Parsed and loaded entities");
 
             api.TagRegistry.LoadTagsFromAssets(api);
-
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
-
             FreeRam();
-
             api.TriggerOnAssetsFirstLoaded();
         }
 
+
+        /// <summary>
+        /// Load world properties
+        /// </summary>
         private void LoadWorldProperties()
         {
             worldProperties = new Dictionary<AssetLocation, StandardWorldProperty>();
@@ -184,7 +307,7 @@ namespace Vintagestory.ServerMods.NoObf
                 AssetLocation loc = entry.Key.Clone();
                 loc.Path = loc.Path.Replace("worldproperties/", "");
                 loc.RemoveEnding();
-                
+
                 entry.Value.Code.Domain = entry.Key.Domain;
 
                 worldProperties.Add(loc, entry.Value);
@@ -239,7 +362,7 @@ namespace Vintagestory.ServerMods.NoObf
         #region Items
         void LoadItems(List<RegistryObjectType>[] variantLists)
         {
-            // Step2: create all the items from the itemtypes, and register them: this has to be on the main thread as the registry is not thread-safe
+            // Step 2: create all the items from the itemtypes, and register them: this has to be on the main thread as the registry is not thread-safe
             LoadFromVariants(variantLists, "item", (variants) =>
             {
                 foreach (ItemType type in variants)
@@ -284,86 +407,21 @@ namespace Vintagestory.ServerMods.NoObf
                         api.Server.Logger.Error(e);
                     }
                 }
-            }); 
+            });
         }
         #endregion
 
         #region generic
-        void PrepareForLoading(int threadsCount)
-        {
-            // JSON parsing is slooowww, so let's multithread the **** out of it :)
-            for (int i = 0; i < threadsCount; i++) TyronThreadPool.QueueTask(GatherAllTypes_Async, "gatheralltypes" + i);
-        }
 
 
-        private void GatherAllTypes_Async()
-        {
-            GatherTypes_Async(itemVariants, itemTypes);
 
-            int timeOut = 1000;
-            bool logged = false;
-            while (blockVariants == null)
-            {
-                if (--timeOut == 0) return;
-                if (!logged)
-                {
-                    api.Logger.VerboseDebug("Waiting for entityTypes to be gathered");
-                    logged = true;
-                }
-                Thread.Sleep(10);
-            }
-            if (logged) api.Logger.VerboseDebug("EntityTypes now all gathered");
 
-            GatherTypes_Async(blockVariants, blockTypes);
 
-            timeOut = 1000;
-            logged = false;
-            while (entityVariants == null)
-            {
-                if (--timeOut == 0) return;
-                if (!logged)
-                {
-                    api.Logger.VerboseDebug("Waiting for blockTypes to be gathered");
-                    logged = true;
-                }
-                Thread.Sleep(10);
-            }
-            if (logged) api.Logger.VerboseDebug("BlockTypes now all gathered");
-
-            GatherTypes_Async(entityVariants, entityTypes);
-        }
 
 
         /// <summary>
-        /// Each thread attempts to resolve and parse the whole list of types, using the parseStarted field for load-sharing
+        /// Gather variants and populate types
         /// </summary>
-        private void GatherTypes_Async(List<RegistryObjectType>[] resolvedTypeLists, Dictionary<AssetLocation, RegistryObjectType> baseTypes)
-        {
-            int i = 0;
-            foreach (RegistryObjectType val in baseTypes.Values)
-            {
-                if (AsyncHelper.CanProceedOnThisThread(ref val.parseStarted))  // In each thread, only do work on RegistryObjectTypes which no other thread has yet worked on
-                {
-                    List<RegistryObjectType> resolvedTypes = new List<RegistryObjectType>();
-                    try
-                    {
-                        if (val.Enabled) GatherVariantsAndPopulate(val, resolvedTypes);
-                    }
-                    finally
-                    {
-                        resolvedTypeLists[i] = resolvedTypes;
-                    }
-                }
-                i++;
-            }
-        }
-
-
-        /// <summary>
-        /// This does the actual gathering and population, through GatherVariants calls - numerous calls if a base type has many variants
-        /// </summary>
-        /// <param name="baseType"></param>
-        /// <param name="typesResolved"></param>
         void GatherVariantsAndPopulate(RegistryObjectType baseType, List<RegistryObjectType> typesResolved)
         {
             List<ResolvedVariant> variants = null;
@@ -386,20 +444,19 @@ namespace Vintagestory.ServerMods.NoObf
             // Single variant
             if (variants == null || variants.Count == 0)
             {
-                RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, baseType.Code.Clone(), baseType.jsonObject, deserializer, new ());
+                string codePath = baseType.Code.Path;
+                JObject resolvedJson = (JObject)RegistryObjectType.Resolve(baseType.jsonObject, codePath, new OrderedDictionary<string, string>());
+                RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, baseType.Code.Clone(), resolvedJson, deserializer, new OrderedDictionary<string, string>());
                 typesResolved.Add(resolvedType);
             }
             else
             {
-                // Multiple variants
-                int count = 1;
+                // Multiple variants: No DeepClone! Resolve lazily for each
                 foreach (ResolvedVariant variant in variants)
                 {
-                    JObject jobject = count++ == variants.Count ? baseType.jsonObject : baseType.jsonObject.DeepClone() as JObject;
-                    // This DeepClone() is expensive, can we find a better way one day?
-
-                    RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, variant.Code, jobject, deserializer, variant.CodeParts);
-
+                    string codePath = variant.Code.Path;
+                    JObject resolvedJson = (JObject)RegistryObjectType.Resolve(baseType.jsonObject, codePath, variant.CodeParts);
+                    RegistryObjectType resolvedType = baseType.CreateAndPopulate(api, variant.Code, resolvedJson, deserializer, variant.CodeParts);
                     typesResolved.Add(resolvedType);
                 }
             }
@@ -444,7 +501,7 @@ namespace Vintagestory.ServerMods.NoObf
         {
             List<ResolvedVariant> variantsFinal = new List<ResolvedVariant>();
 
-            API.Datastructures.OrderedDictionary<string, VariantEntry[]> variantsMul = new ();
+            API.Datastructures.OrderedDictionary<string, VariantEntry[]> variantsMul = new();
 
 
             // 1. Collect all types
@@ -499,19 +556,20 @@ namespace Vintagestory.ServerMods.NoObf
                 var.ResolveCode(baseCode);
             }
 
-            
+
             if (skipVariants != null)
             {
                 List<ResolvedVariant> filteredVariants = new List<ResolvedVariant>();
 
                 HashSet<AssetLocation> skipVariantsHash = new HashSet<AssetLocation>();
                 List<AssetLocation> skipVariantsWildCards = new List<AssetLocation>();
-                foreach(var val in skipVariants)
+                foreach (var val in skipVariants)
                 {
                     if (val.IsWildCard)
                     {
                         skipVariantsWildCards.Add(val);
-                    } else
+                    }
+                    else
                     {
                         skipVariantsHash.Add(val);
                     }
@@ -557,7 +615,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 variantsFinal = filteredVariants;
             }
-            
+
             return variantsFinal;
         }
 
@@ -607,7 +665,7 @@ namespace Vintagestory.ServerMods.NoObf
                             VariantEntry old = stateList[k];
 
                             if (cvg.Code != old.Code) continue;
-                            
+
                             stateList.RemoveAt(k);
 
                             for (int j = 0; j < cvg.States.Length; j++)
