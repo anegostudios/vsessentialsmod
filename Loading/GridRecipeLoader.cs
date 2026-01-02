@@ -1,5 +1,7 @@
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -12,6 +14,7 @@ public class GridRecipeLoader : ModSystem
 {
     private ICoreServerAPI api;
     private bool classExclusiveRecipes = true;
+    private static readonly Regex PlaceholderRegex = new Regex(@"\{([^\{\}]+)\}", RegexOptions.Compiled);
 
     public override double ExecuteOrder() => 1;
 
@@ -66,11 +69,37 @@ public class GridRecipeLoader : ModSystem
 
         if (nameToCodeMapping.Count <= 0)
         {
+            string[] placeholders = GetPlaceholders(recipe.Output?.Code);
+            if (placeholders.Length > 0)
+            {
+                AddInvalidRecipe(assetLocation, "output contains unresolved placeholders " + string.Join(", ", placeholders));
+                return;
+            }
+
             if (recipe.ResolveIngredients(api.World))
             {
                 api.RegisterCraftingRecipe(recipe);
             }
+            else
+            {
+                AddInvalidRecipe(assetLocation, "failed to resolve output " + recipe.Output?.Code);
+            }
 
+            return;
+        }
+
+        List<string> emptyMappings = new List<string>();
+        foreach ((string key, string[] variants) in nameToCodeMapping)
+        {
+            if (variants == null || variants.Length == 0)
+            {
+                emptyMappings.Add(key);
+            }
+        }
+
+        if (emptyMappings.Count > 0)
+        {
+            AddInvalidRecipe(assetLocation, "wildcard name(s) have no matches: " + string.Join(", ", emptyMappings));
             return;
         }
 
@@ -132,11 +161,56 @@ public class GridRecipeLoader : ModSystem
             first = false;
         }
 
+        if (subRecipes.Count == 0)
+        {
+            AddInvalidRecipe(assetLocation, "wildcards did not match any blocks or items");
+            return;
+        }
+
+        bool outputChecked = false;
         foreach (GridRecipe subRecipe in subRecipes)
         {
-            if (!subRecipe.ResolveIngredients(api.World)) continue;
+            if (!outputChecked)
+            {
+                string[] placeholders = GetPlaceholders(subRecipe.Output?.Code);
+                if (placeholders.Length > 0)
+                {
+                    AddInvalidRecipe(assetLocation, "output contains unresolved placeholders " + string.Join(", ", placeholders));
+                    return;
+                }
+                outputChecked = true;
+            }
+
+            if (!subRecipe.ResolveIngredients(api.World))
+            {
+                AddInvalidRecipe(assetLocation, "failed to resolve output " + subRecipe.Output?.Code);
+                continue;
+            }
             api.RegisterCraftingRecipe(subRecipe);
         }
     }
+
+    private void AddInvalidRecipe(AssetLocation path, string reason)
+    {
+        RecipeValidationErrors.Add(string.Format("grid recipe {0}: {1}", path.ToShortString(), reason));
+    }
+
+    private static string[] GetPlaceholders(AssetLocation code)
+    {
+        if (code?.Path == null) return Array.Empty<string>();
+
+        MatchCollection matches = PlaceholderRegex.Matches(code.Path);
+        if (matches.Count == 0) return Array.Empty<string>();
+
+        string[] placeholders = new string[matches.Count];
+        for (int i = 0; i < matches.Count; i++)
+        {
+            placeholders[i] = matches[i].Value;
+        }
+
+        return placeholders;
+    }
+
+    
 }
 
