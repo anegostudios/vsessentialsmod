@@ -272,124 +272,205 @@ namespace Vintagestory.ServerMods.NoObf
 
         }
 
-        internal virtual RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
+            internal virtual RegistryObjectType CreateAndPopulate(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant)
+    {
+        return this;
+    }
+
+
+    /// <summary>
+    /// Create and populate the resolved type
+    /// </summary>
+    protected T CreateResolvedType<T>(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, OrderedDictionary<string, string> variant) where T : RegistryObjectType, new()
+    {
+        T resolvedType = new T()
         {
-            return this;
+            Code = Code,
+            VariantGroups = VariantGroups,
+            Enabled = Enabled,
+            jsonObject = jobject, // This is now already resolved JSON
+            Variant = variant
+        };
+
+        // solvedbytype is no longer needed since we already resolved the JSON earlier
+
+        try
+        {
+            JsonUtil.PopulateObject(resolvedType, jobject, deserializer);
+        }
+        catch (Exception e)
+        {
+            api.Server.Logger.Error("Exception thrown while trying to parse json data of the type with code {0}, variant {1}. Will ignore most of the attributes. Exception:", this.Code, fullcode);
+            api.Server.Logger.Error(e);
         }
 
-        protected T CreateResolvedType<T>(ICoreServerAPI api, AssetLocation fullcode, JObject jobject, JsonSerializer deserializer, API.Datastructures.OrderedDictionary<string, string> variant) where T : RegistryObjectType, new()
+        resolvedType.Code = fullcode;
+        resolvedType.jsonObject = null;
+        return resolvedType;
+    }
+
+    /// <summary>
+    /// Checks if the token needs resolution (contains "byType" or placeholders "{...}").
+    /// This is a static check, independent of codePath and variant.
+    /// </summary>
+    private static bool NeedsResolve(JToken token)
+    {
+        if (token == null) return false;
+
+        // Check if the object has properties ending with "byType"
+        if (token is JObject obj)
         {
-            T resolvedType = new T()
+            foreach (var prop in obj.Properties())
             {
-                Code = Code,
-                VariantGroups = VariantGroups,
-                Enabled = Enabled,
-                jsonObject = jobject,
-                Variant = variant
-            };
-
-            try
-            {
-                solveByType(jobject, fullcode.Path, variant);
+                if (prop.Name.EndsWith("byType", StringComparison.OrdinalIgnoreCase)) return true;
+                if (NeedsResolve(prop.Value)) return true;
             }
-            catch (Exception e)
+            return false;
+        }
+        else if (token is JArray arr) // Check array elements
+        {
+            // If at least one element needs resolution, return true
+            foreach (var item in arr)
             {
-                api.Server.Logger.Error("Exception thrown while trying to resolve *byType properties of type {0}, variant {1}. Will ignore most of the attributes. Exception thrown:", this.Code, fullcode);
-                api.Server.Logger.Error(e);
+                if (NeedsResolve(item)) return true;
             }
-
-            try
-            {
-                JsonUtil.PopulateObject(resolvedType, jobject, deserializer);
-            }
-            catch (Exception e)
-            {
-                api.Server.Logger.Error("Exception thrown while trying to parse json data of the type with code {0}, variant {1}. Will ignore most of the attributes. Exception:", this.Code, fullcode);
-                api.Server.Logger.Error(e);
-            }
-
-            resolvedType.Code = fullcode;
-            resolvedType.jsonObject = null;
-            return resolvedType;
+            return false;
+        }
+        else if (token is JValue val && val.Type == JTokenType.String) // Check string values for placeholders
+        {
+            string str = (string)val.Value;
+            return str != null && str.Contains("{");
         }
 
-        protected static void solveByType(JToken json, string codePath, API.Datastructures.OrderedDictionary<string, string> searchReplace)
+        return false;
+    }
+
+    /// <summary>
+    /// Lazily resolves the JSON token for the given codePath and variant
+    /// Creates new containers (JObject/JArray) only for parts requiring changes
+    /// Unchanged subtrees are shared 
+    /// </summary>
+    public static JToken Resolve(JToken token, string codePath, OrderedDictionary<string, string> searchReplace)
+    {
+        if (token == null)
+            return null;
+
+        // Check if the token needs resolution
+        if (token is JObject obj)
         {
-            if (json is JObject jsonObj)
+            // Check if this object needs resolution at all
+            bool hasByType = false;
+            bool needsChildResolve = false;
+            foreach (var prop in obj.Properties())
             {
-                List<string> propertiesToRemove = null;
-                Dictionary<string, JToken> propertiesToAdd = null;
-
-                foreach (var entry in jsonObj)
+                if (prop.Name.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (entry.Key.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string trueKey = entry.Key.Substring(0, entry.Key.Length - "byType".Length);
-                        var jobj = entry.Value as JObject;
-                        if (jobj == null)
-                        {
-                            throw new FormatException("Invalid value at key: " + entry.Key);
-                        }
-                        foreach (var byTypeProperty in jobj)
-                        {
-                            if (WildcardUtil.Match(byTypeProperty.Key, codePath))
-                            {
-                                JToken typedToken = byTypeProperty.Value;    // Unnecessary to solveByType specifically on this new token's contents as we will be doing a solveByType on all the tokens in the jsonObj anyhow, after adding the propertiesToAdd
-                                if (propertiesToAdd == null) propertiesToAdd = new Dictionary<string, JToken>();
-                                propertiesToAdd.Add(trueKey, typedToken);
-                                break;   // Replaces for first matched key only
-                            }
-                        }
-                        if (propertiesToRemove == null) propertiesToRemove = new List<string>();
-                        propertiesToRemove.Add(entry.Key);
-                    }
+                    hasByType = true;
                 }
-
-
-                if (propertiesToRemove != null)
+                if (NeedsResolve(prop.Value))
                 {
-                    foreach (var property in propertiesToRemove)
-                    {
-                        jsonObj.Remove(property);
-                    }
-
-                    if (propertiesToAdd != null)
-                    {
-                        foreach (var property in propertiesToAdd)
-                        {
-                            if (jsonObj[property.Key] is JObject jobject)
-                            {
-                                jobject.Merge(property.Value);
-                            }
-                            else
-                            {
-                                jsonObj[property.Key] = property.Value;
-                            }
-                        }
-                    }
-                }
-
-                foreach (var entry in jsonObj)
-                {
-                    solveByType(entry.Value, codePath, searchReplace);
+                    needsChildResolve = true;
                 }
             }
-            else if (json.Type == JTokenType.String)
+
+            if (!hasByType && !needsChildResolve)
             {
-                string value = (string)(json as JValue).Value;
-                if (value.Contains("{"))
+                return token; // Share the original object since nothing changes
+            }
+
+            // Create a new JObject only if needed
+            var newObj = new JObject();
+            Dictionary<string, JToken> propertiesToAdd = null;
+
+            foreach (var prop in obj.Properties())
+            {
+                var key = prop.Name;
+                if (key.EndsWith("byType", StringComparison.OrdinalIgnoreCase))
                 {
-                    (json as JValue).Value = RegistryObject.FillPlaceHolder(value, searchReplace);
+                    string trueKey = key.Substring(0, key.Length - "byType".Length);
+                    var byTypeObj = prop.Value as JObject;
+                    if (byTypeObj == null) continue;
+
+                    JToken selected = null;
+                    foreach (var byTypeProp in byTypeObj.Properties())
+                    {
+                        if (WildcardUtil.Match(byTypeProp.Name, codePath))
+                        {
+                            selected = byTypeProp.Value;
+                            break; // First matched
+                        }
+                    }
+
+                    if (selected != null)
+                    {
+                        if (propertiesToAdd == null) propertiesToAdd = new Dictionary<string, JToken>();
+                        propertiesToAdd[trueKey] = selected; // Store JToken directly
+                    }
+                }
+                else
+                {
+                    newObj[key] = Resolve(prop.Value, codePath, searchReplace);
                 }
             }
-            else if (json is JArray jarray)
+
+            // Add the resolved "byType" properties
+            if (propertiesToAdd != null)
             {
-                foreach (var child in jarray)
+                foreach (var add in propertiesToAdd)
                 {
-                    solveByType(child, codePath, searchReplace);
+                    string trueKey = add.Key;
+                    JToken selected = add.Value;
+                    JToken resolvedSelected = Resolve(selected, codePath, searchReplace);
+
+                    if (newObj[trueKey] is JObject existing)
+                    {
+                        existing.Merge(resolvedSelected);  // No mergeSettings, to match original (default Concat for arrays)
+                    }
+                    else
+                    {
+                        newObj[trueKey] = resolvedSelected;
+                    }
                 }
             }
+
+            return newObj;
         }
+        else if (token is JArray arr)
+        {
+            // Check if the array needs resolution
+            bool needs = false;
+            foreach (var item in arr)
+            {
+                if (NeedsResolve(item))
+                {
+                    needs = true;
+                    break;
+                }
+            }
+
+            if (!needs) return token; // Share original
+
+            var newArr = new JArray();
+            foreach (var item in arr)
+            {
+                newArr.Add(Resolve(item, codePath, searchReplace));
+            }
+            return newArr;
+        }
+        else if (token is JValue val && val.Type == JTokenType.String) // String value
+        {
+            string str = (string)val.Value;
+            if (str != null && str.Contains("{"))
+            {
+                return new JValue(RegistryObject.FillPlaceHolderOptimized(str, searchReplace)); // Using optimized version of placeholder replacement method
+            }
+            return token; // Share original
+        }
+        else
+        {
+            return token; // Primitives shared
+        }
+    }
         #endregion
 
     }
