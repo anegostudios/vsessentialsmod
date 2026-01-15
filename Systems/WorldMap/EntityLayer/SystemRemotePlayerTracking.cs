@@ -26,8 +26,6 @@ public class PacketPlayerPosition
     [ProtoMember(5)]
     public bool Despawn;
 
-    public IClientPlayer? Player;
-
     public void SetFrom(PacketPlayerPosition packet)
     {
         PosX = packet.PosX;
@@ -41,32 +39,19 @@ public class SystemRemotePlayerTracking : ModSystem
     private INetworkChannel channel = null!;
     private readonly Queue<IServerPlayer> playerQueue = [];
     private readonly Dictionary<string, PacketPlayerPosition> trackedPlayerPackets = new();
-    private ICoreAPI api = null!;
 
     /// <summary>
     /// Gets or creates a tracked player position for a uid on the client.
     /// </summary>
-    public PacketPlayerPosition GetPlayerPositionInformation(string uid)
+    public PacketPlayerPosition? GetPlayerPositionInformation(string uid)
     {
-        if (!trackedPlayerPackets.TryGetValue(uid, out PacketPlayerPosition? position))
-        {
-            position = new PacketPlayerPosition
-            {
-                PlayerUid = uid,
-                Player = api.World.PlayerByUid(uid) as IClientPlayer
-            };
-
-            trackedPlayerPackets[uid] = position;
-        }
-
-        return position;
+        return trackedPlayerPackets.TryGetValue(uid, out PacketPlayerPosition? position) ? position : null;
     }
 
     public override void StartPre(ICoreAPI api)
     {
         channel = api.Network.RegisterChannel("rpt");
         channel.RegisterMessageType<PacketPlayerPosition>();
-        this.api = api;
 
         if (api is ICoreServerAPI sapi && !api.World.Config.GetBool("mapHideOtherPlayers", false))
         {
@@ -88,8 +73,7 @@ public class SystemRemotePlayerTracking : ModSystem
                 }
                 else
                 {
-                    PacketPlayerPosition position = GetPlayerPositionInformation(p.PlayerUid);
-                    position.SetFrom(p);
+                    trackedPlayerPackets[p.PlayerUid] = p;
                 }
             });
         }

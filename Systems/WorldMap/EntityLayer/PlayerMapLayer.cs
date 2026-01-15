@@ -1,8 +1,9 @@
 using Cairo;
-using System.Collections.Generic;
+using System;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 
 #nullable enable
 
@@ -10,12 +11,11 @@ namespace Vintagestory.GameContent;
 
 public class PlayerMapLayer : MarkerMapLayer
 {
-    // Both PlayerMapComponents and PlayerPositionMapComponents will be used.
-    private readonly Dictionary<string, MapComponent> mapComps = new();
     private readonly ICoreClientAPI? capi;
 
-    private LoadedTexture? ownTexture;
-    private LoadedTexture? otherTexture;
+    private LoadedTexture? ownPlayerTexture;
+    private LoadedTexture? otherPlayerTexture;
+    private MeshRef? quadModel;
 
     public override string Title => "Players";
     public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
@@ -29,151 +29,146 @@ public class PlayerMapLayer : MarkerMapLayer
         playerTracking = api.ModLoader.GetModSystem<SystemRemotePlayerTracking>();
     }
 
-    // These two should now only be called when the player entity comes into/out of range.
-    private void Event_PlayerDespawn(IClientPlayer byPlayer)
-    {
-        if (mapComps.TryGetValue(byPlayer.PlayerUID, out MapComponent? mp))
-        {
-            mp.Dispose();
-            mapComps.Remove(byPlayer.PlayerUID);
-        }
-    }
-
-    private void Event_PlayerSpawn(IClientPlayer byPlayer)
-    {
-        if (capi == null || otherTexture == null) return;
-
-        if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && byPlayer.PlayerUID != capi.World.Player.PlayerUID)
-        {
-            return;
-        }
-
-        if (mapComps.TryGetValue(byPlayer.PlayerUID, out MapComponent? comp))
-        {
-            comp.Dispose();
-            mapComps.Remove(byPlayer.PlayerUID);
-        }
-
-        if (mapSink.IsOpened)
-        {
-            EntityMapComponent cmp = new(capi, otherTexture, byPlayer.Entity);
-            mapComps[byPlayer.PlayerUID] = cmp;
-        }
-    }
-
-    public override void OnLoaded()
-    {
-        if (capi != null)
-        {
-            // Only client side.
-
-            // When an entity is spawned/despawned on the client and is an EntityPlayer this event is triggered.
-            // Spawn is actually called TWICE, in ServerMain::DisconnectPlayer. A player packet is sent.
-            // This packet should not be called.
-            capi.Event.PlayerEntitySpawn += Event_PlayerSpawn;
-            capi.Event.PlayerEntityDespawn += Event_PlayerDespawn;
-        }
-    }
-
     public override void OnMapOpenedClient()
     {
         if (capi == null) return;
 
         int size = (int)GuiElement.scaled(32);
 
-        if (ownTexture == null)
+        if (ownPlayerTexture == null)
         {
             ImageSurface surface = new(Format.Argb32, size, size);
             Context ctx = new(surface);
             ctx.SetSourceRGBA(0, 0, 0, 0);
             ctx.Paint();
             capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, size, size, new double[] { 0, 0, 0, 1 }, new double[] { 1, 1, 1, 1 });
-
-            ownTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size / 2, size / 2);
+            ownPlayerTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size / 2, size / 2);
             ctx.Dispose();
             surface.Dispose();
         }
 
-        if (otherTexture == null)
+        if (otherPlayerTexture == null)
         {
             ImageSurface surface = new(Format.Argb32, size, size);
             Context ctx = new(surface);
             ctx.SetSourceRGBA(0, 0, 0, 0);
             ctx.Paint();
             capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, size, size, new double[] { 0.3, 0.3, 0.3, 1 }, new double[] { 0.7, 0.7, 0.7, 1 });
-            otherTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size / 2, size / 2);
+            otherPlayerTexture = new LoadedTexture(capi, capi.Gui.LoadCairoTexture(surface, false), size / 2, size / 2);
             ctx.Dispose();
             surface.Dispose();
         }
 
+        quadModel ??= capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
+    }
+
+    public override void Render(GuiElementMap map, float dt)
+    {
+        if (!Active || capi == null || ownPlayerTexture == null || otherPlayerTexture == null) return;
+
+        bool hideOtherPlayers = capi.World.Config.GetBool("mapHideOtherPlayers", false);
+        Vec2f viewPos = new();
+        Vec3d worldPos = new();
+        Matrixf mvMat = new();
+        float yaw;
+
+        IShaderProgram prog = capi.Render.GetEngineShader(EnumShaderProgram.Gui);
+        prog.UniformMatrix("projectionMatrix", capi.Render.CurrentProjectionMatrix);
+        prog.Uniform("applyColor", 0);
+        prog.Uniform("extraGlow", 0);
+        prog.Uniform("noTexture", 0f);
+
+        // Color, always white for players.
+        prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
+        capi.Render.GlToggleBlend(true);
+
         foreach (IPlayer player in capi.World.AllOnlinePlayers)
         {
-            // Dispose all previous map components.
-            if (mapComps.TryGetValue(player.PlayerUID, out MapComponent? cmp))
-            {
-                cmp?.Dispose();
-                mapComps.Remove(player.PlayerUID);
-            }
-
-            if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && player.PlayerUID != capi.World.Player.PlayerUID) continue;
+            if (hideOtherPlayers && player.PlayerUID != capi.World.Player.PlayerUID) continue;
 
             // This entity isn't being tracked, get it from the tracking system.
             if (player.Entity == null)
             {
-                PacketPlayerPosition ppos = playerTracking.GetPlayerPositionInformation(player.PlayerUID);
-                cmp = new PlayerPositionMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, ppos);
-                //capi.World.Logger.Warning("Can't add player {0} to world map, missing entity :<", player.PlayerUID);
+                PacketPlayerPosition? pos = playerTracking.GetPlayerPositionInformation(player.PlayerUID);
+                if (pos == null) continue;
+
+                worldPos.Set(pos.PosX, 0, pos.PosZ);
+                yaw = (float)pos.Yaw;
             }
             else
             {
-                cmp = new PlayerMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, (IClientPlayer)player);
+                worldPos.Set(player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z);
+                yaw = player.Entity.Pos.Yaw;
             }
 
-            mapComps[player.PlayerUID] = cmp;
-        }
-    }
+            map.TranslateWorldPosToViewPos(worldPos, ref viewPos);
 
-    public override void Render(GuiElementMap mapElem, float dt)
-    {
-        if (!Active) return;
+            float x = (float)(map.Bounds.renderX + viewPos.X);
+            float y = (float)(map.Bounds.renderY + viewPos.Y);
 
-        foreach (MapComponent mapComp in mapComps.Values)
-        {
-            mapComp.Render(mapElem, dt);
+            LoadedTexture tex = player == capi.World.Player ? ownPlayerTexture : otherPlayerTexture;
+
+            prog.BindTexture2D("tex2d", tex.TextureId, 0);
+
+            mvMat
+            .Set(capi.Render.CurrentModelviewMatrix)
+            .Translate(x, y, 60f)
+            .Scale(tex.Width, tex.Height, 0f)
+            .Scale(0.5f, 0.5f, 0f)
+            .RotateZ(-yaw + (180f * GameMath.DEG2RAD))
+                ;
+
+            prog.UniformMatrix("modelViewMatrix", mvMat.Values);
+
+            capi.Render.RenderMesh(quadModel);
         }
     }
 
     public override void OnMouseMoveClient(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
     {
-        if (!Active) return;
+        if (!Active || capi == null) return;
 
-        foreach (MapComponent mapComp in mapComps.Values)
+        Vec2f viewPos = new();
+        Vec3d worldPos = new();
+
+        foreach (IPlayer player in capi.World.AllOnlinePlayers)
         {
-            mapComp.OnMouseMove(args, mapElem, hoverText);
-        }
-    }
+            // This entity isn't being tracked, get it from the tracking system.
+            if (player.Entity == null)
+            {
+                PacketPlayerPosition? pos = playerTracking.GetPlayerPositionInformation(player.PlayerUID);
+                if (pos == null) continue;
 
-    public override void OnMouseUpClient(MouseEvent args, GuiElementMap mapElem)
-    {
-        if (!Active) return;
+                worldPos.Set(pos.PosX, 0, pos.PosZ);
+            }
+            else
+            {
+                worldPos.Set(player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z);
+            }
 
-        foreach (MapComponent mapComp in mapComps.Values)
-        {
-            mapComp.OnMouseUpOnElement(args, mapElem);
+            mapElem.TranslateWorldPosToViewPos(worldPos, ref viewPos);
+
+            double mouseX = args.X - mapElem.Bounds.renderX;
+            double mouseY = args.Y - mapElem.Bounds.renderY;
+            double sc = GuiElement.scaled(5);
+
+            if (Math.Abs(viewPos.X - mouseX) < sc && Math.Abs(viewPos.Y - mouseY) < sc)
+            {
+                hoverText.Append("Player ");
+                hoverText.AppendLine(player.PlayerName);
+            }
         }
     }
 
     public override void Dispose()
     {
-        foreach (MapComponent mapComp in mapComps.Values)
-        {
-            mapComp.Dispose();
-        }
+        ownPlayerTexture?.Dispose();
+        ownPlayerTexture = null;
 
-        ownTexture?.Dispose();
-        ownTexture = null;
+        otherPlayerTexture?.Dispose();
+        otherPlayerTexture = null;
 
-        otherTexture?.Dispose();
-        otherTexture = null;
+        quadModel?.Dispose();
+        quadModel = null;
     }
 }

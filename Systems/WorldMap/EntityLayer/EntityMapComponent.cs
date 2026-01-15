@@ -1,4 +1,3 @@
-using OpenTK.Mathematics;
 using System;
 using System.Text;
 using Vintagestory.API.Client;
@@ -10,53 +9,30 @@ namespace Vintagestory.GameContent;
 
 #nullable enable
 
-public abstract class TrackableMapComponent : MapComponent
+// Only used for entity rendering now.
+public class EntityMapComponent : MapComponent
 {
+    private readonly Entity entity;
     private readonly MeshRef quadModel;
     private readonly LoadedTexture texture;
     private Vec2f viewPos = new();
-    private readonly Vec3d worldPos = new();
     private readonly Matrixf mvMat = new();
+
     private readonly int color;
 
-    protected TrackableMapComponent(ICoreClientAPI capi, LoadedTexture texture, string? color = null) : base(capi)
+    public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity, string? color = null) : base(capi)
     {
         quadModel = capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
         this.texture = texture;
+        this.entity = entity;
         this.color = color == null ? 0 : (ColorUtil.Hex2Int(color) | (255 << 24));
-    }
-
-    public abstract Vector4d GetTrackablePositionAndYaw();
-    public abstract void AppendHoverInfo(StringBuilder hoverText);
-    public abstract bool ShouldRender();
-
-    public override void OnMouseMove(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
-    {
-        Vec2f viewPos = new();
-
-        Vector4d pos = GetTrackablePositionAndYaw();
-        worldPos.Set(pos.X, pos.Y, pos.Z);
-
-        mapElem.TranslateWorldPosToViewPos(worldPos, ref viewPos);
-
-        double mouseX = args.X - mapElem.Bounds.renderX;
-        double mouseY = args.Y - mapElem.Bounds.renderY;
-        double sc = GuiElement.scaled(5);
-
-        if (Math.Abs(viewPos.X - mouseX) < sc && Math.Abs(viewPos.Y - mouseY) < sc)
-        {
-            AppendHoverInfo(hoverText);
-        }
     }
 
     public override void Render(GuiElementMap map, float dt)
     {
-        if (!ShouldRender() || texture.Disposed || quadModel.Disposed) return;
+        if (texture.Disposed || quadModel.Disposed) return;
 
-        Vector4d pos = GetTrackablePositionAndYaw();
-        worldPos.Set(pos.X, pos.Y, pos.Z);
-
-        map.TranslateWorldPosToViewPos(worldPos, ref viewPos);
+        map.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
         float x = (float)(map.Bounds.renderX + viewPos.X);
         float y = (float)(map.Bounds.renderY + viewPos.Y);
@@ -87,7 +63,7 @@ public abstract class TrackableMapComponent : MapComponent
             .Translate(x, y, 60f)
             .Scale(texture.Width, texture.Height, 0f)
             .Scale(0.5f, 0.5f, 0f)
-            .RotateZ((float)-pos.W + (180f * GameMath.DEG2RAD))
+            .RotateZ(-entity.Pos.Yaw + (180f * GameMath.DEG2RAD))
         ;
 
         prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
@@ -102,82 +78,26 @@ public abstract class TrackableMapComponent : MapComponent
         quadModel.Dispose();
         GC.SuppressFinalize(this);
     }
-}
 
-public class PlayerMapComponent : TrackableMapComponent
-{
-    private readonly IClientPlayer player;
-
-    public PlayerMapComponent(ICoreClientAPI capi, LoadedTexture texture, IClientPlayer player, string? color = null) : base(capi, texture, color)
+    public override void OnMouseMove(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
     {
-        this.player = player;
-    }
+        Vec2f viewPos = new();
+        mapElem.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
-    public override void AppendHoverInfo(StringBuilder hoverText)
-    {
-        hoverText.AppendLine("Player " + player.PlayerName);
-    }
+        double mouseX = args.X - mapElem.Bounds.renderX;
+        double mouseY = args.Y - mapElem.Bounds.renderY;
+        double sc = GuiElement.scaled(5);
 
-    public override Vector4d GetTrackablePositionAndYaw()
-    {
-        return player.Entity == null
-            ? Vector4d.Zero
-            : new Vector4d(player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z, player.Entity.Pos.Yaw);
-    }
-
-    public override bool ShouldRender()
-    {
-        return (player.WorldData?.CurrentGameMode == EnumGameMode.Spectator != true || capi.World.Player == player) && (player.Entity.Controls.Sneak != true || player == capi.World.Player);
-    }
-}
-
-public class PlayerPositionMapComponent : TrackableMapComponent
-{
-    private readonly PacketPlayerPosition position;
-
-    public PlayerPositionMapComponent(ICoreClientAPI capi, LoadedTexture texture, PacketPlayerPosition position, string? color = null) : base(capi, texture, color)
-    {
-        this.position = position;
-    }
-
-    public override void AppendHoverInfo(StringBuilder hoverText)
-    {
-        hoverText.AppendLine("Player " + (position.Player?.PlayerName ?? "Unknown"));
-    }
-
-    public override Vector4d GetTrackablePositionAndYaw()
-    {
-        return new Vector4d(position.PosX, 0, position.PosZ, position.Yaw);
-    }
-
-    public override bool ShouldRender()
-    {
-        if (position.Player == null) return true;
-        return position.Player.WorldData?.CurrentGameMode == EnumGameMode.Spectator != true || capi.World.Player == position.Player;
-    }
-}
-
-public class EntityMapComponent : TrackableMapComponent
-{
-    private readonly Entity entity;
-
-    public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity, string? color = null) : base(capi, texture, color)
-    {
-        this.entity = entity;
-    }
-
-    public override void AppendHoverInfo(StringBuilder hoverText)
-    {
-        hoverText.AppendLine(entity.GetName());
-    }
-
-    public override Vector4d GetTrackablePositionAndYaw()
-    {
-        return new Vector4d(entity.Pos.X, entity.Pos.Y, entity.Pos.Z, entity.Pos.Yaw);
-    }
-
-    public override bool ShouldRender()
-    {
-        return true;
+        if (Math.Abs(viewPos.X - mouseX) < sc && Math.Abs(viewPos.Y - mouseY) < sc)
+        {
+            if (entity is EntityPlayer eplr)
+            {
+                hoverText.AppendLine("Player " + capi.World.PlayerByUid(eplr.PlayerUID)?.PlayerName);
+            }
+            else
+            {
+                hoverText.AppendLine(entity.GetName());
+            }
+        }
     }
 }
