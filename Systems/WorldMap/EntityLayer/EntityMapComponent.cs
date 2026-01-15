@@ -147,7 +147,7 @@ public class PlayerPositionMapComponent : TrackableMapComponent
 
     public override Vector4d GetTrackablePositionAndYaw()
     {
-        return new Vector4d(position.PosX + 30, 0, position.PosZ, position.Yaw);
+        return new Vector4d(position.PosX, 0, position.PosZ, position.Yaw);
     }
 
     public override bool ShouldRender()
