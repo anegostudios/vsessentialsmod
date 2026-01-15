@@ -9,6 +9,9 @@ namespace Vintagestory.GameContent;
 
 #nullable enable
 
+/// <summary>
+/// This map layer is only added to the WorldMapManager if the server config value for it is enabled.
+/// </summary>
 public class EntityMapLayer : MarkerMapLayer
 {
     private readonly Dictionary<long, EntityMapComponent> mapComps = new();
@@ -47,6 +50,7 @@ public class EntityMapLayer : MarkerMapLayer
 
     private void Event_OnEntitySpawn(Entity entity)
     {
+        if (capi == null || otherTexture == null) return;
         if (entity is EntityPlayer) return;
         if (entity.Code.Path.Contains("drifter")) return;
 
@@ -59,6 +63,8 @@ public class EntityMapLayer : MarkerMapLayer
 
     public override void OnMapOpenedClient()
     {
+        if (capi == null) return;
+
         int size = (int)GuiElement.scaled(32);
 
         if (otherTexture == null)

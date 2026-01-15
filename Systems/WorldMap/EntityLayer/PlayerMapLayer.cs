@@ -36,6 +36,8 @@ public class PlayerMapLayer : MarkerMapLayer
 
     private void Event_PlayerSpawn(IClientPlayer byPlayer)
     {
+        if (capi == null || otherTexture == null) return;
+
         if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && byPlayer.PlayerUID != capi.World.Player.PlayerUID)
         {
             return;
@@ -53,6 +55,10 @@ public class PlayerMapLayer : MarkerMapLayer
         if (capi != null)
         {
             // Only client side.
+
+            // When an entity is spawned/despawned on the client and is an EntityPlayer this event is triggered.
+            // Spawn is actually called TWICE, in ServerMain::DisconnectPlayer. A player packet is sent.
+            // This packet should not be called.
             capi.Event.PlayerEntitySpawn += Event_PlayerSpawn;
             capi.Event.PlayerEntityDespawn += Event_PlayerDespawn;
         }
@@ -60,6 +66,8 @@ public class PlayerMapLayer : MarkerMapLayer
 
     public override void OnMapOpenedClient()
     {
+        if (capi == null) return;
+
         int size = (int)GuiElement.scaled(32);
 
         if (ownTexture == null)
@@ -113,9 +121,9 @@ public class PlayerMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
         {
-            val.Value.Render(mapElem, dt);
+            mapComp.Value.Render(mapElem, dt);
         }
     }
 
@@ -133,17 +141,17 @@ public class PlayerMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
         {
-            val.Value.OnMouseUpOnElement(args, mapElem);
+            mapComp.Value.OnMouseUpOnElement(args, mapElem);
         }
     }
 
     public override void Dispose()
     {
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
         {
-            val.Value?.Dispose();
+            mapComp.Value?.Dispose();
         }
 
         ownTexture?.Dispose();
