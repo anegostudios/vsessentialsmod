@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent;
 /// </summary>
 public class EntityMapLayer : MarkerMapLayer
 {
-    private readonly Dictionary<long, EntityMapComponent> mapComps = new();
+    private readonly Dictionary<long, MapComponent> mapComps = new();
     private readonly ICoreClientAPI? capi;
 
     private LoadedTexture? otherTexture;
@@ -41,7 +41,7 @@ public class EntityMapLayer : MarkerMapLayer
 
     private void Event_OnEntityDespawn(Entity entity, EntityDespawnData reasonData)
     {
-        if (mapComps.TryGetValue(entity.EntityId, out EntityMapComponent? mp))
+        if (mapComps.TryGetValue(entity.EntityId, out MapComponent? mp))
         {
             mp.Dispose();
             mapComps.Remove(entity.EntityId);
@@ -84,7 +84,7 @@ public class EntityMapLayer : MarkerMapLayer
             // Players are rendered in PlayerMapLayer
             if (val.Value is EntityPlayer) continue;
 
-            if (mapComps.TryGetValue(val.Value.EntityId, out EntityMapComponent? cmp))
+            if (mapComps.TryGetValue(val.Value.EntityId, out MapComponent? cmp))
             {
                 cmp?.Dispose();
                 mapComps.Remove(val.Value.EntityId);
@@ -99,7 +99,7 @@ public class EntityMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<long, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<long, MapComponent> val in mapComps)
         {
             val.Value.Render(mapElem, dt);
         }
@@ -109,7 +109,7 @@ public class EntityMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<long, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<long, MapComponent> val in mapComps)
         {
             val.Value.OnMouseMove(args, mapElem, hoverText);
         }
@@ -119,7 +119,7 @@ public class EntityMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<long, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<long, MapComponent> val in mapComps)
         {
             val.Value.OnMouseUpOnElement(args, mapElem);
         }
@@ -127,7 +127,7 @@ public class EntityMapLayer : MarkerMapLayer
 
     public override void Dispose()
     {
-        foreach (KeyValuePair<long, EntityMapComponent> val in mapComps)
+        foreach (KeyValuePair<long, MapComponent> val in mapComps)
         {
             val.Value?.Dispose();
         }

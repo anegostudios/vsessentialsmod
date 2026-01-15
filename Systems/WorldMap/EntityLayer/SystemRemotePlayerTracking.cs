@@ -26,6 +26,8 @@ public class PacketPlayerPosition
     [ProtoMember(5)]
     public bool Despawn;
 
+    public IClientPlayer? Player;
+
     public void SetFrom(PacketPlayerPosition packet)
     {
         PosX = packet.PosX;
@@ -39,18 +41,21 @@ public class SystemRemotePlayerTracking : ModSystem
     private INetworkChannel channel = null!;
     private readonly Queue<IServerPlayer> playerQueue = [];
     private readonly Dictionary<string, PacketPlayerPosition> trackedPlayerPackets = new();
+    private ICoreAPI api = null!;
 
     /// <summary>
-    /// Gets or creates a tracked player position for a uid.
+    /// Gets or creates a tracked player position for a uid on the client.
     /// </summary>
     public PacketPlayerPosition GetPlayerPositionInformation(string uid)
     {
         if (!trackedPlayerPackets.TryGetValue(uid, out PacketPlayerPosition? position))
         {
-            position = new PacketPlayerPosition()
+            position = new PacketPlayerPosition
             {
-                PlayerUid = uid
+                PlayerUid = uid,
+                Player = api.World.PlayerByUid(uid) as IClientPlayer
             };
+
             trackedPlayerPackets[uid] = position;
         }
 
@@ -61,8 +66,9 @@ public class SystemRemotePlayerTracking : ModSystem
     {
         channel = api.Network.RegisterChannel("rpt");
         channel.RegisterMessageType<PacketPlayerPosition>();
+        this.api = api;
 
-        if (api is ICoreServerAPI sapi)
+        if (api is ICoreServerAPI sapi && !api.World.Config.GetBool("mapHideOtherPlayers", false))
         {
             sapi.Event.PlayerJoin += ServerEvent_PlayerJoin;
             sapi.Event.PlayerLeave += ServerEvent_PlayerLeave;
@@ -76,13 +82,14 @@ public class SystemRemotePlayerTracking : ModSystem
             {
                 if (p.PlayerUid == "") return;
 
-                if (p.Despawn)
+                if (p.Despawn) // Player has left!
                 {
                     trackedPlayerPackets.Remove(p.PlayerUid);
                 }
                 else
                 {
-                    trackedPlayerPackets[p.PlayerUid] = p;
+                    PacketPlayerPosition position = GetPlayerPositionInformation(p.PlayerUid);
+                    position.SetFrom(p);
                 }
             });
         }
@@ -103,6 +110,14 @@ public class SystemRemotePlayerTracking : ModSystem
                 PosZ = player.Entity.Pos.Z,
                 Yaw = player.Entity.ServerPos.Yaw
             };
+
+            // Hide spectators.
+            if (player.WorldData.CurrentGameMode == EnumGameMode.Spectator)
+            {
+                packet.PosX = 0;
+                packet.PosZ = 0;
+            }
+
             ((IServerNetworkChannel)channel).BroadcastPacket(packet);
         }
 

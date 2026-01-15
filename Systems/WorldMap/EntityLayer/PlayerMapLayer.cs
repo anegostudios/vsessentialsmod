@@ -10,7 +10,8 @@ namespace Vintagestory.GameContent;
 
 public class PlayerMapLayer : MarkerMapLayer
 {
-    private readonly Dictionary<IPlayer, EntityMapComponent> mapComps = new();
+    // Both PlayerMapComponents and PlayerPositionMapComponents will be used.
+    private readonly Dictionary<string, MapComponent> mapComps = new();
     private readonly ICoreClientAPI? capi;
 
     private LoadedTexture? ownTexture;
@@ -20,17 +21,21 @@ public class PlayerMapLayer : MarkerMapLayer
     public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
     public override string LayerGroupCode => "terrain";
 
+    private readonly SystemRemotePlayerTracking playerTracking;
+
     public PlayerMapLayer(ICoreAPI api, IWorldMapManager mapsink) : base(api, mapsink)
     {
         capi = api as ICoreClientAPI;
+        playerTracking = api.ModLoader.GetModSystem<SystemRemotePlayerTracking>();
     }
 
+    // These two should now only be called when the player entity comes into/out of range.
     private void Event_PlayerDespawn(IClientPlayer byPlayer)
     {
-        if (mapComps.TryGetValue(byPlayer, out EntityMapComponent? mp))
+        if (mapComps.TryGetValue(byPlayer.PlayerUID, out MapComponent? mp))
         {
             mp.Dispose();
-            mapComps.Remove(byPlayer);
+            mapComps.Remove(byPlayer.PlayerUID);
         }
     }
 
@@ -43,10 +48,16 @@ public class PlayerMapLayer : MarkerMapLayer
             return;
         }
 
-        if (mapSink.IsOpened && !mapComps.ContainsKey(byPlayer))
+        if (mapComps.TryGetValue(byPlayer.PlayerUID, out MapComponent? comp))
+        {
+            comp.Dispose();
+            mapComps.Remove(byPlayer.PlayerUID);
+        }
+
+        if (mapSink.IsOpened)
         {
             EntityMapComponent cmp = new(capi, otherTexture, byPlayer.Entity);
-            mapComps[byPlayer] = cmp;
+            mapComps[byPlayer.PlayerUID] = cmp;
         }
     }
 
@@ -97,23 +108,28 @@ public class PlayerMapLayer : MarkerMapLayer
 
         foreach (IPlayer player in capi.World.AllOnlinePlayers)
         {
-            if (mapComps.TryGetValue(player, out EntityMapComponent? cmp))
+            // Dispose all previous map components.
+            if (mapComps.TryGetValue(player.PlayerUID, out MapComponent? cmp))
             {
                 cmp?.Dispose();
-                mapComps.Remove(player);
-            }
-
-            if (player.Entity == null)
-            {
-                capi.World.Logger.Warning("Can't add player {0} to world map, missing entity :<", player.PlayerUID);
-                continue;
+                mapComps.Remove(player.PlayerUID);
             }
 
             if (capi.World.Config.GetBool("mapHideOtherPlayers", false) && player.PlayerUID != capi.World.Player.PlayerUID) continue;
 
-            cmp = new EntityMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, player.Entity);
+            // This entity isn't being tracked, get it from the tracking system.
+            if (player.Entity == null)
+            {
+                PacketPlayerPosition ppos = playerTracking.GetPlayerPositionInformation(player.PlayerUID);
+                cmp = new PlayerPositionMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, ppos);
+                //capi.World.Logger.Warning("Can't add player {0} to world map, missing entity :<", player.PlayerUID);
+            }
+            else
+            {
+                cmp = new PlayerMapComponent(capi, player == capi.World.Player ? ownTexture : otherTexture, (IClientPlayer)player);
+            }
 
-            mapComps[player] = cmp;
+            mapComps[player.PlayerUID] = cmp;
         }
     }
 
@@ -121,9 +137,9 @@ public class PlayerMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
+        foreach (MapComponent mapComp in mapComps.Values)
         {
-            mapComp.Value.Render(mapElem, dt);
+            mapComp.Render(mapElem, dt);
         }
     }
 
@@ -131,9 +147,9 @@ public class PlayerMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> val in mapComps)
+        foreach (MapComponent mapComp in mapComps.Values)
         {
-            val.Value.OnMouseMove(args, mapElem, hoverText);
+            mapComp.OnMouseMove(args, mapElem, hoverText);
         }
     }
 
@@ -141,17 +157,17 @@ public class PlayerMapLayer : MarkerMapLayer
     {
         if (!Active) return;
 
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
+        foreach (MapComponent mapComp in mapComps.Values)
         {
-            mapComp.Value.OnMouseUpOnElement(args, mapElem);
+            mapComp.OnMouseUpOnElement(args, mapElem);
         }
     }
 
     public override void Dispose()
     {
-        foreach (KeyValuePair<IPlayer, EntityMapComponent> mapComp in mapComps)
+        foreach (MapComponent mapComp in mapComps.Values)
         {
-            mapComp.Value?.Dispose();
+            mapComp.Dispose();
         }
 
         ownTexture?.Dispose();
