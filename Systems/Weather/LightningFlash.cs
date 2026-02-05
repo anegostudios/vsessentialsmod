@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -209,7 +209,7 @@ namespace Vintagestory.GameContent
 
             var plr = capi.World.Player;
             Vec3d camPos = plr.Entity.CameraPos;
-            capi.Render.CurrentActiveShader.Uniform("origin", new Vec3f((float)(origin.X - camPos.X), (float)(origin.Y - camPos.Y), (float)(origin.Z - camPos.Z)));
+            capi.Render.CurrentActiveShader.Uniform("origin", (float)(origin.X - camPos.X), (float)(origin.Y - camPos.Y), (float)(origin.Z - camPos.Z));
 
             double cntRel = GameMath.Clamp(secondsAlive * 10, 0, 1);
 

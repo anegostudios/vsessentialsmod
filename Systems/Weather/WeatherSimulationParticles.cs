@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 #nullable disable
@@ -64,7 +65,7 @@ namespace Vintagestory.GameContent
         ICoreClientAPI capi;
         Random rand;
         static int[,] lowResRainHeightMap = new int[16, 16];
-        static BlockPos centerPos = new BlockPos();
+        static BlockPos centerPos = new BlockPos(API.Config.Dimensions.NormalWorld);
 
         #region Particle
 
@@ -207,7 +208,7 @@ namespace Vintagestory.GameContent
 
         Block lblock;
         Vec3f parentVeloSnow = new Vec3f();
-        BlockPos tmpPos = new BlockPos();
+        BlockPos tmpPos = new BlockPos(API.Config.Dimensions.NormalWorld);
         Vec3d particlePos = new Vec3d();
 
         #region desert storm ambient
@@ -392,7 +393,7 @@ namespace Vintagestory.GameContent
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
             if (windSpeedIntensity > 0.5f) // && particlePos.Y - rainYPos < 10
             {
-                SpawnDustParticles(manager, weatherData, plrPos, dryness, onwaterSplashParticleColor);
+                SpawnDustParticles(manager, conds, plrPos, dryness, onwaterSplashParticleColor);
             } else
             {
                 spawnCount = -1;
@@ -424,7 +425,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        private void SpawnDustParticles(IAsyncParticleManager manager, WeatherDataSnapshot weatherData, EntityPos plrPos, float dryness, int onwaterSplashParticleColor)
+        private void SpawnDustParticles(IAsyncParticleManager manager, ClimateCondition conds, EntityPos plrPos, float dryness, int onwaterSplashParticleColor)
         {
             float dx = (float)(plrPos.Motion.X * 40) - 50 * windSpeed.X;
             float dy = (float)(plrPos.Motion.Y * 40);
@@ -476,6 +477,7 @@ namespace Vintagestory.GameContent
                         sandFinds += 1 / extra;
                         sandCountByBlock[indicesBySandBlockId[block.Id]] += 1 / extra;
                     }
+                    if (block.BlockMaterial == EnumBlockMaterial.Snow && conds.Temperature > 5) continue;
 
                     if (Math.Abs(py - particlePos.Y) > 15) continue;
 

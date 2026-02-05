@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
 
             ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
             bool wasFedToAdulthood = FedAdultEntityCodes.Length > 0 && (tree != null && tree.GetFloat("saturation") >= OrPortionsEatenForGrowing);
-                
+
             if (entity.World.Calendar.TotalHours >= SpawnedTotalHours + HoursToGrow || wasFedToAdulthood)
             {
                 AssetLocation[] entityCodes = wasFedToAdulthood ? FedAdultEntityCodes : AdultEntityCodes;
@@ -85,18 +85,17 @@ namespace Vintagestory.GameContent
                 Cuboidf collisionBox = adultType.SpawnCollisionBox;
 
                 // Delay adult spawning if we're colliding
-                if (entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, collisionBox, entity.ServerPos.XYZ, false))
+                if (entity.World.CollisionTester.IsColliding(entity.World.BlockAccessor, collisionBox, entity.Pos.XYZ, false))
                 {
                     callbackId = entity.World.RegisterCallback(CheckGrowth, 3000);
                     return;
                 }
 
                 Entity adult = entity.World.ClassRegistry.CreateEntity(adultType);
-                adult.ServerPos.SetFrom(entity.ServerPos);
-                adult.Pos.SetFrom(adult.ServerPos);
-                bool keepTextureIndex = entity.Properties.Client != null 
-                    && entity.Properties.Client.TexturesAlternatesCount > 0 
-                    && adultType.Client != null 
+                adult.Pos.SetFrom(entity.Pos);
+                bool keepTextureIndex = entity.Properties.Client != null
+                    && entity.Properties.Client.TexturesAlternatesCount > 0
+                    && adultType.Client != null
                     && entity.Properties.Client.TexturesAlternatesCount == adultType.Client.TexturesAlternatesCount;
 
                 adult.Attributes.SetBool("wasFedToAdulthood", wasFedToAdulthood);

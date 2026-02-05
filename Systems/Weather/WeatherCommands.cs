@@ -212,7 +212,7 @@ namespace Vintagestory.GameContent
             var code = args.Parsers[0].GetValue() as string;
 
             var player = args.Caller.Player as IServerPlayer;
-            var pos = player.Entity.SidedPos.XYZ.AsBlockPos;
+            var pos = player.Entity.Pos.XYZ.AsBlockPos;
 
             var regionX = pos.X / api.World.BlockAccessor.RegionSize;
             var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
@@ -288,7 +288,7 @@ namespace Vintagestory.GameContent
             wsysServer.ReloadConfigs();
 
             var player = args.Caller.Player as IServerPlayer;
-            var pos = player.Entity.SidedPos.XYZ.AsBlockPos;
+            var pos = player.Entity.Pos.XYZ.AsBlockPos;
 
             var regionX = pos.X / api.World.BlockAccessor.RegionSize;
             var regionZ = pos.Z / api.World.BlockAccessor.RegionSize;
@@ -608,6 +608,7 @@ namespace Vintagestory.GameContent
             sumsnapshot.SnowAccumulationByRegionCorner.Data.Fill(amount);
 
             var updatepacket = wsys.snowSimSnowAccu.UpdateSnowLayer(sumsnapshot, true, mc, chunkPos, null);
+            updatepacket.Coords = chunkPos;
             wsys.snowSimSnowAccu.accum = 1f;
 
             var ba = sapi.World.GetBlockAccessorBulkMinimalUpdate(true, false);
@@ -616,7 +617,7 @@ namespace Vintagestory.GameContent
             wsys.snowSimSnowAccu.processBlockUpdates(mc, updatepacket, ba);
             ba.Commit();
 
-            return TextCommandResult.Success("Ok, test snow accum gen complete");
+            return TextCommandResult.Success("Ok, snow accum gen complete");
         }
 
         private TextCommandResult CmdSnowAccumInfo(TextCommandCallingArgs args)
@@ -780,7 +781,7 @@ namespace Vintagestory.GameContent
         {
             T wsys = api.ModLoader.GetModSystem<T>();
 
-            Vec3d plrPos = player.Entity.SidedPos.XYZ;
+            Vec3d plrPos = player.Entity.Pos.XYZ;
             BlockPos pos = plrPos.AsBlockPos;
 
             var wreader = wsys.getWeatherDataReaderPreLoad();

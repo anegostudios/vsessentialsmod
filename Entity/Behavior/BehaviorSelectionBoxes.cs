@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
@@ -17,6 +17,8 @@ namespace Vintagestory.GameContent
     {
         ICoreClientAPI capi;
         Matrixf mvmat = new Matrixf();
+        [ThreadStatic]
+        static Matrixf mvMatInv;
         bool debug = false;
         bool rendererRegistered=false;
 
@@ -40,7 +42,7 @@ namespace Vintagestory.GameContent
             {
                 debug = capi.Settings.Bool["debugEntitySelectionBoxes"];
             }
-            
+
             setupWireframe();
             entity.trickleDownRayIntersects = true;
             entity.requirePosesOnServer = true;
@@ -168,7 +170,7 @@ namespace Vintagestory.GameContent
             var eplr = capi.World.Player.Entity;
             // Lets pretend our 0/0/0 is at the center point of our creatures feet
             // This means our picking ray starts at playerPos + eyeHeight - creaturePos
-            var pickingray = Ray.FromAngles(eplr.SidedPos.XYZ + eplr.LocalEyePos - entity.SidedPos.XYZ, eplr.SidedPos.Pitch, eplr.SidedPos.Yaw, capi.World.Player.WorldData.PickingRange);
+            var pickingray = Ray.FromAngles(eplr.Pos.XYZ + eplr.LocalEyePos - entity.Pos.XYZ, eplr.Pos.Pitch, eplr.Pos.Yaw, capi.World.Player.WorldData.PickingRange);
             return getHitIndex(pickingray);
         }
 
@@ -176,7 +178,7 @@ namespace Vintagestory.GameContent
         {
             var esr = entity.Properties.Client.Renderer as EntityShapeRenderer;
 
-            mvmat.RotateY(GameMath.PIHALF + entity.SidedPos.Yaw);
+            mvmat.RotateY(GameMath.PIHALF + entity.Pos.Yaw);
 
             if (esr != null)
             {
@@ -207,13 +209,13 @@ namespace Vintagestory.GameContent
 
         public override bool IntersectsRay(Ray ray, AABBIntersectionTest intersectionTester, out double intersectionDistance, ref int selectionBoxIndex, ref EnumHandling handled)
         {
-            var pickingray = new Ray(ray.origin - entity.SidedPos.XYZ, ray.dir);
+            var pickingray = new Ray(ray.origin - entity.Pos.XYZ, ray.dir);
 
             int index = getHitIndex(pickingray);
             if (index >= 0)
             {
                 intersectionDistance = hitPositionAABBSpace.Length();
-                intersectionTester.hitPosition = hitPositionAABBSpace.AddCopy(entity.SidedPos.XYZ);
+                intersectionTester.hitPosition = hitPositionAABBSpace.AddCopy(entity.Pos.XYZ);
                 selectionBoxIndex = 1 + index;
                 handled = EnumHandling.PreventDefault;
 
@@ -231,17 +233,20 @@ namespace Vintagestory.GameContent
             int foundIndex = -1;
             double foundDistance = double.MaxValue;
 
+            mvMatInv ??= new Matrixf();
             var rayLengthSq = pickingray.Length * pickingray.Length;
+            Vec4d rayOrigin = new Vec4d(pickingray.origin.X, pickingray.origin.Y, pickingray.origin.Z, 1);
+            Vec4d rayDirection = new Vec4d(pickingray.dir.X, pickingray.dir.Y, pickingray.dir.Z, 0);
             for (int i = 0; i < selectionBoxes.Length; i++)
             {
                 var apap = selectionBoxes[i];
 
                 mvmat.Identity();
                 applyBoxTransform(mvmat, apap);
-                var mvMatInv = mvmat.Clone().Invert();
+                mvMatInv.Set(mvmat.Values).Invert();
 
-                var obbSpaceOrigin = mvMatInv.TransformVector(new Vec4d(pickingray.origin.X, pickingray.origin.Y, pickingray.origin.Z, 1));
-                var obbSpaceDirection = mvMatInv.TransformVector(new Vec4d(pickingray.dir.X, pickingray.dir.Y, pickingray.dir.Z, 0));
+                var obbSpaceOrigin = mvMatInv.TransformVector(rayOrigin);
+                var obbSpaceDirection = mvMatInv.TransformVector(rayDirection);
                 Ray obbSpaceRay = new Ray(obbSpaceOrigin.XYZ, obbSpaceDirection.XYZ);
 
                 if (Testintersection(standardbox, obbSpaceRay))

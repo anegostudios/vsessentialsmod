@@ -33,7 +33,7 @@ namespace Vintagestory.GameContent
                     entity.Attributes.SetFloat("deathTime", value);
                     deathTimeLocal = value;
                 }
-            } 
+            }
         }
 
         public float DespawnSeconds
@@ -138,7 +138,7 @@ namespace Vintagestory.GameContent
         {
             if (belowLightLevel < 0f) return false;
 
-            EntityPos pos = entity.ServerPos;
+            EntityPos pos = entity.Pos;
             int level = entity.World.BlockAccessor.GetLightLevel((int) pos.X, (int)pos.Y, (int)pos.Z, EnumLightLevelType.MaxLight);
 
             return level >= belowLightLevel;

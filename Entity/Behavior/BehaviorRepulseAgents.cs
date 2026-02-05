@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -69,7 +69,7 @@ namespace Vintagestory.GameContent
             double dx = ownPosRepulseX - theirRepulse.ownPosRepulseX;
             double dz = ownPosRepulseZ - theirRepulse.ownPosRepulseZ;
 
-            var yaw = ourEntity.ServerPos.Yaw;
+            var yaw = ourEntity.Pos.Yaw;
 
             double dist = RelDistanceToEllipsoid(dx, dz, radius.X, radius.Z, yaw);
             if (dist >= 1) return true;
@@ -123,7 +123,9 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorRepulseAgents(Entity entity) : base(entity)
         {
+#pragma warning disable CS0618 // Type or member is obsolete - retained here for mod backwards compatibility if any mod is still checking this
             entity.hasRepulseBehavior = true;
+#pragma warning restore CS0618
         }
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
@@ -156,7 +158,7 @@ namespace Vintagestory.GameContent
         public void AfterPhysicsTick()
         {
             var entity = this.entity;
-            var SidedPos = entity.SidedPos;
+            var SidedPos = entity.Pos;
             var CollisionBox = entity.CollisionBox;
             var OriginCollisionBox = entity.OriginCollisionBox;
             ownPosRepulseX = SidedPos.X + (CollisionBox.X2 - OriginCollisionBox.X2);
@@ -176,7 +178,7 @@ namespace Vintagestory.GameContent
             pushVector.Set(0, 0, 0);
 
             mySize = entity.SelectionBox.Length * entity.SelectionBox.Height * (eagent != null && eagent.Controls.Sneak ? 2 : 1);
-            dimension = entity.ServerPos.Dimension;
+            dimension = entity.Pos.Dimension;
 
             if (cworld != null && entity != cworld.Player.Entity)
             {
@@ -195,12 +197,12 @@ namespace Vintagestory.GameContent
 
             if (cworld != null && entity == cworld.Player.Entity)
             {
-                // Necessary in 1.20 because currently BehaviorPlayerPhysics clientside calls SimPhysics on entity.SidedPos
-                entity.SidedPos.Motion.Add(pushVector);
+                // Necessary in 1.20 because currently BehaviorPlayerPhysics clientside calls SimPhysics on entity.Pos
+                entity.Pos.Motion.Add(pushVector);
             }
             else
             {
-                entity.ServerPos.Motion.Add(pushVector);
+                entity.Pos.Motion.Add(pushVector);
             }
         }
 
@@ -210,7 +212,7 @@ namespace Vintagestory.GameContent
             var ourEntity = this.entity;
             if (e == ourEntity || (e.BHRepulseAgents is not EntityBehaviorRepulseAgents theirRepulse) || !e.IsInteractable || (ignorePlayers && e is EntityPlayer)) return true;
             if (e is EntityAgent eagent && eagent.MountedOn?.Entity == ourEntity) return true;
-            if (e.ServerPos.Dimension != dimension) return true;
+            if (e.Pos.Dimension != dimension) return true;
 
             if (theirRepulse is ICustomRepulseBehavior custom)
             {

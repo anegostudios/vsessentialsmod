@@ -47,8 +47,8 @@ namespace Vintagestory.Essentials
             // For land dwellers only check horizontal distance
             double sqDistToTarget =
                 entity.Properties.Habitat == EnumHabitat.Land ?
-                    target.SquareDistanceTo(entity.ServerPos.X, target.Y, entity.ServerPos.Z) :
-                    target.SquareDistanceTo(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z)
+                    target.SquareDistanceTo(entity.Pos.X, target.Y, entity.Pos.Z) :
+                    target.SquareDistanceTo(entity.Pos.X, entity.Pos.InternalY, entity.Pos.Z)
                 ;
 
 
@@ -61,11 +61,11 @@ namespace Vintagestory.Essentials
 
             bool stuck =
                 (entity.CollidedVertically && entity.Controls.IsClimbing) ||
-                (entity.ServerPos.SquareDistanceTo(prevPos) < 0.005 * 0.005) ||  // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
-                (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0)
+                (entity.Pos.SquareDistanceTo(prevPos) < 0.005 * 0.005) ||  // This used to test motion, but that makes no sense, we want to test if the entity moved, not if it had motion
+                (entity.CollidedHorizontally && entity.Pos.Motion.Y <= 0)
             ;
 
-            prevPos.Set(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z);
+            prevPos.Set(entity.Pos.X, entity.Pos.InternalY, entity.Pos.Z);
 
             stuckCounter = stuck ? (stuckCounter + 1) : 0;
 
@@ -82,9 +82,9 @@ namespace Vintagestory.Essentials
             if (controls == null) return;
 
             targetVec.Set(
-                (float)(target.X - entity.ServerPos.X),
-                (float)(target.Y - entity.ServerPos.InternalY),
-                (float)(target.Z - entity.ServerPos.Z)
+                (float)(target.X - entity.Pos.X),
+                (float)(target.Y - entity.Pos.InternalY),
+                (float)(target.Z - entity.Pos.Z)
             );
 
             float desiredYaw = 0;
@@ -106,13 +106,13 @@ namespace Vintagestory.Essentials
 
         private void yawToMotion(float dt, EntityControls controls, float desiredYaw, float nowMoveSpeed)
         {
-            float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
+            float yawDist = GameMath.AngleRadDistance(entity.Pos.Yaw, desiredYaw);
             float turnSpeed = curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier * movingSpeed;
-            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
-            entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
+            entity.Pos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
+            entity.Pos.Yaw = entity.Pos.Yaw % GameMath.TWOPI;
 
-            double cosYaw = Math.Cos(entity.ServerPos.Yaw);
-            double sinYaw = Math.Sin(entity.ServerPos.Yaw);
+            double cosYaw = Math.Cos(entity.Pos.Yaw);
+            double sinYaw = Math.Sin(entity.Pos.Yaw);
             controls.WalkVector.Set(sinYaw, GameMath.Clamp(targetVec.Y, -1, 1), cosYaw);
             controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier / Math.Max(1, yawDist * 3));
 

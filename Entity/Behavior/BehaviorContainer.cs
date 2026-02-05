@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -234,6 +234,8 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected virtual bool ShouldAddGearToShape(ItemSlot slot) => true;
+
 
 
         protected Shape addGearToShape(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements)
@@ -266,13 +268,11 @@ namespace Vintagestory.GameContent
                     }
                 }
             }
-            
+
             return entityShape;
         }
 
-        protected virtual bool ShouldAddGearToShape(ItemSlot slot) => true;
-
-
+        // this code also gets called server side (required to get attachmentpoint positions)
         protected virtual Shape addGearToShape(Shape entityShape, ItemSlot gearslot, string slotCode, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
         {
             if (gearslot.Empty || entityShape == null) return entityShape;
@@ -290,7 +290,13 @@ namespace Vintagestory.GameContent
             return addGearToShape(entityShape, gearslot.Itemstack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, overrideStepParent);
         }
 
-        protected virtual Shape addGearToShape(Shape entityShape, ItemStack stack, IAttachableToEntity iatta, string slotCode, string shapePathForLogging, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
+        public virtual Shape addGearToShape(Shape entityShape, ItemStack stack, IAttachableToEntity iatta, string slotCode, string shapePathForLogging, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
+        {
+            var textures = entity?.Properties.Client.Textures;
+            return addGearToShape(Api, entity, (Api as ICoreClientAPI)?.EntityTextureAtlas, entityShape, stack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, textures, overrideStepParent);
+        }
+
+        public static Shape addGearToShape(ICoreAPI api, Entity optionalTargetEntity, ITextureAtlasAPI targetAtlas, Shape entityShape, ItemStack stack, IAttachableToEntity iatta, string slotCode, string shapePathForLogging, ref string[] willDeleteElements, IDictionary<string, CompositeTexture> collectedTextures, Dictionary<string, StepParentElementTo> overrideStepParent = null)
         {
             if (stack == null || iatta == null) return entityShape;
 
@@ -308,16 +314,18 @@ namespace Vintagestory.GameContent
                 foreach (var val in keepEles) willDeleteElements = willDeleteElements.Remove(val);
             }
 
-
-            var textures = entity.Properties.Client.Textures;
             string texturePrefixCode = iatta.GetTexturePrefixCode(stack);
+            if(optionalTargetEntity?.Properties.Attributes?["useSlotPrefix"].AsBool() == true)
+            {
+                texturePrefixCode = texturePrefixCode != null ? texturePrefixCode + "-" + slotCode : slotCode;
+            }
 
             Shape gearShape = null;
             AssetLocation shapePath = null;
             CompositeShape compGearShape = null;
             if (stack.Collectible is IWearableShapeSupplier iwss)
             {
-                gearShape = iwss.GetShape(stack, entity, texturePrefixCode);
+                gearShape = iwss.GetShape(stack, optionalTargetEntity, texturePrefixCode);
             }
 
             if (gearShape == null)
@@ -325,18 +333,18 @@ namespace Vintagestory.GameContent
                 compGearShape = iatta.GetAttachedShape(stack, slotCode);
                 shapePath = compGearShape.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json");
 
-                gearShape = Shape.TryGet(Api, shapePath);
+                gearShape = Shape.TryGet(api, shapePath);
                 if (gearShape == null)
                 {
-                    Api.World.Logger.Warning("Entity attachable shape {0} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath);
+                    api.World.Logger.Warning("Entity attachable shape {0} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath);
                     return entityShape;
                 }
 
                 gearShape.SubclassForStepParenting(texturePrefixCode, damageEffect);
-                gearShape.ResolveReferences(entity.World.Logger, shapePath);
+                gearShape.ResolveReferences(api.World.Logger, shapePath);
             }
 
-            var capi = Api as ICoreClientAPI;
+            var capi = api as ICoreClientAPI;
 
             Dictionary<string, CompositeTexture> intoDict = null;
             if (capi != null)
@@ -352,8 +360,8 @@ namespace Vintagestory.GameContent
                 gearShape,
                 (compGearShape?.Base.ToString() ?? "Custom texture from ItemWearableShapeSupplier") + string.Format(" defined in {0} {1}", stack.Class, stack.Collectible.Code),
                 shapePathForLogging,
-                Api.World.Logger,
-                (texcode, tloc) => addTexture(texcode, tloc, textures, texturePrefixCode, capi)
+                api.World.Logger,
+                (texcode, tloc) => addTexture(capi, texcode, tloc, collectedTextures, texturePrefixCode, targetAtlas)
             );
 
 
@@ -361,10 +369,10 @@ namespace Vintagestory.GameContent
             {
                 foreach (var overlay in compGearShape.Overlays)
                 {
-                    Shape oshape = Shape.TryGet(Api, overlay.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json"));
+                    Shape oshape = Shape.TryGet(api, overlay.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json"));
                     if (oshape == null)
                     {
-                        Api.World.Logger.Warning("Entity attachable shape {0} overlay {4} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath, overlay.Base);
+                        api.World.Logger.Warning("Entity attachable shape {0} overlay {4} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath, overlay.Base);
                         continue;
                     }
 
@@ -377,7 +385,7 @@ namespace Vintagestory.GameContent
                     }
 
                     applyStepParentOverrides(overrideStepParent, oshape);
-                    entityShape.StepParentShape(oshape, overlay.Base.ToShortString(), shapePathForLogging, Api.Logger, (texcode, tloc) => addTexture(texcode, tloc, textures, texturePrefixCode, capi));
+                    entityShape.StepParentShape(oshape, overlay.Base.ToShortString(), shapePathForLogging, api.Logger, (texcode, tloc) => addTexture(capi, texcode, tloc, collectedTextures, texturePrefixCode, targetAtlas));
                 }
             }
 
@@ -385,8 +393,8 @@ namespace Vintagestory.GameContent
             {
                 foreach (var val in intoDict)
                 {
-                    var cmpt = textures[val.Key] = val.Value.Clone();
-                    capi.EntityTextureAtlas.GetOrInsertTexture(cmpt, out int textureSubid, out _);
+                    var cmpt = collectedTextures[val.Key] = val.Value.Clone();
+                    targetAtlas.GetOrInsertTexture(cmpt, out int textureSubid, out _);
                     cmpt.Baked.TextureSubId = textureSubid;
                 }
             }
@@ -395,7 +403,7 @@ namespace Vintagestory.GameContent
             return entityShape;
         }
 
-        private static void applyStepParentOverrides(Dictionary<string, StepParentElementTo> overrideStepParent, Shape gearShape)
+        public static void applyStepParentOverrides(Dictionary<string, StepParentElementTo> overrideStepParent, Shape gearShape)
         {
             if (overrideStepParent != null)
             {
@@ -417,15 +425,18 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void addTexture(string texcode, AssetLocation tloc, IDictionary<string, CompositeTexture> textures, string texturePrefixCode, ICoreClientAPI capi)
+        public static void addTexture(ICoreClientAPI capi, string texcode, AssetLocation tloc, IDictionary<string, CompositeTexture> textures, string texturePrefixCode, ITextureAtlasAPI targetAtlas)
         {
-            if (capi != null)
+            if (capi == null) return;
+
+            var cmpt = new CompositeTexture(tloc);
+            if (textures != null)
             {
-                var cmpt = textures[texturePrefixCode + texcode] = new CompositeTexture(tloc);
-                cmpt.Bake(Api.Assets);
-                capi.EntityTextureAtlas.GetOrInsertTexture(cmpt.Baked.TextureFilenames[0], out int textureSubid, out _);
-                cmpt.Baked.TextureSubId = textureSubid;
+                textures[texturePrefixCode + texcode] = cmpt;
             }
+            cmpt.Bake(capi.Assets);
+            targetAtlas.GetOrInsertTexture(cmpt.Baked.TextureFilenames[0], out int textureSubid, out _);
+            cmpt.Baked.TextureSubId = textureSubid;
         }
 
         public override void OnLoadCollectibleMappings(IWorldAccessor worldForNewMappings, Dictionary<int, AssetLocation> oldBlockIdMapping, Dictionary<int, AssetLocation> oldItemIdMapping, bool resolveImports)
@@ -465,7 +476,7 @@ namespace Vintagestory.GameContent
             container.ToTreeAttributes(entity.WatchedAttributes);
             entity.WatchedAttributes.MarkPathDirty(InventoryClassName);
             // Tell server to save this chunk to disk again
-            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.AsBlockPos)?.MarkModified();
+            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.Pos.AsBlockPos)?.MarkModified();
         }
 
 
@@ -510,7 +521,7 @@ namespace Vintagestory.GameContent
 
             if (dropContentsOnDeath)
             {
-                Inventory.DropAll(entity.ServerPos.XYZ);
+                Inventory.DropAll(entity.Pos.XYZ);
             }
         }
 

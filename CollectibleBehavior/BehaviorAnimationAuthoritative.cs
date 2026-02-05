@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Client;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
@@ -56,7 +56,7 @@ namespace Vintagestory.GameContent
         public override string GetHeldTpUseAnimation(ItemSlot activeHotbarSlot, Entity byEntity, ref EnumHandling bhHandling)
         {
             bhHandling = EnumHandling.PreventDefault;
-            return "interactstatic";
+            return collObj.HeldTpUseAnimation; // "interactstatic"; - why hardcoded?
         }
 
 

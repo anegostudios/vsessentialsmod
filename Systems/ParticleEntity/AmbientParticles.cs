@@ -98,7 +98,7 @@ public class ModSystemAmbientParticles : ModSystem
     bool spawnParticles = false;
 
     Vec3d position = new Vec3d();
-    BlockPos blockPos = new BlockPos();
+    BlockPos blockPos = new BlockPos(Dimensions.WillSetLater);
     private bool AsyncParticleSpawnTick(float dt, IAsyncParticleManager manager)
     {
         if (!spawnParticles) return true;
@@ -108,6 +108,7 @@ public class ModSystemAmbientParticles : ModSystem
 
         var world = capi.World;
         var eplr = world.Player.Entity;
+        blockPos.SetDimension(eplr.Pos.Dimension);
 
         ClimateCondition conds = world.BlockAccessor.GetClimateAt(blockPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z), EnumGetClimateMode.NowValues);
 

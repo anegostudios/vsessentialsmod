@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 #nullable disable
@@ -18,17 +19,16 @@ namespace Vintagestory.GameContent
 
     public class EntityPlayerShapeRenderer : EntityShapeRenderer
     {
-        MultiTextureMeshRef firstPersonMeshRef;
-        MultiTextureMeshRef thirdPersonMeshRef;
-        bool watcherRegistered;
-        EntityPlayer entityPlayer;
-        ModSystemFpHands modSys;
-
-        RenderMode renderMode;
+        protected MultiTextureMeshRef firstPersonMeshRef;
+        protected MultiTextureMeshRef thirdPersonMeshRef;
+        protected bool watcherRegistered;
+        protected EntityPlayer entityPlayer;
+        protected ModSystemFpHands modSys;
+        protected RenderMode renderMode;
+        protected bool guiAnimations = false;
 
         public float? HeldItemPitchFollowOverride { get; set; } = null;
-
-        float smoothedBodyYaw;
+        protected float smoothedBodyYaw;
 
 
         protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
@@ -38,8 +38,10 @@ namespace Vintagestory.GameContent
         public EntityPlayerShapeRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
             entityPlayer = entity as EntityPlayer;
-
+            guiAnimations = entity.Attributes.GetBool("guiAnimations");
             modSys = api.ModLoader.GetModSystem<ModSystemFpHands>();
+
+            api.Event.ReloadTextures += entity.MarkShapeModified;      // For unknown reason in 1.22-dev, EntityPlayer (but not other dressed humanoids) become invisible when textures are reloaded, until the player is re-tesselated with the updated textures
         }
 
         public override void OnEntityLoaded()
@@ -114,8 +116,8 @@ namespace Vintagestory.GameContent
                     else
                     {
                         HashSet<int> includeJointIds = new HashSet<int>();
-                        loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName("UpperArmL"), includeJointIds);
-                        loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName("UpperArmR"), includeJointIds);
+                        loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName(entity.GetBoneName("upperArmRBoneName", "UpperArmR")), includeJointIds);
+                        loadJointIdsRecursive(entity.AnimManager.Animator.GetPosebyName(entity.GetBoneName("upperArmLBoneName", "UpperArmL")), includeJointIds);
 
                         firstPersonMesh.AddMeshData(meshData, (i) => includeJointIds.Contains(meshData.CustomInts.Values[i * 4]));
                     }
@@ -186,12 +188,31 @@ namespace Vintagestory.GameContent
 
         public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
+            var prog = capi.Render.CurrentActiveShader;
+
+            if (capi.IsGamePaused)
+            {
+                entityPlayer.TpAnimManager.StopAllAnimations();
+                entityPlayer.TpAnimManager.StartAnimation("idle");
+                var prevValue = entity.IsRendered;
+                entity.IsRendered = true;
+                entityPlayer.TpAnimManager.RunWhilePaused = true;
+                entityPlayer.TpAnimManager.OnClientFrame(dt);
+                entity.IsRendered = prevValue;
+                entityPlayer.TpAnimManager.RunWhilePaused = false;
+            }
+
+            prog.Uniform("applyAnimation", guiAnimations ? (int)1 : 0);
+            prog.UBOs["Animation"].Update(entityPlayer.TpAnimManager.Animator.Matrices, 0, entity.AnimManager.Animator.MaxJointId * 16 * 4);
+
             if (IsSelf)
             {
                 meshRefOpaque = thirdPersonMeshRef;
             }
 
             base.RenderToGui(dt, posX, posY, posZ, yawDelta, size);
+
+            prog.Uniform("applyAnimation", (int)0);
         }
 
 
@@ -300,7 +321,7 @@ namespace Vintagestory.GameContent
             return base.getReadyShader();
         }
 
-        static ModelTransform DefaultTongTransform = new ModelTransform()
+        public static ModelTransform DefaultTongTransform = new ModelTransform()
         {
             Translation = new FastVec3f(-0.68f, -0.52f, -0.6f),
             Rotation = new FastVec3f(-26, -13, -88),
@@ -319,11 +340,15 @@ namespace Vintagestory.GameContent
 
                 ItemStack stack = slot?.Itemstack;
                 var tongStack = eagent?.LeftHandItemSlot?.Itemstack;
-                if (stack != null && stack.Collectible.GetTemperature(entity.World, stack) > 200 && tongStack?.ItemAttributes?.IsTrue("heatResistant")==true)
+                if (stack != null && stack.Collectible.GetTemperature(entity.World, stack) > GlobalConstants.TooHotToTouchTemperature && tongStack?.ItemAttributes?.IsTrue("heatResistant")==true)
                 {
                     AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose("LeftHand");
                     ItemRenderInfo renderInfo = capi.Render.GetItemStackRenderInfo(slot, EnumItemRenderTarget.HandTpOff, dt);
-                    renderInfo.Transform = stack.ItemAttributes?["onTongTransform"].AsObject(DefaultTongTransform) ?? DefaultTongTransform;
+
+                    string transformCode = tongStack?.ItemAttributes["transformCode"].AsString();
+                    if (!stack.ItemAttributes[transformCode].Exists) transformCode = "onTongTransform";
+
+                    renderInfo.Transform = stack.ItemAttributes?[transformCode].AsObject(DefaultTongTransform) ?? DefaultTongTransform;
                     RenderItem(dt, isShadowPass, stack, apap, renderInfo);
                     return;
                 }
@@ -526,6 +551,7 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             base.Dispose();
+            capi.Event.ReloadTextures -= entity.MarkShapeModified;
 
             firstPersonMeshRef?.Dispose();
             thirdPersonMeshRef?.Dispose();

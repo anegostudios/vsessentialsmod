@@ -41,7 +41,8 @@ namespace Vintagestory.GameContent
         float pinnedToOffsetStartYaw;
         [ProtoMember(13)]
         string pinnedToPlayerUid; // player entity ids change over time >.<
-
+        [ProtoMember(14)]
+        public bool NoAttachTransform;
 
         public bool Dirty { get; internal set; }
 
@@ -53,7 +54,7 @@ namespace Vintagestory.GameContent
         Entity pinnedTo;
         Matrixf pinOffsetTransform;
 
-        // These values are set be the constraints, they should actually get summed up though. 
+        // These values are set be the constraints, they should actually get summed up though.
         // For rope, a single set works though, because we only need the ends, connected by 1 constraint
         // In otherwords: Cloth pulling motion thing is not supported
         public Vec3d TensionDirection = new Vec3d();
@@ -105,7 +106,7 @@ namespace Vintagestory.GameContent
             pinnedTo = toEntity;
             pinnedToEntityId = toEntity.EntityId;
             pinnedToOffset = pinOffset;
-            pinnedToOffsetStartYaw = toEntity.SidedPos.Yaw;
+            pinnedToOffsetStartYaw = toEntity.Pos.Yaw;
             pinOffsetTransform = Matrixf.Create();
             pinnedToBlockPos = null;
             if (toEntity is EntityPlayer eplr) pinnedToPlayerUid = eplr.PlayerUID;
@@ -174,30 +175,31 @@ namespace Vintagestory.GameContent
                     AttachmentPointAndPose apap = eplr?.AnimManager?.Animator?.GetAttachmentPointPose("RightHand");
                     if (apap == null) apap = pinnedTo?.AnimManager?.Animator?.GetAttachmentPointPose("rope");
 
-                    if (apap != null)
-                    {
-                        Matrixf modelmat = new Matrixf();
-                        if (eplr != null) modelmat.RotateY(eagent.BodyYaw + GameMath.PIHALF);
-                        else modelmat.RotateY(pinnedTo.SidedPos.Yaw + GameMath.PIHALF);
-
-                        modelmat.Translate(-0.5, 0, -0.5);
-                        apap.MulUncentered(modelmat);
-                        outvec = modelmat.TransformVector(new Vec4f(0f, 0f, 0f, 1f));
-                    }
-                    else
+                    if (apap == null || NoAttachTransform)
                     {
                         pinOffsetTransform.Identity();
-                        pinOffsetTransform.RotateY(pinnedTo.SidedPos.Yaw - pinnedToOffsetStartYaw);
+                        if (!NoAttachTransform) pinOffsetTransform.RotateY(pinnedTo.Pos.Yaw - pinnedToOffsetStartYaw);
                         tmpvec.Set(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1f);
                         outvec = pinOffsetTransform.TransformVector(tmpvec);
                     }
+                    else
+                    {
+                        Matrixf modelmat = new Matrixf();
+                        if (eplr != null) modelmat.RotateY(eagent.BodyYaw + GameMath.PIHALF);
+                        else modelmat.RotateY(pinnedTo.Pos.Yaw + GameMath.PIHALF);
 
-                    EntityPos pos = pinnedTo.SidedPos; // This makes the physics magic equation : entity.SidedPos.Motion.Add
+                        modelmat.Translate(-0.5, 0, -0.5);
+                        apap.MulUncentered(modelmat);
+                        outvec = modelmat.TransformVector(new Vec4f(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1f));
+                    }
+
+                    EntityPos pos = pinnedTo.Pos; // This makes the physics magic equation : entity.SidedPos.Motion.Add
                     Pos.Set(pos.X + outvec.X, pos.Y + outvec.Y, pos.Z + outvec.Z);
 
-                    bool pushable = true;// PushingPhysics && (eplr?.Player.WorldData.CurrentGameMode != EnumGameMode.Creative);
+                    bool canpull = cs.CanPull;
+                    if (!canpull) return;
 
-                    if (pushable && extension > 0) // Do not act on compressive force
+                    if (extension > 0) // Do not act on compressive force
                     {
                         float f = counterTensionStrength * dt * 0.006f;
                         Vec3d direction = TensionDirection.Clone();
@@ -221,7 +223,7 @@ namespace Vintagestory.GameContent
 
                         // Compute push needed from player
                         double velocityForce = tensionResistStrength * 1.65f;
-                        double extraForce = tensionForce - velocityForce; // extra force to pull the animal 
+                        double extraForce = tensionForce - velocityForce; // extra force to pull the animal
                         double totalPushForce = velocityForce + extraForce;
 
                         // Separate horizontal and vertical move forces
@@ -247,7 +249,7 @@ namespace Vintagestory.GameContent
                                 GameMath.Clamp(Math.Abs(TensionDirection.Z) + horizontalForce - pullBackDiag, 0.0, 400.0) * Math.Sign(TensionDirection.Z)
                              ) * f;
 
-                            pinnedToMounted.SidedPos.Motion.Add(tensionDrag);
+                            pinnedToMounted.Pos.Motion.Add(tensionDrag);
 
                         }
                         else if (isTaut)
@@ -258,7 +260,7 @@ namespace Vintagestory.GameContent
                                 GameMath.Clamp(Math.Abs(TensionDirection.Z * 0.1) + (horizontalForce - pullBackDiag) * 0.5, 0.0, 400.0) * Math.Sign(TensionDirection.Z)
                              ) * f;
 
-                            pinnedToMounted.SidedPos.Motion.Add(tensionDrag);
+                            pinnedToMounted.Pos.Motion.Add(tensionDrag);
 
                         }
                         else
@@ -344,7 +346,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        
+
 
         public void updateFromPoint(ClothPoint point, IWorldAccessor world)
         {

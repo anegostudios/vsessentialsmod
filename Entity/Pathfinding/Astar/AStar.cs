@@ -9,6 +9,7 @@ using Vintagestory.API.Server;
 
 namespace Vintagestory.Essentials
 {
+
     public class AStar
     {
         protected ICoreServerAPI api;
@@ -32,13 +33,33 @@ namespace Vintagestory.Essentials
         public PathNodeSet openSet = new PathNodeSet();
         public HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
-        public virtual List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+
+
+        public virtual List<Vec3d> FindPathAsWaypoints(BlockPos start, BlockPos end, float modeMinFleeDistance, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
-            List<PathNode> nodes = FindPath(start, end, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance, creatureType);
+            List<PathNode> nodes = FindPathOrEscapePath(start, end, modeMinFleeDistance, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance, creatureType);
             return nodes == null ? null : ToWaypoints(nodes);
         }
 
         public virtual List<PathNode> FindPath(BlockPos start, BlockPos end, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+        {
+            return FindPathOrEscapePath(start, end, -1, maxFallHeight, stepHeight, entityCollBox, searchDepth, mhdistanceTolerance, creatureType);
+        }
+
+        /// <summary>
+        /// Searches for an escape path if minFleeDistanceMode>0
+        /// </summary>
+        /// <param name="start"></param>
+        /// <param name="endOrAvoidPos">The target to reach if minFleeDistanceMode<=0 or the target to avoid if minFleeDistanceMode>0</param>
+        /// <param name="minFleeDistanceMode"></param>
+        /// <param name="maxFallHeight"></param>
+        /// <param name="stepHeight"></param>
+        /// <param name="entityCollBox"></param>
+        /// <param name="searchDepth"></param>
+        /// <param name="mhdistanceTolerance"></param>
+        /// <param name="creatureType"></param>
+        /// <returns></returns>
+        public virtual List<PathNode> FindPathOrEscapePath(BlockPos start, BlockPos endOrAvoidPos, float modeMinFleeDistance, int maxFallHeight, float stepHeight, Cuboidf entityCollBox, int searchDepth = 9999, int mhdistanceTolerance = 0, EnumAICreatureType creatureType = EnumAICreatureType.Default)
         {
             if (entityCollBox.XSize > 100 || entityCollBox.YSize > 100 || entityCollBox.ZSize > 100)
             {
@@ -55,13 +76,15 @@ namespace Vintagestory.Essentials
             NodesChecked = 0;
 
             PathNode startNode = new PathNode(start);
-            PathNode targetNode = new PathNode(end);
+            PathNode targetNode = new PathNode(endOrAvoidPos);
+            
+            var distSq = modeMinFleeDistance * modeMinFleeDistance;
 
             openSet.Clear();
             closedSet.Clear();
 
             openSet.Add(startNode);
-            
+
             while (openSet.Count > 0)
             {
                 if (NodesChecked++ > searchDepth)
@@ -72,9 +95,19 @@ namespace Vintagestory.Essentials
                 PathNode nearestNode = openSet.RemoveNearest();
                 closedSet.Add(nearestNode);
 
-                if (nearestNode == targetNode || (mhdistanceTolerance>0 && Math.Abs(nearestNode.X - targetNode.X) <= mhdistanceTolerance && Math.Abs(nearestNode.Z - targetNode.Z) <= mhdistanceTolerance && (Math.Abs(nearestNode.Y - targetNode.Y) <= mhdistanceTolerance /*|| (targetNode.Y > nearestNode.Y && targetNode.Y - nearestNode.Y < 4 + mhdistanceTolerance)* - why TF is this here? It makes path finds to pillard up players successfull! */)))
+                if (modeMinFleeDistance > 0)
                 {
-                    return retracePath(startNode, nearestNode);
+                    if (nearestNode.DistanceSqTo(start.X, start.Y, start.Z) > distSq)
+                    {
+                        return retracePath(startNode, nearestNode);
+                    }
+                }
+                else
+                {
+                    if (nearestNode == targetNode || (mhdistanceTolerance > 0 && Math.Abs(nearestNode.X - targetNode.X) <= mhdistanceTolerance && Math.Abs(nearestNode.Z - targetNode.Z) <= mhdistanceTolerance && (Math.Abs(nearestNode.Y - targetNode.Y) <= mhdistanceTolerance /*|| (targetNode.Y > nearestNode.Y && targetNode.Y - nearestNode.Y < 4 + mhdistanceTolerance)* - why TF is this here? It makes path finds to pillard up players successfull! */)))
+                    {
+                        return retracePath(startNode, nearestNode);
+                    }
                 }
 
                 for (int i = 0; i < Cardinal.ALL.Length; i++)
@@ -103,7 +136,7 @@ namespace Vintagestory.Essentials
                         {
                             UpdateNode(nearestNode, neighbourNode, extraCost);
                             
-                            neighbourNode.hCost = neighbourNode.distanceTo(targetNode);
+                            neighbourNode.hCost = modeMinFleeDistance > 0 ? 1 + modeMinFleeDistance - neighbourNode.distanceTo(targetNode) : neighbourNode.distanceTo(targetNode);
                             openSet.Add(neighbourNode);
                         }
                     }
@@ -127,15 +160,8 @@ namespace Vintagestory.Essentials
         }
 
 
-        [Obsolete("Deprecated, please use UpdateNode() instead")]
-        protected void addIfNearer(PathNode nearestNode, PathNode neighbourNode, PathNode targetNode, HashSet<PathNode> openSet, float extraCost)
-        {
-            UpdateNode(nearestNode, neighbourNode, extraCost);
-        }
-
-
         protected readonly Vec3d tmpVec = new Vec3d();
-        protected readonly BlockPos tmpPos = new BlockPos();
+        protected readonly BlockPos tmpPos = new BlockPos(API.Config.Dimensions.WillSetLater);
         protected Cuboidd tmpCub = new Cuboidd();
 
         protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
@@ -217,7 +243,7 @@ namespace Vintagestory.Essentials
                 }*/
 
                 // If diagonal, make sure we can squeeze through
-                if (fromDir.IsDiagnoal)
+                if (fromDir.IsDiagonal)
                 {
                     tmpVec.Add(-fromDir.Normali.X / 2f, 0, -fromDir.Normali.Z / 2f);
                     if (collTester.IsColliding(blockAccess, entityCollBox, tmpVec, false))
@@ -234,7 +260,7 @@ namespace Vintagestory.Essentials
                 extraCost += ucost;
 
                 // Humans: Don't walk diagonally right besides lava
-                if (fromDir.IsDiagnoal && creatureType == EnumAICreatureType.Humanoid)
+                if (fromDir.IsDiagonal && creatureType == EnumAICreatureType.Humanoid)
                 {
                     tmpPos.Set(node.X - fromDir.Normali.X, node.Y, node.Z);
                     fblock = blockAccess.GetBlock(tmpPos, BlockLayersAccess.Fluid);
@@ -276,7 +302,7 @@ namespace Vintagestory.Essentials
             // Test for collision if we step up
             if (!collTester.GetCollidingCollisionBox(blockAccess, entityCollBox, tmpVec, ref tmpCub, false, node.dimension))
             {
-                if (fromDir.IsDiagnoal)
+                if (fromDir.IsDiagonal)
                 {
                     if (collboxes != null && collboxes.Length > 0)
                     {

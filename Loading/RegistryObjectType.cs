@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -51,26 +51,23 @@ namespace Vintagestory.ServerMods.NoObf
         volatile internal int parseStarted;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>true</jsondefault>-->
         /// If set to false, this object will not be loaded.
         /// </summary>
-        [DocumentAsJson]
+        [DocumentAsJson("Optional", "True")]
         public bool Enabled = true;
 
         public JObject jsonObject;
 
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The unique code for this object. Used as the prefix for any variant codes.
         /// </summary>
-        [DocumentAsJson]
+        [DocumentAsJson("Required")]
         public AssetLocation Code;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// All available variants for this object.
         /// </summary>
-        [DocumentAsJson]
+        [DocumentAsJson("Optional", "None")]
         public RegistryObjectVariantGroup[] VariantGroups;
 
         /// <summary>
@@ -79,40 +76,40 @@ namespace Vintagestory.ServerMods.NoObf
         public API.Datastructures.OrderedDictionary<string, string> Variant = new ();
 
         /// <summary>
-        /// <!--<jsonoptional>Unused</jsonoptional><jsondefault>None</jsondefault>-->
         /// (Currently unused) A set of potential world interactions for this object. Used to display what the object is used for - e.g. Shift + Right Click to Knap Stones.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Unused", "None")]
         public WorldInteraction[] Interactions;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// A set of resolved code-variants that will not be loaded by the game.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
         public AssetLocation[] SkipVariants;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// If set, only resolved code-variants in this list will be loaded by the game.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
         public AssetLocation[] AllowedVariants;
 
         public HashSet<AssetLocation> AllowedVariantsQuickLookup = new HashSet<AssetLocation>();
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// A reference to the registered C# class of the object. Can be used to add extra functionality to objects.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
         public string Class;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// List of tags that this type belongs to. Used for categorizing objects.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
         public string[] Tags = Array.Empty<string>();
 
         /// <summary>

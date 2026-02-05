@@ -109,7 +109,7 @@ namespace Vintagestory.GameContent
                 return blockAccessor;
             }}
         // Looks a bit heavy, but we write to this only once per game per thread; then later we can ensure that we dispose of all the blockAccessors even if the thread itself is *not* disposed (ThreadPool threads for example are not disposed)
-        private System.Collections.Concurrent.ConcurrentDictionary<int, ICachingBlockAccessor> disposableBlockAccessors = new();
+        private System.Collections.Concurrent.ConcurrentDictionary<int, ICachingBlockAccessor> disposableBlockAccessors = new(4, 16);
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {

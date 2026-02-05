@@ -17,6 +17,10 @@ namespace Vintagestory.GameContent
         void ResolveOnLoad(ItemSlot slot, IWorldAccessor worldForResolve, bool resolveImports);
     }
 
+    /// <summary>
+    /// Represents a owner-agnostic in-world container that has a location in the world and thus
+    /// can be affected by enviromental factors, such as temperature and being inside a room
+    /// </summary>
     public class InWorldContainer
     {
         protected RoomRegistry roomReg;
@@ -155,8 +159,12 @@ namespace Vintagestory.GameContent
 
         protected virtual float Inventory_OnAcquireTransitionSpeed(EnumTransitionType transType, ItemStack stack, float baseMul)
         {
-            float positionAwarePerishRate = Api != null && transType == EnumTransitionType.Perish ? GetPerishRate() : 1;
-            if (transType == EnumTransitionType.Dry || transType == EnumTransitionType.Melt) positionAwarePerishRate = 0.25f;
+            float positionAwarePerishRate = transType switch
+            {
+                EnumTransitionType.Perish => Api != null ? GetPerishRate() : 1,
+                EnumTransitionType.Dry or EnumTransitionType.Melt => 0.25f,
+                _ => 1
+            };
 
             return positionAwarePerishRate;
         }

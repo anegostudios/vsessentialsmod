@@ -96,11 +96,17 @@ namespace Vintagestory.GameContent
         public bool Matches(ItemStack itemstack, bool checkCategory = true, float foodTagMinWeight = 0)
         {
             var cobj = itemstack.Collectible;
-            var foodCat = checkCategory ? (cobj?.NutritionProps?.FoodCategory ?? EnumFoodCategory.NoNutrition) : EnumFoodCategory.NoNutrition;
-            var foodTags = cobj?.Attributes?["foodTags"].AsArray<string>();
+            var foodCat = checkCategory ? (cobj.GetNutritionProperties(null, itemstack, null)?.FoodCategory ?? EnumFoodCategory.NoNutrition) : EnumFoodCategory.NoNutrition;
+            var foodTags = itemstack.Collectible.GetCollectibleInterface<ICreatureDietFoodTags>()?.GetFoodTags(itemstack);
+            foodTags ??= cobj?.Attributes?["foodTags"].AsArray<string>();
 
             return Matches(foodCat, foodTags, foodTagMinWeight);
         }
+    }
+
+    public interface ICreatureDietFoodTags
+    {
+        string[] GetFoodTags(ItemStack itemstack);
     }
 
     public interface IAnimalFoodSource : IPointOfInterest
@@ -164,7 +170,7 @@ namespace Vintagestory.GameContent
             int maxcz = (int)(centerPos.Z + radius) / chunksize;
 
             float radiusSq = radius * radius;
-            
+
             for (int cx = mincx; cx < maxcx; cx++)
             {
                 for (int cz = mincz; cz < maxcz; cz++)
@@ -211,7 +217,7 @@ namespace Vintagestory.GameContent
                         float distSq = poipos.SquareDistanceTo(centerPos);
                         if (distSq > radiusSq) continue;
 
-                        if (distSq < nearestDistSq && matcher(pois[i])) 
+                        if (distSq < nearestDistSq && matcher(pois[i]))
                         {
                             nearestPoi = pois[i];
                             nearestDistSq = distSq;
@@ -255,7 +261,7 @@ namespace Vintagestory.GameContent
                     for (int i = 0; i < pois.Count; i++)
                     {
                         Vec3d poipos = pois[i].Position;
-                        float weight = pois[i] is IAnimalNest nest ? nest.DistanceWeighting : 1f; 
+                        float weight = pois[i] is IAnimalNest nest ? nest.DistanceWeighting : 1f;
                         float distSq = poipos.SquareDistanceTo(centerPos) * weight;
                         if (distSq > radiusSq) continue;
 

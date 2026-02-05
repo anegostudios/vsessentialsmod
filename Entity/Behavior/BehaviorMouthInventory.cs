@@ -73,7 +73,7 @@ namespace Vintagestory.GameContent
         {
             if (entity.World.Side == EnumAppSide.Server)
             {
-                mouthInv.DropAll(entity.ServerPos.XYZ);
+                mouthInv.DropAll(entity.Pos.XYZ);
             }
 
             base.OnEntityDeath(damageSourceForDeath);
@@ -83,7 +83,7 @@ namespace Vintagestory.GameContent
         {
             if (entity.World.Side == EnumAppSide.Server && entity.World.Rand.NextDouble() < 0.25)
             {
-                mouthInv.DropAll(entity.ServerPos.XYZ);
+                mouthInv.DropAll(entity.Pos.XYZ);
 
                 PickupCoolDownUntilMs = entity.World.ElapsedMilliseconds + 10000;
             }

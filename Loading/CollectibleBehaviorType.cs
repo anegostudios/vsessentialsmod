@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -30,17 +30,17 @@ namespace Vintagestory.ServerMods.NoObf
     public class CollectibleBehaviorType
     {
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The code of the collectible behavior to add.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Required")]
         public string name;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// A list of properties for the specific behavior.
         /// </summary>
         [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
+        [DocumentAsJson("Optional", "None")]
         public JsonObject properties;
     }
 

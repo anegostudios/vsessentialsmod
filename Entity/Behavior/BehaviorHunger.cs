@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Xml.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -17,24 +18,10 @@ namespace Vintagestory.GameContent
         EntityAgent entityAgent;
 
         float hungerCounter;
-        //float lastFatReserves;
         int sprintCounter;
 
         long listenerId;
         long lastMoveMs;
-        ICoreAPI api;
-
-        /*internal float FatReserves
-        {
-            get { return hungerTree.GetFloat("currentfatreserves"); }
-            set { hungerTree.SetFloat("currentfatreserves", value); entity.WatchedAttributes.MarkPathDirty("hunger"); }
-        }*/
-        /* internal float MaxFatReserves
-         {
-             get { return hungerTree.GetFloat("maxfatreserves"); }
-             set { hungerTree.SetFloat("maxfatreserves", value); entity.WatchedAttributes.MarkPathDirty("hunger"); }
-         }*/
-
 
         public float SaturationLossDelayFruit
         {
@@ -118,7 +105,6 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject typeAttributes)
         {
             hungerTree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-            api = entity.World.Api;
 
             if (hungerTree == null)
             {
@@ -138,12 +124,7 @@ namespace Vintagestory.GameContent
                 GrainLevel = 0;
                 ProteinLevel = 0;
                 DairyLevel = 0;
-
-                //FatReserves = configHungerTree["currentfatreserves"].AsFloat(1000);
-                //MaxFatReserves = configHungerTree["maxfatreserves"].AsFloat(1000);
             }
-
-            //lastFatReserves = FatReserves;
 
             listenerId = entity.World.RegisterGameTickListener(SlowTick, 6000);
 
@@ -214,12 +195,11 @@ namespace Vintagestory.GameContent
 
         public override void OnGameTick(float deltaTime)
         {
-            if (entity is EntityPlayer)
-            {
-                EntityPlayer plr = (EntityPlayer)entity;
-                EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
+            detox(deltaTime);
 
-                detox(deltaTime);
+            if (entity is EntityPlayer plr)
+            {
+                EnumGameMode mode = entity.World.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode;
 
                 if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) return;
 
@@ -251,8 +231,6 @@ namespace Vintagestory.GameContent
 
                 hungerCounter = 0;
                 sprintCounter = 0;
-
-                detox(deltaTime);
             }
         }
 
@@ -263,11 +241,22 @@ namespace Vintagestory.GameContent
             detoxCounter += dt;
             if (detoxCounter > 1)
             {
+                // 60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul) is the default, so we scale according to the default time multiplier
+                var gameSpeedMultiplier = entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul / 30;
+                if (gameSpeedMultiplier == 0)  gameSpeedMultiplier = 1; // To make sure sobering up still happens with time paused
+
                 float intox = entity.WatchedAttributes.GetFloat("intoxication");
                 if (intox > 0)
                 {
-                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f));
+                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f * gameSpeedMultiplier));
                 }
+
+                float psyche = entity.WatchedAttributes.GetFloat("psychedelic");
+                if (psyche > 0)
+                {
+                    entity.WatchedAttributes.SetFloat("psychedelic", Math.Max(0, psyche - 0.005f * gameSpeedMultiplier));
+                }
+
                 detoxCounter = 0;
             }
         }
@@ -383,7 +372,6 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                // 0..1
                 float diff = GameMath.Clamp(2 - temperature, 0, 10);
 
                 Room room = entity.World.Api.ModLoader.GetModSystem<RoomRegistry>().GetRoomForPosition(entity.Pos.AsBlockPos);
@@ -394,48 +382,9 @@ namespace Vintagestory.GameContent
 
             if (Saturation <= 0)
             {
-                // Let's say a fat reserve of 1000 is depleted in 3 ingame days using the default game speed of 1/60th
-                // => 72 ingame hours / 60 = 1.2 irl hours = 4320 irl seconds
-                // => 1 irl seconds substracts 1/4.32 fat reserves
-
-                //float sprintLoss = sprintCounter / (15f * 6);
-                //FatReserves = Math.Max(0, FatReserves - dt / 4.32f - sprintLoss / 4.32f);
-
-                //if (FatReserves <= 0)
-                {
-                    entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Internal, Type = EnumDamageType.Hunger }, 0.125f);
-                }
-
+                entity.ReceiveDamage(new DamageSource() { Source = EnumDamageSource.Internal, Type = EnumDamageType.Hunger }, 0.125f);
                 sprintCounter = 0;
             }
-
-            /*if (Saturation >= 0.85 * MaxSaturation)
-            {
-                // Fat recovery is 6 times slower
-                FatReserves = Math.Min(MaxFatReserves, FatReserves + dt / (6 * 4.32f));
-            }
-
-            float max = MaxFatReserves;
-            float cur = FatReserves / max;
-
-            if (cur <= 0.8 || lastFatReserves <= 0.8)
-            {
-                float diff = cur - lastFatReserves;
-                if (Math.Abs(diff) >= 0.1)
-                {
-                    HealthLocked += diff > 0 ? -1 : 1;
-
-                    if (diff > 0 || Health > 0)
-                    {
-                        entity.ReceiveDamage(new DamageSource() { source = EnumDamageSource.Internal, type = (diff > 0) ? EnumDamageType.Heal : EnumDamageType.Hunger }, 1);
-                    }
-
-                    lastFatReserves = cur;
-                }
-            } else
-            {
-                lastFatReserves = cur;
-            } */
         }
 
         public override string PropertyName()
@@ -447,6 +396,12 @@ namespace Vintagestory.GameContent
         {
             if (damageSource.Type == EnumDamageType.Heal && damageSource.Source == EnumDamageSource.Revive)
             {
+                if (entity.Attributes.GetBool("noSatietyRestoreOnRevive"))
+                {
+                    entity.Attributes.RemoveAttribute("noSatietyRestoreOnRevive");
+                    return;
+                }
+
                 SaturationLossDelayFruit = 60;
                 SaturationLossDelayVegetable = 60;
                 SaturationLossDelayProtein = 60;

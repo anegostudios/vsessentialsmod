@@ -18,7 +18,7 @@ namespace Vintagestory.GameContent
 	///	{ "name": "RopeTieable" }
 	///],
     /// </code></example>
-    [DocumentAsJson] 
+    [DocumentAsJson]
     public class BlockBehaviorRopeTieable : BlockBehavior
     {
 
@@ -50,7 +50,7 @@ namespace Vintagestory.GameContent
                 Entity byEntity = byPlayer.Entity;
 
                 Vec3d lpos = new Vec3d(0, byEntity.LocalEyePos.Y - 0.25f, 0);
-                Vec3d aheadPos = lpos.AheadCopy(0.25f, byEntity.SidedPos.Pitch, byEntity.SidedPos.Yaw);
+                Vec3d aheadPos = lpos.AheadCopy(0.25f, byEntity.Pos.Pitch, byEntity.Pos.Yaw);
 
                 // Already handled by ItemRope
                 if (!hotbarslot.Empty && hotbarslot.Itemstack.Collectible.Code.Path=="rope")
@@ -113,13 +113,13 @@ namespace Vintagestory.GameContent
                 }
 
                 if (ropestack == null)
-                {                    
+                {
                     if (hotbarslot.Empty)
                     {
                         hotbarslot.Itemstack = stack;
                         hotbarslot.MarkDirty();
                         targetPoint.PinTo(byEntity, aheadPos.ToVec3f());
-                    } 
+                    }
                     else if (byPlayer.InventoryManager.TryGiveItemstack(stack, true))
                     {
                         targetPoint.PinTo(byEntity, aheadPos.ToVec3f());

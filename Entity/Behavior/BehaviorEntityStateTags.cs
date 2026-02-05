@@ -23,7 +23,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
             UpdatePeriodSec = attributes["updatePeriodSec"].AsFloat(UpdatePeriodSec);
         }
 
-        EntityTagArray tags = entity.Tags;
+        EntityTagSet tags = entity.Tags;
 
         TagsInitialUpdate(ref tags);
 
@@ -44,7 +44,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         if (TimeSinceUpdateSec < UpdatePeriodSec) return;
         TimeSinceUpdateSec = 0;
 
-        EntityTagArray tags = entity.Tags;
+        EntityTagSet tags = entity.Tags;
 
         TagsUpdate(ref tags);
 
@@ -72,57 +72,52 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
     protected bool HoldingOpenFire = false;
 
     // Assigned entity tags, filled in GetTagsIds() in Initialize()
-    protected static EntityTagArray TagSwimming = EntityTagArray.Empty;
-    protected static EntityTagArray TagFeetInLiquid = EntityTagArray.Empty;
-    protected static EntityTagArray TagFlying = EntityTagArray.Empty;
-    protected static EntityTagArray TagOnGround = EntityTagArray.Empty;
-    protected static EntityTagArray TagMoving = EntityTagArray.Empty;
-    protected static EntityTagArray TagAlive = EntityTagArray.Empty;
-    protected static EntityTagArray TagAiming = EntityTagArray.Empty;
-    protected static EntityTagArray TagSprinting = EntityTagArray.Empty;
-    protected static EntityTagArray TagSneaking = EntityTagArray.Empty;
-    protected static EntityTagArray TagArmed = EntityTagArray.Empty;
-    protected static EntityTagArray TagArmedMelee = EntityTagArray.Empty;
-    protected static EntityTagArray TagArmedRanged = EntityTagArray.Empty;
-    protected static EntityTagArray TagHoldingOpenFire = EntityTagArray.Empty;
+    protected static EntityTagSet TagSwimming = EntityTagSet.Empty;
+    protected static EntityTagSet TagFeetInLiquid = EntityTagSet.Empty;
+    protected static EntityTagSet TagFlying = EntityTagSet.Empty;
+    protected static EntityTagSet TagOnGround = EntityTagSet.Empty;
+    protected static EntityTagSet TagMoving = EntityTagSet.Empty;
+    protected static EntityTagSet TagAlive = EntityTagSet.Empty;
+    protected static EntityTagSet TagAiming = EntityTagSet.Empty;
+    protected static EntityTagSet TagSprinting = EntityTagSet.Empty;
+    protected static EntityTagSet TagSneaking = EntityTagSet.Empty;
+    protected static EntityTagSet TagArmed = EntityTagSet.Empty;
+    protected static EntityTagSet TagArmedMelee = EntityTagSet.Empty;
+    protected static EntityTagSet TagArmedRanged = EntityTagSet.Empty;
+    protected static EntityTagSet TagHoldingOpenFire = EntityTagSet.Empty;
 
-    // Checked item tags, filled in GetTagsIds() in Initialize()
-    protected static ItemTagArray ItemTagWeapon = ItemTagArray.Empty;
-    protected static ItemTagArray ItemTagWeaponMelee = ItemTagArray.Empty;
-    protected static ItemTagArray ItemTagWeaponRanged = ItemTagArray.Empty;
-    protected static ItemTagArray ItemTagHasOpenFire = ItemTagArray.Empty;
-
-    // Checked block tags, filled in GetTagsIds() in Initialize()
-    protected static BlockTagArray BlockTagHasOpenFire = BlockTagArray.Empty;
+    // Checked collectible tags, filled in GetTagsIds() in Initialize()
+    protected static TagSet CollectibleTagWeapon = TagSet.Empty;
+    protected static TagSet CollectibleTagWeaponMelee = TagSet.Empty;
+    protected static TagSet CollectibleTagWeaponRanged = TagSet.Empty;
+    protected static TagSet CollectibleTagHasOpenFire = TagSet.Empty;
 
     protected float TimeSinceUpdateSec = 0;
     protected float UpdatePeriodSec = 1;
 
 
-    public static void GetTagsIds(ITagRegistry registry)
+    public static void GetTagsIds(ITagsManager registry)
     {
-        TagSwimming = new(registry.EntityTagToTagId("state-swimming"));
-        TagFeetInLiquid = new(registry.EntityTagToTagId("state-feet-in-liquid"));
-        TagFlying = new(registry.EntityTagToTagId("state-flying"));
-        TagOnGround = new(registry.EntityTagToTagId("state-on-ground"));
-        TagMoving = new(registry.EntityTagToTagId("state-moving"));
-        TagAlive = new(registry.EntityTagToTagId("state-alive"));
-        TagAiming = new(registry.EntityTagToTagId("state-aiming"));
-        TagSprinting = new(registry.EntityTagToTagId("state-sprinting"));
-        TagSneaking = new(registry.EntityTagToTagId("state-sneaking"));
-        TagArmed = new(registry.EntityTagToTagId("state-armed"));
-        TagArmedMelee = new(registry.EntityTagToTagId("state-armed-melee"));
-        TagArmedRanged = new(registry.EntityTagToTagId("state-armed-ranged"));
+        TagSwimming = registry.GetEntityTagSet("state-swimming");
+        TagFeetInLiquid = registry.GetEntityTagSet("state-feet-in-liquid");
+        TagFlying = registry.GetEntityTagSet("state-flying");
+        TagOnGround = registry.GetEntityTagSet("state-on-ground");
+        TagMoving = registry.GetEntityTagSet("state-moving");
+        TagAlive = registry.GetEntityTagSet("state-alive");
+        TagAiming = registry.GetEntityTagSet("state-aiming");
+        TagSprinting = registry.GetEntityTagSet("state-sprinting");
+        TagSneaking = registry.GetEntityTagSet("state-sneaking");
+        TagArmed = registry.GetEntityTagSet("state-armed");
+        TagArmedMelee = registry.GetEntityTagSet("state-armed-melee");
+        TagArmedRanged = registry.GetEntityTagSet("state-armed-ranged");
 
-        ItemTagWeapon = new(registry.ItemTagToTagId("weapon"));
-        ItemTagWeaponMelee = new(registry.ItemTagToTagId("weapon-melee"));
-        ItemTagWeaponRanged = new(registry.ItemTagToTagId("weapon-ranged"));
-        ItemTagHasOpenFire = new(registry.ItemTagToTagId("has-open-fire"));
-
-        BlockTagHasOpenFire = new(registry.BlockTagToTagId("has-open-fire"));
+        CollectibleTagWeapon = registry.GetGeneralTagSet("weapon");
+        CollectibleTagWeaponMelee = registry.GetGeneralTagSet("weapon-melee");
+        CollectibleTagWeaponRanged = registry.GetGeneralTagSet("weapon-ranged");
+        CollectibleTagHasOpenFire = registry.GetGeneralTagSet("has-open-fire");
     }
 
-    protected virtual void TagsInitialUpdate(ref EntityTagArray tags)
+    protected virtual void TagsInitialUpdate(ref EntityTagSet tags)
     {
         EntityTagsInitialUpdate(ref tags);
 
@@ -133,7 +128,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         }
     }
 
-    protected virtual void TagsUpdate(ref EntityTagArray tags)
+    protected virtual void TagsUpdate(ref EntityTagSet tags)
     {
         EntityTagsUpdate(ref tags);
 
@@ -144,45 +139,48 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         }
     }
 
-    protected virtual void EntityTagsInitialUpdate(ref EntityTagArray tags)
+    protected virtual void EntityTagsInitialUpdate(ref EntityTagSet tags)
     {
-        tags = tags.Remove(TagSwimming);
-        tags = tags.Remove(TagFeetInLiquid);
-        tags = tags.Remove(TagOnGround);
-        tags = tags.Remove(TagAlive);
+        tags = tags.Except(TagSwimming);
+        tags = tags.Except(TagFeetInLiquid);
+        tags = tags.Except(TagOnGround);
+        tags = tags.Except(TagAlive);
 
         EntityTagsUpdate(ref tags);
     }
 
-    protected virtual void EntityAgentTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
+    protected virtual void EntityAgentTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
     {
-        tags = tags.Remove(TagMoving);
-        tags = tags.Remove(TagAiming);
-        tags = tags.Remove(TagFlying);
-        tags = tags.Remove(TagSneaking);
-        tags = tags.Remove(TagSprinting);
+        tags = tags.Except(TagMoving);
+        tags = tags.Except(TagAiming);
+        tags = tags.Except(TagFlying);
+        tags = tags.Except(TagSneaking);
+        tags = tags.Except(TagSprinting);
 
         EntityAgentTagsUpdate(entityAgent, ref tags);
     }
 
-    protected virtual void EntityAgentHandItemsTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
+    protected virtual void EntityAgentHandItemsTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
     {
         ItemStack? handStack = entityAgent.RightHandItemSlot?.Itemstack;
-        ItemTagArray itemTags = handStack?.Item?.Tags ?? ItemTagArray.Empty;
-        BlockTagArray blockTags = handStack?.Block?.Tags ?? BlockTagArray.Empty;
+        TagSet itemTags = handStack?.Collectible?.Tags ?? TagSet.Empty;
 
         handStack = entityAgent.LeftHandItemSlot?.Itemstack;
-        if (handStack?.Item != null) itemTags |= handStack.Item.Tags;
-        if (handStack?.Block != null) blockTags |= handStack.Block.Tags;
+        if (handStack?.Collectible != null) itemTags = itemTags.Union(handStack.Collectible.Tags);
 
-        InitializeTag(ref tags, Armed = itemTags.ContainsAll(ItemTagWeapon), TagArmed);
-        InitializeTag(ref tags, ArmedMelee = itemTags.ContainsAll(ItemTagWeaponMelee), TagArmedMelee);
-        InitializeTag(ref tags, ArmedRanged = itemTags.ContainsAll(ItemTagWeaponRanged), TagArmedRanged);
-        InitializeTag(ref tags, HoldingOpenFire = itemTags.ContainsAll(ItemTagHasOpenFire) || blockTags.ContainsAll(BlockTagHasOpenFire), TagHoldingOpenFire);
+        Armed = itemTags.IsSupersetOf(CollectibleTagWeapon);
+        ArmedMelee = itemTags.IsSupersetOf(CollectibleTagWeaponMelee);
+        ArmedRanged = itemTags.IsSupersetOf(CollectibleTagWeaponRanged);
+        HoldingOpenFire = itemTags.IsSupersetOf(CollectibleTagHasOpenFire);
+
+        InitializeTag(ref tags, Armed, TagArmed);
+        InitializeTag(ref tags, ArmedMelee, TagArmedMelee);
+        InitializeTag(ref tags, ArmedRanged, TagArmedRanged);
+        InitializeTag(ref tags, HoldingOpenFire, TagHoldingOpenFire);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected virtual void UpdateTag(ref EntityTagArray tags, ref bool storedValue, EntityTagArray mask, bool newValue)
+    protected virtual void UpdateTag(ref EntityTagSet tags, ref bool storedValue, EntityTagSet mask, bool newValue)
     {
         if (storedValue == newValue) return;
 
@@ -190,28 +188,28 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
 
         if (newValue)
         {
-            tags |= mask;
+            tags = tags.Union(mask);
         }
         else
         {
-            tags &= ~mask;
+            tags = tags.Except(mask);
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected virtual void InitializeTag(ref EntityTagArray tags, bool newValue, EntityTagArray mask)
+    protected virtual void InitializeTag(ref EntityTagSet tags, bool newValue, EntityTagSet mask)
     {
         if (newValue)
         {
-            tags |= mask;
+            tags = tags.Union(mask);
         }
         else
         {
-            tags &= ~mask;
+            tags = tags.Except(mask);
         }
     }
 
-    protected virtual void EntityTagsUpdate(ref EntityTagArray tags)
+    protected virtual void EntityTagsUpdate(ref EntityTagSet tags)
     {
         UpdateTag(ref tags, ref Swimming, TagSwimming, entity.Swimming);
         UpdateTag(ref tags, ref FeetInLiquid, TagFeetInLiquid, entity.FeetInLiquid && !Swimming);
@@ -219,7 +217,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         UpdateTag(ref tags, ref Alive, TagAlive, entity.Alive);
     }
 
-    protected virtual void EntityAgentTagsUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
+    protected virtual void EntityAgentTagsUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
     {
         EntityControls controls = entityAgent.Controls;
 
@@ -232,27 +230,23 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         UpdateTag(ref tags, ref Sprinting, TagSprinting, controls.Sprint);
     }
 
-    protected virtual void EntityAgentHandItemsTagsUpdate(EntityAgent entityAgent, ref EntityTagArray tags)
+    protected virtual void EntityAgentHandItemsTagsUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
     {
         ItemStack? handStack = entityAgent.ActiveHandItemSlot?.Itemstack;
-        Item? item = handStack?.Item;
+        CollectibleObject? item = handStack?.Collectible;
         if (item == null) // This will be the case for 99% of entities, which do not hold anything in their hands
         {
             UpdateTag(ref tags, ref Armed, TagArmed, false);
             UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, false);
             UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, false);
+            UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire, false);
         }
         else
         {
-            UpdateTag(ref tags, ref Armed, TagArmed, ItemTagWeapon.isPresentIn(ref item.Tags));
-            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, ItemTagWeaponMelee.isPresentIn(ref item.Tags));
-            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, ItemTagWeaponRanged.isPresentIn(ref item.Tags));
+            UpdateTag(ref tags, ref Armed, TagArmed, CollectibleTagWeapon.IsSubsetOf(item.Tags));
+            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, CollectibleTagWeaponMelee.IsSubsetOf(item.Tags));
+            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, CollectibleTagWeaponRanged.IsSubsetOf(item.Tags));
+            UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire, CollectibleTagHasOpenFire.IsSubsetOf(item.Tags));
         }
-
-        Block? block = handStack?.Block;
-        UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire,
-            item != null && ItemTagHasOpenFire.isPresentIn(ref item.Tags) ||
-            block != null && BlockTagHasOpenFire.isPresentIn(ref block.Tags)
-        );
     }
 }

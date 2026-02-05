@@ -166,6 +166,8 @@ public class EntityBehaviorHealth : EntityBehavior
     /// </summary>
     protected string HurtEntitySoundCode = "hurt";
 
+    protected string SmallHurtEntitySoundCode = "hurt";
+
     protected float timeSinceLastDoTTickSec = 0;
     protected float timeBetweenDoTTicksSec = 0.5f;
 
@@ -180,6 +182,33 @@ public class EntityBehaviorHealth : EntityBehavior
 
     public override void Initialize(EntityProperties properties, JsonObject attributes)
     {
+        entity.WatchedAttributes.SetFloat("onHurt", 0);
+        int onHurtCounter = entity.WatchedAttributes.GetInt("onHurtCounter");
+        entity.WatchedAttributes.RegisterModifiedListener("onHurt", () => {
+            float damage = entity.WatchedAttributes.GetFloat("onHurt", 0);
+            if (damage == 0) return;
+            int newOnHurtCounter = entity.WatchedAttributes.GetInt("onHurtCounter");
+            if (newOnHurtCounter == onHurtCounter) return;
+
+            onHurtCounter = newOnHurtCounter;
+
+            if (entity.Attributes.GetInt("dmgkb") == 0)
+            {
+                entity.Attributes.SetInt("dmgkb", 1);
+            }
+
+            if (damage > 0.05)
+            {
+                entity.SetActivityRunning("invulnerable", 500);
+                // Gets already called on the server directly
+                if (entity.World.Side == EnumAppSide.Client)
+                {
+                    entity.OnHurt(null, entity.WatchedAttributes.GetFloat("onHurt", 0));
+                }
+            }
+        });
+
+
         ITreeAttribute? entityHealthTree = entity.WatchedAttributes.GetTreeAttribute("health");
 
         if (entityHealthTree == null)
@@ -203,26 +232,14 @@ public class EntityBehaviorHealth : EntityBehavior
 
         secondsSinceLastUpdate = (float)entity.World.Rand.NextDouble();   // Randomise which game tick these update, a starting server would otherwise start all loaded entities with the same zero timer
 
-        ReceiveHailDamage = entity is EntityPlayer;
-        if (attributes.KeyExists("receiveHailDamage"))
-        {
-            ReceiveHailDamage = attributes["receiveHailDamage"].AsBool(entity is EntityPlayer);
-        }
+        ReceiveHailDamage = attributes["receiveHailDamage"].AsBool(entity is EntityPlayer);
 
-        if (attributes.KeyExists("autoRegenSaturationThreshold"))
-        {
-            AutoRegenSaturationThreshold = attributes["autoRegenSaturationThreshold"].AsFloat();
-        }
+        AutoRegenSaturationThreshold = attributes["autoRegenSaturationThreshold"].AsFloat(AutoRegenSaturationThreshold);
+        SaturationPerHealthPoint = attributes["saturationPerHealthPoint"].AsFloat(SaturationPerHealthPoint);
 
-        if (attributes.KeyExists("saturationPerHealthPoint"))
-        {
-            SaturationPerHealthPoint = attributes["saturationPerHealthPoint"].AsFloat();
-        }
-
-        if (attributes.KeyExists("hurtAnimationCode"))
-        {
-            HurtAnimationCode = attributes["hurtAnimationCode"].AsString();
-        }
+        HurtAnimationCode = attributes["hurtAnimationCode"].AsString(HurtAnimationCode);
+        HurtEntitySoundCode = attributes["hurtSoundCode"].AsString(HurtEntitySoundCode);
+        SmallHurtEntitySoundCode = attributes["smallHurtSoundCode"].AsString(SmallHurtEntitySoundCode);
 
         timeBetweenDoTTicksSec = attributes["timeBetweenTicksSec"].AsFloat(0.5f);
 
@@ -308,7 +325,9 @@ public class EntityBehaviorHealth : EntityBehavior
                 entity.AnimManager.StartAnimation(HurtAnimationCode);
             }
 
-            entity.PlayEntitySound(HurtEntitySoundCode);
+            bool playLoudly = damage > 2 && damageSource.Type != EnumDamageType.Poison && damageSource.Type != EnumDamageType.Frost;
+
+            entity.PlayEntitySound(playLoudly ? HurtEntitySoundCode : SmallHurtEntitySoundCode);
         }
     }
 
@@ -319,7 +338,10 @@ public class EntityBehaviorHealth : EntityBehavior
 
         double yDistance = Math.Abs(lastTerrainContact.Y - entity.Pos.Y);
 
-        if (yDistance < FallDamageFallenDistanceThreshold) return;
+        double fallDamageFallenDistanceThreshold = FallDamageFallenDistanceThreshold * entity.Stats.GetBlended("fallDamageThreshold");
+        double fallDamageYMotionThreshold = FallDamageYMotionThreshold * entity.Stats.GetBlended("fallDamageThreshold");
+
+        if (yDistance < fallDamageFallenDistanceThreshold) return;
         if (gliding)
         {
             yDistance = Math.Min(yDistance / 2, Math.Min(14, yDistance));
@@ -328,16 +350,16 @@ public class EntityBehaviorHealth : EntityBehavior
             // 1.5x pi is down
             // 1 x pi is horizontal
             // 0.5x pi half is up
-            if (entity.ServerPos.Pitch < 1.25 * GameMath.PI)
+            if (entity.Pos.Pitch < 1.25 * GameMath.PI)
             {
                 yDistance = 0;
             }
         }
 
-        if (withYMotion > FallDamageYMotionThreshold) return;
+        if (withYMotion > fallDamageYMotionThreshold) return;
 
         yDistance *= entity.Properties.FallDamageMultiplier;
-        double fallDamage = Math.Max(0, yDistance - FallDamageFallenDistanceThreshold);
+        double fallDamage = Math.Max(0, yDistance - fallDamageFallenDistanceThreshold);
 
         // Some super rough experimentally determined formula that always underestimates
         // the actual ymotion.
@@ -348,6 +370,8 @@ public class EntityBehaviorHealth : EntityBehavior
         fallDamage -= 20 * yMotionLoss;
 
         if (fallDamage <= 0) return;
+
+        fallDamage *= entity.Stats.GetBlended("fallDamageFactor");
 
         /*if (fallDamage > 2)
         {
@@ -371,13 +395,13 @@ public class EntityBehaviorHealth : EntityBehavior
         }
     }
 
-    public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player, ref EnumHandling handled)
+    public override WorldInteraction[]? GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player, ref EnumHandling handled)
     {
         if (IsHealable(player.Entity))
         {
             ICanHealCreature? canHealCreature = player.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible?.GetCollectibleInterface<ICanHealCreature>();
 
-            if (canHealCreature != null)
+            if (canHealCreature != null && canHealCreature.CanHeal(entity))
             {
                 return canHealCreature.GetHealInteractionHelp(world, es, player).Append(base.GetInteractionHelp(world, es, player, ref handled));
             }
@@ -435,11 +459,37 @@ public class EntityBehaviorHealth : EntityBehavior
         if (wasFullHealth) Health = MaxHealth;
     }
 
-    public bool IsHealable(EntityAgent eagent, ItemSlot? slot = null)
+    public static ItemStack[] GetAllHealingItems(ICoreAPI api)
     {
-        ICanHealCreature? canHealCreature = (slot ?? eagent.RightHandItemSlot)?.Itemstack?.Collectible?.GetCollectibleInterface<ICanHealCreature>();
+        return ObjectCacheUtil.GetOrCreate<ItemStack[]>(api, "poulticeStacks", () =>
+        {
+            var poulticeStacks = new List<ItemStack>();
+            foreach (CollectibleObject item in api.World.Collectibles)
+            {
+                if (item.GetCollectibleInterface<ICanHealCreature>() != null)
+                {
+                    poulticeStacks.Add(new ItemStack(item));
+                }
+            }
 
-        return Health < MaxHealth && canHealCreature?.CanHeal(entity) == true;
+            return poulticeStacks.ToArray();
+        });
+    }
+
+    public bool IsHealable(EntityAgent byEntity, ItemSlot? slot = null)
+    {
+        if (Health >= MaxHealth)
+        {
+            return false;
+        }
+
+        if (entity is EntityPlayer)
+        {
+            return true;
+        }
+
+        int minGenerationToAllowHealing = entity.Properties.Attributes?["minGenerationToAllowHealing"].AsInt(-1) ?? -1;
+        return entity.Alive && (minGenerationToAllowHealing >= 0 && minGenerationToAllowHealing >= entity.WatchedAttributes.GetInt("generation", 0));
     }
 
     public virtual int ApplyDoTEffect(
@@ -508,11 +558,11 @@ public class EntityBehaviorHealth : EntityBehavior
         if (!ReceiveHailDamage) return;
 
         // A costly check every 1s for hail damage, but it applies only to entities who are in the open
-        int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.ServerPos.X, (int)entity.ServerPos.Z);
-        if (entity.ServerPos.Y >= rainy)
+        int rainy = entity.World.BlockAccessor.GetRainMapHeightAt((int)entity.Pos.X, (int)entity.Pos.Z);
+        if (entity.Pos.Y >= rainy)
         {
             WeatherSystemBase wsys = entity.Api.ModLoader.GetModSystem<WeatherSystemBase>();
-            PrecipitationState state = wsys.GetPrecipitationState(entity.ServerPos.XYZ);
+            PrecipitationState state = wsys.GetPrecipitationState(entity.Pos.XYZ);
 
             if (state != null && state.ParticleSize >= 0.5 && state.Type == EnumPrecipitationType.Hail && entity.World.Rand.NextDouble() < state.Level / 2)
             {
@@ -582,7 +632,7 @@ public class EntityBehaviorHealth : EntityBehavior
     protected virtual void LogPlayerToPlayerDamage(DamageSource damageSource, float damage, float damageBeforeDelegatesApplied)
     {
         if (entity is not EntityPlayer player || damageSource.GetCauseEntity() is not EntityPlayer otherPlayer) return;
-        
+
         string weapon;
         if (damageSource.SourceEntity != otherPlayer)
         {

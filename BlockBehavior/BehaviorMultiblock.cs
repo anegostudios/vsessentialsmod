@@ -58,13 +58,13 @@ namespace Vintagestory.GameContent
         /// The controller position of the multiblock. This is the primary placed location of the multiblock.
         /// </summary>
         [DocumentAsJson("Recommended", "(1, 0, 1)")]
-        Vec3i ControllerPositionRel;
+        public Vec3i ControllerPositionRel;
 
         /// <summary>
         /// The type of the multiblock. Usually monolithic.
         /// </summary>
         string type;
-               
+
         public BlockBehaviorMultiblock(Block block) : base(block) { }
 
         public override void Initialize(JsonObject properties)

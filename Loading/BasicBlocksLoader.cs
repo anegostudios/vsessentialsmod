@@ -4,13 +4,11 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 
-#nullable disable
-
 namespace Vintagestory.ServerMods
 {
     public class ModBasicBlocksLoader : ModSystem
     {
-        ICoreServerAPI api;
+        ICoreServerAPI api = null!;
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -41,10 +39,16 @@ namespace Vintagestory.ServerMods
                 RequiredMiningTier = 196,
                 Sounds = new BlockSounds()
                 {
-                    Walk = new AssetLocation("sounds/walk/stone"),
+                    Walk = new SoundAttributes(new AssetLocation("sounds/walk/stone"), true),
                     ByTool = new Dictionary<EnumTool, BlockSounds>()
                     {
-                        { EnumTool.Pickaxe, new BlockSounds() { Hit = new AssetLocation("sounds/block/rock-hit-pickaxe"), Break = new AssetLocation("sounds/block/rock-hit-pickaxe") } }
+                        {
+                            EnumTool.Pickaxe, new BlockSounds()
+                                {
+                                    Hit = new SoundAttributes(new AssetLocation("sounds/block/rock-hit-pickaxe"), true),
+                                    Break = new SoundAttributes(new AssetLocation("sounds/block/rock-hit-pickaxe"), true) 
+                                }
+                        }
                     }
                 },
                 CreativeInventoryTabs = new string[] { "general" }

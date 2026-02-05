@@ -26,7 +26,7 @@ namespace FluffyClouds {
         public short UndulatingCloudMode;
         public short CloudOpaqueness;
 
-        public LCGRandom brightnessRand;
+        public LCGRandom brightnessRand = null!;
 
         internal bool rainValuesSet;
         internal float lerpRainCloudOverlay;
@@ -71,8 +71,8 @@ namespace FluffyClouds {
     {
         int TextureData1;
         int TextureData2;
-        short[] TextureDataBuffer1;
-        short[] TextureDataBuffer2;
+        short[] TextureDataBuffer1 = null!;
+        short[] TextureDataBuffer2 = null!;
 
         int Framebuffer;
         public int TextureMap;
@@ -80,7 +80,7 @@ namespace FluffyClouds {
 
         public Vec3f offset = new Vec3f();
         MeshRef quad;
-        IShaderProgram prog;
+        IShaderProgram prog = null!;
         int programId;
 
         Matrixf matrix = new Matrixf();
@@ -90,8 +90,8 @@ namespace FluffyClouds {
         public CloudTilesState mainThreadState = new CloudTilesState();
         public CloudTilesState offThreadState = new CloudTilesState();
 
-        public CloudTile[] Tiles;
-        CloudTile[] tempTiles;
+        public CloudTile[] Tiles = null!;
+        CloudTile[] tempTiles = null!;
 
         bool newStateRready = false;
         object cloudStateLock = new object();
@@ -111,12 +111,12 @@ namespace FluffyClouds {
 
         Random rand;
         bool renderCloudMap;
-        public WeatherSystemClient weatherSys;
+        public WeatherSystemClient weatherSys = null!;
         
         Thread cloudTileUpdThread;
         bool isShuttingDown = false;
 
-        ICoreClientAPI capi;
+        ICoreClientAPI capi = null!;
         ModSystem mod;
 
         int cloudTileBlendSpeed = 32;
@@ -129,9 +129,8 @@ namespace FluffyClouds {
 
         public CloudRendererMap(ModSystem mod, ICoreClientAPI capi)
         {
-
-            WeatherSystemClient weatherSys = capi.ModLoader.GetModSystem<WeatherSystemBase>() as WeatherSystemClient;
-
+            ArgumentNullException.ThrowIfNull(capi);
+            WeatherSystemClient weatherSys = (WeatherSystemClient)capi.ModLoader.GetModSystem<WeatherSystemBase>();
             this.capi = capi;
             this.mod = mod;
             this.weatherSys = weatherSys;

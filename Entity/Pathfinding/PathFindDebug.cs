@@ -47,9 +47,9 @@ namespace Vintagestory.Essentials
             string subcmd = (string)args[0];
             var player = args.Caller.Player;
 
-            BlockPos plrPos = player.Entity.ServerPos.XYZ.AsBlockPos;
+            BlockPos plrPos = player.Entity.Pos.XYZ.AsBlockPos;
             PathfindSystem pfs = sapi.ModLoader.GetModSystem<PathfindSystem>();
-            
+
             Cuboidf narrow = new Cuboidf(-0.4f, 0, -0.4f, 0.4f, 1.5f, 0.4f);
             Cuboidf narrower = new Cuboidf(-0.2f, 0, -0.2f, 0.2f, 1.5f, 0.2f);
             Cuboidf wide = new Cuboidf(-0.6f, 0, -0.6f, 0.6f, 1.5f, 0.6f);

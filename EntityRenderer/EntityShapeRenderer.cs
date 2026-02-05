@@ -27,54 +27,40 @@ namespace Vintagestory.GameContent
     public class EntityShapeRenderer : EntityRenderer, ITexPositionSource
     {
         protected long listenerId;
-
         protected LoadedTexture debugTagTexture = null;
-
         protected MultiTextureMeshRef meshRefOpaque;
-
         protected Vec4f color = new Vec4f(1, 1, 1, 1);
         protected long lastDebugInfoChangeMs = 0;
         protected bool isSpectator;
         protected IClientPlayer player;
-        public float bodyYawLerped = 0;
-
-        public Vec3f OriginPos = new Vec3f();
-        public float[] ModelMat = Mat4f.Create();
-        protected float[] tmpMvMat = Mat4f.Create();
-        protected Matrixf ItemModelMat = new Matrixf();
+        protected Matrixf ItemModelMat;    // No value assigned by default, as it is only relevant to a few entities which hold items
+        protected List<MessageTexture> messageTextures = null;
+        protected EntityAgent eagent;
+        protected IInventory gearInv;
+        protected ITexPositionSource defaultTexSource;
+        protected Vec4f lightrgbs;
+        protected float intoxIntensity;
 
         public bool DoRenderHeldItem;
         public virtual bool DisplayChatMessages { get; set; }
-
         public int AddRenderFlags;
         public double WindWaveIntensity = 1f;
         public bool glitchFlicker;
-
+        public float bodyYawLerped = 0;
+        public Vec3f OriginPos = new Vec3f();
+        public float[] ModelMat = Mat4f.Create();
+        public static readonly float[] tmpMvMat = Mat4f.Create();
         public bool frostable;
         public float frostAlpha;
         public float targetFrostAlpha;
         public OnGetFrostAlpha getFrostAlpha;
         public float frostAlphaAccum;
-
-        protected List<MessageTexture> messageTextures = null;
-
-
-        protected EntityAgent eagent;
-
         public CompositeShape OverrideCompositeShape;
         public Shape OverrideEntityShape;
         public string[] OverrideSelectiveElements = null;
-
         public bool glitchAffected;
-        protected IInventory gearInv;
-
-        protected ITexPositionSource defaultTexSource;
-
-        protected Vec4f lightrgbs;
-        protected float intoxIntensity;
-
-
-
+        public bool waterBobbing;
+        public Vec3f renderOffset;
         public Size2i AtlasSize { get { return capi.EntityTextureAtlas.Size; } }
         public TextureAtlasPosition skinTexPos;
         public virtual TextureAtlasPosition this[string textureCode]
@@ -92,6 +78,7 @@ namespace Vintagestory.GameContent
 
             DoRenderHeldItem = true;
             glitchAffected = true;
+            waterBobbing = entity.Properties.Attributes?["waterBobbing"].AsBool(false) ?? false;
             glitchFlicker = entity.Properties.Attributes?["glitchFlicker"].AsBool(false) ?? false;
             frostable = entity.Properties.Attributes?["frostable"].AsBool(true) ?? true;
             shouldSwivelFromMotion = entity.Properties.Attributes?["shouldSwivelFromMotion"].AsBool(true) ?? true;
@@ -118,8 +105,10 @@ namespace Vintagestory.GameContent
                 var conds = api.World.BlockAccessor.GetClimateAt(pos, EnumGetClimateMode.NowValues);
                 if (conds == null) return targetFrostAlpha;
 
+                float frostOverlayThreshold = entity.Properties.Attributes?["frostOverlayThreshold"].AsFloat(-5) ?? -5f;
+
                 float dist = 1 - GameMath.Clamp((api.World.BlockAccessor.GetDistanceToRainFall(pos, 5) - 2) / 3f, 0, 1f);
-                float a = GameMath.Clamp((Math.Max(0, -conds.Temperature) - 2) / 5f, 0, 1) * dist;
+                float a = GameMath.Clamp((Math.Max(0, -conds.Temperature) + frostOverlayThreshold) / 5f, 0, 1) * dist;
 
                 if (a > 0)
                 {
@@ -288,7 +277,7 @@ namespace Vintagestory.GameContent
                 }, "uploadentitymesh");
 
                 capi.TesselatorManager.ThreadDispose();
-            });
+            }, "EntityShapeRenderer.TesselateShape");
         }
 
 
@@ -424,8 +413,8 @@ namespace Vintagestory.GameContent
 
         float accum = 0;
         // Needed to reproject particles to the correct position
-        protected float[] pMatrixHandFov = null;
-        protected float[] pMatrixNormalFov = null;
+        public float[] pMatrixHandFov = null;
+        public float[] pMatrixNormalFov = null;
 
         protected virtual IShaderProgram getReadyShader()
         {
@@ -461,15 +450,16 @@ namespace Vintagestory.GameContent
             var itemTranslation = itemTransform.Translation;
             var itemRotation = itemTransform.Rotation;
             var itemScaleXYZ = itemTransform.ScaleXYZ;
+            ItemModelMat ??= new();
             ItemModelMat
                 .Set(ModelMat)
                 .Mul(apap.AnimModelMatrix)
                 .Translate(itemOrigin.X, itemOrigin.Y, itemOrigin.Z)
                 .Scale(itemScaleXYZ.X, itemScaleXYZ.Y, itemScaleXYZ.Z)
                 .Translate(ap.PosX / 16f + itemTranslation.X, ap.PosY / 16f + itemTranslation.Y, ap.PosZ / 16f + itemTranslation.Z)
-                .RotateX((float)(ap.RotationX + itemRotation.X) * GameMath.DEG2RAD)
-                .RotateY((float)(ap.RotationY + itemRotation.Y) * GameMath.DEG2RAD)
-                .RotateZ((float)(ap.RotationZ + itemRotation.Z) * GameMath.DEG2RAD)
+                .Rotate((float)(ap.RotationX + itemRotation.X) * GameMath.DEG2RAD,
+                        (float)(ap.RotationY + itemRotation.Y) * GameMath.DEG2RAD,
+                        (float)(ap.RotationZ + itemRotation.Z) * GameMath.DEG2RAD)
                 .Translate(-itemOrigin.X, -itemOrigin.Y, -itemOrigin.Z)
             ;
 
@@ -478,17 +468,18 @@ namespace Vintagestory.GameContent
             {
                 samplername = "tex2d";
                 prog = rapi.CurrentActiveShader;
-                float[] mvpMat = Mat4f.Mul(ItemModelMat.Values, capi.Render.CurrentModelviewMatrix, ItemModelMat.Values);
-                Mat4f.Mul(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
+                float[] mvpMat = ItemModelMat.Values;
+                Mat4f.Multiply(mvpMat, capi.Render.CurrentModelviewMatrix, mvpMat);
+                Mat4f.Multiply(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
 
                 prog.UniformMatrix("mvpMatrix", mvpMat);
-                prog.Uniform("origin", new Vec3f());
+                prog.Uniform("origin", 0f, 0f, 0f);
             }
             else
             {
                 prog = getReadyShader();
 
-                prog.Uniform("dontWarpVertices", (int)0);
+                prog.Uniform("dontWarpVertices", (int)2);
                 prog.Uniform("addRenderFlags", (int)0);
                 prog.Uniform("normalShaded", (int)1);
                 prog.Uniform("tempGlowMode", stack.ItemAttributes?["tempGlowMode"].AsInt() ?? 0);
@@ -500,10 +491,10 @@ namespace Vintagestory.GameContent
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
                 {
                     prog.BindTexture2D("tex2dOverlay", renderInfo.OverlayTexture.TextureId, 1);
-                    prog.Uniform("overlayTextureSize", new Vec2f(renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height));
-                    prog.Uniform("baseTextureSize", new Vec2f(renderInfo.TextureSize.Width, renderInfo.TextureSize.Height));
+                    prog.Uniform("overlayTextureSize", renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height);
+                    prog.Uniform("baseTextureSize", renderInfo.TextureSize.Width, renderInfo.TextureSize.Height);
                     TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(stack);
-                    prog.Uniform("baseUvOrigin", new Vec2f(texPos.x1, texPos.y1));
+                    prog.Uniform("baseUvOrigin", texPos.x1, texPos.y1);
                 }
 
 
@@ -512,12 +503,19 @@ namespace Vintagestory.GameContent
                 var gi = GameMath.Clamp((temp - 500) / 3, 0, 255);
 
                 var baked = (stack.Item?.FirstTexture ?? stack.Block?.FirstTextureInventory)?.Baked;
-                Vec4f vec = baked == null ? new Vec4f(1, 1, 1, 1) : ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
-                prog.Uniform("averageColor", vec);
+                if (baked == null)
+                {
+                    prog.Uniform("averageColor", 1f, 1f, 1f, 1f);
+                }
+                else
+                {
+                    Vec4f vec = ColorUtil.ToRGBAVec4f(capi.BlockTextureAtlas.GetAverageColor(baked.TextureSubId));
+                    prog.Uniform("averageColor", vec);
+                }
                 prog.Uniform("extraGlow", (int)gi);
                 prog.Uniform("rgbaAmbientIn", rapi.AmbientColor);
                 prog.Uniform("rgbaLightIn", lightrgbs);
-                prog.Uniform("rgbaGlowIn", new Vec4f(glowColor[0], glowColor[1], glowColor[2], gi / 255f));
+                prog.Uniform("rgbaGlowIn", glowColor[0], glowColor[1], glowColor[2], gi / 255f);
                 prog.Uniform("rgbaFogIn", rapi.FogColor);
                 prog.Uniform("fogMinIn", rapi.FogMin);
                 prog.Uniform("fogDensityIn", rapi.FogDensity);
@@ -553,21 +551,23 @@ namespace Vintagestory.GameContent
 
                 if (stack.Collectible != null && !capi.IsGamePaused)
                 {
-                    Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Collectible.TopMiddlePos.X, stack.Collectible.TopMiddlePos.Y, stack.Collectible.TopMiddlePos.Z, 1));
+                    const float weirdMultiplier = 5f; // for some reason we need to spawn roughly 5 times fewer particles to have the same amount as a placed block
 
-                    if (pMatrixHandFov != null)
-                    {
-                        var screenSpaceCoordNormalFov = new Matrixf().Set(pMatrixHandFov).Mul(rapi.CameraMatrixOriginf).TransformVector(pos);
-                        var unprojectMatrix = new Matrixf(rapi.CameraMatrixOriginf).Invert().Mul(new Matrixf(pMatrixNormalFov).Invert());
-                        pos = unprojectMatrix.TransformVector(screenSpaceCoordNormalFov);
-                    }
-
-                    EntityPlayer entityPlayer = capi.World.Player.Entity;
                     accum += dt;
-                    if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > 0.05f)
+                    if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > ParticlePhysics.AsyncSpawnTime * weirdMultiplier)
                     {
-                        accum = accum % 0.025f;
+                        accum = Math.Min(1, accum - ParticlePhysics.AsyncSpawnTime * weirdMultiplier);
 
+                        Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Collectible.TopMiddlePos.X, stack.Collectible.TopMiddlePos.Y, stack.Collectible.TopMiddlePos.Z, 1));
+                        if (pMatrixHandFov != null)
+                        {
+                            Matrixf tmpMatrix = new Matrixf();
+                            Vec4f screenSpaceCoordNormalFov = tmpMatrix.Set(pMatrixHandFov).Mul(rapi.CameraMatrixOriginf).TransformVector(pos);
+                            Matrixf unprojectMatrix = new Matrixf(rapi.CameraMatrixOriginf).Invert().Mul(tmpMatrix.Set(pMatrixNormalFov).Invert());
+                            pos = unprojectMatrix.TransformVector(screenSpaceCoordNormalFov);
+                        }
+
+                        EntityPlayer entityPlayer = capi.World.Player.Entity;
                         for (int i = 0; i < ParticleProperties.Length; i++)
                         {
                             AdvancedParticleProperties bps = ParticleProperties[i];
@@ -736,7 +736,15 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.InternalY + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+                if (eagent?.MountedOn != null)
+                {
+                    var mountableSeat = eagent.MountedOn;
+                    aboveHeadPos = new Vec3d(mountableSeat.SeatPosition.X, mountableSeat.SeatPosition.InternalY + entity.SelectionBox.Y2, mountableSeat.SeatPosition.Z);
+                }
+                else
+                {
+                    aboveHeadPos = new Vec3d(entity.Pos.X, entity.Pos.InternalY + entity.SelectionBox.Y2 + 0.2, entity.Pos.Z);
+                }
             }
 
             double offX = entity.SelectionBox.X2 - entity.OriginSelectionBox.X2;
@@ -798,6 +806,14 @@ namespace Vintagestory.GameContent
             if (!isShadowPass)
             {
                 updateStepPitch(dt);
+
+                if (waterBobbing && entity.Swimming)
+                {
+                    long ellapseMs = capi.World.ElapsedMilliseconds;
+                    xangle = GameMath.DEG2RAD * GameMath.Sin((float)(ellapseMs / 1000.0)) * 8;
+                    yangle = GameMath.DEG2RAD * GameMath.Cos((float)(ellapseMs / 2000.0)) * 3;
+                    zangle = GameMath.DEG2RAD * -GameMath.Sin((float)(ellapseMs / 3000.0)) * 8;
+                }
             }
 
             double[] quat = Quaterniond.Create();
@@ -821,9 +837,7 @@ namespace Vintagestory.GameContent
             Quaterniond.RotateZ(quat, quat, zangle);
 
 
-            float[] qf = new float[quat.Length];
-            for (int i = 0; i < quat.Length; i++) qf[i] = (float)quat[i];
-            Mat4f.Mul(ModelMat, ModelMat, Mat4f.FromQuat(Mat4f.Create(), qf));
+            Mat4f.MulQuat(ModelMat, quat);
             if (shouldSwivelFromMotion)
             {
                 Mat4f.RotateX(ModelMat, ModelMat, nowSwivelRad);
@@ -903,7 +917,7 @@ namespace Vintagestory.GameContent
                     return;
                 }
 
-                var mot = entity.ServerPos.Motion;
+                var mot = entity.Pos.Motion;
                 if (mot.X != 0 && mot.Z != 0)    // Ignore perfectly zero motion X or Z as that throws off the calculation (can be 0 for a single frame apparently, due to collisions etc.)
                 {
                     double deltaY = entity.Pos.Y - prevY;
@@ -912,7 +926,7 @@ namespace Vintagestory.GameContent
                     // If we are walking backwards, then invert the deltaY so that stepPitch will still be correct
                     if (deltaY != 0)
                     {
-                        var yawAngle = GameMath.PI - entity.ServerPos.Yaw;
+                        var yawAngle = GameMath.PI - entity.Pos.Yaw;
                         var motionAngle = (float)Math.Atan2(mot.Z, mot.X) + GameMath.PIHALF;
                         // yawAngle is now the angle clockwise from due north: so facing East it will be PI / 2, South is PI, West is 3 * PI / 2  etc.
                         // likewise, motionAngle here will be the angle of the motion vector clockwise from due north

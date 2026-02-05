@@ -93,7 +93,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
     }
 
     // Interval at what things should be received.
-    public float interval = 1 / 15f;
+    public const float interval = 1 / 15f;
     public int queueCount;
 
     public void PopQueue(bool clear)
@@ -112,7 +112,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
 
         if (mountableSupplier?.IsBeingControlled() == true) return;
 
-        entity.ServerPos.SetPos(pN.x, pN.y, pN.z);
+        entity.Pos.SetPos(pN.x, pN.y, pN.z);
         physics?.HandleRemotePhysics(Math.Max(pN.interval, interval), pN.isTeleport);
     }
 
@@ -120,27 +120,27 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
 
     public override void Initialize(EntityProperties properties, JsonObject attributes)
     {
-        currentYaw = entity.ServerPos.Yaw;
-        targetYaw = entity.ServerPos.Yaw;
+        currentYaw = entity.Pos.Yaw;
+        targetYaw = entity.Pos.Yaw;
 
-        PushQueue(new PositionSnapshot(entity.ServerPos, 0, false));
+        PushQueue(new PositionSnapshot(entity.Pos, 0, false));
 
-        targetYaw = entity.ServerPos.Yaw;
-        targetPitch = entity.ServerPos.Pitch;
-        targetRoll = entity.ServerPos.Roll;
+        targetYaw = entity.Pos.Yaw;
+        targetPitch = entity.Pos.Pitch;
+        targetRoll = entity.Pos.Roll;
 
-        currentYaw = entity.ServerPos.Yaw;
-        currentPitch = entity.ServerPos.Pitch;
-        currentRoll = entity.ServerPos.Roll;
+        currentYaw = entity.Pos.Yaw;
+        currentPitch = entity.Pos.Pitch;
+        currentRoll = entity.Pos.Roll;
 
         if (agent != null)
         {
-            targetHeadYaw = entity.ServerPos.HeadYaw;
-            targetHeadPitch = entity.ServerPos.HeadPitch;
+            targetHeadYaw = entity.Pos.HeadYaw;
+            targetHeadPitch = entity.Pos.HeadPitch;
             targetBodyYaw = agent.BodyYawServer;
 
-            currentHeadYaw = entity.ServerPos.HeadYaw;
-            currentHeadPitch = entity.ServerPos.HeadPitch;
+            currentHeadYaw = entity.Pos.HeadYaw;
+            currentHeadPitch = entity.Pos.HeadPitch;
             currentBodyYaw = agent.BodyYawServer;
         }
 
@@ -162,7 +162,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
     {
         float tickInterval = entity.Attributes.GetInt("tickDiff", 1) * interval;
 
-        PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, isTeleport));
+        PushQueue(new PositionSnapshot(entity.Pos, tickInterval, isTeleport));
 
         if (isTeleport)
         {
@@ -170,21 +170,32 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
             positionQueue.Clear();
             queueCount = 0;
 
-            PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, false));
-            PushQueue(new PositionSnapshot(entity.ServerPos, tickInterval, false));
+            PushQueue(new PositionSnapshot(entity.Pos, tickInterval, false));
+            PushQueue(new PositionSnapshot(entity.Pos, tickInterval, false));
 
             PopQueue(false);
             PopQueue(false);
+
+            currentYaw = entity.Pos.Yaw;
+            currentPitch = entity.Pos.Pitch;
+            currentRoll = entity.Pos.Roll;
+
+            if (agent != null)
+            {
+                currentHeadYaw = entity.Pos.HeadYaw;
+                currentHeadPitch = entity.Pos.HeadPitch;
+                currentBodyYaw = agent.BodyYawServer;
+            }
         }
 
-        targetYaw = entity.ServerPos.Yaw;
-        targetPitch = entity.ServerPos.Pitch;
-        targetRoll = entity.ServerPos.Roll;
+        targetYaw = entity.Pos.Yaw;
+        targetPitch = entity.Pos.Pitch;
+        targetRoll = entity.Pos.Roll;
 
         if (agent != null)
         {
-            targetHeadYaw = entity.ServerPos.HeadYaw;
-            targetHeadPitch = entity.ServerPos.HeadPitch;
+            targetHeadYaw = entity.Pos.HeadYaw;
+            targetHeadPitch = entity.Pos.HeadPitch;
             targetBodyYaw = agent.BodyYawServer;
         }
 
@@ -304,7 +315,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         int signY = Math.Sign(pDiff);
         current += 0.6f * Math.Clamp(GameMath.AngleRadDistance(current, target), -signY * pDiff, signY * pDiff);
         current %= GameMath.TWOPI;
-        
+
         return current;
     }
 

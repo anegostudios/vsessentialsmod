@@ -157,23 +157,21 @@ namespace Vintagestory.GameContent
             var setblocks = updateChunk.SetBlocks;
             double lastSnowAccumUpdateTotalHours = updateChunk.LastSnowAccumUpdateTotalHours;
 
-            Vec2i tmpVec = new Vec2i();
             int cx = updateChunk.Coords.X;
             int cz = updateChunk.Coords.Y;
 
-            tmpPos ??= new BlockPos(Dimensions.NormalWorld);
+            BlockPos pos = tmpPos ??= new BlockPos(Dimensions.NormalWorld);
             foreach (var sval in setblocks)
             {
                 Block newblock = sval.Value.Block;
                 float snowLevel = sval.Value.SnowLevel;
-                tmpPos.SetFromColumnIndex3d(sval.Key, cx, cz);
+                pos.SetFromColumnIndex3d(sval.Key, cx, cz);
 
-                Block hereblock = ba.GetBlock(tmpPos);
+                Block hereblock = ba.GetBlock(pos);
 
-                tmpVec.Set(tmpPos.X, tmpPos.Z);
-                if (snowLevel > 0 && !mc.SnowAccum.ContainsKey(tmpVec)) continue; // Must have gotten removed since we last checked in our seperate thread
+                if (snowLevel > 0 && mc.SnowAccum[new Vec2iStruct(pos.X, pos.Z).ToInChunkIndex] == 0f) continue; // Must have gotten removed since we last checked in our seperate thread
 
-                hereblock.PerformSnowLevelUpdate(ba, tmpPos, newblock, snowLevel);
+                hereblock.PerformSnowLevelUpdate(ba, pos, newblock, snowLevel);
             }
 
             mc.SetModdata("lastSnowAccumUpdateTotalHours", SerializerUtil.Serialize<double>(lastSnowAccumUpdateTotalHours));
@@ -595,17 +593,17 @@ namespace Vintagestory.GameContent
                     else if (block.GetSnowLevel(pos) == 0) continue;  // No snow layer should form on blocks which are in liquids
                 }
 
-                float hereAccum = 0;
 
-                Vec2i vec = new Vec2i(pos.X, pos.Z);
-                if (!ignoreOldAccum && !mc.SnowAccum.TryGetValue(vec, out hereAccum))
+                Vec2iStruct vec = new Vec2iStruct(pos.X, pos.Z);
+                float hereAccum = mc.SnowAccum[vec.ToInChunkIndex];
+                if (!ignoreOldAccum && hereAccum == 0f)
                 {
                     hereAccum = block.GetSnowLevel(pos);
                 }
 
                 float nowAccum = hereAccum + sumsnapshot.GetAvgSnowAccumByRegionCorner(relx, rely, relz);
 
-                mc.SnowAccum[vec] = GameMath.Clamp(nowAccum, -1, snowBlocksCount + 0.6f);
+                mc.SnowAccum[vec.ToInChunkIndex] = GameMath.Clamp(nowAccum, -1, snowBlocksCount + 0.6f);
 
                 float hereShouldLevel = nowAccum - GameMath.MurmurHash3Mod(pos.X, 0, pos.Z, 150) / 300f;
 
@@ -633,7 +631,7 @@ namespace Vintagestory.GameContent
 
                 // Case 1: We have a block that can become snow covered (or more snow covered)
                 placePos.Set(pos);
-                Block newblock = block.GetSnowCoveredVariant(placePos, hereShouldLevel);
+                Block newblock = block.GetSnowCoveredVariant(placePos, Math.Min(snowBlocksCount, hereShouldLevel));
                 if (newblock != null)
                 {
                     if (block.Id != newblock.Id && upBlock.Replaceable > 6000)
@@ -648,7 +646,7 @@ namespace Vintagestory.GameContent
 
                     if (upBlock.Id != 0)
                     {
-                        newblock = upBlock.GetSnowCoveredVariant(placePos, hereShouldLevel);
+                        newblock = upBlock.GetSnowCoveredVariant(placePos, Math.Min(snowBlocksCount, hereShouldLevel));
                         if (newblock != null && upBlock.Id != newblock.Id)
                         {
                             updateChunk.SetBlocks[placePos.ToColumnIndex3d()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);

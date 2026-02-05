@@ -174,7 +174,7 @@ namespace Vintagestory.GameContent
                     if (type == "ws")
                     {
                         var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
-                        if (block.LiquidCode == "water" && block.PushVector == null)
+                        if ((block is IBlockFlowing flowing && flowing.IsStill) && block.LiquidCode == "water")
                         {
                             var ws = new EntityParticleWaterStrider(capi, x, y+block.LiquidLevel/8f, z);
                             sys.SpawnParticle(ws);
@@ -185,7 +185,7 @@ namespace Vintagestory.GameContent
                         x = pos.X + (rand.NextDouble() - 0.5) * 2;
                         z = pos.Z + (rand.NextDouble() - 0.5) * 2;
                         var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
-                        if (block.LiquidCode == "saltwater" && block.PushVector == null)
+                        if ((block is IBlockFlowing flowing && flowing.IsStill) && block.LiquidCode == "saltwater")
                         {
                             var ws = new EntityParticleFish(capi, x, y - block.LiquidLevel, z, new Vec3f(0.4f), 0, 0.3f);
                             sys.SpawnParticle(ws);
@@ -259,7 +259,7 @@ namespace Vintagestory.GameContent
                 var block = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y, (int)z, BlockLayersAccess.Fluid);
                 var belowblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y - 1, (int)z);
                 var aboveblock = capi.World.BlockAccessor.GetBlockRaw((int)x, (int)y + 1, (int)z);
-                if (block.LiquidCode == "water" && block.PushVector == null && belowblock.Replaceable < 6000 && aboveblock.Id == 0)
+                if ((block is IBlockFlowing flowing && flowing.IsStill) && block.LiquidCode == "water" && belowblock.Replaceable < 6000 && aboveblock.Id == 0)
                 {
                     var ws = new EntityParticleWaterStrider(capi, x, y + block.LiquidLevel / 8f, z);
                     sys.SpawnParticle(ws);

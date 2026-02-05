@@ -82,11 +82,15 @@ namespace Vintagestory.ServerMods
 
             api.RegisterCollectibleBehaviorClass("AnimationAuthoritative", typeof(CollectibleBehaviorAnimationAuthoritative));
             api.RegisterCollectibleBehaviorClass("HeldBag", typeof(CollectibleBehaviorHeldBag));
+            api.RegisterCollectibleBehaviorClass("Throwable", typeof(CollectibleBehaviorThrowable));
+            api.RegisterCollectibleBehaviorClass("Buffable", typeof(CollectibleBehaviorBuffable));
+            api.RegisterCollectibleBehaviorClass("Quenchable", typeof(CollectibleBehaviorQuenchable));
+            
         }
 
         public override void AssetsFinalize(ICoreAPI api)
         {
-            EntityBehaviorEntityStateTags.GetTagsIds(api.TagRegistry);
+            EntityBehaviorEntityStateTags.GetTagsIds(api.TagsManager);
         }
 
 
@@ -133,6 +137,7 @@ namespace Vintagestory.ServerMods
         private void RegisterDefaultEntities()
         {    
             api.RegisterEntity("EntityBlockfalling", typeof(EntityBlockFalling));
+            api.RegisterEntity("EntityThrownItem", typeof(EntityThrownItem));
         }
 
 
@@ -148,7 +153,6 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("controlledphysics", typeof(EntityBehaviorControlledPhysics));
             
             api.RegisterEntityBehaviorClass("taskai", typeof(EntityBehaviorTaskAI));
-            api.RegisterEntityBehaviorClass("goalai", typeof(EntityBehaviorGoalAI));
             api.RegisterEntityBehaviorClass("interpolateposition", typeof(EntityBehaviorInterpolatePosition));
             api.RegisterEntityBehaviorClass("despawn", typeof(EntityBehaviorDespawn));
 

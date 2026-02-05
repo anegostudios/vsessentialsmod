@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -51,7 +51,7 @@ namespace Vintagestory.GameContent
         Vec4f col = new Vec4f(1,1,1,1);
         float quarterSecAccum = 0;
         public ClimateCondition clientClimateCond;
-        BlockPos plrPos = new BlockPos();
+        BlockPos plrPos = new BlockPos(API.Config.Dimensions.NormalWorld);
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {

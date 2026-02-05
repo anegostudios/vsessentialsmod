@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -34,17 +34,17 @@ namespace Vintagestory.ServerMods.NoObf
     public class CropBehaviorType
     {
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The ID of the crop behavior class to use.
         /// </summary>
         [JsonProperty]
+        [DocumentAsJson("Required")]
         public string name;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// Properties for the specific crop behavior class.
         /// </summary>
         [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
+        [DocumentAsJson("Optional", "None")]
         public JsonObject properties;
     }
 }

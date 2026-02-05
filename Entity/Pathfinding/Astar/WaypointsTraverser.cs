@@ -14,7 +14,7 @@ namespace Vintagestory.Essentials
     {
         float minTurnAnglePerSec;
         float maxTurnAnglePerSec;
-        
+
         Vec3f targetVec = new Vec3f();
 
         List<Vec3d> waypoints;
@@ -87,7 +87,7 @@ namespace Vintagestory.Essentials
             this.targetDistance_New = targetDistance;
             if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
 
-            BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
+            BlockPos startBlockPos = entity.Pos.AsBlockPos;
             if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
             {
                 HandleNoPath();
@@ -98,6 +98,31 @@ namespace Vintagestory.Essentials
 
             return AfterFoundPath();
         }
+
+
+        public override bool FleeFrom(Vec3d target, float movingSpeed, float fleedistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        {
+            this.desiredTarget = target;
+            this.OnNoPath = onNoPath;
+            this.OnStuck_New = OnStuck;
+            this.OnGoalReached_New = OnGoalReached;
+            this.movingSpeed_New = movingSpeed;
+            this.targetDistance_New = 1;
+            if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
+
+            BlockPos startBlockPos = entity.Pos.AsBlockPos;
+            if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            {
+                HandleNoPath();
+                return false;
+            }
+
+            FindEscapePath(startBlockPos, target.AsBlockPos, fleedistance, searchDepth);
+
+            return AfterFoundPath();
+        }
+
+
 
 
         public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
@@ -114,17 +139,45 @@ namespace Vintagestory.Essentials
             this.movingSpeed_New = movingSpeed;
             this.targetDistance_New = targetDistance;
 
-            BlockPos startBlockPos = entity.ServerPos.AsBlockPos;
+            BlockPos startBlockPos = entity.Pos.AsBlockPos;
             if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
             {
                 HandleNoPath();
                 return false;
             }
 
-            FindPath_Async(startBlockPos, target.AsBlockPos, searchDepth, mhdistanceTolerance);
+            FindPath_Async(startBlockPos, target.AsBlockPos, 0, searchDepth, mhdistanceTolerance);
 
             return true;
         }
+
+
+        public override bool Flee_Async(Vec3d fleeFromPos, float fleeDistance, float movingSpeed, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        {
+            if (this.asyncSearchObject != null) return false;  // Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
+
+            this.desiredTarget = null;
+            if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
+
+            // these all have to be saved because they are local parameters, but not used until we call AfterFoundPath()
+            this.OnNoPath = onNoPath;
+            this.OnGoalReached_New = OnGoalReached;
+            this.OnStuck_New = OnStuck;
+            this.movingSpeed_New = movingSpeed;
+            this.targetDistance_New = 1;
+
+            BlockPos startBlockPos = entity.Pos.AsBlockPos;
+            if (entity.World.BlockAccessor.IsNotTraversable(startBlockPos))
+            {
+                HandleNoPath();
+                return false;
+            }
+
+            FindPath_Async(startBlockPos, fleeFromPos.AsBlockPos, fleeDistance, searchDepth, 0);
+
+            return true;
+        }
+
 
 
         private void FindPath(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth, int mhdistanceTolerance = 0)
@@ -135,25 +188,35 @@ namespace Vintagestory.Essentials
             float stepHeight = bh == null ? 0.6f : bh.StepHeight;
             int maxFallHeight = entity.Properties.FallDamage ? Math.Min(8, (int)Math.Round(3.51 / Math.Max(0.01, entity.Properties.FallDamageMultiplier))) - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType);
+            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, -1, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType);
         }
 
+        private void FindEscapePath(BlockPos startBlockPos, BlockPos targetBlockPos, float modeMinimumFleeDistance, int searchDepth)
+        {
+            waypointToReachIndex = 0;
 
-        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
+            var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
+            float stepHeight = bh == null ? 0.6f : bh.StepHeight;
+            int maxFallHeight = entity.Properties.FallDamage ? Math.Min(8, (int)Math.Round(3.51 / Math.Max(0.01, entity.Properties.FallDamageMultiplier))) - (int)(movingSpeed * 30) : 8;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
+
+            newWaypoints = psys.FindPathAsWaypoints(startBlockPos, targetBlockPos, modeMinimumFleeDistance, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, 0, creatureType);
+        }
+
+        public PathfinderTask PreparePathfinderTask(BlockPos startBlockPos, BlockPos targetBlockPos, float modeMinFleeDistance, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
             var bh = entity.GetBehavior<EntityBehaviorControlledPhysics>();
             float stepHeight = bh == null ? 0.6f : bh.StepHeight;
             bool avoidFall = entity.Properties.FallDamage && entity.Properties.Attributes?["reckless"].AsBool(false) != true;
             int maxFallHeight = avoidFall ? 4 - (int)(movingSpeed * 30) : 12;   // fast moving entities cannot safely fall so far (might miss target block below due to outward drift)
 
-            return new PathfinderTask(startBlockPos, targetBlockPos, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType ?? this.creatureType);
+            return new PathfinderTask(startBlockPos, targetBlockPos, modeMinFleeDistance, maxFallHeight, stepHeight, entity.CollisionBox, searchDepth, mhdistanceTolerance, creatureType ?? this.creatureType);
         }
 
 
-        private void FindPath_Async(BlockPos startBlockPos, BlockPos targetBlockPos, int searchDepth, int mhdistanceTolerance = 0)
+        private void FindPath_Async(BlockPos startBlockPos, BlockPos targetBlockPos, float modeMinFleeDistance, int searchDepth, int mhdistanceTolerance = 0)
         {
             waypointToReachIndex = 0;
-            asyncSearchObject = PreparePathfinderTask(startBlockPos, targetBlockPos, searchDepth, mhdistanceTolerance, creatureType);
+            asyncSearchObject = PreparePathfinderTask(startBlockPos, targetBlockPos, modeMinFleeDistance, searchDepth, mhdistanceTolerance, creatureType);
             asyncPathfinder.EnqueuePathfinderTask(asyncSearchObject);
         }
 
@@ -187,7 +250,7 @@ namespace Vintagestory.Essentials
                     i++;
                 }
 
-                poses.Add(desiredTarget.AsBlockPos);
+                if (desiredTarget != null) poses.Add(desiredTarget.AsBlockPos);
                 colors.Add(ColorUtil.ColorFromRgba(128, 0, 255, 255));
 
                 IPlayer player = entity.World.AllOnlinePlayers[0];
@@ -197,7 +260,7 @@ namespace Vintagestory.Essentials
                 );
             }
 
-            waypoints.Add(desiredTarget);
+            if (desiredTarget != null) waypoints.Add(desiredTarget);
 
             base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
 
@@ -231,7 +294,7 @@ namespace Vintagestory.Essentials
                 );
             }
 
-            waypoints.Add(desiredTarget);
+            if (desiredTarget != null) waypoints.Add(desiredTarget);
 
             base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
 
@@ -317,7 +380,7 @@ namespace Vintagestory.Essentials
 
             bool stuck =
                 (entity.CollidedVertically && entity.Controls.IsClimbing)
-                || (entity.CollidedHorizontally && entity.ServerPos.Motion.Y <= 0)
+                || (entity.CollidedHorizontally && entity.Pos.Motion.Y <= 0)
                 || stuckBelowOrAbove
                 || (entity.CollidedHorizontally && waypoints.Count > 1 && waypointToReachIndex < waypoints.Count && entity.World.ElapsedMilliseconds - lastWaypointIncTotalMs > 2000)    // If it takes more than 2 seconds to reach next waypoint (waypoints are always 1 block apart)
             ;
@@ -333,7 +396,7 @@ namespace Vintagestory.Essentials
             {
                 prevPosAccum = 0;
                 prevPrevPos.Set(prevPos);
-                prevPos.Set(entity.ServerPos.X, entity.ServerPos.InternalY, entity.ServerPos.Z);
+                prevPos.Set(entity.Pos.X, entity.Pos.InternalY, entity.Pos.Z);
             }
 
             // Long duration tests to make sure we're not just wobbling around in the same spot
@@ -354,7 +417,7 @@ namespace Vintagestory.Essentials
             {
                 stuckCounter++;
             }
-            
+
             if (GlobalConstants.OverallSpeedMultiplier > 0 && stuckCounter > 60 / GlobalConstants.OverallSpeedMultiplier)
             {
                 //entity.World.SpawnParticles(10, ColorUtil.WhiteArgb, prevPos, prevPos, new Vec3f(0, 0, 0), new Vec3f(0, -1, 0), 1, 1);
@@ -367,16 +430,16 @@ namespace Vintagestory.Essentials
             if (controls == null) return;
 
             targetVec.Set(
-                (float)(target.X - entity.ServerPos.X),
-                (float)(target.Y - entity.ServerPos.InternalY),
-                (float)(target.Z - entity.ServerPos.Z)
+                (float)(target.X - entity.Pos.X),
+                (float)(target.Y - entity.Pos.InternalY),
+                (float)(target.Z - entity.Pos.Z)
             );
             targetVec.Normalize();
 
             //entity.World.SpawnParticles(1, ColorUtil.WhiteArgb, target, target, new Vec3f(), new Vec3f(), 0.2f, 0, 1);
 
             float desiredYaw = 0;
-            
+
             if (sqDistToTarget >= 0.01)
             {
                 desiredYaw = (float)Math.Atan2(targetVec.X, targetVec.Z);
@@ -389,15 +452,15 @@ namespace Vintagestory.Essentials
                 nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max(sqDistToTarget, 0.2f));
             }
 
-            float yawDist = GameMath.AngleRadDistance(entity.ServerPos.Yaw, desiredYaw);
+            float yawDist = GameMath.AngleRadDistance(entity.Pos.Yaw, desiredYaw);
             float turnSpeed = curTurnRadPerSec * dt * GlobalConstants.OverallSpeedMultiplier * movingSpeed;
-            entity.ServerPos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
-            entity.ServerPos.Yaw = entity.ServerPos.Yaw % GameMath.TWOPI;
+            entity.Pos.Yaw += GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
+            entity.Pos.Yaw = entity.Pos.Yaw % GameMath.TWOPI;
 
-            
 
-            double cosYaw = Math.Cos(entity.ServerPos.Yaw);
-            double sinYaw = Math.Sin(entity.ServerPos.Yaw);
+
+            double cosYaw = Math.Cos(entity.Pos.Yaw);
+            double sinYaw = Math.Sin(entity.Pos.Yaw);
             controls.WalkVector.Set(sinYaw, GameMath.Clamp(targetVec.Y, -1, 1), cosYaw);
             controls.WalkVector.Mul(nowMoveSpeed * GlobalConstants.OverallSpeedMultiplier / Math.Max(1, Math.Abs(yawDist)*3));
 
@@ -479,8 +542,8 @@ namespace Vintagestory.Essentials
             int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + waypointOffset);
             Vec3d target = waypoints[wayPointIndex];
 
-            double curPosY = entity.ServerPos.InternalY;
-            sqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
+            double curPosY = entity.Pos.InternalY;
+            sqDistToTarget = target.HorizontalSquareDistanceTo(entity.Pos.X, entity.Pos.Z);
 
             var vdistsq = (target.Y - curPosY) * (target.Y - curPosY);
             bool above = curPosY > target.Y;
@@ -488,7 +551,7 @@ namespace Vintagestory.Essentials
 
             if (!nearHorizontally)
             {
-                double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.ServerPos.X, entity.ServerPos.Z);
+                double horsqDistToTarget = target.HorizontalSquareDistanceTo(entity.Pos.X, entity.Pos.Z);
                 nearHorizontally = horsqDistToTarget < TargetDistance * TargetDistance;
             }
 
@@ -516,6 +579,6 @@ namespace Vintagestory.Essentials
             waypointToReachIndex = waypoints.Count - 1;
         }
 
-        
+
     }
 }

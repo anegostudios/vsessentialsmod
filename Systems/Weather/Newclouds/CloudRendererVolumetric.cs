@@ -13,7 +13,7 @@ namespace FluffyClouds {
         ICoreClientAPI capi;
         ModSystem mod;
         CloudRendererMap map;
-        IShaderProgram program;
+        IShaderProgram program = null!;
         MeshRef quad;
         Matrixf matrix = new Matrixf();
         int frame = 0;
@@ -77,16 +77,10 @@ namespace FluffyClouds {
 
             GL.Disable(EnableCap.DepthTest);
             GL.Enable(EnableCap.Blend);
-            GL.BlendFuncSeparate(0, BlendingFactorSrc.One, BlendingFactorDest.One, BlendingFactorSrc.One, BlendingFactorDest.One);
-            GL.BlendFuncSeparate(1, BlendingFactorSrc.Zero, BlendingFactorDest.OneMinusSrcColor, BlendingFactorSrc.Zero, BlendingFactorDest.OneMinusSrcColor);
-            GL.BlendFuncSeparate(2, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
 
             capi.Render.RenderMesh(quad);
 
             GL.Enable(EnableCap.DepthTest);
-            GL.BlendFuncSeparate(0, BlendingFactorSrc.One, BlendingFactorDest.One, BlendingFactorSrc.One, BlendingFactorDest.One);
-            GL.BlendFuncSeparate(1, BlendingFactorSrc.Zero, BlendingFactorDest.OneMinusSrcColor, BlendingFactorSrc.Zero, BlendingFactorDest.OneMinusSrcColor);
-            GL.BlendFuncSeparate(2, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha);
 
             program.Stop();
 

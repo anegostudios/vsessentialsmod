@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -37,7 +37,7 @@ namespace Vintagestory.GameContent
             { EnumBlockMaterial.Plant, "plant" },
             { EnumBlockMaterial.Wood, "forest" },
             { EnumBlockMaterial.Snow, "glacier" },
-            { EnumBlockMaterial.Liquid, "lake" },
+            { EnumBlockMaterial.Water, "lake" },
             { EnumBlockMaterial.Ice, "glacier" },
             { EnumBlockMaterial.Lava, "lava" }
         };
@@ -53,6 +53,7 @@ namespace Vintagestory.GameContent
             { "road", "#805030" },
             { "plant", "#808650" },
             { "lake", "#CCC890" },
+            { "lava", "#CCC890" },
             { "ocean", "#CCC890" },
             { "glacier", "#E0E0C0" },
             { "devastation", "#755c3c" }
@@ -68,7 +69,7 @@ namespace Vintagestory.GameContent
 
         object chunksToGenLock = new object();
         UniqueQueue<FastVec2i> chunksToGen = new ();
-        ConcurrentDictionary<FastVec2i, MultiChunkMapComponent> loadedMapData = new ();
+        ConcurrentDictionary<FastVec2i, MultiChunkMapComponent> loadedMapData = new (2, 16);
         HashSet<FastVec2i> curVisibleChunks = new ();
 
         ConcurrentQueue<ReadyMapPiece> readyMapPieces = new ConcurrentQueue<ReadyMapPiece>();
@@ -85,6 +86,7 @@ namespace Vintagestory.GameContent
         ICoreClientAPI capi;
 
         bool colorAccurate;
+        float colorRandomizationWeight = 0.6f;
 
         public string getMapDbFilePath()
         {
@@ -113,6 +115,9 @@ namespace Vintagestory.GameContent
 
             if (api.Side == EnumAppSide.Client)
             {
+                colorAccurate = api.World.Config.GetAsBool("colorAccurateWorldmap", false) || (capi.World.Player.Privileges.IndexOf("colorAccurateWorldmap") != -1);
+                colorRandomizationWeight = (float)api.World.Config.GetDecimal("colorRandomizationWeight", 0.6f);
+
                 api.World.Logger.Notification("Loading world map cache db...");
                 mapdb = new MapDB(api.World.Logger);
                 string errorMessage = null;
@@ -301,7 +306,9 @@ namespace Vintagestory.GameContent
                     cord = chunksToGen.Dequeue();
                 }
 
+#pragma warning disable CS0618 // Type or member is obsolete  - but it's OK here as we are generating mapchunks for the Normal world
                 if (!api.World.BlockAccessor.IsValidPos(cord.X * chunksize, 1, cord.Y * chunksize)) continue;
+#pragma warning restore CS0618
 
                 IMapChunk mc = api.World.BlockAccessor.GetMapChunk(cord.X, cord.Y);
                 if (mc == null)
@@ -364,10 +371,9 @@ namespace Vintagestory.GameContent
                         FastVec2i mcord = new FastVec2i(mappiece.Cord.X / MultiChunkMapComponent.ChunkLen, mappiece.Cord.Y / MultiChunkMapComponent.ChunkLen);
                         FastVec2i baseCord = new FastVec2i(mcord.X * MultiChunkMapComponent.ChunkLen, mcord.Y * MultiChunkMapComponent.ChunkLen);
 
-                        if (!loadedMapData.TryGetValue(mcord, out MultiChunkMapComponent mccomp))
-                        {
-                            loadedMapData[mcord] = mccomp = new MultiChunkMapComponent(api as ICoreClientAPI, baseCord);
-                        }
+                        MultiChunkMapComponent mccomp = loadedMapData.GetOrAdd(mcord, (mcord) =>
+                            new MultiChunkMapComponent(api as ICoreClientAPI, baseCord)
+                        );
 
                         mccomp.setChunk(mappiece.Cord.X - baseCord.X, mappiece.Cord.Y - baseCord.Y, mappiece.Pixels);
                         modified.Add(mccomp);
@@ -497,7 +503,7 @@ namespace Vintagestory.GameContent
 
         private static bool isLake(Block block)
         {
-            return block.BlockMaterial == EnumBlockMaterial.Liquid || (block.BlockMaterial == EnumBlockMaterial.Ice && block.Code.Path != "glacierice");
+            return block.BlockMaterial == EnumBlockMaterial.Water || (block.BlockMaterial == EnumBlockMaterial.Ice && block.Code.Path != "glacierice");
         }
 
         [ThreadStatic]
@@ -506,7 +512,7 @@ namespace Vintagestory.GameContent
         static byte[] shadowMapBlurReusable;
         public int[] GenerateChunkImage(FastVec2i chunkPos, IMapChunk mc, bool colorAccurate = false)
         {
-            BlockPos tmpPos = new BlockPos();
+            BlockPos tmpPos = new BlockPos(Dimensions.NormalWorld);  // Used for building the map pixels
             Vec2i localpos = new Vec2i();
 
             // Prefetch chunks
@@ -605,9 +611,9 @@ namespace Vintagestory.GameContent
                     int rndCol = block.GetRandomColor(capi, tmpPos, BlockFacing.UP, GameMath.MurmurHash3Mod(tmpPos.X, tmpPos.Y, tmpPos.Z, 30));
                     // Why the eff is r and b flipped
                     rndCol = ((rndCol & 0xff) << 16) | (((rndCol >> 8) & 0xff) << 8) | (((rndCol >> 16) & 0xff) << 0);
-
+                    
                     // Add a bit of randomness to each pixel
-                    int col = ColorUtil.ColorOverlay(avgCol, rndCol, 0.6f);
+                    int col = ColorUtil.ColorOverlay(avgCol, rndCol, colorRandomizationWeight);
 
                     tintedImage[i] = col;
                     shadowMap[i] = (byte)(shadowMap[i] * b);

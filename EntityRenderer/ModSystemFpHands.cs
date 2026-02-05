@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Client;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
@@ -27,6 +27,7 @@ namespace Vintagestory.GameContent
             capi.Shader.RegisterFileShaderProgram("standard", fpModeItemShader);
 
             fpModeHandShader = createProg();
+            fpModeHandShader.Oit = false;
             capi.Shader.RegisterFileShaderProgram("entityanimated", fpModeHandShader);
 
             bool ok = fpModeItemShader.Compile() && fpModeHandShader.Compile();
@@ -43,6 +44,7 @@ namespace Vintagestory.GameContent
         private IShaderProgram createProg()
         {
             var prog = capi.Shader.NewShaderProgram();
+            
             prog.VertexShader = capi.Shader.NewShader(EnumShaderType.VertexShader);
             prog.VertexShader.PrefixCode = "#define ALLOWDEPTHOFFSET 1\r\n";
             prog.VertexShader.PrefixCode += "#define MAXANIMATEDELEMENTS " + GlobalConstants.MaxAnimatedElements + "\r\n";

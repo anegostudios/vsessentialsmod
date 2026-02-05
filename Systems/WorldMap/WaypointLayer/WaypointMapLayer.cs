@@ -1,4 +1,4 @@
-﻿using Cairo;
+using Cairo;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -469,7 +469,9 @@ namespace Vintagestory.GameContent
 
         public override void OnViewChangedServer(IServerPlayer fromPlayer, int x1, int z1, int x2, int z2)
         {
+#pragma warning disable CS0618 // Type or member is obsolete - intentionally called here for mod backwards compatibility if a mod extended this class
             OnViewChangedServer(fromPlayer, null, null);
+#pragma warning restore CS0618
         }
 
 

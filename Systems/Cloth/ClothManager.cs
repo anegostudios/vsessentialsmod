@@ -173,6 +173,8 @@ namespace Vintagestory.GameContent
                     foreach (var val in clothSystems)
                     {
                         var cs = val.Value;
+                        if (!cs.CanRip) continue;
+
                         if (cs.MaxExtension > cs.StretchWarn)
                         {
                             cs.secondsOverStretched += dt;
@@ -269,6 +271,8 @@ namespace Vintagestory.GameContent
 
                     foreach (var val in clothSystems)
                     {
+                        if (!val.Value.CanRip) continue;
+
                         var cs = val.Value;
                         cs.CollectDirtyPoints(packets);
 

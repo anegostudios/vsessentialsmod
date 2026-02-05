@@ -12,19 +12,15 @@ namespace Vintagestory.GameContent
 {
     public class BEBehaviorAnimatable : BlockEntityBehavior
     {
-        public BEBehaviorAnimatable(BlockEntity blockentity) : base(blockentity)
-        {
-        }
+        public BEBehaviorAnimatable(BlockEntity blockentity) : base(blockentity) { }
 
         public BlockEntityAnimationUtil animUtil;
 
         public override void Initialize(ICoreAPI api, JsonObject properties)
         {
             base.Initialize(api, properties);
-
             animUtil = new BlockEntityAnimationUtil(api, Blockentity);
         }
-
 
         public override void OnBlockUnloaded()
         {
@@ -44,29 +40,23 @@ namespace Vintagestory.GameContent
             animUtil?.Dispose();
         }
 
-
-
-        public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
-        {
-            base.FromTreeAttributes(tree, worldAccessForResolve);
-        }
-
-        public override void ToTreeAttributes(ITreeAttribute tree)
-        {
-            base.ToTreeAttributes(tree);
-        }
-
         public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
         {
             return animUtil.activeAnimationsByAnimCode.Count > 0 || (animUtil.animator != null && animUtil.animator.ActiveAnimationCount > 0);
         }
 
-
         public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
         {
             if (Api is ICoreClientAPI capi && capi.Settings.Bool["extendedDebugInfo"] == true)
             {
-                dsc.AppendLine(string.Format("Active animations: {0}", string.Join(", ", animUtil.activeAnimationsByAnimCode.Keys)));
+                dsc.Append("<font color=\"#bbb\">Active animations:");
+                foreach (var val in animUtil.activeAnimationsByAnimCode)
+                {
+                    dsc.Append(val.Key + " (frame " + animUtil.animator.GetAnimationState(val.Key)?.CurrentFrame +")");
+                }
+
+                dsc.AppendLine("</font>");
+
             }
         }
     }
@@ -103,7 +93,7 @@ namespace Vintagestory.GameContent
         /// <param name="texSource"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public virtual MeshData CreateMesh(string nameForLogging, Shape shape, out Shape resultingShape, ITexPositionSource texSource)
+        public virtual MeshData CreateMesh(string nameForLogging, Shape shape, out Shape resultingShape, ITexPositionSource texSource, TesselationMetaData metaOverride = null)
         {
             if (api.Side != EnumAppSide.Client) throw new NotImplementedException("Server side animation system not implemented yet.");
 
@@ -133,9 +123,9 @@ namespace Vintagestory.GameContent
 
             TesselationMetaData meta = new TesselationMetaData()
             {
-                QuantityElements = block.Shape.QuantityElements,
-                SelectiveElements = block.Shape.SelectiveElements,
-                IgnoreElements = block.Shape.IgnoreElements,
+                QuantityElements = metaOverride?.QuantityElements ?? block.Shape.QuantityElements,
+                SelectiveElements = metaOverride?.SelectiveElements ?? block.Shape.SelectiveElements,
+                IgnoreElements = metaOverride?.IgnoreElements ?? block.Shape.IgnoreElements,
                 TexSource = texSource,
                 WithJointIds = true,
                 WithDamageEffect = true,

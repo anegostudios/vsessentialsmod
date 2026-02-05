@@ -12,24 +12,18 @@ namespace Vintagestory.GameContent
 {
     public class EntityBehaviorMultiply : EntityBehaviorMultiplyBase
     {
-        JsonObject typeAttributes;
         long callbackId = 0;
-        AssetLocation[] spawnEntityCodes;
 
-        internal float PregnancyDays
-        {
-            get { return typeAttributes["pregnancyDays"].AsFloat(3f); }
-        }
+        protected AssetLocation[] SpawnEntityCodes;
 
-        internal string RequiresNearbyEntityCode
-        {
-            get { return typeAttributes["requiresNearbyEntityCode"].AsString(""); }
-        }
+        [JsonProperty] public AssetLocation[] RequiresNearbyEntityCodes;
+        // <summary> Alternate format for specifying a single code. Can still be used. Ignored if requiresNearbyEntityCodes is set. </summary>
+        [JsonProperty] private AssetLocation requiresNearbyEntityCode { set => RequiresNearbyEntityCodes ??= [ value ]; }
 
-        internal float RequiresNearbyEntityRange
-        {
-            get { return typeAttributes["requiresNearbyEntityRange"].AsFloat(5); }
-        }
+        [JsonProperty] public double PregnancyDays = 3;
+        [JsonProperty] public float RequiresNearbyEntityRange = 5;
+        [JsonProperty] public float SpawnQuantityMin = 1;
+        [JsonProperty] public float SpawnQuantityMax = 2;
 
         /*internal int GrowthCapQuantity
         {
@@ -45,16 +39,6 @@ namespace Vintagestory.GameContent
         {
             get { return AssetLocation.toLocations(attributes["growthCapEntityCodes"].AsStringArray(new string[0])); }
         }*/
-
-        public float SpawnQuantityMin
-        {
-            get { return typeAttributes["spawnQuantityMin"].AsFloat(1); }
-        }
-        public float SpawnQuantityMax
-        {
-            get { return typeAttributes["spawnQuantityMax"].AsFloat(2); }
-        }
-
 
         public double TotalDaysLastBirth
         {
@@ -78,11 +62,11 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                return 
-                    eatAnyway || 
+                return
+                    eatAnyway ||
                     (
-                        !IsPregnant 
-                        && GetSaturation() < PortionsEatenForMultiply 
+                        !IsPregnant
+                        && GetSaturation() < PortionsEatenForMultiply
                         && TotalDaysCooldownUntil <= entity.World.Calendar.TotalDays
                     )
                 ;
@@ -97,8 +81,7 @@ namespace Vintagestory.GameContent
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
             base.Initialize(properties, attributes);
-
-            this.typeAttributes = attributes;
+            PopulateSpawnEntityCodes(attributes);
 
             if (entity.World.Side == EnumAppSide.Server)
             {
@@ -144,7 +127,7 @@ namespace Vintagestory.GameContent
                 return;
             }*/
 
-            
+
             if (daysNow - TotalDaysPregnancyStart > PregnancyDays)
             {
                 Random rand = entity.World.Rand;
@@ -166,22 +149,19 @@ namespace Vintagestory.GameContent
             Random rand = entity.World.Rand;
 
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            if (spawnEntityCodes == null) PopulateSpawnEntityCodes();
-            if (spawnEntityCodes != null)
+            if (SpawnEntityCodes != null)
             {
                 while (q > 1 || rand.NextDouble() < q)
                 {
                     q--;
-                    AssetLocation SpawnEntityCode = spawnEntityCodes[rand.Next(spawnEntityCodes.Length)];
+                    AssetLocation SpawnEntityCode = SpawnEntityCodes[rand.Next(SpawnEntityCodes.Length)];
                     EntityProperties childType = entity.World.GetEntityType(SpawnEntityCode);
                     if (childType == null) continue;
                     Entity childEntity = entity.World.ClassRegistry.CreateEntity(childType);
 
-                    childEntity.ServerPos.SetFrom(entity.ServerPos);
-                    childEntity.ServerPos.Motion.X += (rand.NextDouble() - 0.5f) / 20f;
-                    childEntity.ServerPos.Motion.Z += (rand.NextDouble() - 0.5f) / 20f;
+                    childEntity.Pos.Motion.X += (rand.NextDouble() - 0.5f) / 20f;
+                    childEntity.Pos.Motion.Z += (rand.NextDouble() - 0.5f) / 20f;
 
-                    childEntity.Pos.SetFrom(childEntity.ServerPos);
                     childEntity.Attributes.SetString("origin", "reproduction");
                     childEntity.WatchedAttributes.SetInt("generation", generation + 1);
                     entity.World.SpawnEntity(childEntity);
@@ -189,26 +169,27 @@ namespace Vintagestory.GameContent
             }
         }
 
-        protected virtual void PopulateSpawnEntityCodes()
+        protected virtual void PopulateSpawnEntityCodes(JsonObject typeAttributes)
         {
             JsonObject sec = typeAttributes["spawnEntityCodes"];   // Optional fancier syntax in version 1.19+
             if (!sec.Exists)
             {
                 sec = typeAttributes["spawnEntityCode"];    // The simple property as it was pre-1.19 - can still be used, suitable for the majority of cases
-                if (sec.Exists) spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
+                if (sec.Exists) SpawnEntityCodes = [ sec.AsString("") ];
                 return;
             }
             if (sec.IsArray())
             {
                 SpawnEntityProperties[] codes = sec.AsArray<SpawnEntityProperties>();
-                spawnEntityCodes = new AssetLocation[codes.Length];
-                for (int i = 0; i < codes.Length; i++) spawnEntityCodes[i] = new AssetLocation(codes[i].Code ?? "");
+                SpawnEntityCodes = new AssetLocation[codes.Length];
+                for (int i = 0; i < codes.Length; i++) SpawnEntityCodes[i] = new AssetLocation(codes[i].Code ?? "");
             }
             else
             {
-                spawnEntityCodes = new AssetLocation[] { new AssetLocation(sec.AsString("")) };
+                SpawnEntityCodes = [ sec.AsString("") ];
             }
         }
+
 
         public override void TestCommand(object arg)
         {
@@ -224,11 +205,11 @@ namespace Vintagestory.GameContent
             if (tree == null) return false;
 
             float saturation = tree.GetFloat("saturation", 0);
-            
+
             if (saturation >= PortionsEatenForMultiply)
             {
                 Entity maleentity = null;
-                if (RequiresNearbyEntityCode != null && (maleentity = GetRequiredEntityNearby()) == null) return false;
+                if (RequiresNearbyEntityCodes != null && (maleentity = GetRequiredEntityNearby()) == null) return false;
 
                 if (entity.World.Rand.NextDouble() < 0.2)
                 {
@@ -260,21 +241,26 @@ namespace Vintagestory.GameContent
 
         protected virtual Entity GetRequiredEntityNearby()
         {
-            if (RequiresNearbyEntityCode == null) return null;
+            if (RequiresNearbyEntityCodes == null) return null;
 
-            return entity.World.GetNearestEntity(entity.ServerPos.XYZ, RequiresNearbyEntityRange, RequiresNearbyEntityRange, (e) =>
+            return entity.World.GetNearestEntity(entity.Pos.XYZ, RequiresNearbyEntityRange, RequiresNearbyEntityRange, (e) =>
             {
-                if (e.WildCardMatch(new AssetLocation(RequiresNearbyEntityCode)))
+                bool matches = false;
+                foreach (AssetLocation sire in RequiresNearbyEntityCodes)
                 {
-                    if (!e.WatchedAttributes.GetBool("doesEat") || (e.WatchedAttributes["hunger"] as ITreeAttribute)?.GetFloat("saturation") >= 1)
-                    {
-                        return true;
+                    if (e.WildCardMatch(sire)) {
+                        matches = true;
+                        break;
                     }
                 }
 
-                return false;
-
+                return matches && EntityCanMate(e);
             });
+        }
+
+        protected virtual bool EntityCanMate(Entity e)
+        {
+            return !e.WatchedAttributes.GetBool("doesEat") || (e.WatchedAttributes["hunger"] as ITreeAttribute)?.GetFloat("saturation") >= 1;
         }
 
         public override void OnEntityDespawn(EntityDespawnData despawn)

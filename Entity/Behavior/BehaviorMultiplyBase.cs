@@ -1,3 +1,4 @@
+﻿using Newtonsoft.Json;
 ﻿using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -11,13 +12,14 @@ namespace Vintagestory.GameContent
     /// <summary>
     /// Common code for egg-laying and live births: this is all connected with food saturation and cooldowns
     /// </summary>
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
     public class EntityBehaviorMultiplyBase : EntityBehavior
     {
         protected ITreeAttribute multiplyTree;
 
-        public double MultiplyCooldownDaysMin { get; set; }
-        public double MultiplyCooldownDaysMax { get; set; }
-        public float PortionsEatenForMultiply { get; set; }
+        [JsonProperty] public double MultiplyCooldownDaysMin = 6;
+        [JsonProperty] public double MultiplyCooldownDaysMax = 12;
+        [JsonProperty] public float PortionsEatenForMultiply = 3;
 
         public double TotalDaysCooldownUntil
         {
@@ -25,7 +27,7 @@ namespace Vintagestory.GameContent
             set { multiplyTree.SetDouble("totalDaysCooldownUntil", value); entity.WatchedAttributes.MarkPathDirty("multiply"); }
         }
 
-        protected bool eatAnyway = false;
+        [JsonProperty] protected bool eatAnyway = false;
 
         public virtual bool ShouldEat
         {
@@ -58,11 +60,12 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(properties, attributes);
 
-            eatAnyway = attributes["eatAnyway"].AsBool(false);
-            MultiplyCooldownDaysMin = attributes["multiplyCooldownDaysMin"].AsFloat(6);
-            MultiplyCooldownDaysMax = attributes["multiplyCooldownDaysMax"].AsFloat(12);
-            PortionsEatenForMultiply = attributes["portionsEatenForMultiply"].AsFloat(3);
-
+            if (attributes.Exists)
+            {
+                // Note that the generic type here is only used for proving the target is a class rather than a struct,
+                // and does not limit which fields will be populated
+                JsonUtil.Populate<EntityBehaviorMultiplyBase>(attributes.Token, this);
+            }
 
             multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");
 

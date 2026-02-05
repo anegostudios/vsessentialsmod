@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -206,7 +206,7 @@ namespace Vintagestory.GameContent
 
         public float lerpRainCloudOverlay;
         public float lerpRainOverlay;
-        BlockPos tmpPos = new BlockPos();
+        BlockPos tmpPos = new BlockPos(API.Config.Dimensions.NormalWorld);
         IMapRegion hereMapRegion;
 
         public void LoadLerp(Vec3d pos, bool useArgValues, float lerpRainCloudOverlay = 0, float lerpRainOverlay = 0, float dt = 1)

@@ -1,6 +1,7 @@
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -41,11 +42,19 @@ namespace Vintagestory.GameContent
         List<ClothConstraint> Constraints = new List<ClothConstraint>();
         [ProtoMember(5)]
         public bool Active { get; set; }
+        [DefaultValue(true)]
+        [ProtoMember(6)]
+        public bool CanRip { get; set; } = true;
+        [DefaultValue(true)]
+        [ProtoMember(7)]
+        public bool CanPull { get; set; } = true;
+        [ProtoMember(8)]
+        public float RopeRenderThickness = 1f;
 
         /// <summary>
         /// 10 joints per meter
         /// </summary>
-        public static float Resolution = 2;
+        public float Resolution = 2;
 
         public float StretchWarn = 0.6f;
         public float StretchRip = 0.75f;
@@ -65,6 +74,7 @@ namespace Vintagestory.GameContent
 
         public float secondsOverStretched;
 
+        
 
         public bool PinnedAnywhere
         {
@@ -129,9 +139,9 @@ namespace Vintagestory.GameContent
             return new ClothSystem(api, cm, start, end, EnumClothType.Cloth);
         }
 
-        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, AssetLocation clothSectionModel)
+        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, AssetLocation clothSectionModel, float resolution = 2)
         {
-            return new ClothSystem(api, cm, start, end, EnumClothType.Rope, clothSectionModel);
+            return new ClothSystem(api, cm, start, end, EnumClothType.Rope, clothSectionModel, resolution);
         }
 
         private ClothSystem() { }
@@ -197,12 +207,14 @@ namespace Vintagestory.GameContent
             return true;
         }
 
-        private ClothSystem(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, EnumClothType clothType, AssetLocation ropeSectionModel = null)
+        private ClothSystem(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, EnumClothType clothType, AssetLocation ropeSectionModel = null, float resolution = 2)
         {
             this.clothType = clothType;
             this.ropeSectionModel = ropeSectionModel;
+            this.Resolution = resolution;
 
-            Init(api, cm);            
+            Init(api, cm);
+            
             float step = 1 / Resolution;
 
             var dir = end - start;
@@ -381,7 +393,7 @@ namespace Vintagestory.GameContent
 
                 float length = GameMath.Sqrt(dX*dX+dY*dY+dZ*dZ);
 
-                Mat4f.Scale(tmpMat, tmpMat, new float[] { length, 1, 1 }); // + (float)Math.Sin(api.World.ElapsedMilliseconds / 1000f) * 0.1f
+                Mat4f.Scale(tmpMat, tmpMat, new float[] { length, RopeRenderThickness, RopeRenderThickness }); // + (float)Math.Sin(api.World.ElapsedMilliseconds / 1000f) * 0.1f
                 Mat4f.Translate(tmpMat, tmpMat, -1.5f, -1 / 32f, -0.5f); // not sure why the -1.5 here instead of -0.5
 
 

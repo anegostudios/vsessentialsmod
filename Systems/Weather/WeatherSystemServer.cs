@@ -14,7 +14,7 @@ namespace Vintagestory.GameContent
     {
         public ICoreServerAPI sapi;
         public IServerNetworkChannel serverChannel;
-        
+
         internal WeatherSimulationSnowAccum snowSimSnowAccu;
 
         protected WeatherPatternAssetsPacket packetForClient;
@@ -190,8 +190,8 @@ namespace Vintagestory.GameContent
             List<IServerPlayer> playersToSend = new List<IServerPlayer>(allOnlinePlayers.Length);
             foreach (var plr in allOnlinePlayers)
             {
-                int plrRegionX = (int)plr.Entity.ServerPos.X / regionSize;
-                int plrRegionZ = (int)plr.Entity.ServerPos.Z / regionSize;
+                int plrRegionX = (int)plr.Entity.Pos.X / regionSize;
+                int plrRegionZ = (int)plr.Entity.Pos.Z / regionSize;
 
                 if (Math.Abs(state.RegionX - plrRegionX) <= 1 && Math.Abs(state.RegionZ - plrRegionZ) <= 1)
                 {
@@ -247,7 +247,7 @@ namespace Vintagestory.GameContent
             foreach (var key in toRemove)
             {
                 weatherSimByMapRegion.Remove(key);
-            }   
+            }
         }
 
         public override void SpawnLightningFlash(Vec3d pos)

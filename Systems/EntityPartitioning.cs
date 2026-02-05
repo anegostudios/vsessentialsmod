@@ -89,7 +89,7 @@ namespace Vintagestory.GameContent
         {
             return true;
         }
-        
+
 
         public override void Start(ICoreAPI api)
         {
@@ -143,7 +143,7 @@ namespace Vintagestory.GameContent
                     if (entity.touchDistance > largestTouchDistance) largestTouchDistance = entity.touchDistance;
                 }
 
-                EntityPos pos = entity.SidedPos;
+                EntityPos pos = entity.Pos;
 
                 int x = (int)pos.X;
                 int z = (int)pos.Z;
@@ -223,7 +223,7 @@ namespace Vintagestory.GameContent
             {
                 WalkEntities(position.X, position.Y, position.Z, radius, (e) =>
                 {
-                    double distSq = e.ServerPos.SquareDistanceTo(position);
+                    double distSq = e.Pos.SquareDistanceTo(position);
 
                     if (distSq < nearestDistanceSq && matches(e))
                     {
@@ -244,7 +244,7 @@ namespace Vintagestory.GameContent
 
         private bool onIsInRangeServer(Entity e, double posX, double posY, double posZ, double radiusSq)
         {
-            var ePos = e.ServerPos;
+            var ePos = e.Pos;
             double dx = ePos.X - posX;
             double dy = ePos.InternalY - posY;
             double dz = ePos.Z - posZ;

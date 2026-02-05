@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -54,7 +54,9 @@ namespace Vintagestory.ServerMods.NoObf
         {
             Class = "Item";
             GuiTransform = ModelTransform.ItemDefaultGui();
+#pragma warning disable CS0618 // Type or member is obsolete
             FpHandTransform = ModelTransform.ItemDefaultFp();
+#pragma warning restore CS0618
             TpHandTransform = ModelTransform.ItemDefaultTp();
             TpOffHandTransform = null;
             GroundTransform = ModelTransform.ItemDefaultGround();
@@ -143,10 +145,12 @@ namespace Vintagestory.ServerMods.NoObf
             item.Textures = this.Textures;
             item.MaterialDensity = this.MaterialDensity;
 
-            item.Tags = api.TagRegistry.ItemTagsToTagArray(this.Tags);
+            item.Tags = api.TagsManager.GetTagSetUnsafe<TagSet>(this.Tags);
 
             item.GuiTransform = this.GuiTransform;
+#pragma warning disable CS0618 // Type or member is obsolete
             item.FpHandTransform = this.FpHandTransform;
+#pragma warning restore CS0618
             item.TpHandTransform = this.TpHandTransform;
             item.TpOffHandTransform = this.TpOffHandTransform;
             item.GroundTransform = this.GroundTransform;
@@ -183,6 +187,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
             item.MatterState = this.MatterState;
             item.ParticleProperties = this.ParticleProperties;
+            item.ParticlesTextureCode = this.ParticlesTextureCode;
 
             this.InitItem(api.ClassRegistry, api.World.Logger, item, this.Variant);
 

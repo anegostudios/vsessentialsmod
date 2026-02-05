@@ -22,7 +22,7 @@ namespace Vintagestory.GameContent
         {
             if (t is AiTaskFleeEntity fleetask)
             {
-                return fleetask.WhenInEmotionState == null && fleetask.targetEntity is not EntityPlayer;
+                return fleetask.WhenInEmotionStates == null && fleetask.targetEntity is not EntityPlayer;
             }
             return true;
         }

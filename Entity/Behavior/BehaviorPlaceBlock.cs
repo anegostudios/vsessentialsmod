@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
                 return locs;
             }
         }
-        
+
 
 
         internal double TotalHoursUntilPlace
@@ -83,13 +83,13 @@ namespace Vintagestory.GameContent
             if (!entity.Alive || entity.Swimming || entity.FeetInLiquid)  // Quick fix for chicken laying eggs in water
             {
                 callbackId = 0;
-                return; 
+                return;
             }
 
             callbackId = entity.World.RegisterCallback(CheckShouldPlace, 3000);
 
             if (entity.World.Calendar == null) return;
-            
+
             while (entity.World.Calendar.TotalHours > TotalHoursUntilPlace && entity.World.Rand.NextDouble() < 0.5f)
             {
                 AssetLocation[] codes = BlockCodes;
@@ -114,7 +114,7 @@ namespace Vintagestory.GameContent
         private bool TryPlace(Block block, int dx, int dy, int dz)
         {
             IBlockAccessor blockAccess = entity.World.BlockAccessor;
-            BlockPos pos = entity.ServerPos.XYZ.AsBlockPos.Add(dx, dy, dz);
+            BlockPos pos = entity.Pos.XYZ.AsBlockPos.Add(dx, dy, dz);
             Block blockAtPos = blockAccess.GetBlock(pos);
 
             pos.Y--;
@@ -128,7 +128,7 @@ namespace Vintagestory.GameContent
                 betran?.SetPlaceTime(TotalHoursUntilPlace);
 
                 if (betran?.IsDueTransition() == true)
-                { 
+                {
                     blockAccess.SetBlock(0, pos);
                 }
 
@@ -143,6 +143,6 @@ namespace Vintagestory.GameContent
             entity.World.UnregisterCallback(callbackId);
         }
 
-        
+
     }
 }

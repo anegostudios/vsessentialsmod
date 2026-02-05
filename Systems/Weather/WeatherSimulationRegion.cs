@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -222,7 +222,7 @@ namespace Vintagestory.GameContent
 
             // Idea: We don't want to simulate 512x512 blocks at all times, thats a lot of iterations
             // lets try with just the 8 corner points of the region cuboid and lerp
-            BlockPos tmpPos = new BlockPos();
+            BlockPos tmpPos = new BlockPos(API.Config.Dimensions.NormalWorld);
             int regsize = ws.api.World.BlockAccessor.RegionSize;
 
             for (int ix = 0; ix < snowAccumResolution; ix++)

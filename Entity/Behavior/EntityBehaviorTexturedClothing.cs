@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -134,6 +134,7 @@ namespace Vintagestory.GameContent
 
                 ItemStack stack = Inventory[slotid]?.Itemstack;
                 if (stack == null) continue;
+                if (stack.ItemAttributes?.IsTrue("renderOntoSkin") != true) continue;
                 if (hideClothing) continue;
                 if (stack.Item.FirstTexture == null) continue; // Invalid/Unknown/Corrupted item
 

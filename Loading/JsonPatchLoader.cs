@@ -1,15 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using JsonPatch.Operations;
 using JsonPatch.Operations.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using Tavis;
 using Vintagestory.API;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
@@ -67,22 +67,22 @@ namespace Vintagestory.ServerMods.NoObf
     public class PatchCondition
     {
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The key for the world config that this condition relies on.
         /// </summary>
-        [DocumentAsJson] public string When;
+        [DocumentAsJson("Required")]
+        public string When;
 
         /// <summary>
-        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>None</jsondefault>-->
         /// What value does the world config need to be for this patch to happen? Required if not using <see cref="useValue"/>. Will be ignored if using <see cref="useValue"/>.
         /// </summary>
-        [DocumentAsJson] public string IsValue;
+        [DocumentAsJson("Recommended", "None")]
+        public string IsValue;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>False</jsondefault>-->
         /// If true, then this will replace the <see cref="JsonPatch.Value"/> with the value in the world config. Can be used to create more complex patches. Required if not using <see cref="IsValue"/>.
         /// </summary>
-        [DocumentAsJson] public bool useValue;
+        [DocumentAsJson("Optional", "False")]
+        public bool useValue;
     }
 
     /// <summary>
@@ -92,16 +92,16 @@ namespace Vintagestory.ServerMods.NoObf
     public class PatchModDependence
     {
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The mod ID that this patch relies on.
         /// </summary>
-        [DocumentAsJson] public string modid;
+        [DocumentAsJson("Required")]
+        public string modid;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>False</jsondefault>-->
         /// If true, then the patch will only occur if the specified mod is *not* installed.
         /// </summary>
-        [DocumentAsJson] public bool invert = false;
+        [DocumentAsJson("Optional", "False")]
+        public bool invert = false;
     }
 
     /// <summary>
@@ -113,47 +113,46 @@ namespace Vintagestory.ServerMods.NoObf
     public class JsonPatch
     {
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The operation for the patch. Essentially controls what the patch actually does.
         /// </summary>
-        [DocumentAsJson] public EnumJsonPatchOp Op;
+        [DocumentAsJson("Required")]
+        public EnumJsonPatchOp Op;
 
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// The asset location of the file where the patch should be applied.
         /// </summary>
-        [DocumentAsJson] public AssetLocation File;
+        [DocumentAsJson("Required")]
+        public AssetLocation File;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional>-->
         /// If using <see cref="EnumJsonPatchOp.Move"/> or <see cref="EnumJsonPatchOp.Copy"/>, this is the path to the json property to move or copy from.
         /// </summary>
-        [DocumentAsJson] public string FromPath;
+        [DocumentAsJson("Optional", "None")]
+        public string FromPath;
 
         /// <summary>
-        /// <!--<jsonoptional>Required</jsonoptional>-->
         /// This is the path to the json property where the operation will take place.
         /// </summary>
-        [DocumentAsJson] public string Path;
+        [DocumentAsJson("Required")]
+        public string Path;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// A list of mod dependencies for the patch. Can be used to create patches that are specific on certain mods being installed. Useful for compatibility!
         /// </summary>
-        [DocumentAsJson] public PatchModDependence[] DependsOn;
+        [DocumentAsJson("Optional", "None")]
+        public PatchModDependence[] DependsOn;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>True</jsondefault>-->
         /// Should this patch be applied or not?
         /// </summary>
-        [DocumentAsJson] public bool Enabled = true;
+        [DocumentAsJson("Optional", "True")]
+        public bool Enabled = true;
 
         /// <summary>
-        /// <!--<jsonoptional>Obsolete</jsonoptional>-->
         /// The app side that the patch should be loaded on. Obsolete, please use <see cref="Side"/> instead.
         /// </summary>
         [Obsolete("Use Side instead")]
-        [DocumentAsJson]
+        [DocumentAsJson("Obsolete")]
         public EnumAppSide? SideType
         {
             get { return Side; }
@@ -161,22 +160,22 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>Universal</jsondefault>-->
         /// The app side that the patch should be loaded on.
         /// </summary>
-        [DocumentAsJson] public EnumAppSide? Side = EnumAppSide.Universal;
+        [DocumentAsJson("Optional", "Universal")]
+        public EnumAppSide? Side = EnumAppSide.Universal;
 
         /// <summary>
-        /// <!--<jsonoptional>Optional</jsonoptional><jsondefault>None</jsondefault>-->
         /// A condition that this patch must satisfy to be applied. Uses specific values from the world config. Useful in conjunction with code mods.
         /// </summary>
-        [DocumentAsJson] public PatchCondition Condition;
+        [DocumentAsJson("Optional", "None")]
+        public PatchCondition Condition;
 
         /// <summary>
-        /// <!--<jsonoptional>Recommended</jsonoptional><jsondefault>None</jsondefault>-->
         /// If adding, this is the value (or values) that will be added.
         /// </summary>
         [JsonProperty, JsonConverter(typeof(JsonAttributesConverter))]
+        [DocumentAsJson("Recommended", "None")]
         public JsonObject Value;
     }
 
@@ -184,6 +183,9 @@ namespace Vintagestory.ServerMods.NoObf
     {
         ICoreAPI api;
         ITreeAttribute worldConfig;
+
+        // Cache for loaded JSON documents
+        private Dictionary<AssetLocation, (JToken token, IAsset asset)> jsonCache = [];
 
         public override bool ShouldLoad(EnumAppSide side)
         {
@@ -211,6 +213,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// <param name="forPartialPath">Only apply patches that patch a file starting with this path.</param>
         public void ApplyPatches(string forPartialPath = null)
         {
+            // Load all patch files
             List<IAsset> entries = api.Assets.GetMany("patches/");
 
             int appliedCount = 0;
@@ -219,25 +222,39 @@ namespace Vintagestory.ServerMods.NoObf
             int totalCount = 0;
             int unmetConditionCount = 0;
 
-            HashSet<string> loadedModIds = new HashSet<string>(api.ModLoader.Mods.Select((m) => m.Info.ModID).ToList());
+            // List of loaded mods for dependency checks
+            HashSet<string> loadedModIds = [.. api.ModLoader.Mods.Select((m) => m.Info.ModID)];
 
+            // First collect all valid patches
+            var validPatches = new List<(JsonPatch patch, AssetLocation source, int index)>();
+
+            // Iterate over all patch files
             foreach (IAsset asset in entries)
             {
                 JsonPatch[] patches = null;
                 try
                 {
                     patches = asset.ToObject<JsonPatch[]>();
-                } catch (Exception e)
+                }
+                catch (Exception e)
                 {
                     api.Logger.Error("Failed loading patches file {0}:", asset.Location);
                     api.Logger.Error(e);
                 }
 
+                // Iterate over all patches in the file
                 for (int j = 0; patches != null && j < patches.Length; j++)
                 {
                     JsonPatch patch = patches[j];
+
+                    // Skip disabled patches
                     if (!patch.Enabled) continue;
 
+                    // Immediately check the patch side
+                    EnumAppSide targetSide = patch.Side == null ? patch.File.Category.SideType : (EnumAppSide)patch.Side;
+                    if (targetSide != EnumAppSide.Universal && patch.Side != api.Side) continue;
+
+                    // Check the patch condition
                     if (patch.Condition != null)
                     {
                         IAttribute attr = worldConfig[patch.Condition.When];
@@ -247,19 +264,16 @@ namespace Vintagestory.ServerMods.NoObf
                         {
                             patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken()));
                         }
-                        else
+                        else if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
                         {
-                            if (!patch.Condition.IsValue.Equals(attr.GetValue() + "",
-                                    StringComparison.InvariantCultureIgnoreCase))
-                            {
-                                api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})",
-                                    asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
-                                unmetConditionCount++;
-                                continue;
-                            }
+                            api.Logger.VerboseDebug("Patch file {0}, patch {1}: Unmet IsValue condition ({2}!={3})",
+                                asset.Location, j, patch.Condition.IsValue, attr.GetValue() + "");
+                            unmetConditionCount++;
+                            continue;
                         }
                     }
 
+                    // Check patch dependencies
                     if (patch.DependsOn != null)
                     {
                         bool enabled = true;
@@ -280,14 +294,88 @@ namespace Vintagestory.ServerMods.NoObf
                         }
                     }
 
-                    if(forPartialPath != null && !patch.File.PathStartsWith(forPartialPath)) continue;
+                    // Filter by path if needed
+                    if (forPartialPath != null && !patch.File.PathStartsWith(forPartialPath)) continue;
 
-                    totalCount++;
-                    ApplyPatch(j, asset.Location, patch, ref appliedCount, ref notfoundCount, ref errorCount);
+                    // Add valid patches to processing list
+                    validPatches.Add((patch, asset.Location, j));
                 }
             }
 
-            StringBuilder sb = new StringBuilder();
+
+            totalCount = validPatches.Count;
+
+            // Process patches in the order they appear in validPatches
+            var processedFiles = new HashSet<AssetLocation>();
+            var filesToSave = new List<AssetLocation>();
+
+            // Iterate over all valid patches in order from the beginning
+            for (int i = 0; i < validPatches.Count; i++)
+            {
+                var (patch, source, index) = validPatches[i];
+                var targetFile = patch.File.Clone();
+
+                // Handle wildcards
+                if (targetFile.Path.EndsWith('*'))
+                {
+                    string basePath = targetFile.Path.TrimEnd('*');
+                    List<IAsset> assets = api.Assets.GetMany(basePath, targetFile.Domain, false);
+
+                    // Apply patch to all found files
+                    for (int j = 0; j < assets.Count; j++)
+                    {
+                        ProcessSinglePatch(assets[j].Location, patch, source, index,
+                            ref appliedCount, ref notfoundCount, ref errorCount,
+                            ref processedFiles, ref filesToSave);
+                    }
+                }
+                else
+                {
+                    // Apply patch to a single file
+                    ProcessSinglePatch(targetFile, patch, source, index,
+                        ref appliedCount, ref notfoundCount, ref errorCount,
+                        ref processedFiles, ref filesToSave);
+                }
+            }
+
+            // Save all modified files
+            foreach (var fileLoc in filesToSave)
+            {
+                // Get modified JSON document from cache
+                if (jsonCache.TryGetValue(fileLoc, out var cachedData))
+                {
+                    try
+                    {
+                        // Serialize JSON back to string
+                        var sbFile = StringBuilderCache.Acquire();
+                        using (var writer = new StringWriter(sbFile))
+                        using (var jsonWriter = new JsonTextWriter(writer))
+                        {
+                            cachedData.token.WriteTo(jsonWriter);
+                        }
+
+                        // Save back to bytes
+                        cachedData.asset.Data = Encoding.UTF8.GetBytes(StringBuilderCache.GetStringAndRelease(sbFile));
+                        cachedData.asset.IsPatched = true;
+                    }
+                    catch (Exception e)
+                    {
+                        api.World.Logger.Error("Failed to serialize JSON file {0}:", fileLoc);
+                        api.World.Logger.Error(e);
+                        errorCount++;
+                    }
+                }
+            }
+
+            // Clear caches after processing
+            jsonCache?.Clear();
+            filesToSave?.Clear();
+            processedFiles?.Clear();
+            validPatches?.Clear();
+            entries?.Clear();
+
+            // Log results
+            StringBuilder sb = new();
             sb.Append("JsonPatch Loader: ");
 
             if (totalCount == 0)
@@ -296,7 +384,6 @@ namespace Vintagestory.ServerMods.NoObf
             }
             else
             {
-
                 sb.Append(string.Format("{0} patches total", totalCount));
 
                 if (appliedCount > 0)
@@ -320,7 +407,7 @@ namespace Vintagestory.ServerMods.NoObf
                 }
                 else
                 {
-                    sb.Append(string.Format(", no errors", errorCount));
+                    sb.Append(", no errors");
                 }
             }
 
@@ -328,6 +415,172 @@ namespace Vintagestory.ServerMods.NoObf
             api.Logger.VerboseDebug("Patchloader finished");
         }
 
+
+        /// <summary>
+        /// Processes a single patch for a single file
+        /// </summary>
+        private void ProcessSinglePatch(AssetLocation fileLoc, JsonPatch patch, AssetLocation source, int index,
+            ref int applied, ref int notFound, ref int errorCount,
+            ref HashSet<AssetLocation> processedFiles, ref List<AssetLocation> filesToSave)
+        {
+            // Fix file extension if necessary
+            fileLoc.WithPathAppendixOnce(".json");
+
+            // Load or get JSON document from cache
+            if (!jsonCache.TryGetValue(fileLoc, out var cachedData))
+            {
+                var asset = api.Assets.TryGet(fileLoc);
+                if (asset == null)
+                {
+                    notFound++;
+                    LogFileNotFound(fileLoc, patch, source, index);
+                    return;
+                }
+
+                // Parse JSON
+                JToken token;
+                try
+                {
+                    var jsonText = asset.ToText();
+                    token = JToken.Parse(jsonText);
+                }
+                catch (Exception e)
+                {
+                    errorCount++;
+                    api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed probably because the syntax of the value is broken:",
+                        index, source, fileLoc);
+                    api.World.Logger.Error(e);
+                    return;
+                }
+
+                cachedData = (token, asset);
+                jsonCache[fileLoc] = cachedData;
+            }
+
+            // Apply patch (create operation)
+            Operation op = CreateOperation(patch, source, index, ref errorCount);
+            if (op == null) return;
+
+            // Apply the operation
+            var patchdoc = new PatchDocument(op);
+            try
+            {
+                // Apply patch
+                patchdoc.ApplyTo(cachedData.token);
+                applied++;
+
+                // Mark file to be saved
+                if (!processedFiles.Contains(fileLoc))
+                {
+                    processedFiles.Add(fileLoc);
+                    filesToSave.Add(fileLoc);
+                }
+            }
+            catch (PathNotFoundException p)
+            {
+                api.World.Logger.Error("Patch {0} (target: {4}) in {1} failed because supplied path {2} is invalid: {3}",
+                    index, source, patch.Path, p.Message, fileLoc);
+                errorCount++;
+            }
+            catch (Exception e)
+            {
+                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed:", index, source, fileLoc);
+                api.World.Logger.Error(e);
+                errorCount++;
+            }
+        }
+
+
+
+        private void LogFileNotFound(AssetLocation loc, JsonPatch patch, AssetLocation source, int index)
+        {
+            if (patch.File.Category == null)
+            {
+                api.World.Logger.Error("Patch {0} in {1}: File {2} not found. Wrong asset category",
+                    index, source, loc);
+            }
+            else
+            {
+                EnumAppSide catSide = patch.File.Category.SideType;
+                if (catSide != EnumAppSide.Universal && api.Side != catSide)
+                {
+                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side",
+                        index, source, loc, catSide);
+                }
+                else
+                {
+                    api.World.Logger.Error("Patch {0} in {1}: File {2} not found",
+                        index, source, loc);
+                }
+            }
+        }
+
+
+
+        private Operation CreateOperation(JsonPatch jsonPatch, AssetLocation source, int index, ref int errorCount)
+        {
+            switch (jsonPatch.Op)
+            {
+                case EnumJsonPatchOp.Add:
+                    if (jsonPatch.Value == null)
+                    {
+                        api.World.Logger.Error("Patch {0} in {1} failed: Add operation requires Value", index, source);
+                        errorCount++;
+                        return null;
+                    }
+
+                    return new AddReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                case EnumJsonPatchOp.AddEach:
+                    if (jsonPatch.Value == null)
+                    {
+                        api.World.Logger.Error("Patch {0} in {1} failed: AddEach operation requires Value", index, source);
+                        errorCount++;
+                        return null;
+                    }
+
+                    return new AddEachOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                case EnumJsonPatchOp.Remove:
+                    return new RemoveOperation() { Path = new JsonPointer(jsonPatch.Path) };
+
+                case EnumJsonPatchOp.Replace:
+                    if (jsonPatch.Value == null)
+                    {
+                        api.World.Logger.Error("Patch {0} in {1} failed: Replace operation requires Value", index, source);
+                        errorCount++;
+                        return null;
+                    }
+
+                    return new ReplaceOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                case EnumJsonPatchOp.Copy:
+                    return new CopyOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+
+                case EnumJsonPatchOp.Move:
+                    return new MoveOperation() { Path = new JsonPointer(jsonPatch.Path), FromPath = new JsonPointer(jsonPatch.FromPath) };
+
+                case EnumJsonPatchOp.AddMerge:
+                    if (jsonPatch.Value == null)
+                    {
+                        api.World.Logger.Error("Patch {0} in {1} failed: AddMerge operation requires Value", index, source);
+                        errorCount++;
+                        return null;
+                    }
+
+                    return new AddMergeOperation() { Path = new JsonPointer(jsonPatch.Path), Value = jsonPatch.Value.Token };
+
+                default:
+                    return null;
+            }
+        }
+
+
+
+
+        ///
+        /// For backward compatibility with older calls
+        /// 
 
         public void ApplyPatch(int patchIndex, AssetLocation patchSourcefile, JsonPatch jsonPatch, ref int applied, ref int notFound, ref int errorCount)
         {
@@ -365,18 +618,19 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 if (jsonPatch.File.Category == null)
                 {
-                    api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Wrong asset category", patchIndex, patchSourcefile, loc);
+                    api.World.Logger.Error("Patch {0} in {1}: File {2} not found. Wrong asset category", patchIndex, patchSourcefile, loc);
                 }
                 else
                 {
                     EnumAppSide catSide = jsonPatch.File.Category.SideType;
                     if (catSide != EnumAppSide.Universal && api.Side != catSide)
                     {
+                        // While it would technically be correct to treat this as a warning, that would cause significant log spam for mods which leave out a side when patching entities/blocks/items (which many do)
                         api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found. Hint: This asset is usually only loaded {3} side", patchIndex, patchSourcefile, loc, catSide);
                     }
                     else
                     {
-                        api.World.Logger.VerboseDebug("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
+                        api.World.Logger.Error("Patch {0} in {1}: File {2} not found", patchIndex, patchSourcefile, loc);
                     }
                 }
 
@@ -458,7 +712,7 @@ namespace Vintagestory.ServerMods.NoObf
             }
             catch (Exception e)
             {
-                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed, following Exception was thrown:", patchIndex, patchSourcefile,loc);
+                api.World.Logger.Error("Patch {0} (target: {2}) in {1} failed, following Exception was thrown:", patchIndex, patchSourcefile, loc);
                 api.World.Logger.Error(e);
                 errorCount++;
                 return;
@@ -471,4 +725,33 @@ namespace Vintagestory.ServerMods.NoObf
             applied++;
         }
     }
+
+
+    // Simple cache for StringBuilder
+    internal static class StringBuilderCache
+    {
+        [ThreadStatic]
+        private static StringBuilder cachedInstance;
+
+        public static StringBuilder Acquire()
+        {
+            var result = cachedInstance;
+            if (result == null)
+            {
+                return new StringBuilder(4096); // Initial capacity
+            }
+
+            cachedInstance = null;
+            result.Length = 0;
+            return result;
+        }
+
+        public static string GetStringAndRelease(StringBuilder sb)
+        {
+            var result = sb.ToString();
+            cachedInstance = sb;
+            return result;
+        }
+    }
 }
+

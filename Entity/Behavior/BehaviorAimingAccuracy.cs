@@ -141,7 +141,10 @@ namespace Vintagestory.GameContent
         public override void Update(float dt, ref float accuracy)
         {
             float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
-            float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed");
+
+            var itemspeed = entity.RightHandItemSlot?.Itemstack?.ItemAttributes?["rangedWeaponsSpeedMul"].AsFloat(1f) ?? 1f;
+
+            float modspeed = entity.Stats.GetBlended("rangedWeaponsSpeed") * itemspeed;
 
             // https://pfortuny.net/fooplot.com/#W3sidHlwZSI6MCwiZXEiOiIxLTAuMDc1L3giLCJjb2xvciI6IiMwMDAwMDAifSx7InR5cGUiOjEwMDAsIndpbmRvdyI6WyIwIiwiMTAiLCIwIiwiMiJdLCJzaXplIjpbNjQ5LDM5OV19XQ--
             float maxAccuracy = Math.Min(1 - 0.075f / rangedAcc, 1);

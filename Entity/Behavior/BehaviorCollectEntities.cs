@@ -16,11 +16,11 @@ namespace Vintagestory.GameContent
 
         float itemsPerSecond = 23f;
         float unconsumedDeltaTime;
-        
+
         public EntityBehaviorCollectEntities(Entity entity) : base(entity)
         {
         }
-        
+
 
         public override void OnGameTick(float deltaTime)
         {
@@ -40,7 +40,7 @@ namespace Vintagestory.GameContent
 
             if (player?.WorldData.CurrentGameMode == EnumGameMode.Spectator) return;
 
-            tmp.Set(entity.ServerPos.X, entity.ServerPos.InternalY + entity.SelectionBox.Y1 + entity.SelectionBox.Y2 / 2, entity.ServerPos.Z);
+            tmp.Set(entity.Pos.X, entity.Pos.InternalY + entity.SelectionBox.Y1 + entity.SelectionBox.Y2 / 2, entity.Pos.Z);
             Entity[] entities = entity.World.GetEntitiesAround(tmp, 1.5f, 1.5f, entityMatcher);
             if (entities.Length == 0)
             {
@@ -48,7 +48,7 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            
+
             deltaTime = System.Math.Min(1f, deltaTime + unconsumedDeltaTime);
 
             while ((deltaTime - 1/itemsPerSecond) > 0)
@@ -100,7 +100,7 @@ namespace Vintagestory.GameContent
             {
                 collected = entity.TryGiveItemStack(itemstack);
             }
-                
+
             if (itemstack != null && itemstack.StackSize <= 0)
             {
                 foundEntity.Die(EnumDespawnReason.PickedUp);

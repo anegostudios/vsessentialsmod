@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
@@ -305,7 +305,7 @@ namespace Vintagestory.GameContent
 
             prog.Uniform("sunColor", capi.World.Calendar.SunColor);
             prog.Uniform("dayLight", Math.Max(0, capi.World.Calendar.DayLightStrength - capi.World.Calendar.MoonLightStrength*0.95f));
-            prog.Uniform("windOffset", new Vec3f((float)offsetX, 0, (float)offsetZ));
+            prog.Uniform("windOffset", (float)offsetX, 0, (float)offsetZ);
 
 
             prog.Uniform("alpha", GameMath.Clamp(1 - 1.5f * Math.Max(0, capi.Render.ShaderUniforms.GlitchStrength - 0.1f), 0, 1));
@@ -313,7 +313,7 @@ namespace Vintagestory.GameContent
             prog.Uniform("fogMinIn", capi.Ambient.BlendedFogMin);
             prog.Uniform("fogDensityIn", capi.Ambient.BlendedFogDensity);
             prog.Uniform("playerPos", capi.Render.ShaderUniforms.PlayerPos);
-            prog.Uniform("tileOffset", new Vec2f((committedState.CenterTilePos.X - committedState.TileOffsetX) * CloudTileSize, (committedState.CenterTilePos.Z - committedState.TileOffsetZ) * CloudTileSize));
+            prog.Uniform("tileOffset", (committedState.CenterTilePos.X - committedState.TileOffsetX) * CloudTileSize, (committedState.CenterTilePos.Z - committedState.TileOffsetZ) * CloudTileSize);
 
             prog.Uniform("cloudTileSize", CloudTileSize);
             prog.Uniform("cloudsLength", (float)CloudTileSize * CloudTileLength);

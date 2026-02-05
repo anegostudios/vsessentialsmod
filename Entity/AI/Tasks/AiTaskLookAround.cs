@@ -1,0 +1,52 @@
+using Vintagestory.API.Common;
+using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
+
+#nullable disable
+
+namespace Vintagestory.GameContent
+{
+    public class AiTaskLookAround : AiTaskBase
+    {
+        public int minduration;
+        public int maxduration;
+        public float turnSpeedMul = 0.5f;
+
+        public long idleUntilMs;
+
+        public AiTaskLookAround(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
+        {
+            this.minduration = (int)taskConfig["minduration"]?.AsInt(2000);
+            this.maxduration = (int)taskConfig["maxduration"]?.AsInt(4000);
+            this.turnSpeedMul = (float)taskConfig["turnSpeedMul"]?.AsFloat(0.5f);
+
+            idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
+        }
+
+        public override bool ShouldExecute()
+        {
+            return cooldownUntilMs < entity.World.ElapsedMilliseconds;
+        }
+
+        public override void StartExecute()
+        {
+            base.StartExecute();
+            idleUntilMs = entity.World.ElapsedMilliseconds + minduration + entity.World.Rand.Next(maxduration - minduration);
+
+            entity.Pos.Yaw = (float)GameMath.Clamp(
+                entity.World.Rand.NextDouble() * GameMath.TWOPI,
+                entity.Pos.Yaw - GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul,
+                entity.Pos.Yaw + GameMath.PI / 4 * GlobalConstants.OverallSpeedMultiplier * turnSpeedMul
+            );
+        }
+
+        public override bool ContinueExecute(float dt)
+        {
+            //Check if time is still valid for task.
+            if (!IsInValidDayTimeHours(false)) return false;
+
+            return entity.World.ElapsedMilliseconds < idleUntilMs;
+        }
+    }
+}

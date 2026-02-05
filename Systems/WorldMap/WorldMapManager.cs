@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -132,6 +132,8 @@ namespace Vintagestory.GameContent
                .RegisterMessageType(typeof(OnMapToggle))
                .SetMessageHandler<MapLayerUpdate>(OnMapLayerDataReceivedClient)
             ;
+
+            GuiDialogAddWayPoint.LoadSavedNames(api.Logger);
         }
 
 

@@ -23,7 +23,7 @@ namespace Vintagestory.GameContent
                     oxygenTree.SetFloat("currentoxygen", value);
                     entity.WatchedAttributes.MarkPathDirty("oxygen");
                 }
-                
+
             }
         }
 
@@ -54,7 +54,7 @@ namespace Vintagestory.GameContent
         Block suffocationSourceBlock;
         float damageAccum;
 
-        
+
         public EntityBehaviorBreathe(Entity entity) : base(entity)
         {
         }
@@ -103,7 +103,7 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            var ePos = entity.SidedPos;
+            var ePos = entity.Pos;
             var eyeHeight = entity.Swimming ? entity.Properties.SwimmingEyeHeight : entity.Properties.EyeHeight;
             var eyeHeightMod1 = (ePos.Y + eyeHeight) % 1;
 

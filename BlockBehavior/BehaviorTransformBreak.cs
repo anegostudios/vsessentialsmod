@@ -67,7 +67,7 @@ namespace Vintagestory.GameContent
             this.properties= properties;
         }
 
-        public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, ref EnumHandling handling)
+        public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier, ref EnumHandling handling)
         {
             if (transformIntoBlock != null)
             {
@@ -111,7 +111,7 @@ namespace Vintagestory.GameContent
                     }
                 }
 
-                world.PlaySoundAt(block.Sounds?.GetBreakSound(byPlayer), pos, 0, byPlayer);
+                if (block.Sounds != null) world.PlaySoundAt(block.Sounds.GetBreakSound(byPlayer), pos, 0, byPlayer);
             }
 
             

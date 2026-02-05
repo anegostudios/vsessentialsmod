@@ -72,12 +72,12 @@ namespace Vintagestory.GameContent
 
         public override void OnTesselation(ref Shape entityShape, string shapePathForLogging, ref bool shapeIsCloned, ref string[] willDeleteElements)
         {
-            IInventory backPackInv = Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
+            IInventory backpackInv = Player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
 
             Dictionary<string, ItemSlot> uniqueGear = new Dictionary<string, ItemSlot>();
-            for (int i = 0; backPackInv != null && i < 4; i++)
+            for (int i = 0; backpackInv != null && i < 4; i++)
             {
-                ItemSlot slot = backPackInv[i];
+                ItemSlot slot = backpackInv[i];
                 if (slot.Empty) continue;
                 uniqueGear[(slot.Itemstack.ItemAttributes?["attachableToEntity"]?["categoryCode"]?.AsString(null) ?? ("" + slot.Itemstack.Class + slot.Itemstack.Collectible.Id))] = slot;
             }
@@ -107,7 +107,7 @@ namespace Vintagestory.GameContent
                         if (slot.Empty) continue;
                         if (slot.Itemstack.ItemAttributes?["protectionModifiers"].Exists == true)
                         {
-                            Api.World.SpawnItemEntity(slot.Itemstack, entity.ServerPos.XYZ);
+                            Api.World.SpawnItemEntity(slot.Itemstack, entity.Pos.XYZ);
                             slot.Itemstack = null;
                             slot.MarkDirty();
                         }

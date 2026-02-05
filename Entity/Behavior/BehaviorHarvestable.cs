@@ -320,7 +320,7 @@ namespace Vintagestory.GameContent
             }
 
             // Maybe fixes meat reappearing non nun full harvested animals? (reported by Its Ragnar! on discord)
-            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.XYZ.AsBlockPos)?.MarkModified();
+            entity.World.BlockAccessor.GetChunkAtBlockPos(entity.Pos.XYZ.AsBlockPos)?.MarkModified();
         }
 
 
@@ -356,7 +356,7 @@ namespace Vintagestory.GameContent
 
             Vec3d centerPos = entity.Pos.XYZ;
 
-            var dist = entity.Pos.XYZ.Add(hitPosition).DistanceTo(byEntity.SidedPos.XYZ.Add(byEntity.LocalEyePos));
+            var dist = entity.Pos.XYZ.Add(hitPosition).DistanceTo(byEntity.Pos.XYZ.Add(byEntity.LocalEyePos));
             bool inRange = dist <= 5 + (Api.Side == EnumAppSide.Server ? 1 : 0);
 
             if (!IsHarvested || !inRange)
@@ -443,7 +443,12 @@ namespace Vintagestory.GameContent
                     extraMul = byPlayer?.Entity?.Stats.GetBlended(dstack.DropModbyStat) ?? 0;
                 }
 
-                if (dstack.ResolvedItemstack.Collectible.NutritionProps != null || dstack.ResolvedItemstack.Collectible.CombustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.NutritionProps != null)
+                FoodNutritionProperties nutritionProps = dstack.ResolvedItemstack.Collectible.GetNutritionProperties(Api.World, dstack.ResolvedItemstack, byPlayer?.Entity);
+
+                CombustibleProperties combustibleProps = dstack.ResolvedItemstack.Collectible.GetCombustibleProperties(Api.World, dstack.ResolvedItemstack, null);
+                FoodNutritionProperties combNutritionProps = combustibleProps?.SmeltedStack?.ResolvedItemstack?.Collectible?.GetNutritionProperties(Api.World, combustibleProps?.SmeltedStack?.ResolvedItemstack, byPlayer?.Entity);
+
+                if (nutritionProps != null || combNutritionProps != null)
                 {
                     // Adjust the multiplier by animal weight beforehand so that we can set an offset in NatFloat
                     extraMul *= AnimalWeight;
@@ -475,7 +480,7 @@ namespace Vintagestory.GameContent
             List<IHarvestableDrops> harvestableInterfaces = entity.GetInterfaces<IHarvestableDrops>();
             harvestableInterfaces?.ForEach(hInterface =>
             {
-                ItemStack[] harvestableDrops = hInterface.GetHarvestableDrops(entity.World, entity.ServerPos.AsBlockPos, byPlayer);
+                ItemStack[] harvestableDrops = hInterface.GetHarvestableDrops(entity.World, entity.Pos.AsBlockPos, byPlayer);
                 harvestableDrops?.Foreach(stack =>
                 {
                     todrop.Add(stack);
@@ -499,7 +504,7 @@ namespace Vintagestory.GameContent
 
             if (entity.World.Side == EnumAppSide.Server)
             {
-                entity.World.BlockAccessor.GetChunkAtBlockPos(entity.ServerPos.AsBlockPos).MarkModified();
+                entity.World.BlockAccessor.GetChunkAtBlockPos(entity.Pos.AsBlockPos).MarkModified();
             }
         }
 
@@ -509,25 +514,13 @@ namespace Vintagestory.GameContent
         {
             interactions = ObjectCacheUtil.GetOrCreate(world.Api, "harvestableEntityInteractions", () =>
             {
-                List<ItemStack> knifeStacklist = new List<ItemStack>();
-
-                foreach (Item item in world.Items)
-                {
-                    if (item.Code == null) continue;
-
-                    if (item.Tool == EnumTool.Knife)
-                    {
-                        knifeStacklist.Add(new ItemStack(item));
-                    }
-                }
-
                 return new WorldInteraction[] {
                     new WorldInteraction()
                     {
                         ActionLangCode = "blockhelp-creature-harvest",
                         MouseButton = EnumMouseButton.Right,
                         HotKeyCode = "shift",
-                        Itemstacks = knifeStacklist.ToArray()
+                        Itemstacks = ObjectCacheUtil.GetToolStacks(world.Api, EnumTool.Knife)
                     }
                 };
             });

@@ -61,7 +61,7 @@ namespace Vintagestory.Essentials
                 PathfinderTask task;
                 while ((task = Next()) != null && maxCount-- > 0)
                 {
-                    task.waypoints = astar_mainthread.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
+                    task.waypoints = astar_mainthread.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.modeMinFleeDistance, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance);
                     task.Finished = true;
                     if (isShuttingDown) break;
                     if (api.World.FrameProfiler.Enabled) api.World.FrameProfiler.Mark("path d:" + task.searchDepth + " r:" + (task.waypoints == null ? "fail" : task.waypoints.Count.ToString()) + " s:" + task.startBlockPos + " e:" + task.targetBlockPos + " w:" + task.collisionBox.Width);
@@ -87,7 +87,7 @@ namespace Vintagestory.Essentials
             {
                 try
                 {
-                    task.waypoints = astar.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance, task.CreatureType);
+                    task.waypoints = astar.FindPathAsWaypoints(task.startBlockPos, task.targetBlockPos, task.modeMinFleeDistance, task.maxFallHeight, task.stepHeight, task.collisionBox, task.searchDepth, task.mhdistanceTolerance, task.CreatureType);
                 } catch (Exception e)
                 {
                     task.waypoints = null;

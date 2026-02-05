@@ -43,13 +43,14 @@ namespace Vintagestory.GameContent
             if (entity.AnimManager != null && entity.World.Side == EnumAppSide.Client)
             {
                 AttachmentPointAndPose apap = entity.AnimManager.Animator?.GetAttachmentPointPose("Center");
+                apap ??= entity.AnimManager.Animator?.GetAttachmentPointPose("center");
                 if (apap == null)
                 {
                     var hashse = ObjectCacheUtil.GetOrCreate(entity.Api, "missingCenterApEntityCodes", () => new HashSet<AssetLocation>());
                     if (!hashse.Contains(entity.Code)) // Log the error only once per entity type
                     {
                         hashse.Add(entity.Code);
-                        entity.World.Logger.Warning("Entity " + entity.Code + " with shape " + entity.Properties.Client.Shape + " seems to be missing attachment point center but also has the FloatUpWhenStuck behavior - it might not work correctly with the center point lacking");
+                        entity.World.Logger.Warning("Entity " + entity.Code + " with shape " + entity.Properties.Client.Shape + " seems to be missing attachment point Center but also has the FloatUpWhenStuck behavior - it might not work correctly with the center point lacking");
                     }
                 }
             }
@@ -68,7 +69,7 @@ namespace Vintagestory.GameContent
                 entity.Properties.Habitat = EnumHabitat.Land;   // One effect of this line (1.18.2) is to convert a dead Salmon fom EnumHabitat.Underwater to EnumHabitat.Land
                 if (!entity.Swimming)
                 {
-                    tmpPos.Set(entity.SidedPos.X, entity.SidedPos.Y, entity.SidedPos.Z);
+                    tmpPos.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
                     Cuboidd collbox = entity.World.CollisionTester.GetCollidingCollisionBox(entity.World.BlockAccessor, entity.CollisionBox.Clone().ShrinkBy(0.01f), tmpPos, false);
 
                     if (collbox != null)
@@ -85,9 +86,9 @@ namespace Vintagestory.GameContent
 
         private void PushoutOfCollisionbox(float dt, Cuboidd collBox)
         {
-            double posX = entity.SidedPos.X;
-            double posY = entity.SidedPos.Y;
-            double posZ = entity.SidedPos.Z;
+            double posX = entity.Pos.X;
+            double posY = entity.Pos.Y;
+            double posZ = entity.Pos.Z;
 
             var ba = entity.World.BlockAccessor;
 
@@ -107,7 +108,7 @@ namespace Vintagestory.GameContent
                         if (r < shortestDist)
                         {
                                                 // Make going diagonal a bit more costly
-                            shortestDist = r + (cardinal.IsDiagnoal ? 0.1f : 0);
+                            shortestDist = r + (cardinal.IsDiagonal ? 0.1f : 0);
                             pushDir = cardinal.Normali;
                             break;
                         }
@@ -124,13 +125,13 @@ namespace Vintagestory.GameContent
             float rndx = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
             float rndz = ((float)entity.World.Rand.NextDouble() - 0.5f) / 600f;
 
-            entity.SidedPos.X += pushDir.X * dt * 0.4f;
-            entity.SidedPos.Y += pushDir.Y * dt * 0.4f;
-            entity.SidedPos.Z += pushDir.Z * dt * 0.4f;
+            entity.Pos.X += pushDir.X * dt * 0.4f;
+            entity.Pos.Y += pushDir.Y * dt * 0.4f;
+            entity.Pos.Z += pushDir.Z * dt * 0.4f;
 
-            entity.SidedPos.Motion.X = pushVelocityMul * pushDir.X * dt + rndx;
-            entity.SidedPos.Motion.Y = pushVelocityMul * pushDir.Y * dt * 2;
-            entity.SidedPos.Motion.Z = pushVelocityMul * pushDir.Z * dt + rndz;
+            entity.Pos.Motion.X = pushVelocityMul * pushDir.X * dt + rndx;
+            entity.Pos.Motion.Y = pushVelocityMul * pushDir.Y * dt * 2;
+            entity.Pos.Motion.Z = pushVelocityMul * pushDir.Z * dt + rndz;
 
             entity.Properties.Habitat = EnumHabitat.Air;
         }

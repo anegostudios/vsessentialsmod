@@ -1,9 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
@@ -134,7 +135,7 @@ namespace Vintagestory.ServerMods.NoObf
             foreach (KeyValuePair<AssetLocation, JObject> entry in api.Assets.GetMany<JObject>(api.Server.Logger, "blocktypes/"))
             {
                 if (!entry.Key.Path.EndsWithOrdinal(".json")) continue;
-                
+
                 try
                 {
                     BlockType et = new BlockType();
@@ -166,7 +167,7 @@ namespace Vintagestory.ServerMods.NoObf
             LoadEntities(entityVariants);
             api.Logger.VerboseDebug("Parsed and loaded entities");
 
-            api.TagRegistry.LoadTagsFromAssets(api);
+            (api.TagsManager as ITagLoader)?.LoadTagsFromAssets(api);
 
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
 
@@ -184,7 +185,7 @@ namespace Vintagestory.ServerMods.NoObf
                 AssetLocation loc = entry.Key.Clone();
                 loc.Path = loc.Path.Replace("worldproperties/", "");
                 loc.RemoveEnding();
-                
+
                 entry.Value.Code.Domain = entry.Key.Domain;
 
                 worldProperties.Add(loc, entry.Value);
@@ -224,11 +225,11 @@ namespace Vintagestory.ServerMods.NoObf
         #region Entities
         void LoadEntities(List<RegistryObjectType>[] variantLists)
         {
-            LoadFromVariants(variantLists, "entitie", (variants) =>
+            LoadFromVariants(variantLists, "entities", (variants) =>
             {
                 foreach (EntityType type in variants)
                 {
-                    api.TagRegistry.RegisterEntityTags(type.Tags);
+                    api.TagsManager.RegisterEntityTags(type.Tags);
                     api.RegisterEntityClass(type.Class, type.CreateProperties(api));
                 }
             });
@@ -244,7 +245,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (ItemType type in variants)
                 {
-                    api.TagRegistry.RegisterItemTags(type.Tags);
+                    api.TagsManager.RegisterGeneralTags(type.Tags);
 
                     Item item = type.CreateItem(api);
 
@@ -270,7 +271,7 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (BlockType type in variants)
                 {
-                    api.TagRegistry.RegisterBlockTags(type.Tags);
+                    api.TagsManager.RegisterGeneralTags(type.Tags);
 
                     Block block = type.CreateBlock(api);
 
@@ -284,7 +285,7 @@ namespace Vintagestory.ServerMods.NoObf
                         api.Server.Logger.Error(e);
                     }
                 }
-            }); 
+            });
         }
         #endregion
 
@@ -296,7 +297,7 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        private void GatherAllTypes_Async()
+        private async Task GatherAllTypes_Async()
         {
             GatherTypes_Async(itemVariants, itemTypes);
 
@@ -307,12 +308,12 @@ namespace Vintagestory.ServerMods.NoObf
                 if (--timeOut == 0) return;
                 if (!logged)
                 {
-                    api.Logger.VerboseDebug("Waiting for entityTypes to be gathered");
+                    api.Logger.VerboseDebug("Waiting for BlockTypes to be gathered");
                     logged = true;
                 }
-                Thread.Sleep(10);
+                await Task.Delay(10);
             }
-            if (logged) api.Logger.VerboseDebug("EntityTypes now all gathered");
+            if (logged) api.Logger.VerboseDebug("BlockTypes now all gathered");
 
             GatherTypes_Async(blockVariants, blockTypes);
 
@@ -323,12 +324,12 @@ namespace Vintagestory.ServerMods.NoObf
                 if (--timeOut == 0) return;
                 if (!logged)
                 {
-                    api.Logger.VerboseDebug("Waiting for blockTypes to be gathered");
+                    api.Logger.VerboseDebug("Waiting for entityTypes to be gathered");
                     logged = true;
                 }
-                Thread.Sleep(10);
+                await Task.Delay(10);
             }
-            if (logged) api.Logger.VerboseDebug("BlockTypes now all gathered");
+            if (logged) api.Logger.VerboseDebug("EntityTypes now all gathered");
 
             GatherTypes_Async(entityVariants, entityTypes);
         }
@@ -342,7 +343,9 @@ namespace Vintagestory.ServerMods.NoObf
             int i = 0;
             foreach (RegistryObjectType val in baseTypes.Values)
             {
+#pragma warning disable CS0420 // A reference to a volatile field will not be treated as volatile
                 if (AsyncHelper.CanProceedOnThisThread(ref val.parseStarted))  // In each thread, only do work on RegistryObjectTypes which no other thread has yet worked on
+#pragma warning restore CS0420 // A reference to a volatile field will not be treated as volatile
                 {
                     List<RegistryObjectType> resolvedTypes = new List<RegistryObjectType>();
                     try
@@ -499,7 +502,7 @@ namespace Vintagestory.ServerMods.NoObf
                 var.ResolveCode(baseCode);
             }
 
-            
+
             if (skipVariants != null)
             {
                 List<ResolvedVariant> filteredVariants = new List<ResolvedVariant>();
@@ -557,7 +560,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                 variantsFinal = filteredVariants;
             }
-            
+
             return variantsFinal;
         }
 
@@ -607,7 +610,7 @@ namespace Vintagestory.ServerMods.NoObf
                             VariantEntry old = stateList[k];
 
                             if (cvg.Code != old.Code) continue;
-                            
+
                             stateList.RemoveAt(k);
 
                             for (int j = 0; j < cvg.States.Length; j++)
@@ -702,8 +705,8 @@ namespace Vintagestory.ServerMods.NoObf
         }
 
 
-        // Takes n lists of properties and returns every unique n-tuple 
-        // through a 2 dimensional array blockvariants[i, ni] 
+        // Takes n lists of properties and returns every unique n-tuple
+        // through a 2 dimensional array blockvariants[i, ni]
         // where i = n-tuple index and ni = index of current element in the n-tuple
         VariantEntry[,] MultiplyProperties(VariantEntry[][] variants)
         {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
@@ -124,7 +124,7 @@ namespace Vintagestory.GameContent
             if (TryTriggerState("alarmherdondamage", sourceEntityId) && damagedBy != null && herdId > 0)
             {
                 EmotionState state = availableStates.First((s) => s.Code == "alarmherdondamage");
-                entity.World.GetNearestEntity(entity.ServerPos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
+                entity.World.GetNearestEntity(entity.Pos.XYZ, state.NotifyRange, state.NotifyRange, (e) =>
                 {
                     EntityAgent agent = e as EntityAgent;
                     if (e.EntityId != entity.EntityId && agent != null && agent.Alive && agent.HerdId == herdId)
@@ -208,7 +208,7 @@ namespace Vintagestory.GameContent
             var wptrav = entity.GetBehavior<EntityBehaviorTaskAI>()?.PathTraverser as WaypointsTraverser;
             if (wptrav != null)
             {
-                pathtask = wptrav.PreparePathfinderTask(entity.ServerPos.AsBlockPos, api.World.GetEntityById(sourceEntityId).ServerPos.AsBlockPos);
+                pathtask = wptrav.PreparePathfinderTask(entity.Pos.AsBlockPos, api.World.GetEntityById(sourceEntityId).Pos.AsBlockPos, -1);
                 asyncPathfinder.EnqueuePathfinderTask(pathtask);
 
                 nopathEmoStateid = emostateid;
@@ -357,7 +357,7 @@ namespace Vintagestory.GameContent
 
         private bool entitiesNearby(EmotionState newstate)
         {
-            return epartSys.GetNearestEntity(entity.ServerPos.XYZ, newstate.NotifyRange, (e) =>
+            return epartSys.GetNearestEntity(entity.Pos.XYZ, newstate.NotifyRange, (e) =>
             {
                 if (newstate.EntityCodeLocs == null) return false;
                 for (int i = 0; i < newstate.EntityCodeLocs.Length; i++)

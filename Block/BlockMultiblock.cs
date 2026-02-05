@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Client;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -21,7 +21,7 @@ namespace Vintagestory.GameContent
 
     public interface IMultiBlockInteract
     {
-        bool MBDoParticalSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
+        bool MBDoPartialSelection(IWorldAccessor world, BlockPos pos, Vec3i offset);
         bool MBOnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
         bool MBOnBlockInteractStep(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
         void MBOnBlockInteractStop(float secondsUsed, IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, Vec3i offset);
@@ -74,9 +74,10 @@ namespace Vintagestory.GameContent
         public delegate void BlockCallDelegateInterface<K>(K block);
         public delegate void BlockCallDelegateBlock(Block block);
 
+        // Ensure y value is based on BlockPos.InternalY
         T Handle<T, K>(IBlockAccessor ba, int x, int y, int z, BlockCallDelegateInterface<T, K> onImplementsInterface, BlockCallDelegateBlock<T> onIsMultiblock, BlockCallDelegateBlock<T> onOtherwise) where K : class
         {
-            var block = ba.GetBlock(x, y, z);
+            var block = ba.GetBlockRaw(x, y, z);
             var blockInf = block as K;
 
             if (blockInf == null) blockInf = block.GetBehavior(typeof(K), true) as K;
@@ -91,9 +92,10 @@ namespace Vintagestory.GameContent
             return onOtherwise(block);
         }
 
+        // Ensure y value is based on BlockPos.InternalY
         void Handle<K>(IBlockAccessor ba, int x, int y, int z, BlockCallDelegateInterface<K> onImplementsInterface, BlockCallDelegateBlock onIsMultiblock, BlockCallDelegateBlock onOtherwise) where K : class
         {
-            var block = ba.GetBlock(x, y, z);
+            var block = ba.GetBlockRaw(x, y, z);
             var blockInf = block as K;
 
             if (blockInf == null) blockInf = block.GetBehavior(typeof(K), true) as K;
@@ -161,14 +163,25 @@ namespace Vintagestory.GameContent
            );
         }
 
-        public override bool DoParticalSelection(IWorldAccessor world, BlockPos pos)
+        public override Cuboidf[] GetParticleCollisionBoxes(IBlockAccessor ba, BlockPos pos)
+        {
+            return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
+                ba,
+                pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
+                (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
+                (block) => new Cuboidf[] { Cuboidf.Default() },
+                (block) => block.GetParticleCollisionBoxes(ba, pos.AddCopy(OffsetInv))
+            );
+        }
+
+        public override bool DoPartialSelection(IWorldAccessor world, BlockPos pos)
         {
             return Handle<bool, IMultiBlockInteract>(
                 world.BlockAccessor,
                 pos.X + OffsetInv.X, pos.InternalY + OffsetInv.Y, pos.Z + OffsetInv.Z,
-                (inf) => inf.MBDoParticalSelection(world, pos, OffsetInv),
-                (block) => base.DoParticalSelection(world, pos.AddCopy(OffsetInv)),
-                (block) => block.DoParticalSelection(world, pos.AddCopy(OffsetInv))
+                (inf) => inf.MBDoPartialSelection(world, pos, OffsetInv),
+                (block) => base.DoPartialSelection(world, pos.AddCopy(OffsetInv)),
+                (block) => block.DoPartialSelection(world, pos.AddCopy(OffsetInv))
             );
         }
 

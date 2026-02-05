@@ -16,7 +16,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 {
     private IPlayer player;
     private IServerPlayer serverPlayer;
-    private EntityPlayer entityPlayer;    
+    private EntityPlayer entityPlayer;
 
     // 60/s client-side updates.
     private const float interval = 1 / 60f;
@@ -55,7 +55,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             OnReceivedServerPos(true, ref handling);
         }
 
-        entity.PhysicsUpdateWatcher?.Invoke(0, entity.SidedPos.XYZ);
+        entity.PhysicsUpdateWatcher?.Invoke(0, entity.Pos.XYZ);
     }
 
     public override void SetModules()
@@ -69,16 +69,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         physicsModules.Add(new PModuleKnockback());
     }
 
-    public override void OnReceivedServerPos(bool isTeleport, ref EnumHandling handled)
-    {
-        //int tickDiff = entity.Attributes.GetInt("tickDiff", 1);
-        //HandleRemotePhysics(clientInterval * tickDiff, isTeleport);
-    }
-
     public new void OnReceivedClientPos(int version)
     {
         serverPlayer ??= entityPlayer.Player as IServerPlayer;
-        entity.ServerPos.SetFrom(entity.Pos);
 
         if (version > previousVersion)
         {
@@ -100,14 +93,14 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         if (nPos == null)
         {
             nPos = new();
-            nPos.Set(entity.ServerPos);
+            nPos.Set(entity.Pos);
         }
 
         var lPos = this.lPos;
         float dtFactor = dt * 60;
 
         lPos.SetFrom(nPos);
-        nPos.Set(entity.ServerPos);
+        nPos.Set(entity.Pos);
         lPos.Dimension = entity.Pos.Dimension;
 
         // Set the last pos to be the same as the next pos when teleporting.
@@ -124,7 +117,6 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
         // Set client/server motion.
         entity.Pos.Motion.Set(lPos.Motion);
-        entity.ServerPos.Motion.Set(lPos.Motion);
 
         collisionTester.NewTick(lPos);
 
@@ -139,9 +131,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
                 entity.Pos.SetPos(eagent.MountedOn.SeatPosition);
             }
 
-            entity.ServerPos.Motion.X = 0;
-            entity.ServerPos.Motion.Y = 0;
-            entity.ServerPos.Motion.Z = 0;
+            entity.Pos.Motion.X = 0;
+            entity.Pos.Motion.Y = 0;
+            entity.Pos.Motion.Z = 0;
 
             // No-clip detection.
             if (sapi != null)
@@ -151,9 +143,6 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
             return;
         }
-
-        // Set pos for triggering events.
-        entity.Pos.SetFrom(entity.ServerPos);
 
         SetState(lPos, dt);
 
@@ -170,7 +159,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             ApplyTests(lPos, eagent.Controls, dt, true);
         } else
         {
-            var pos = entity.ServerPos;
+            var pos = entity.Pos;
 
             pos.X += pos.Motion.X * dt * 60f;
             pos.Y += pos.Motion.Y * dt * 60f;
@@ -186,7 +175,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     // Main client physics tick called every frame.
     public override void OnPhysicsTick(float dt)
     {
-        SimPhysics(dt, entity.SidedPos);
+        SimPhysics(dt, entity.Pos);
     }
 
     public override void OnGameTick(float deltaTime)
@@ -281,7 +270,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     public void SetPlayerControls(EntityPos pos, EntityControls controls, float dt)
     {
         IClientWorldAccessor clientWorld = entity.World as IClientWorldAccessor;
-        // We pretend the entity is flying to disable gravity so that EntityBehaviorInterpolatePosition system 
+        // We pretend the entity is flying to disable gravity so that EntityBehaviorInterpolatePosition system
         // can work better   (see commit 09003c0c)
         controls.IsFlying = player.WorldData.FreeMove || (clientWorld != null && clientWorld.Player.ClientId != player.ClientId) && !controls.IsClimbing;
         controls.NoClip = player.WorldData.NoClip;
@@ -349,7 +338,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
                     if (entityPlayer.WalkPitch < 0) entityPlayer.WalkPitch = 0;
                 }
             }
-            
+
             float prevYaw = pos.Yaw;
             controls.CalcMovementVectors(pos, dt);
             pos.Yaw = prevYaw;

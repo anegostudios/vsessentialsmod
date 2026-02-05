@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -47,7 +47,7 @@ namespace Vintagestory.GameContent
         private bool soundsReady;
 
 
-        BlockPos plrPos = new BlockPos();
+        BlockPos plrPos = new BlockPos(Dimensions.NormalWorld);
 
         public WeatherSimulationSound(ICoreClientAPI capi, WeatherSystemClient weatherSys)
         {

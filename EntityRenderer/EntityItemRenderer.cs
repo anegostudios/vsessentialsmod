@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -52,7 +52,7 @@ namespace Vintagestory.GameContent
     public class EntityItemRenderer : EntityRenderer
     {
         public static bool RunWittySkipRenderAlgorithm;
-        public static BlockPos LastPos = new BlockPos();
+        public static FastVec3i LastPos;
         public static int LastCollectibleId;
         public static int RenderCount;
         public static int RenderModulo;
@@ -96,7 +96,7 @@ namespace Vintagestory.GameContent
             if (RunWittySkipRenderAlgorithm)
             {
                 int x = (int)entity.Pos.X;
-                int y = (int)entity.Pos.Y;
+                int y = (int)entity.Pos.InternalY;
                 int z = (int)entity.Pos.Z;
 
                 int collId = (entityitem.Itemstack.Class == EnumItemClass.Block ? -1 : 1) * entityitem.Itemstack.Id;
@@ -134,13 +134,13 @@ namespace Vintagestory.GameContent
                 float[] mvpMat = Mat4f.Mul(ModelMat, capi.Render.CurrentModelviewMatrix, ModelMat);
                 Mat4f.Mul(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
                 capi.Render.CurrentActiveShader.UniformMatrix("mvpMatrix", mvpMat);
-                capi.Render.CurrentActiveShader.Uniform("origin", new Vec3f());
+                capi.Render.CurrentActiveShader.Uniform("origin", 0f, 0f, 0f);
             }
             else
             {
                 prog = rapi.StandardShader;
                 prog.Use();
-                prog.RgbaTint = entity.Swimming ? new Vec4f(0.5f, 0.5f, 0.5f, 1f) : ColorUtil.WhiteArgbVec;
+                prog.RgbaTint = /*entity.Swimming ? new Vec4f(0.5f, 0.5f, 0.5f, 1f) : - no longer needed with our liquid depth shading */ ColorUtil.WhiteArgbVec;
                 prog.DontWarpVertices = 0;
                 prog.NormalShaded = 1;
                 prog.AlphaTest = renderInfo.AlphaTest;
@@ -160,10 +160,10 @@ namespace Vintagestory.GameContent
                 if (renderInfo.OverlayTexture != null && renderInfo.OverlayOpacity > 0)
                 {
                     prog.Tex2dOverlay2D = renderInfo.OverlayTexture.TextureId;
-                    prog.OverlayTextureSize = new Vec2f(renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height);
-                    prog.BaseTextureSize = new Vec2f(renderInfo.TextureSize.Width, renderInfo.TextureSize.Height);
+                    prog.Uniform("overlayTextureSize", renderInfo.OverlayTexture.Width, renderInfo.OverlayTexture.Height);
+                    prog.Uniform("baseTextureSize", renderInfo.TextureSize.Width, renderInfo.TextureSize.Height);
                     TextureAtlasPosition texPos = rapi.GetTextureAtlasPosition(entityitem.Itemstack);
-                    prog.BaseUvOrigin = new Vec2f(texPos.x1, texPos.y1);
+                    prog.Uniform("baseUvOrigin", texPos.x1, texPos.y1);
                 }
 
 

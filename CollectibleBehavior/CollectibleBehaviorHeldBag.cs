@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
@@ -34,6 +34,8 @@ namespace Vintagestory.GameContent
     {
         public const int PacketIdBitShift = 11;    // magic number; see also IClientNetworkAPI.SendEntityPacketWithOffset() which enables such tricks
 
+        public GeneralTagGroups StorageTags { get; set; }
+
         public CollectibleBehaviorHeldBag(CollectibleObject collObj) : base(collObj)
         {
         }
@@ -41,21 +43,34 @@ namespace Vintagestory.GameContent
         public override void Initialize(JsonObject properties)
         {
             base.Initialize(properties);
+
+            if (properties.KeyExists("tags"))
+            {
+                StorageTags = properties.AsObject<GeneralTagGroups>();
+            }
         }
 
-        public void Clear(ItemStack backPackStack)
+        public override void OnLoaded(ICoreAPI api)
         {
-            ITreeAttribute stackBackPackTree = backPackStack.Attributes.GetTreeAttribute("backpack");
-            stackBackPackTree["slots"] = new TreeAttribute();
+            base.OnLoaded(api);
+
+            StorageTags?.Resolve(api.World);
+            StorageTags?.ClearTagNames();
+        }
+
+        public void Clear(ItemStack backpackStack)
+        {
+            ITreeAttribute stackBackpackTree = backpackStack.Attributes.GetTreeAttribute("backpack");
+            stackBackpackTree["slots"] = new TreeAttribute();
         }
 
         public ItemStack[] GetContents(ItemStack bagstack, IWorldAccessor world)
         {
-            ITreeAttribute backPackTree = bagstack.Attributes.GetTreeAttribute("backpack");
-            if (backPackTree == null) return null;
+            ITreeAttribute backpackTree = bagstack.Attributes.GetTreeAttribute("backpack");
+            if (backpackTree == null) return null;
 
             List<ItemStack> contents = new List<ItemStack>();
-            ITreeAttribute slotsTree = backPackTree.GetTreeAttribute("slots");
+            ITreeAttribute slotsTree = backpackTree.GetTreeAttribute("slots");
 
             foreach (var val in slotsTree.SortedCopy())
             {
@@ -74,9 +89,9 @@ namespace Vintagestory.GameContent
 
         public virtual bool IsEmpty(ItemStack bagstack)
         {
-            ITreeAttribute backPackTree = bagstack.Attributes.GetTreeAttribute("backpack");
-            if (backPackTree == null) return true;
-            ITreeAttribute slotsTree = backPackTree.GetTreeAttribute("slots");
+            ITreeAttribute backpackTree = bagstack.Attributes.GetTreeAttribute("backpack");
+            if (backpackTree == null) return true;
+            ITreeAttribute slotsTree = backpackTree.GetTreeAttribute("slots");
 
             foreach (var val in slotsTree)
             {
@@ -95,8 +110,8 @@ namespace Vintagestory.GameContent
 
         public void Store(ItemStack bagstack, ItemSlotBagContent slot)
         {
-            ITreeAttribute stackBackPackTree = bagstack.Attributes.GetTreeAttribute("backpack");
-            ITreeAttribute slotsTree = stackBackPackTree.GetTreeAttribute("slots");
+            ITreeAttribute stackBackpackTree = bagstack.Attributes.GetTreeAttribute("backpack");
+            ITreeAttribute slotsTree = stackBackpackTree.GetTreeAttribute("slots");
 
             slotsTree["slot-" + slot.SlotIndex] = new ItemstackAttribute(slot.Itemstack);
         }
@@ -106,10 +121,16 @@ namespace Vintagestory.GameContent
             return bagstack.ItemAttributes["backpack"]["slotBgColor"].AsString(null);
         }
 
-        const int defaultFlags = (int)(EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit);
+        public const int defaultFlags = (int)(EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit);
+
         public virtual EnumItemStorageFlags GetStorageFlags(ItemStack bagstack)
         {
             return (EnumItemStorageFlags)bagstack.ItemAttributes["backpack"]["storageFlags"].AsInt(defaultFlags);
+        }
+
+        public virtual IEnumerable<TagCondition<TagSet>> GetStorageTags(ItemStack bagStack, ICoreAPI api)
+        {
+            return StorageTags?.GetResolvedTags() ?? [];
         }
 
         public List<ItemSlotBagContent> GetOrCreateSlots(ItemStack bagstack, InventoryBase parentinv, int bagIndex, IWorldAccessor world)
@@ -119,33 +140,36 @@ namespace Vintagestory.GameContent
             string bgcolhex = GetSlotBgColor(bagstack);
             var flags = GetStorageFlags(bagstack);
             int quantitySlots = GetQuantitySlots(bagstack);
+            IEnumerable<TagCondition<TagSet>> tags = GetStorageTags(bagstack, world.Api);
 
-            ITreeAttribute stackBackPackTree = bagstack.Attributes.GetTreeAttribute("backpack");
-            if (stackBackPackTree == null)
+            ITreeAttribute stackBackpackTree = bagstack.Attributes.GetTreeAttribute("backpack");
+            if (stackBackpackTree == null)
             {
-                stackBackPackTree = new TreeAttribute();
+                stackBackpackTree = new TreeAttribute();
                 ITreeAttribute slotsTree = new TreeAttribute();
 
                 for (int slotIndex = 0; slotIndex < quantitySlots; slotIndex++)
                 {
                     ItemSlotBagContent slot = new ItemSlotBagContent(parentinv, bagIndex, slotIndex, flags);
                     slot.HexBackgroundColor = bgcolhex;
+                    slot.CanStoreTags = tags;
                     bagContents.Add(slot);
                     slotsTree["slot-" + slotIndex] = new ItemstackAttribute(null);
                 }
 
-                stackBackPackTree["slots"] = slotsTree;
-                bagstack.Attributes["backpack"] = stackBackPackTree;
+                stackBackpackTree["slots"] = slotsTree;
+                bagstack.Attributes["backpack"] = stackBackpackTree;
             }
             else
             {
-                ITreeAttribute slotsTree = stackBackPackTree.GetTreeAttribute("slots");
+                ITreeAttribute slotsTree = stackBackpackTree.GetTreeAttribute("slots");
 
                 foreach (var val in slotsTree)
                 {
                     int slotIndex = val.Key.Split("-")[1].ToInt();
                     ItemSlotBagContent slot = new ItemSlotBagContent(parentinv, bagIndex, slotIndex, flags);
                     slot.HexBackgroundColor = bgcolhex;
+                    slot.CanStoreTags = tags;
 
                     if (val.Value?.GetValue() != null)
                     {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
@@ -50,6 +50,16 @@ namespace Vintagestory.API.Common
         public virtual bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action OnNoPath = null, int searchDepth = 10000, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
         {
             return WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck, creatureType ?? EnumAICreatureType.Default);
+        }
+
+        public virtual bool Flee_Async(Vec3d fleeFromPos, float fleeDistance, float movingSpeed, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual bool FleeFrom(Vec3d target, float movingSpeed, float fleedistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        {
+            throw new NotImplementedException();
         }
 
         public virtual bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, EnumAICreatureType creatureType = EnumAICreatureType.Default)

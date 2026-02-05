@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Xml.Linq;
 using Vintagestory.API;
 using Vintagestory.API.Common;
@@ -69,6 +69,7 @@ namespace Vintagestory.GameContent
             if (properties["alternateZOffset"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.AlternateZOffset;
             if (properties["notFullFace"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.NotFullFace;
             if (properties["removable"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.Removable;
+            if (properties["canAttachToAnything"].AsBool(false)) block.decorBehaviorFlags |= DecorFlags.CanAddToAnything;
             if (sidedVariants) block.decorBehaviorFlags |= DecorFlags.HasSidedVariants;
             block.DecorThickness = properties["thickness"].AsFloat(0.03125f);
 
@@ -83,7 +84,7 @@ namespace Vintagestory.GameContent
             {
                 if (sides[i] == blockSel.Face)
                 {
-                    BlockPos pos = blockSel.Position.AddCopy(blockSel.Face.Opposite);
+                    BlockPos pos = blockSel.DidOffset ? blockSel.Position.AddCopy(blockSel.Face.Opposite) : blockSel.Position;
 
                     Block blockToPlace;
                     if (sidedVariants)
@@ -131,7 +132,13 @@ namespace Vintagestory.GameContent
                     }
 
                     var mat = attachingBlock.GetBlockMaterial(world.BlockAccessor, pos);
-                    if (!attachingBlock.CanAttachBlockAt(world.BlockAccessor, blockToPlace, pos, blockSel.Face) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
+                    bool? attachingBlockCanAllow = null;
+                    if (attachingBlock.Attributes != null)
+                    {
+                        var attr = attachingBlock.Attributes["allowOverlays"];
+                        if (attr.Exists) attachingBlockCanAllow = attr.AsBool(true);
+                    }
+                    if ((((block.decorBehaviorFlags & DecorFlags.CanAddToAnything) == 0 || (attachingBlock.DrawType != API.Client.EnumDrawType.JSON && attachingBlock.DrawType != API.Client.EnumDrawType.JSONAndSnowLayer) || attachingBlock.RenderPass == API.Client.EnumChunkRenderPass.Transparent || attachingBlockCanAllow == false) && attachingBlockCanAllow != true && !attachingBlock.CanAttachBlockAt(world.BlockAccessor, blockToPlace, pos, blockSel.Face)) || mat == EnumBlockMaterial.Snow || mat == EnumBlockMaterial.Ice)
                     {
                         failureCode = "decorrequiressolid";
                         return false;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Cairo;
 using Vintagestory.API.Client;
@@ -17,7 +17,7 @@ namespace Vintagestory.GameContent
         public float ZoomLevel = 1;
 
 
-        internal Vec3d prevPlayerPos = new Vec3d();
+        public Vec3d prevPlayerPos = new Vec3d();
         public Cuboidi chunkViewBoundsBefore = new Cuboidi();
 
         public OnViewChangedDelegate viewChanged;
@@ -258,7 +258,7 @@ namespace Vintagestory.GameContent
             if (chunkViewBoundsBefore.Equals(chunkviewBounds)) return;
             viewChangedSync(chunkviewBounds.X1, chunkviewBounds.Z1, chunkviewBounds.X2, chunkviewBounds.Z2);
             
-            BlockPos cur = new BlockPos();
+            FastVec3i cur = new();
 
             bool beforeBoundsEmpty = chunkViewBoundsBefore.SizeX == 0 && chunkViewBoundsBefore.SizeZ == 0;
 

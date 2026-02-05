@@ -25,7 +25,7 @@ namespace Vintagestory.GameContent
         public bool playerChunkLoaded;
 
         float quarterSecAccum = 0;
-        BlockPos plrPos = new BlockPos();
+        BlockPos plrPos = new BlockPos(Dimensions.NormalWorld);
         Vec3d plrPosd = new Vec3d();
 
 
@@ -51,8 +51,10 @@ namespace Vintagestory.GameContent
                     // Refresh at 16 FPS rate, thats plenty
                     blendedLastCheckedMSDiv60 = msd60;
                     blendedWeatherDataCached = WeatherDataAtPlayer.BlendedWeatherData;
-
-                    OnGetBlendedWeatherData(blendedWeatherDataCached);
+                    if (OnGetBlendedWeatherData != null)
+                    {
+                        OnGetBlendedWeatherData(blendedWeatherDataCached);
+                    }
                 }
                 return blendedWeatherDataCached;
             }
@@ -287,7 +289,6 @@ namespace Vintagestory.GameContent
             weatherSim.Transitioning = msg.Transitioning;
             weatherSim.Weight = msg.Weight;
 
-            //bool windChanged = weatherSim.CurWindPattern.State.Index != msg.WindPattern.Index;
             weatherSim.CurWindPattern = weatherSim.WindPatterns[Math.Min(weatherSim.WindPatterns.Length - 1, msg.WindPattern.Index)];
             weatherSim.CurWindPattern.State = msg.WindPattern;
 
@@ -299,9 +300,6 @@ namespace Vintagestory.GameContent
                 weatherSim.NewWePattern.OnBeginUse();
                 cloudRenderer.instantTileBlend = true;
             }
-
-
-            //api.World.Logger.Notification("Weather pattern update @{0}/{1}", weatherSim.regionX, weatherSim.regionZ);
 
             if (msg.Transitioning)
             {
@@ -332,7 +330,7 @@ namespace Vintagestory.GameContent
             capi.Ambient.CurrentModifiers.InsertBefore("serverambient", "weather", WeatherDataAtPlayer.BlendedWeatherData.Ambient);
             haveLevelFinalize = true;
 
-            // Pre init the clouds.
+            // Pre init the clouds
             capi.Ambient.UpdateAmbient(0.1f);
 
             cloudRenderer.CloudTick(0.1f);

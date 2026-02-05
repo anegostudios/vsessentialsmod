@@ -11,7 +11,7 @@ namespace Vintagestory.GameContent
     {
         ITreeAttribute decayTree;
         JsonObject typeAttributes;
-        
+
 
         public float HoursToDecay { get; set; }
 
@@ -76,9 +76,9 @@ namespace Vintagestory.GameContent
                 AssetLocation blockcode = new AssetLocation(typeAttributes["decayedBlock"].AsString());
                 Block decblock = entity.World.GetBlock(blockcode);
 
-                double x = entity.ServerPos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1;
-                double y = entity.ServerPos.Y + entity.SelectionBox.Y1 - entity.OriginSelectionBox.Y1;
-                double z = entity.ServerPos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1;
+                double x = entity.Pos.X + entity.SelectionBox.X1 - entity.OriginSelectionBox.X1;
+                double y = entity.Pos.Y + entity.SelectionBox.Y1 - entity.OriginSelectionBox.Y1;
+                double z = entity.Pos.Z + entity.SelectionBox.Z1 - entity.OriginSelectionBox.Z1;
 
                 BlockPos bonepos = new BlockPos((int)x, (int)y, (int)z);
                 var bl = entity.World.BlockAccessor;
@@ -101,10 +101,10 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
-                
+
             }
 
-            Vec3d pos = entity.SidedPos.XYZ + entity.CollisionBox.Center - entity.OriginCollisionBox.Center;
+            Vec3d pos = entity.Pos.XYZ + entity.CollisionBox.Center - entity.OriginCollisionBox.Center;
             pos.Y += entity.Properties.DeadCollisionBoxSize.Y / 2;
 
             entity.World.SpawnParticles(new EntityCubeParticles(
