@@ -331,6 +331,9 @@ namespace Vintagestory.GameContent
             if (gearShape == null)
             {
                 compGearShape = iatta.GetAttachedShape(stack, slotCode);
+                if (compGearShape == null) return entityShape;
+
+
                 shapePath = compGearShape.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json");
 
                 gearShape = Shape.TryGet(api, shapePath);

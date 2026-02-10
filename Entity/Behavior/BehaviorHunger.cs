@@ -394,27 +394,26 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityReceiveDamage(DamageSource damageSource, ref float damage)
         {
-            if (damageSource.Type == EnumDamageType.Heal && damageSource.Source == EnumDamageSource.Revive)
+            if (damageSource is not { Type: EnumDamageType.Heal, Source: EnumDamageSource.Revive }) return;
+
+            if (entity.Attributes.GetBool("noSatietyRestoreOnRevive"))
             {
-                if (entity.Attributes.GetBool("noSatietyRestoreOnRevive"))
-                {
-                    entity.Attributes.RemoveAttribute("noSatietyRestoreOnRevive");
-                    return;
-                }
-
-                SaturationLossDelayFruit = 60;
-                SaturationLossDelayVegetable = 60;
-                SaturationLossDelayProtein = 60;
-                SaturationLossDelayGrain = 60;
-                SaturationLossDelayDairy = 60;
-
-                Saturation = MaxSaturation / 2;
-                VegetableLevel /= 2;
-                ProteinLevel /= 2;
-                FruitLevel /= 2;
-                DairyLevel /= 2;
-                GrainLevel /= 2;
+                entity.Attributes.RemoveAttribute("noSatietyRestoreOnRevive");
+                return;
             }
+
+            SaturationLossDelayFruit = 60;
+            SaturationLossDelayVegetable = 60;
+            SaturationLossDelayProtein = 60;
+            SaturationLossDelayGrain = 60;
+            SaturationLossDelayDairy = 60;
+
+            Saturation = MaxSaturation / 2;
+            VegetableLevel /= 2;
+            ProteinLevel /= 2;
+            FruitLevel /= 2;
+            DairyLevel /= 2;
+            GrainLevel /= 2;
         }
     }
  

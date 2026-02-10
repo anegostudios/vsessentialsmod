@@ -24,11 +24,12 @@ namespace Vintagestory.GameContent
         {
             base.SetDefaultValues();
             ExecutionChance = 0.04;
+            WhenSwimming = true;
         }
 
         public override bool ShouldExecute()
         {
-            if (!entity.Swimming) return false;
+            if (!PreconditionsSatisfied()) return false;
             if (rand.NextDouble() > ExecutionChance) return false;
 
             int range = GameMath.Min(50, 30 + searchattempts*2);

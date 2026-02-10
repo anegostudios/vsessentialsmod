@@ -57,6 +57,7 @@ namespace Vintagestory.GameContent
 
         public override bool ShouldExecute()
         {
+            if (!PreconditionsSatisfied()) return false;
             if (rand.NextDouble() > ExecutionChance) return false;
 
             if (stuckCounter > 3)

@@ -297,6 +297,8 @@ namespace Vintagestory.GameContent
         bool needsToTele = false;
         public override bool ShouldExecute()
         {
+            if (!PreconditionsSatisfied()) return false;
+
             if (rand.NextDouble() > (failedWanders > 0 ? (1 - ExecutionChance * 4 * failedWanders) : ExecutionChance))    // if a wander failed (got stuck) initially greatly increase the chance of trying again, but eventually give up
             {
                 failedWanders = 0;

@@ -31,6 +31,9 @@ namespace Vintagestory.GameContent
         {
             if (!manualExecute)
             {
+                if (!PreconditionsSatisfied()) return false;
+                if (rand.NextDouble() > ExecutionChance) return false;
+
                 targetEntity = partitionUtil.GetNearestEntity(entity.Pos.XYZ, seekingRange, (e) => IsTargetableEntity(e, seekingRange), EnumEntitySearchType.Creatures);
                 return targetEntity != null;
             }
