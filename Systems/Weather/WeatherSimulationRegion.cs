@@ -299,7 +299,7 @@ namespace Vintagestory.GameContent
                 if (rnd.NextDouble() < CurWeatherEvent.State.LightningRate)
                 {
                     ClimateCondition nowcond = ws.api.World.BlockAccessor.GetClimateAt(regionCenterPos, EnumGetClimateMode.NowValues);
-                    if (nowcond.Temperature >= targetLightninMinTemp && nowcond.RainCloudOverlay > 0.15)
+                    if (nowcond != null && nowcond.Temperature >= targetLightninMinTemp && nowcond.RainCloudOverlay > 0.15)
                     {
                         Vec3d pos = regionCenterPos.ToVec3d().Add(-200 + rnd.NextDouble() * 400, ws.api.World.SeaLevel, -200 + rnd.NextDouble() * 400);
                         ws.SpawnLightningFlash(pos);

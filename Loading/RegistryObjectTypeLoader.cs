@@ -82,6 +82,10 @@ namespace Vintagestory.ServerMods.NoObf
             if (!(coreApi is ICoreServerAPI api)) return;
             this.api = api;
 
+            // Do this as soon as possible, so other systems can make use of the preloaded tags.
+            api.Logger.VerboseDebug("Starting to preload tags");
+            PreloadTags();
+
             api.Logger.VerboseDebug("Starting to gather blocktypes, itemtypes and entities");
             LoadWorldProperties();
             int maxThreads = api.Server.IsDedicated ? 3 : 8;
@@ -167,8 +171,6 @@ namespace Vintagestory.ServerMods.NoObf
             LoadEntities(entityVariants);
             api.Logger.VerboseDebug("Parsed and loaded entities");
 
-            (api.TagsManager as ITagLoader)?.LoadTagsFromAssets(api);
-
             api.Server.LogNotification("BlockLoader: Entities, Blocks and Items loaded");
 
             FreeRam();
@@ -229,7 +231,6 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (EntityType type in variants)
                 {
-                    api.TagsManager.RegisterEntityTags(type.Tags);
                     api.RegisterEntityClass(type.Class, type.CreateProperties(api));
                 }
             });
@@ -245,8 +246,6 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (ItemType type in variants)
                 {
-                    api.TagsManager.RegisterGeneralTags(type.Tags);
-
                     Item item = type.CreateItem(api);
 
                     try
@@ -271,8 +270,6 @@ namespace Vintagestory.ServerMods.NoObf
             {
                 foreach (BlockType type in variants)
                 {
-                    api.TagsManager.RegisterGeneralTags(type.Tags);
-
                     Block block = type.CreateBlock(api);
 
                     try
@@ -287,6 +284,62 @@ namespace Vintagestory.ServerMods.NoObf
                 }
             });
         }
+        #endregion
+
+        #region Tags
+
+        //TODO(Rennorb) @cleanup @refactor: This is probably in the wrong place, and should not be part of the essentialsMod.
+        // Instead it should maybe be in some Main.
+        void PreloadTags()
+        {
+            const string TagsAssetPath = "config/preloaded-tags";
+
+            var tagsLists = api.Assets.GetMany<Dictionary<string, string[]>>(api.Logger, TagsAssetPath);
+            foreach (var (location, tags) in tagsLists)
+            {
+                foreach (var (registryName, tagNames) in tags)
+                {
+                    // :ArbitraryTagRegistries
+                    switch(registryName)
+                    {
+                        case "entities": {
+                            var err = api.EntityTagRegistry.TryRegister(tagNames.AsSpan());
+                            if(err != TagRegistryError.None)
+                            {
+                                api.EntityTagRegistry.LogIssue("EntityTag Preregister", err, tagNames.AsSpan());
+                                continue;
+                            }
+                            break;
+                        }
+
+                        case "collectibles": {
+                            var err = api.CollectibleTagRegistry.TryRegister(tagNames.AsSpan());
+                            if(err != TagRegistryError.None)
+                            {
+                                api.CollectibleTagRegistry.LogIssue("CollectibleTag Preregister", err, tagNames.AsSpan());
+                                continue;
+                            }
+                            break;
+                        }
+
+                        default:
+                            api.Logger.Notification($"Unknown registry '{registryName}' to register preloaded tags for (domain: '{location.Domain}').");
+                            continue;
+                    }
+
+                    
+                    if (tagNames.Length > 0)
+                    {
+                        api.Logger.VerboseDebug($"Preloaded {tagNames.Length} tags for registry '{registryName}' from domain '{location.Domain}': {string.Join(", ", tagNames)}");
+                    }
+                    else
+                    {
+                        api.Logger.Notification($"Preloaded {tagNames.Length} tags for registry '{registryName}' from domain '{location.Domain}'");
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region generic

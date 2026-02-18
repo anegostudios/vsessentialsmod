@@ -90,7 +90,6 @@ namespace Vintagestory.ServerMods
         public override void StartServerSide(ICoreServerAPI api)
         {
             api.Event.InitWorldGenerator(initWorldGen, "standard");
-            api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.Terrain, "standard");
         }
 
         public void initWorldGen()
@@ -154,6 +153,8 @@ namespace Vintagestory.ServerMods
             borderIndicesByCardinal[Cardinal.NorthWest] = (chunksize - 1) * chunksize + chunksize - 1;
 
             landforms = null;  // Reset this, useful when /wgen regen command reloads all the generators because landforms gets reloaded from file there
+
+            api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.Terrain, "standard");
         }
 
         private double[] scaleAdjustedFreqs(double[] vs, float horizontalScale)

@@ -21,10 +21,14 @@ namespace Vintagestory.ServerMods
         {
             this.api = api;
 
+            this.api.Event.InitWorldGenerator(InitWorldGen, "standard");
+            this.api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
+        }
+
+        private void InitWorldGen()
+        {
             this.api.Event.ChunkColumnGeneration(this.OnChunkColumnGeneration, EnumWorldGenPass.Vegetation, "standard");
             this.api.Event.ChunkColumnGeneration(this.OnChunkColumnGenerationFlood, EnumWorldGenPass.NeighbourSunLightFlood, "standard");
-
-            this.api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
         }
 
         private void OnWorldGenBlockAccessor(IChunkProviderThread chunkProvider)
@@ -42,13 +46,6 @@ namespace Vintagestory.ServerMods
             blockAccessor.BeginColumn();
             api.WorldManager.SunFloodChunkColumnForWorldGen(request.Chunks, request.ChunkX, request.ChunkZ);
             blockAccessor.RunScheduledBlockLightUpdates(request.ChunkX, request.ChunkZ);
-
-#if DEBUG
-            for (int chunkY = 0; chunkY < request.Chunks.Length; chunkY++)
-            {
-                //if (request.Chunks[chunkY].Lighting.IsNull) throw new NullReferenceException(string.Format("Attempted to load Chunk at position {0}/{1}/{2}, but it has lightLayer null!", request.ChunkX, chunkY, request.ChunkZ));
-            }
-#endif
         }
 
         private void OnChunkColumnGenerationFlood(IChunkColumnGenerateRequest request)

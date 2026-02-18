@@ -202,6 +202,13 @@ namespace Vintagestory.ServerMods.NoObf
         [DocumentAsJson("Optional", "None")]
         public BlockDropItemStack[] Drops;
 
+        /// <summary>
+        /// List of tags that entity has. Used for categorizing.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public TagSetFast Tags;
+
 
         public EntityProperties CreateProperties(ICoreAPI api)
         {
@@ -221,7 +228,6 @@ namespace Vintagestory.ServerMods.NoObf
             EntityProperties properties = new EntityProperties()
             {
                 Code = Code,
-                Tags = api.TagsManager.GetTagSetUnsafe<EntityTagSet>(this.Tags),
                 Variant = new (Variant),
                 Class = Class,
                 Habitat = Habitat,
@@ -242,7 +248,8 @@ namespace Vintagestory.ServerMods.NoObf
                 IdleSoundChance = IdleSoundChance,
                 Drops = DropsCopy,
                 EyeHeight = EyeHeight,
-                SwimmingEyeHeight = SwimmingEyeHeight ?? EyeHeight
+                SwimmingEyeHeight = SwimmingEyeHeight ?? EyeHeight,
+                Tags = Tags,
             };
 
             var serverBhHealth = Server?.Behaviors?.FirstOrDefault(jsobjs => jsobjs["code"].AsString() == "health");

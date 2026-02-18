@@ -122,7 +122,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        public override void OnCreatedByCrafting(ItemSlot[] allInputslots, ItemSlot outputSlot, GridRecipe byRecipe, ref EnumHandling bhHandling)
+        public override void OnCreatedByCrafting(ItemSlot[] allInputslots, ItemSlot outputSlot, IRecipeBase byRecipe, ref EnumHandling bhHandling)
         {
             foreach (var slot in allInputslots)
             {
@@ -321,7 +321,7 @@ namespace Vintagestory.GameContent
                 {
                     currentvalue *= buff.Multiplier;
                     currentvalue += buff.FlatChange;
-                    bhHandling = EnumHandling.PreventDefault;
+                    bhHandling = EnumHandling.Handled; // PreventDefault would cause this buff not to get applied on top of existing buffs (e.g. mining speeds of a pickaxe)
                 }
             }
 

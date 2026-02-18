@@ -27,8 +27,6 @@ namespace Vintagestory.ServerMods
 
             if (TerraGenConfig.DoDecorationPass)
             {
-                api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
-
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
 
                 api.ChatCommands.GetOrCreate("dev")
@@ -54,6 +52,8 @@ namespace Vintagestory.ServerMods
             heightvarNoise = NormalizedSimplexNoise.FromDefaultOctaves(3, 1f / 20f, 0.9f, api.World.Seed + 12);
 
             regionsize = api.World.BlockAccessor.RegionSize;
+
+            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
         }
 
 

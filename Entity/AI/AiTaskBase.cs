@@ -1,11 +1,10 @@
 using Newtonsoft.Json;
-﻿using System;
+using System;
 using System.Linq;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
-using Vintagestory.API.Util;
 using Vintagestory.Essentials;
 
 namespace Vintagestory.API.Common
@@ -62,14 +61,10 @@ namespace Vintagestory.API.Common
         /// List of entity tags that will be added to entity when task start.<br/>
         /// Added tags will be removed when task finishes, unless the entity already had them when starting the task. Not designed for use with multiple slots, as tags may be removed too early if multiple AI tasks added the same ones.
         /// </summary>
-        [JsonProperty("tagsAppliedToEntity")]
-        protected string[]? SetTagsAppliedFromStrings
-        {
-            set => TagsAppliedToEntity = value == null ? EntityTagSet.Empty : entity.Api.TagsManager.GetEntityTagSet(value);
-        }
-        public EntityTagSet TagsAppliedToEntity = EntityTagSet.Empty;
+        [JsonProperty]
+        public TagSetFast TagsAppliedToEntity;
         /// <summary> Tags that were actually applied on the start of the task. Will be removed from entity when task is finished. </summary>
-        protected EntityTagSet tagsAppliedOnStart = EntityTagSet.Empty;
+        protected TagSetFast tagsAppliedOnStart;
 
         /// <summary> Minimal cooldown before task can be run again, in IRL milliseconds (generally used for shorter cooldowns). </summary>
         [JsonProperty]
@@ -396,10 +391,10 @@ namespace Vintagestory.API.Common
 
             ExecutionStartTimeMs = entity.World.ElapsedMilliseconds;
 
-            tagsAppliedOnStart = TagsAppliedToEntity.Except(entity.Tags);
-            if (tagsAppliedOnStart != EntityTagSet.Empty)
+            tagsAppliedOnStart = TagsAppliedToEntity & ~entity.Tags; // Do not modify tags the entity already had.
+            if (!tagsAppliedOnStart.IsEmpty)
             {
-                entity.Tags = entity.Tags.Union(tagsAppliedOnStart);
+                entity.Tags |= tagsAppliedOnStart;
                 entity.MarkTagsDirty();
             }
         }
@@ -433,9 +428,9 @@ namespace Vintagestory.API.Common
                 entity.World.PlaySoundAt(finishSound, entity.Pos.X, entity.Pos.InternalY, entity.Pos.Z, null, true, soundRange);
             }
 
-            if (tagsAppliedOnStart != EntityTagSet.Empty)
+            if (!tagsAppliedOnStart.IsEmpty)
             {
-                entity.Tags = entity.Tags.Except(tagsAppliedOnStart);
+                entity.Tags &= ~tagsAppliedOnStart;
                 entity.MarkTagsDirty();
             }
         }

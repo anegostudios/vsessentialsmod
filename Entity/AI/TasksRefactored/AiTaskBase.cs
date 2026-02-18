@@ -100,7 +100,7 @@ public class AiTaskBaseConfig
     /// List of entity tags that will be added to entity when task start.<br/>
     /// Tags that were actually added (that entity didn't have when task is started) will be removed when task finishes.
     /// </summary>
-    [JsonProperty] private string[]? tagsAppliedToEntity = [];
+    [JsonProperty] public TagSetFast TagsAppliedToEntity;
 
     /// <summary>
     /// If set to 'true' task will be started only if entity is swimming.<br/>
@@ -248,8 +248,6 @@ public class AiTaskBaseConfig
 
     public float PriorityForCancel => priorityForCancel ?? Priority;
 
-    public EntityTagSet TagsAppliedToEntity = EntityTagSet.Empty;
-
     public AnimationMetaData? AnimationMeta = null;
 
     public DayTimeFrame[] DuringDayTimeFrames = [];
@@ -266,14 +264,12 @@ public class AiTaskBaseConfig
     /// </summary>
     public virtual void Init(EntityAgent entity)
     {
-        if (tagsAppliedToEntity != null) TagsAppliedToEntity = entity.Api.TagsManager.GetEntityTagSet(tagsAppliedToEntity);
         if (duringDayTimeFramesHours != null)
         {
             DuringDayTimeFrames = [.. duringDayTimeFramesHours.Select(frame => new DayTimeFrame(frame[0], frame[1]))];
         }
 
         duringDayTimeFramesHours = null;
-        tagsAppliedToEntity = null;
 
         if (animation != "")
         {
@@ -394,7 +390,7 @@ public abstract class AiTaskBaseR : IAiTask
     /// <summary>
     /// Tags that were actually applied on the start of the task. Will be removed from entity when task is finished.
     /// </summary>
-    protected EntityTagSet tagsAppliedOnStart;
+    protected TagSetFast tagsAppliedOnStart;
 
 
     protected AiTaskBaseR(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig)
@@ -497,10 +493,10 @@ public abstract class AiTaskBaseR : IAiTask
 
         executionStartTimeMs = entity.World.ElapsedMilliseconds;
 
-        tagsAppliedOnStart = Config.TagsAppliedToEntity.Except(entity.Tags);
-        if (tagsAppliedOnStart != EntityTagSet.Empty)
+        tagsAppliedOnStart = Config.TagsAppliedToEntity & ~entity.Tags;
+        if (tagsAppliedOnStart.IsEmpty)
         {
-            entity.Tags = entity.Tags.Union(tagsAppliedOnStart);
+            entity.Tags |= tagsAppliedOnStart;
             entity.MarkTagsDirty();
         }
 
@@ -526,9 +522,9 @@ public abstract class AiTaskBaseR : IAiTask
             entity.World.PlaySoundAt(Config.FinishSound, entity.Pos.X, entity.Pos.InternalY, entity.Pos.Z, null, Config.RandomizePitch, Config.SoundRange, Config.SoundVolume);
         }
 
-        if (tagsAppliedOnStart != EntityTagSet.Empty)
+        if (!tagsAppliedOnStart.IsEmpty)
         {
-            entity.Tags = entity.Tags.Except(tagsAppliedOnStart);
+            entity.Tags &= ~tagsAppliedOnStart;
             entity.MarkTagsDirty();
         }
 

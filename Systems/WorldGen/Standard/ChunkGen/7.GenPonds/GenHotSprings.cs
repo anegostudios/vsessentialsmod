@@ -37,8 +37,6 @@ namespace Vintagestory.ServerMods
 
             if (TerraGenConfig.DoDecorationPass)
             {
-                api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
-
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
                 api.Event.InitWorldGenerator(initWorldGen, "standard");
             }
@@ -54,14 +52,16 @@ namespace Vintagestory.ServerMods
             LoadGlobalConfig(api);
 
             decorBlocks = new Block[] {
-                api.World.GetBlock(new AssetLocation("hotspringbacteria-87deg")),
-                api.World.GetBlock(new AssetLocation("hotspringbacteriasmooth-74deg")),
-                api.World.GetBlock(new AssetLocation("hotspringbacteriasmooth-65deg")),
-                api.World.GetBlock(new AssetLocation("hotspringbacteriasmooth-55deg"))
+                api.World.GetBlock(gcfg.hotSpringBacteria87DegCode),
+                api.World.GetBlock(gcfg.hotSpringBacteriaSmooth74DegCode),
+                api.World.GetBlock(gcfg.hotSpringBacteriaSmooth65DegCode),
+                api.World.GetBlock(gcfg.hotSpringBacteriaSmooth55DegCode)
             };
 
-            blocksludgygravel = api.World.GetBlock(new AssetLocation("sludgygravel"));
-            boilingWaterBlockId = api.World.GetBlock(new AssetLocation("boilingwater-still-7")).Id;
+            blocksludgygravel = api.World.GetBlock(gcfg.sludgyGravelBlockCode);
+            boilingWaterBlockId = gcfg.boilingWaterBlockId;
+
+            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
         }
 
 

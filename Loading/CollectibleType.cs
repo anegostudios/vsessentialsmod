@@ -337,6 +337,13 @@ namespace Vintagestory.ServerMods.NoObf
         [DocumentAsJson("Optional", "None")]
         public string ParticlesTextureCode = null;
 
+        /// <summary>
+        /// List of tags that collectible has. Used for categorizing.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public TagSet Tags;
+
 
         [OnDeserialized]
         internal void OnDeserializedMethod(StreamingContext context)

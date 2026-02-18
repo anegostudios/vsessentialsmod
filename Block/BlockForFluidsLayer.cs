@@ -82,7 +82,7 @@ namespace Vintagestory.GameContent
         // Default implementation for sub-classes which implement IBlockFlowing; otherwise unused (e.g. not used by Lake Ice)
         public virtual float FlowRate(BlockPos pos)
         {
-            return 1f;
+            return (this as IBlockFlowing)?.FlowNormali?.Length() ?? 1f;
         }
     }
 }

@@ -47,28 +47,9 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     [JsonProperty] public float MaxTargetWeight = 0;
 
     /// <summary>
-    /// List of tags entity should have to be targetable.
-    /// This list is split into groups of tags. By default entity should have at least one tag from each group to be targetable.
-    /// If 'ReverseTagsCheck' parameter is set to true, entity should have all tags from at least one group to be targetable.
+    /// Conjunctive set of tags an entity must have to be considered targetable. [A, B, C] means the entity must have A and B an C to be a valid target.
     /// </summary>
-    [JsonProperty] private List<List<string>>? entityTags = [];
-
-    /// <summary>
-    /// List of tags entity should have to be not targetable.
-    /// This list is split into groups of tags. By default entity should have all tags from at least one group to be not targetable.
-    /// If 'ReverseSkipTagsCheck' parameter is set to true, entity should have at least one tag from each group to be not targetable.
-    /// </summary>
-    [JsonProperty] private List<List<string>>? skipEntityTags = [];
-
-    /// <summary>
-    /// If set to true will change how 'EntityTags' check works. See 'EntityTags' description.
-    /// </summary>
-    [JsonProperty] public bool ReverseTagsCheck = false;
-
-    /// <summary>
-    /// If set to true will change how 'SkipEntityCodes' check works. See 'SkipEntityCodes' description.
-    /// </summary>
-    [JsonProperty] public bool ReverseSkipTagsCheck = false;
+    [JsonProperty] public ComplexTagCondition<TagSetFast> EntityTags;
 
     /// <summary>
     /// Serves as a list of exceptions from tags and weight checks. Applied to an entity if it failed this checks.'
@@ -176,9 +157,6 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     [JsonProperty] public bool TargetPlayerInAllGameModes = false;
 
 
-    public TagCondition<EntityTagSet>[] EntityTags = [];
-
-    public TagCondition<EntityTagSet>[] SkipEntityTags = [];
 
     public string[] TargetEntityCodesBeginsWith = [];
 
@@ -189,8 +167,7 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
 
 
     public bool NoEntityCodes => TargetEntityCodesExact.Length == 0 && TargetEntityCodesBeginsWith.Length == 0;
-    public bool NoTags => EntityTags.Length == 0 && SkipEntityTags.Length == 0;
-    public bool TargetEverything => NoEntityCodes && NoTags && NoEntityWeight;
+    public bool TargetEverything => NoEntityCodes && EntityTags.IsEmpty && NoEntityWeight;
     public bool NoEntityWeight => MaxTargetWeight <= 0 && MinTargetWeight <= 0;
     public bool IgnoreTargetLightLevel => TargetLightLevels[0] == 0 && TargetLightLevels[1] == 0 && TargetLightLevels[2] == maxLightLevel && TargetLightLevels[3] == maxLightLevel;
 
@@ -200,16 +177,6 @@ public class AiTaskBaseTargetableConfig : AiTaskBaseConfig
     {
         base.Init(entity);
 
-        if (entityTags != null)
-        {
-            EntityTags = [.. entityTags.Select(tagList => TagCondition<EntityTagSet>.Get(entity.Api, tagList.ToArray()))];
-            entityTags = null;
-        }
-        if (skipEntityTags != null)
-        {
-            SkipEntityTags = [.. skipEntityTags.Select(tagList => TagCondition<EntityTagSet>.Get(entity.Api, tagList.ToArray()))];
-            skipEntityTags = null;
-        }
         if (entityCodes != null)
         {
             InitializeTargetCodes(entityCodes, out TargetEntityCodesExact, out TargetEntityCodesBeginsWith, out TargetEntityFirstLetters);
@@ -420,44 +387,9 @@ public abstract class AiTaskBaseTargetableR : AiTaskBaseR, IWorldIntersectionSup
         return true;
     }
 
-    protected virtual bool CheckTargetTags(EntityTagSet tags)
+    protected virtual bool CheckTargetTags(TagSetFast targetTags)
     {
-        if (Config.NoTags) return false;
-
-        if (!Config.ReverseTagsCheck)
-        {
-            if (TagCondition<EntityTagSet>.OverlapsWithEach(tags, Config.EntityTags))
-            {
-                if (Config.SkipEntityTags.Length == 0) return true;
-
-                if (!Config.ReverseSkipTagsCheck)
-                {
-                    if (!TagCondition<EntityTagSet>.OverlapsWithEach(tags, Config.SkipEntityTags)) return true;
-                }
-                else
-                {
-                    if (!TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, Config.SkipEntityTags)) return true;
-                }
-            }
-        }
-        else
-        {
-            if (TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, Config.EntityTags))
-            {
-                if (Config.SkipEntityTags.Length == 0) return true;
-
-                if (!Config.ReverseSkipTagsCheck)
-                {
-                    if (!TagCondition<EntityTagSet>.OverlapsWithEach(tags, Config.SkipEntityTags)) return true;
-                }
-                else
-                {
-                    if (!TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, Config.SkipEntityTags)) return true;
-                }
-            }
-        }
-
-        return false;
+        return this.Config.EntityTags.Matches(targetTags);
     }
 
     protected virtual bool CheckTargetCodes(string testPath)

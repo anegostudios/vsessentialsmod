@@ -15,20 +15,19 @@ namespace Vintagestory.GameContent
 
     public abstract class AiTaskBaseTargetable : AiTaskBase, IWorldIntersectionSupplier
     {
-        protected TagCondition<EntityTagSet>[] EntityTags = [];
-
-        protected TagCondition<EntityTagSet>[] SkipEntityTags = [];
-
-        protected bool noTags = true;
+        [JsonProperty]
+        protected ComplexTagCondition<TagSetFast> EntityTags;
 
         [JsonProperty]
-        protected bool reverseTagsCheck = false;
-
-
+        protected float minTargetWeight = 0;
         [JsonProperty]
-        protected float MinTargetWeight = 0;
+        protected float maxTargetWeight = float.MaxValue;
+
+        // <summary>Fraction of health the creature must be missing for this task to target it. 0 injury = full health, 1 injury = 0 health</summary>
         [JsonProperty]
-        protected float MaxTargetWeight = float.MaxValue;
+        protected float minTargetInjury = 0;
+        [JsonProperty]
+        protected float maxTargetInjury = 1;
 
         protected string[] targetEntityCodesBeginsWith = Array.Empty<string>();
         protected string[] targetEntityCodesExact = null!;
@@ -92,20 +91,11 @@ namespace Vintagestory.GameContent
             }
             InitializeTargetCodes(codes!, ref targetEntityCodesExact!, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
 
-            List<List<string>> entityTags = taskConfig["entityTags"].AsObject<List<List<string>>>([]);
-
-            List<List<string>> skipEntityTags = taskConfig["skipEntityTags"].AsObject<List<List<string>>>([]);
-
-            if (entityTags != null)
+            var tags = taskConfig["entityTags"];
+            if (tags.Exists)
             {
-                EntityTags = [.. entityTags.Select(tagList => TagCondition<EntityTagSet>.Get(entity.Api, tagList.ToArray()))];
+                this.EntityTags = GenericComplexConditionConverter.EntityConverter.ReadJson(tags.Token);
             }
-            if (skipEntityTags != null)
-            {
-                SkipEntityTags = [.. skipEntityTags.Select(tagList => TagCondition<EntityTagSet>.Get(entity.Api, tagList.ToArray()))];
-            }
-
-            noTags = EntityTags.Length == 0 && SkipEntityTags.Length == 0;
         }
 
         /// <summary>
@@ -178,56 +168,20 @@ namespace Vintagestory.GameContent
         protected virtual bool CheckTargetWeight(float weight)
         {
             float weightFraction = entity.Properties.Weight > 0 ? weight / entity.Properties.Weight : float.MaxValue;
-            if (MinTargetWeight > 0 && weightFraction < MinTargetWeight) return false;
-            if (MaxTargetWeight > 0 && weightFraction > MaxTargetWeight) return false;
+            if (minTargetWeight > 0 && weightFraction < minTargetWeight) return false;
+            if (maxTargetWeight > 0 && weightFraction > maxTargetWeight) return false;
             return true;
         }
 
-        protected virtual bool CheckTargetTags(EntityTagSet tags)
+        protected virtual bool CheckTargetTags(TagSetFast targetTags)
         {
-            if (!reverseTagsCheck)
-            {
-                if (TagCondition<EntityTagSet>.OverlapsWithEach(tags, EntityTags))
-                {
-                    if (SkipEntityTags.Length == 0) return true;
-
-                    if (!reverseTagsCheck)
-                    {
-                        if (!TagCondition<EntityTagSet>.OverlapsWithEach(tags, SkipEntityTags)) return true;
-                    }
-                    else
-                    {
-                        if (!TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, SkipEntityTags)) return true;
-                    }
-                }
-            }
-            else
-            {
-                if (TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, EntityTags))
-                {
-                    if (SkipEntityTags.Length == 0) return true;
-
-                    if (!reverseTagsCheck)
-                    {
-                        if (!TagCondition<EntityTagSet>.OverlapsWithEach(tags, SkipEntityTags)) return true;
-                    }
-                    else
-                    {
-                        if (!TagCondition<EntityTagSet>.SupersetOfAtLeastOne(tags, SkipEntityTags)) return true;
-                    }
-                }
-            }
-
-            return false;
+            return this.EntityTags.Matches(targetTags);
         }
 
-
+        [Obsolete("Use IsTargetableEntity instead")]
         public virtual bool IsTargetableEntityWithTags(Entity e, float range)
         {
-            if (CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return e.Alive && CanSense(e, range);
-            if (targetEntityFirstLetters.Length == 0 || IsTargetEntity(e.Code.Path)) return e.Alive && CanSense(e, range);
-
-            return false;
+            return IsTargetableEntity(e, range);
         }
 
         /// <summary>
@@ -251,7 +205,15 @@ namespace Vintagestory.GameContent
         public virtual bool IsTargetableEntity(Entity e, float range)
         {
             if (!e.Alive) return false;
-            if (!noTags && CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return CanSense(e, range);
+
+            if (minTargetInjury > 0 || maxTargetInjury < 1)
+            {
+                var healthBehavior = e.GetBehavior<EntityBehaviorHealth>();
+                float injury = healthBehavior == null ? 0 : (1 - healthBehavior.Health / healthBehavior.MaxHealth);
+                if (injury < minTargetInjury || injury > maxTargetInjury) return false;
+            }
+
+            if (!EntityTags.IsEmpty && CheckTargetTags(e.Tags) && CheckTargetWeight(e.Properties.Weight)) return CanSense(e, range);
             // targetEntityFirstLetters.Length == 0 means target everything (there was a universal wildcard "*", for example BeeMob)
             if (targetEntityFirstLetters.Length == 0 || IsTargetEntity(e.Code.Path)) return CanSense(e, range);
 

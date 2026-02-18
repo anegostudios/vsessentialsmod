@@ -37,6 +37,7 @@ using Vintagestory.API.Config;
 [assembly: AssemblyVersion(GameVersion.AssemblyVersion)]
 [assembly: AssemblyFileVersion(GameVersion.OverallVersion)]
 [assembly: InternalsVisibleTo("VSSurvivalModTests")]
+[assembly: InternalsVisibleTo("VSSurvivalMod")]
 
 [assembly: ModInfo("Essentials", "game",
     Version = GameVersion.ShortGameVersion,

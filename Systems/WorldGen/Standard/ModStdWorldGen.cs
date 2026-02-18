@@ -144,7 +144,7 @@ namespace Vintagestory.ServerMods
 
         public IStructureLocation GetIntersectingStructure(int x, int z, int category)
         {
-            return provider.GetIntersectingStructure(x, z, category);
+            return provider?.GetIntersectingStructure(x, z, category);
         }
 
 

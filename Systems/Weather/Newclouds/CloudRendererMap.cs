@@ -254,8 +254,9 @@ namespace FluffyClouds {
                 isFirstTick = false;
             }
 
-            deltaTime = Math.Min(deltaTime, 1);
             deltaTime *= capi.World.Calendar.SpeedOfTime / 60f;
+            deltaTime = Math.Min(deltaTime, 1);
+
             if (deltaTime > 0)
             {
                 if (windChangeTimer - capi.ElapsedMilliseconds < 0)

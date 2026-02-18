@@ -45,11 +45,6 @@ namespace Vintagestory.ServerMods
             this.api.Event.InitWorldGenerator(InitWorldGen, "superflat"); // Just the Init so that BlockSoil can grow grass; and both these are needed even if DecoPass is off
             //this.api.Event.MapRegionGeneration(OnMapRegionGen, "standard");   // 8.2.24 commented out because the method has no code
 
-            if (TerraGenConfig.DoDecorationPass)
-            {
-                this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Terrain, "standard");
-            }
-
             distort2dx = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 20980);
             distort2dz = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 20981);
         }
@@ -92,7 +87,12 @@ namespace Vintagestory.ServerMods
 
             mapheight = api.WorldManager.MapSizeY;
 
-            boilingWaterBlockId = api.World.GetBlock(new AssetLocation("boilingwater-still-7"))?.Id ?? 0;
+            boilingWaterBlockId = gcfg.boilingWaterBlockId;
+
+            if (TerraGenConfig.DoDecorationPass)
+            {
+                this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Terrain, "standard");
+            }
         }
 
 
@@ -108,6 +108,7 @@ namespace Vintagestory.ServerMods
             IntDataMap2D forestMap = chunks[0].MapChunk.MapRegion.ForestMap;
             IntDataMap2D climateMap = chunks[0].MapChunk.MapRegion.ClimateMap;
             IntDataMap2D beachMap = chunks[0].MapChunk.MapRegion.BeachMap;
+            IntDataMap2D biomeMap = chunks[0].MapChunk.MapRegion.BiomeMap;
 
             ushort[] heightMap = chunks[0].MapChunk.RainHeightMap;
 
@@ -142,6 +143,12 @@ namespace Vintagestory.ServerMods
             {
                 for (int z = 0; z < chunksize; z++)
                 {
+                    int biome = 0;
+                    if (biomeMap != null)
+                    {
+                        float biomeStep = (float)biomeMap.InnerSize / regionChunkSize;
+                        biome = biomeMap.GetUnpaddedInt((int)(rdx * biomeStep + (float)x / chunksize * biomeStep), (int)(rdz * biomeStep + (float)z / chunksize * biomeStep));
+                    }
                     herePos.Set(chunkX * chunksize + x, 1, chunkZ * chunksize + z);
                     // Some weird randomnes stuff to hide fundamental bugs in the climate transition system :D T_T   (maybe not bugs but just fundamental shortcomings of using lerp on a very low resolution map)
                     int rnd = RandomlyAdjustPosition(herePos, out double distx, out double distz);
@@ -201,7 +208,7 @@ namespace Vintagestory.ServerMods
 
                     herePos.Y = posY;
                     int disty = (int)(distort2dx.Noise(-herePos.X, -herePos.Z) / 4.0);
-                    posY = PutLayers(transitionRand, x, z, disty, herePos, chunks, rainRel, temp, tempUnscaled, heightMap);
+                    posY = PutLayers(transitionRand, x, z, disty, herePos, chunks, rainRel, temp, tempUnscaled, heightMap, biome);
 
                     if (prevY == TerraGenConfig.seaLevel - 1)
                     {
@@ -209,7 +216,7 @@ namespace Vintagestory.ServerMods
                         GenBeach(x, prevY, z, chunks, rainRel, temp, beachRel, rockblockID);
                     }
 
-                    PlaceTallGrass(x, prevY, z, chunks, rainRel, tempRel, temp, forestRel);
+                    PlaceTallGrass(x, prevY, z, chunks, rainRel, tempRel, temp, forestRel, biome);
 
 
                     // Try again to put layers if above sealevel and we found over 10 air blocks
@@ -230,7 +237,7 @@ namespace Vintagestory.ServerMods
                             {
                                 //temp = Climate.GetScaledAdjustedTemperatureFloat(tempUnscaled, posY - TerraGenConfig.seaLevel);
                                 //rainRel = Climate.GetRainFall((climate >> 8) & 0xff, posY) / 255f;
-                                //PutLayers(transitionRand, x, posY, z, chunks, rainRel, temp, tempUnscaled, null);
+                                //PutLayers(transitionRand, x, posY, z, chunks, rainRel, temp, tempUnscaled, null, biome);
                                 break;
                             } else
                             {
@@ -255,7 +262,7 @@ namespace Vintagestory.ServerMods
             return (int)(distx / 5);
         }
 
-        private int PutLayers(double posRand, int lx, int lz, int posyoffs, BlockPos pos, IServerChunk[] chunks, float rainRel, float temp, int unscaledTemp, ushort[] heightMap)
+        private int PutLayers(double posRand, int lx, int lz, int posyoffs, BlockPos pos, IServerChunk[] chunks, float rainRel, float temp, int unscaledTemp, ushort[] heightMap, int biome)
         {
             int i = 0;
             int j = 0;
@@ -303,7 +310,7 @@ namespace Vintagestory.ServerMods
                         chunks[0].MapChunk.TopRockIdMap[lz * chunksize + lx] = blockId;
                         if (underIce) break;   // radfast 30.1.24: Note, under ice we do not set the sea/lake floor layers (gravel etc), for consistency with legacy worldgen prior to 1.19.4
 
-                        LoadBlockLayers(posRand, rainRel, temp, unscaledTemp, startPosY + posyoffs, pos, blockId, isOcean);
+                        LoadBlockLayers(posRand, rainRel, temp, unscaledTemp, startPosY + posyoffs, pos, blockId, isOcean, biome);
                         first = false;
 
                         if (!underWater) heightMap[lz * chunksize + lx] = (ushort)(pos.Y + 1);
@@ -358,7 +365,7 @@ namespace Vintagestory.ServerMods
             }
         }
 
-        void PlaceTallGrass(int x, int posY, int z, IServerChunk[] chunks, float rainRel, float tempRel, float temp, float forestRel)
+        void PlaceTallGrass(int x, int posY, int z, IServerChunk[] chunks, float rainRel, float tempRel, float temp, float forestRel, int biome)
         {
             double rndVal = blockLayerConfig.Tallgrass.RndWeight * rnd.NextDouble() + blockLayerConfig.Tallgrass.PerlinWeight * grassDensity.Noise(x, z, -0.5f);
 
@@ -370,23 +377,42 @@ namespace Vintagestory.ServerMods
 
             if (api.World.Blocks[blockId].Fertility <= rnd.NextInt(100)) return;
 
-            double gheight = Math.Max(0, grassHeight.Noise(x, z) * blockLayerConfig.Tallgrass.BlockCodeByMin.Length - 1);
-            int start = (int)gheight + (rnd.NextDouble() < gheight ? 1 : 0);
-
-            for (int i = start; i < blockLayerConfig.Tallgrass.BlockCodeByMin.Length; i++)
+            if (blockLayerConfig.Tallgrass.BlockCodeByBiome != null)
             {
-                TallGrassBlockCodeByMin bcbymin = blockLayerConfig.Tallgrass.BlockCodeByMin[i];
-
-                if (forestRel <= bcbymin.MaxForest && rainRel >= bcbymin.MinRain && temp >= bcbymin.MinTemp)
+                var layers = blockLayerConfig.Tallgrass.BlockCodeByBiome;
+                double gh = Math.Max(0, grassHeight.Noise(x, z) * layers.Length - 1);
+                int st = (int)gh + (rnd.NextDouble() < gh ? 1 : 0);
+                for (int i = st; i < layers.Length; i++)
                 {
-                    chunks[(posY + 1) / chunksize].Data[(chunksize * ((posY + 1) % chunksize) + z) * chunksize + x] = bcbymin.BlockId;
-                    return;
+                    if (layers[i].Biome == -1 || layers[i].Biome == biome)
+                    {
+                        chunks[(posY + 1) / chunksize].Data[(chunksize * ((posY + 1) % chunksize) + z) * chunksize + x] = layers[i].BlockId;
+                        return;
+                    }
+                }
+            }
+
+            if (blockLayerConfig.Tallgrass.BlockCodeByMin != null)
+            {
+                double gheight = Math.Max(0, grassHeight.Noise(x, z) * blockLayerConfig.Tallgrass.BlockCodeByMin.Length - 1);
+                int start = (int)gheight + (rnd.NextDouble() < gheight ? 1 : 0);
+
+                for (int i = start; i < blockLayerConfig.Tallgrass.BlockCodeByMin.Length; i++)
+                {
+                    TallGrassBlockCodeByMin bcbymin = blockLayerConfig.Tallgrass.BlockCodeByMin[i];
+
+
+                    if (forestRel <= bcbymin.MaxForest && rainRel >= bcbymin.MinRain && temp >= bcbymin.MinTemp)
+                    {
+                        chunks[(posY + 1) / chunksize].Data[(chunksize * ((posY + 1) % chunksize) + z) * chunksize + x] = bcbymin.BlockId;
+                        return;
+                    }
                 }
             }
         }
 
 
-        private void LoadBlockLayers(double posRand, float rainRel, float temperature, int unscaledTemp, int posY, BlockPos pos, int firstBlockId, bool isOcean)
+        private void LoadBlockLayers(double posRand, float rainRel, float temperature, int unscaledTemp, int posY, BlockPos pos, int firstBlockId, bool isOcean, int biome)
         {
             float heightRel = ((float)posY - TerraGenConfig.seaLevel) / ((float)mapheight - TerraGenConfig.seaLevel);
             float fertilityRel = Climate.GetFertilityFromUnscaledTemp((int)(rainRel * 255), unscaledTemp, heightRel) / 255f;
@@ -405,9 +431,15 @@ namespace Vintagestory.ServerMods
                 float yDist = bl.CalcYDistance(posY, mapheight);
                 float trfDist = bl.CalcTrfDistance(temperature, rainRel, fertilityRel);
 
+                if (bl.Biome != -1)
+                {
+                     if (bl.Biome != biome) continue;
+                     trfDist = 0;
+                }
+
                 if (trfDist + yDist <= posRand)
                 {
-                    int blockId = bl.GetBlockId(posRand, temperature, rainRel, fertilityRel, firstBlockId, pos, mapheight);
+                    int blockId = bl.GetBlockId(posRand, temperature, rainRel, fertilityRel, firstBlockId, pos, mapheight, biome);
                     if (blockId != 0)
                     {
                         BlockLayersIds.Add(blockId);

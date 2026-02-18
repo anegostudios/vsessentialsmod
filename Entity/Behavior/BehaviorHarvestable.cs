@@ -49,7 +49,7 @@ namespace Vintagestory.GameContent
         }
     }
 
-    public class EntityBehaviorHarvestable : EntityBehaviorContainer
+    public class EntityBehaviorHarvestable : EntityBehaviorContainer, IHarvestable
     {
         const float minimumWeight = 0.5f;
         protected BlockDropItemStack[] jsonDrops;
@@ -138,17 +138,14 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public bool Harvestable
+        public bool IsHarvestable(ItemSlot withItem, Entity forEntity)
         {
-            get
-            {
-                return !entity.Alive && !IsHarvested;
-            }
+            return !entity.Alive && !IsHarvested;
         }
 
 
         float baseHarvestDuration;
-        public float GetHarvestDuration(Entity forEntity)
+        public float GetHarvestDuration(ItemSlot withItem, Entity forEntity)
         {
             return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingTime");
         }

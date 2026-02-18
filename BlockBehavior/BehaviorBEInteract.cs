@@ -110,12 +110,12 @@ namespace Vintagestory.GameContent
                 (IInteractable ii, ref EnumHandling iiihandling) => {
                     if (ii is ILongInteractable iil)
                     {
-                        var result = iil.OnBlockInteractStep(secondsUsed, world, byPlayer, blockSel, ref iiihandling);
+                        iil.OnBlockInteractStop(secondsUsed, world, byPlayer, blockSel, ref iiihandling);
                         if (iiihandling != EnumHandling.PassThrough) iihandling = iiihandling;
-                        return result;
+                        return true;
                     }
                     iihandling = EnumHandling.PassThrough;
-                    return false;
+                    return true;
                 },
                 () => base.OnBlockInteractStop(secondsUsed, world, byPlayer, blockSel, ref iihandling)
             );

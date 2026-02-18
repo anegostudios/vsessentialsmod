@@ -41,14 +41,24 @@ namespace Vintagestory.ServerMods.NoObf
             PatchesNonTree = patchesNonTree.ToArray();
         }
 
-
-
-
-
-        public bool IsPatchSuitableAt(BlockPatch patch, Block onBlock, int mapSizeY, int climate, int y, float forestRel, float shrubRel)
+        public bool IsPatchSuitableAt(BlockPatch patch, Block onBlock, int mapSizeY, int climate, int y, float forestRel, float shrubRel, int biome = -1)
         {
             if ((patch.Placement == EnumBlockPatchPlacement.NearWater || patch.Placement == EnumBlockPatchPlacement.UnderWater) && onBlock.LiquidCode != "water") return false;
             if ((patch.Placement == EnumBlockPatchPlacement.NearSeaWater || patch.Placement == EnumBlockPatchPlacement.UnderSeaWater) && onBlock.LiquidCode != "saltwater") return false;
+
+            if (patch.Biome != -1)
+            {
+                return patch.Biome == biome;
+            }
+            // patches for multiple biomes
+            if (patch.Biomes != null)
+            {
+                for (int i = 0; i < patch.Biomes.Length; i++)
+                {
+                    if (patch.Biomes[i] == biome) return true;
+                }
+                return false;
+            }
 
             if (forestRel < patch.MinForest || forestRel > patch.MaxForest || shrubRel < patch.MinShrub || forestRel > patch.MaxShrub)
             {

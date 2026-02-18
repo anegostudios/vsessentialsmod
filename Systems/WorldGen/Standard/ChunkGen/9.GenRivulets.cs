@@ -205,7 +205,7 @@ namespace Vintagestory.ServerMods
             int y = mapChunk.WorldGenTerrainHeightMap[dz * chunksize + dx] - 2;
 
             if (y < minY) return;
-            if (liquidBlockID == gcfg.rivuletRapidWaterBlockId && y - TerraGenConfig.seaLevel > 20) return; // Normal rivulets only at lower heights
+            if (liquidBlockID == gcfg.rivuletWaterBlockId && y - TerraGenConfig.seaLevel > 20) return; // Normal rivulets only at lower heights
 
             Vec3i dir = null;
             int len = 0;

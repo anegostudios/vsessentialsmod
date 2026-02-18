@@ -261,6 +261,48 @@ namespace Vintagestory.ServerMods.NoObf
         public int Fertility;
 
         /// <summary>
+        /// -1 = auto from BlockMaterial, 0+ = manual. Higher priority bleeds onto lower.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "-1")]
+        public int BleedPriority = -1;
+
+        /// <summary>
+        /// Can receive bleeding from higher priority neighbors.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "false")]
+        public bool CanReceiveBleed = false;
+
+        /// <summary>
+        /// 9-slice overlay texture path, e.g. "game:block/sand_overlay". Null disables overlay blending.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "null")]
+        public string BleedOverlayTexture = null;
+
+        /// <summary>
+        /// Only top face (UP) receives bleeding. For grass-type blocks.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "false")]
+        public bool BleedTopFaceOnly = false;
+
+        /// <summary>
+        /// Blocks only bleed to others with matching BleedGroup. Null = no restriction.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "null")]
+        public string BleedGroup = null;
+
+        /// <summary>
+        /// Occludes bleeding from neighbors behind. False for glass/transparent blocks.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "true")]
+        public bool BlocksTextureBleed = true;
+
+        /// <summary>
         /// Data thats passed on to the graphics card for every vertex of the blocks model
         /// </summary>
         [JsonProperty]
@@ -469,8 +511,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.LiquidSelectable = this.LiquidSelectable;
             block.LiquidCode = this.LiquidCode;
             block.BlockEntityBehaviors = (BlockEntityBehaviorType[])this.EntityBehaviors?.Clone() ?? Array.Empty<BlockEntityBehaviorType>();
-
-            block.Tags = api.TagsManager.GetTagSetUnsafe<TagSet>(this.Tags);
+            block.Tags = this.Tags;
 
             if (block.EntityClass == null && block.BlockEntityBehaviors != null && block.BlockEntityBehaviors.Length > 0)
             {
@@ -486,6 +527,12 @@ namespace Vintagestory.ServerMods.NoObf
             block.DrawType = this.DrawType;
             block.Replaceable = this.Replaceable;
             block.Fertility = this.Fertility;
+            block.BleedPriority = this.BleedPriority;
+            block.CanReceiveBleed = this.CanReceiveBleed;
+            block.BleedOverlayTexture = this.BleedOverlayTexture;
+            block.BleedTopFaceOnly = this.BleedTopFaceOnly;
+            block.BleedGroup = this.BleedGroup;
+            block.BlocksTextureBleed = this.BlocksTextureBleed;
             block.LightAbsorption = this.LightAbsorption;
             block.LightHsv = this.LightHsv;
             block.VertexFlags = this.VertexFlags?.Clone() ?? new VertexFlags(0);

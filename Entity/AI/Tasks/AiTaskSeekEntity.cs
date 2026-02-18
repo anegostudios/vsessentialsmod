@@ -148,7 +148,7 @@ namespace Vintagestory.GameContent
                 ownPos.SetWithDimension(entity.Pos);
 
                 targetEntity = partitionUtil.GetNearestEntity(ownPos, NowSeekRange,
-                    noTags ? targetEntityFirstLetters.Length == 0 ? (e) => noTagMatchAll(e, isTamed)
+                    EntityTags.IsEmpty ? targetEntityFirstLetters.Length == 0 ? (e) => noTagMatchAll(e, isTamed)
                     : (e) => noTagMatchNoAll(e, isTamed)
                     : (e) => tagMatch(e, isTamed)
                 , searchType);
@@ -185,7 +185,7 @@ namespace Vintagestory.GameContent
         private bool tagMatch(Entity e, bool fullyTamed)
         {
             if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
-            return IsTargetableEntityWithTags(e, NowSeekRange);
+            return IsTargetableEntity(e, NowSeekRange);
         }
 
         private bool noTagMatchNoAll(Entity e, bool fullyTamed)

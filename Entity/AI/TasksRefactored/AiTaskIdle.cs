@@ -32,12 +32,12 @@ public class AiTaskIdleConfig : AiTaskBaseTargetableConfig
     /// <summary>
     /// Entity should be above or inside block with these tags to start this task. If not specified this check will be ignored.
     /// </summary>
-    [JsonProperty] private string[]? allowedBlockBelowTags = [];
+    [JsonProperty] public TagSet AllowedBlockBelowTags = new();
 
     /// <summary>
     /// Entity should be above or inside block without these tags to start this task. If not specified this check will be ignored.
     /// </summary>
-    [JsonProperty] private string[]? skipBlockBelowTags = [];
+    [JsonProperty] public TagSet SkipBlockBelowTags = new();
 
     /// <summary>
     /// Entity should be above or inside block with code equal to this value exactly or matching this as wildcard. If not specified this check will be ignored.
@@ -61,29 +61,7 @@ public class AiTaskIdleConfig : AiTaskBaseTargetableConfig
     [JsonProperty] public float ChanceToCheckTarget = 0.3f;
 
 
-
-    public TagCondition<TagSet> AllowedBlockBelowTags;
-
-    public TagCondition<TagSet> SkipBlockBelowTags;
-
-    public bool IgnoreBlockCodeAndTags => AllowedBlockBelowTags.IsEmpty() && SkipBlockBelowTags.IsEmpty() && AllowedBlockBelowCode == null;
-
-
-    public override void Init(EntityAgent entity)
-    {
-        base.Init(entity);
-
-        if (allowedBlockBelowTags != null)
-        {
-            AllowedBlockBelowTags = TagCondition<TagSet>.Get(entity.Api, allowedBlockBelowTags);
-            allowedBlockBelowTags = null;
-        }
-        if (skipBlockBelowTags != null)
-        {
-            SkipBlockBelowTags = TagCondition<TagSet>.Get(entity.Api, skipBlockBelowTags);
-            skipBlockBelowTags = null;
-        }
-    }
+    public bool IgnoreBlockCodeAndTags => AllowedBlockBelowTags.IsEmpty && SkipBlockBelowTags.IsEmpty && AllowedBlockBelowCode == null;
 }
 
 public class AiTaskIdleR : AiTaskBaseTargetableR
@@ -165,8 +143,8 @@ public class AiTaskIdleR : AiTaskBaseTargetableR
     protected virtual bool CheckForBlock(Block block)
     {
         if (Config.IgnoreBlockCodeAndTags) return true;
-        if (!Config.AllowedBlockBelowTags.IsEmpty() && !Config.AllowedBlockBelowTags.Overlaps(block.Tags)) return false;
-        if (!Config.SkipBlockBelowTags.IsEmpty() && Config.SkipBlockBelowTags.Overlaps(block.Tags)) return false;
+        if (!Config.AllowedBlockBelowTags.IsEmpty && !Config.AllowedBlockBelowTags.Overlaps(block.Tags)) return false;
+        if (!Config.SkipBlockBelowTags.IsEmpty && Config.SkipBlockBelowTags.Overlaps(block.Tags)) return false;
         if (Config.AllowedBlockBelowCode != null && !block.WildCardMatch(Config.AllowedBlockBelowCode)) return false;
 
         return true;

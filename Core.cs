@@ -85,14 +85,13 @@ namespace Vintagestory.ServerMods
             api.RegisterCollectibleBehaviorClass("Throwable", typeof(CollectibleBehaviorThrowable));
             api.RegisterCollectibleBehaviorClass("Buffable", typeof(CollectibleBehaviorBuffable));
             api.RegisterCollectibleBehaviorClass("Quenchable", typeof(CollectibleBehaviorQuenchable));
-            
         }
 
         public override void AssetsFinalize(ICoreAPI api)
         {
-            EntityBehaviorEntityStateTags.GetTagsIds(api.TagsManager);
+            // Wait until after tags have finished pre-loading. Here might not be the best place to do this.
+            EntityBehaviorEntityStateTags.SetupTagIds(api);
         }
-
 
         private void RegisterDefaultBlocks()
         {

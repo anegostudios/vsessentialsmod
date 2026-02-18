@@ -386,10 +386,10 @@ namespace Vintagestory.ServerMods
             bushGen.SetInputMap(mapRegion.ClimateMap, mapRegion.ShrubMap);
             mapRegion.ShrubMap.Data = bushGen.GenLayer(regionX * noiseSizeShrubs, regionZ * noiseSizeShrubs, noiseSizeShrubs + 1, noiseSizeShrubs + 1);
 
-            mapRegion.FlowerMap.Size = noiseSizeForest + 1;
-            mapRegion.FlowerMap.BottomRightPadding = 1;
-            flowerGen.SetInputMap(mapRegion.ClimateMap, mapRegion.FlowerMap);
-            mapRegion.FlowerMap.Data = flowerGen.GenLayer(regionX * noiseSizeForest, regionZ * noiseSizeForest, noiseSizeForest + 1, noiseSizeForest + 1);
+            mapRegion.BiomeMap.Size = noiseSizeForest + 1;
+            mapRegion.BiomeMap.BottomRightPadding = 1;
+            flowerGen.SetInputMap(mapRegion.ClimateMap, mapRegion.BiomeMap);
+            mapRegion.BiomeMap.Data = flowerGen.GenLayer(regionX * noiseSizeForest, regionZ * noiseSizeForest, noiseSizeForest + 1, noiseSizeForest + 1);
 
             pad = TerraGenConfig.landformMapPadding;
             mapRegion.LandformMap.Data = landformsGen.GenLayer(regionX * noiseSizeLandform - pad, regionZ * noiseSizeLandform - pad, noiseSizeLandform + 2*pad, noiseSizeLandform + 2*pad);

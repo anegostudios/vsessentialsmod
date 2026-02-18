@@ -9,7 +9,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
-#nullable disable
+#nullable disable annotations
 
 namespace Vintagestory.GameContent
 {
@@ -34,7 +34,7 @@ namespace Vintagestory.GameContent
     {
         public const int PacketIdBitShift = 11;    // magic number; see also IClientNetworkAPI.SendEntityPacketWithOffset() which enables such tricks
 
-        public GeneralTagGroups StorageTags { get; set; }
+        public TagSet StorageTags;
 
         public CollectibleBehaviorHeldBag(CollectibleObject collObj) : base(collObj)
         {
@@ -43,19 +43,8 @@ namespace Vintagestory.GameContent
         public override void Initialize(JsonObject properties)
         {
             base.Initialize(properties);
-
-            if (properties.KeyExists("tags"))
-            {
-                StorageTags = properties.AsObject<GeneralTagGroups>();
-            }
-        }
-
-        public override void OnLoaded(ICoreAPI api)
-        {
-            base.OnLoaded(api);
-
-            StorageTags?.Resolve(api.World);
-            StorageTags?.ClearTagNames();
+            var tags = properties["tags"].Token;
+            if(tags != null) StorageTags = CollectibleTagSetConverter.ProxyInstance.ReadJson(tags);
         }
 
         public void Clear(ItemStack backpackStack)
@@ -128,9 +117,9 @@ namespace Vintagestory.GameContent
             return (EnumItemStorageFlags)bagstack.ItemAttributes["backpack"]["storageFlags"].AsInt(defaultFlags);
         }
 
-        public virtual IEnumerable<TagCondition<TagSet>> GetStorageTags(ItemStack bagStack, ICoreAPI api)
+        public virtual TagSet GetStorageTags(ItemStack bagStack)
         {
-            return StorageTags?.GetResolvedTags() ?? [];
+            return StorageTags;
         }
 
         public List<ItemSlotBagContent> GetOrCreateSlots(ItemStack bagstack, InventoryBase parentinv, int bagIndex, IWorldAccessor world)
@@ -140,7 +129,7 @@ namespace Vintagestory.GameContent
             string bgcolhex = GetSlotBgColor(bagstack);
             var flags = GetStorageFlags(bagstack);
             int quantitySlots = GetQuantitySlots(bagstack);
-            IEnumerable<TagCondition<TagSet>> tags = GetStorageTags(bagstack, world.Api);
+            TagSet storageTags = GetStorageTags(bagstack);
 
             ITreeAttribute stackBackpackTree = bagstack.Attributes.GetTreeAttribute("backpack");
             if (stackBackpackTree == null)
@@ -152,7 +141,7 @@ namespace Vintagestory.GameContent
                 {
                     ItemSlotBagContent slot = new ItemSlotBagContent(parentinv, bagIndex, slotIndex, flags);
                     slot.HexBackgroundColor = bgcolhex;
-                    slot.CanStoreTags = tags;
+                    slot.CanStoreTags = storageTags;
                     bagContents.Add(slot);
                     slotsTree["slot-" + slotIndex] = new ItemstackAttribute(null);
                 }
@@ -169,7 +158,7 @@ namespace Vintagestory.GameContent
                     int slotIndex = val.Key.Split("-")[1].ToInt();
                     ItemSlotBagContent slot = new ItemSlotBagContent(parentinv, bagIndex, slotIndex, flags);
                     slot.HexBackgroundColor = bgcolhex;
-                    slot.CanStoreTags = tags;
+                    slot.CanStoreTags = storageTags;
 
                     if (val.Value?.GetValue() != null)
                     {

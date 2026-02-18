@@ -144,9 +144,7 @@ namespace Vintagestory.ServerMods.NoObf
             item.Class = this.Class;
             item.Textures = this.Textures;
             item.MaterialDensity = this.MaterialDensity;
-
-            item.Tags = api.TagsManager.GetTagSetUnsafe<TagSet>(this.Tags);
-
+            item.Tags = this.Tags;
             item.GuiTransform = this.GuiTransform;
 #pragma warning disable CS0618 // Type or member is obsolete
             item.FpHandTransform = this.FpHandTransform;

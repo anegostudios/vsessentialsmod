@@ -48,9 +48,6 @@ namespace Vintagestory.ServerMods
             this.api = api;
 
             api.Event.InitWorldGenerator(initWorldGen, "standard");
-            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
-
-            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
         }
 
 
@@ -77,7 +74,7 @@ namespace Vintagestory.ServerMods
             // Amount of regions in all of the map
             regionMapSize = api.WorldManager.MapSizeX / (chunksize * geoProvRegionNoiseSize);
 
-            rockBlockId = (ushort)api.WorldManager.GetBlockId(new AssetLocation("rock-granite"));
+            rockBlockId = gcfg.defaultRockId;
 
             distort2dx = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 9876);
             distort2dz = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 9877);
@@ -105,6 +102,9 @@ namespace Vintagestory.ServerMods
 
                 strataNoises[i] = new MapLayerCustomPerlin(api.World.Seed + 23423 + i, ampls, freq, th);
             }
+
+            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
+            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
             api.Logger.VerboseDebug("Initialised GenRockStrata");
         }
 

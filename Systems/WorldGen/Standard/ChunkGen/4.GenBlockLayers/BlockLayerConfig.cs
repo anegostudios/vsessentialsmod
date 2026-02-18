@@ -78,9 +78,20 @@ namespace Vintagestory.ServerMods
 
             SnowLayer.BlockId = api.WorldManager.GetBlockId(SnowLayer.BlockCode);
 
-            for (int i = 0; i < Tallgrass.BlockCodeByMin.Length; i++)
+            if (Tallgrass.BlockCodeByMin != null)
             {
-                Tallgrass.BlockCodeByMin[i].BlockId = api.WorldManager.GetBlockId(Tallgrass.BlockCodeByMin[i].BlockCode);
+                for (int i = 0; i < Tallgrass.BlockCodeByMin.Length; i++)
+                {
+                    Tallgrass.BlockCodeByMin[i].BlockId = api.WorldManager.GetBlockId(Tallgrass.BlockCodeByMin[i].BlockCode);
+                }
+            }
+
+            if (Tallgrass.BlockCodeByBiome != null)
+            {
+                for (int i = 0; i < Tallgrass.BlockCodeByBiome.Length; i++)
+                {
+                    Tallgrass.BlockCodeByBiome[i].BlockId = api.WorldManager.GetBlockId(Tallgrass.BlockCodeByBiome[i].BlockCode);
+                }
             }
 
             for (int i = 0; i < LakeBedLayer.BlockCodeByMin.Length; i++)
@@ -103,6 +114,18 @@ namespace Vintagestory.ServerMods
         public float RndWeight;
         public float PerlinWeight;
         public TallGrassBlockCodeByMin[] BlockCodeByMin;
+        public TallGrassBlockCodeByBiome[] BlockCodeByBiome;
+    }
+
+    [JsonObject(MemberSerialization.OptIn)]
+    public class TallGrassBlockCodeByBiome
+    {
+        [JsonProperty]
+        public AssetLocation BlockCode;
+        [JsonProperty]
+        public int Biome = -1;
+
+        public int BlockId;
     }
 
 

@@ -23,7 +23,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
             UpdatePeriodSec = attributes["updatePeriodSec"].AsFloat(UpdatePeriodSec);
         }
 
-        EntityTagSet tags = entity.Tags;
+        TagSetFast tags = entity.Tags;
 
         TagsInitialUpdate(ref tags);
 
@@ -44,7 +44,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         if (TimeSinceUpdateSec < UpdatePeriodSec) return;
         TimeSinceUpdateSec = 0;
 
-        EntityTagSet tags = entity.Tags;
+        TagSetFast tags = entity.Tags;
 
         TagsUpdate(ref tags);
 
@@ -72,19 +72,23 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
     protected bool HoldingOpenFire = false;
 
     // Assigned entity tags, filled in GetTagsIds() in Initialize()
-    protected static EntityTagSet TagSwimming = EntityTagSet.Empty;
-    protected static EntityTagSet TagFeetInLiquid = EntityTagSet.Empty;
-    protected static EntityTagSet TagFlying = EntityTagSet.Empty;
-    protected static EntityTagSet TagOnGround = EntityTagSet.Empty;
-    protected static EntityTagSet TagMoving = EntityTagSet.Empty;
-    protected static EntityTagSet TagAlive = EntityTagSet.Empty;
-    protected static EntityTagSet TagAiming = EntityTagSet.Empty;
-    protected static EntityTagSet TagSprinting = EntityTagSet.Empty;
-    protected static EntityTagSet TagSneaking = EntityTagSet.Empty;
-    protected static EntityTagSet TagArmed = EntityTagSet.Empty;
-    protected static EntityTagSet TagArmedMelee = EntityTagSet.Empty;
-    protected static EntityTagSet TagArmedRanged = EntityTagSet.Empty;
-    protected static EntityTagSet TagHoldingOpenFire = EntityTagSet.Empty;
+    protected static TagSetFast TagSwimming;
+    protected static TagSetFast TagFeetInLiquid;
+    protected static TagSetFast TagFlying;
+    protected static TagSetFast TagOnGround;
+    protected static TagSetFast TagMoving;
+    protected static TagSetFast TagAlive;
+    protected static TagSetFast TagAiming;
+    protected static TagSetFast TagSprinting;
+    protected static TagSetFast TagSneaking;
+    protected static TagSetFast TagArmed;
+    protected static TagSetFast TagArmedMelee;
+    protected static TagSetFast TagArmedRanged;
+    protected static TagSetFast TagHoldingOpenFire;
+
+    protected static TagSetFast TagMaskInitialUpdate;
+    protected static TagSetFast TagMaskAgentInitialUpdate;
+
 
     // Checked collectible tags, filled in GetTagsIds() in Initialize()
     protected static TagSet CollectibleTagWeapon = TagSet.Empty;
@@ -96,28 +100,33 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
     protected float UpdatePeriodSec = 1;
 
 
-    public static void GetTagsIds(ITagsManager registry)
+    public static void SetupTagIds(ICoreAPI api)
     {
-        TagSwimming = registry.GetEntityTagSet("state-swimming");
-        TagFeetInLiquid = registry.GetEntityTagSet("state-feet-in-liquid");
-        TagFlying = registry.GetEntityTagSet("state-flying");
-        TagOnGround = registry.GetEntityTagSet("state-on-ground");
-        TagMoving = registry.GetEntityTagSet("state-moving");
-        TagAlive = registry.GetEntityTagSet("state-alive");
-        TagAiming = registry.GetEntityTagSet("state-aiming");
-        TagSprinting = registry.GetEntityTagSet("state-sprinting");
-        TagSneaking = registry.GetEntityTagSet("state-sneaking");
-        TagArmed = registry.GetEntityTagSet("state-armed");
-        TagArmedMelee = registry.GetEntityTagSet("state-armed-melee");
-        TagArmedRanged = registry.GetEntityTagSet("state-armed-ranged");
+        // These are pre-registered, otherwise we would need to RegisterAndCreate here
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagSwimming, "state-swimming");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagFeetInLiquid, "state-feet-in-liquid");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagFlying, "state-flying");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagOnGround, "state-on-ground");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagMoving, "state-moving");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagAlive, "state-alive");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagAiming, "state-aiming");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagSprinting, "state-sprinting");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagSneaking, "state-sneaking");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagArmed, "state-armed");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagArmedMelee, "state-armed-melee");
+        api.EntityTagRegistry.TryCreateTagSetAndLogIssues(out TagArmedRanged, "state-armed-ranged");
 
-        CollectibleTagWeapon = registry.GetGeneralTagSet("weapon");
-        CollectibleTagWeaponMelee = registry.GetGeneralTagSet("weapon-melee");
-        CollectibleTagWeaponRanged = registry.GetGeneralTagSet("weapon-ranged");
-        CollectibleTagHasOpenFire = registry.GetGeneralTagSet("has-open-fire");
+        TagMaskInitialUpdate = ~(TagSwimming | TagFeetInLiquid | TagOnGround | TagAlive);
+        TagMaskAgentInitialUpdate = ~(TagMoving | TagAiming | TagFlying | TagSneaking | TagSprinting);
+
+        // These are pre-registered, otherwise we would need to RegisterAndCreate here
+        api.CollectibleTagRegistry.TryCreateTagSetAndLogIssues(out CollectibleTagWeapon, "weapon");
+        api.CollectibleTagRegistry.TryCreateTagSetAndLogIssues(out CollectibleTagWeaponMelee, "weapon-melee");
+        api.CollectibleTagRegistry.TryCreateTagSetAndLogIssues(out CollectibleTagWeaponRanged, "weapon-ranged");
+        api.CollectibleTagRegistry.TryCreateTagSetAndLogIssues(out CollectibleTagHasOpenFire, "has-open-fire");
     }
 
-    protected virtual void TagsInitialUpdate(ref EntityTagSet tags)
+    protected virtual void TagsInitialUpdate(ref TagSetFast tags)
     {
         EntityTagsInitialUpdate(ref tags);
 
@@ -128,7 +137,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         }
     }
 
-    protected virtual void TagsUpdate(ref EntityTagSet tags)
+    protected virtual void TagsUpdate(ref TagSetFast tags)
     {
         EntityTagsUpdate(ref tags);
 
@@ -139,39 +148,36 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         }
     }
 
-    protected virtual void EntityTagsInitialUpdate(ref EntityTagSet tags)
+    protected virtual void EntityTagsInitialUpdate(ref TagSetFast tags)
     {
-        tags = tags.Except(TagSwimming);
-        tags = tags.Except(TagFeetInLiquid);
-        tags = tags.Except(TagOnGround);
-        tags = tags.Except(TagAlive);
+        tags &= TagMaskInitialUpdate;
 
         EntityTagsUpdate(ref tags);
     }
 
-    protected virtual void EntityAgentTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
+    protected virtual void EntityAgentTagsInitialUpdate(EntityAgent entityAgent, ref TagSetFast tags)
     {
-        tags = tags.Except(TagMoving);
-        tags = tags.Except(TagAiming);
-        tags = tags.Except(TagFlying);
-        tags = tags.Except(TagSneaking);
-        tags = tags.Except(TagSprinting);
+        tags &= TagMaskAgentInitialUpdate;
 
         EntityAgentTagsUpdate(entityAgent, ref tags);
     }
 
-    protected virtual void EntityAgentHandItemsTagsInitialUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
+    protected virtual void EntityAgentHandItemsTagsInitialUpdate(EntityAgent entityAgent, ref TagSetFast tags)
     {
-        ItemStack? handStack = entityAgent.RightHandItemSlot?.Itemstack;
-        TagSet itemTags = handStack?.Collectible?.Tags ?? TagSet.Empty;
+        ItemStack? rightHandStack = entityAgent.RightHandItemSlot?.Itemstack;
+        TagSet rightHandItemTags = rightHandStack?.Collectible?.Tags ?? TagSet.Empty;
+        Armed           = rightHandItemTags.Overlaps(CollectibleTagWeapon);
+        ArmedMelee      = rightHandItemTags.Overlaps(CollectibleTagWeaponMelee);
+        ArmedRanged     = rightHandItemTags.Overlaps(CollectibleTagWeaponRanged);
+        HoldingOpenFire = rightHandItemTags.Overlaps(CollectibleTagHasOpenFire);
 
-        handStack = entityAgent.LeftHandItemSlot?.Itemstack;
-        if (handStack?.Collectible != null) itemTags = itemTags.Union(handStack.Collectible.Tags);
+        ItemStack? leftHandStack = entityAgent.LeftHandItemSlot?.Itemstack;
+        TagSet leftHandItemTags = leftHandStack?.Collectible?.Tags ?? TagSet.Empty;
+        Armed           = Armed           || leftHandItemTags.Overlaps(CollectibleTagWeapon);
+        ArmedMelee      = ArmedMelee      || leftHandItemTags.Overlaps(CollectibleTagWeaponMelee);
+        ArmedRanged     = ArmedRanged     || leftHandItemTags.Overlaps(CollectibleTagWeaponRanged);
+        HoldingOpenFire = HoldingOpenFire || leftHandItemTags.Overlaps(CollectibleTagHasOpenFire);
 
-        Armed = itemTags.IsSupersetOf(CollectibleTagWeapon);
-        ArmedMelee = itemTags.IsSupersetOf(CollectibleTagWeaponMelee);
-        ArmedRanged = itemTags.IsSupersetOf(CollectibleTagWeaponRanged);
-        HoldingOpenFire = itemTags.IsSupersetOf(CollectibleTagHasOpenFire);
 
         InitializeTag(ref tags, Armed, TagArmed);
         InitializeTag(ref tags, ArmedMelee, TagArmedMelee);
@@ -180,36 +186,24 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected virtual void UpdateTag(ref EntityTagSet tags, ref bool storedValue, EntityTagSet mask, bool newValue)
+    protected virtual void UpdateTag(ref TagSetFast tags, ref bool storedValue, TagSetFast mask, bool newValue)
     {
         if (storedValue == newValue) return;
 
         storedValue = newValue;
 
-        if (newValue)
-        {
-            tags = tags.Union(mask);
-        }
-        else
-        {
-            tags = tags.Except(mask);
-        }
+        if (newValue)   tags |=  mask;
+        else            tags &= ~mask;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected virtual void InitializeTag(ref EntityTagSet tags, bool newValue, EntityTagSet mask)
+    protected virtual void InitializeTag(ref TagSetFast tags, bool newValue, TagSetFast mask)
     {
-        if (newValue)
-        {
-            tags = tags.Union(mask);
-        }
-        else
-        {
-            tags = tags.Except(mask);
-        }
+        if (newValue)   tags |=  mask;
+        else            tags &= ~mask;
     }
 
-    protected virtual void EntityTagsUpdate(ref EntityTagSet tags)
+    protected virtual void EntityTagsUpdate(ref TagSetFast tags)
     {
         UpdateTag(ref tags, ref Swimming, TagSwimming, entity.Swimming);
         UpdateTag(ref tags, ref FeetInLiquid, TagFeetInLiquid, entity.FeetInLiquid && !Swimming);
@@ -217,7 +211,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         UpdateTag(ref tags, ref Alive, TagAlive, entity.Alive);
     }
 
-    protected virtual void EntityAgentTagsUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
+    protected virtual void EntityAgentTagsUpdate(EntityAgent entityAgent, ref TagSetFast tags)
     {
         EntityControls controls = entityAgent.Controls;
 
@@ -230,7 +224,7 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         UpdateTag(ref tags, ref Sprinting, TagSprinting, controls.Sprint);
     }
 
-    protected virtual void EntityAgentHandItemsTagsUpdate(EntityAgent entityAgent, ref EntityTagSet tags)
+    protected virtual void EntityAgentHandItemsTagsUpdate(EntityAgent entityAgent, ref TagSetFast tags)
     {
         ItemStack? handStack = entityAgent.ActiveHandItemSlot?.Itemstack;
         CollectibleObject? item = handStack?.Collectible;
@@ -243,10 +237,10 @@ public class EntityBehaviorEntityStateTags : EntityBehavior
         }
         else
         {
-            UpdateTag(ref tags, ref Armed, TagArmed, CollectibleTagWeapon.IsSubsetOf(item.Tags));
-            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, CollectibleTagWeaponMelee.IsSubsetOf(item.Tags));
-            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, CollectibleTagWeaponRanged.IsSubsetOf(item.Tags));
-            UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire, CollectibleTagHasOpenFire.IsSubsetOf(item.Tags));
+            UpdateTag(ref tags, ref Armed, TagArmed, CollectibleTagWeapon.Overlaps(item.Tags));
+            UpdateTag(ref tags, ref ArmedMelee, TagArmedMelee, CollectibleTagWeaponMelee.Overlaps(item.Tags));
+            UpdateTag(ref tags, ref ArmedRanged, TagArmedRanged, CollectibleTagWeaponRanged.Overlaps(item.Tags));
+            UpdateTag(ref tags, ref HoldingOpenFire, TagHoldingOpenFire, CollectibleTagHasOpenFire.Overlaps(item.Tags));
         }
     }
 }

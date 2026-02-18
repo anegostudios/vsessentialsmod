@@ -119,7 +119,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                if (noTags)
+                if (EntityTags.IsEmpty)
                 {
                     if (targetEntityFirstLetters.Length == 0)
                     {
@@ -132,7 +132,7 @@ namespace Vintagestory.GameContent
                 }
                 else
                 {
-                    targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityWithTags(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                    targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntity(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
                 }
             }
 

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
@@ -33,6 +33,23 @@ namespace Vintagestory.ServerMods
     }
 
     [JsonObject(MemberSerialization.OptIn)]
+    public class BlockLayerCodeByBiome
+    {
+        [JsonProperty]
+        public AssetLocation BlockCode;
+        [JsonProperty]
+        public float MinY = 0;
+        [JsonProperty]
+        public float MaxY = 1;
+        [JsonProperty]
+        public int Biome = -1;
+
+        public int BlockId;
+
+        public Dictionary<int, int> BlockIdMapping;
+    }
+
+    [JsonObject(MemberSerialization.OptIn)]
     public class BlockLayer
     {
         [JsonProperty]
@@ -43,6 +60,8 @@ namespace Vintagestory.ServerMods
         public AssetLocation BlockCode;
         [JsonProperty]
         public BlockLayerCodeByMin[] BlockCodeByMin;
+        [JsonProperty]
+        public BlockLayerCodeByBiome[] BlockCodeByBiome;
         [JsonProperty]
         public int MinTemp = -30;
         [JsonProperty]
@@ -59,6 +78,8 @@ namespace Vintagestory.ServerMods
         public float MinY = 0;
         [JsonProperty]
         public float MaxY = 1;
+        [JsonProperty]
+        public int Biome = -1;
         [JsonProperty]
         public int Thickness = 1;
 
@@ -142,13 +163,40 @@ namespace Vintagestory.ServerMods
                     {
                         BlockCodeByMin[i].BlockId = api.WorldManager.GetBlockId(blockCode);
                     }
+                }
+            }
 
-                    
+            if (BlockCodeByBiome != null)
+            {
+                for (int i = 0; i < BlockCodeByBiome.Length; i++)
+                {
+                    AssetLocation blockCode = BlockCodeByBiome[i].BlockCode;
+
+                    if (blockCode != null && blockCode.Path.Contains("{rocktype}"))
+                    {
+                        BlockCodeByBiome[i].BlockIdMapping = new Dictionary<int, int>();
+                        for (int j = 0; j < rockstrata.Variants.Length; j++)
+                        {
+                            string rocktype = rockstrata.Variants[j].BlockCode.Path.Split('-')[1];
+
+                            Block rockBlock = api.World.GetBlock(rockstrata.Variants[j].BlockCode);
+                            Block rocktypedBlock = api.World.GetBlock(blockCode.CopyWithPath(blockCode.Path.Replace("{rocktype}", rocktype)));
+
+                            if (rockBlock != null && rocktypedBlock != null)
+                            {
+                                BlockCodeByBiome[i].BlockIdMapping[rockBlock.BlockId] = rocktypedBlock.BlockId;
+                            }
+                        }
+                    }
+                    else if (blockCode != null)
+                    {
+                        BlockCodeByBiome[i].BlockId = api.WorldManager.GetBlockId(blockCode);
+                    }
                 }
             }
         }
 
-        public int GetBlockId(double posRand, float temp, float rainRel, float fertilityRel, int firstBlockId, BlockPos pos, int mapheight)
+        public int GetBlockId(double posRand, float temp, float rainRel, float fertilityRel, int firstBlockId, BlockPos pos, int mapheight, int biome = -1)
         {
             if (noiseGen != null && noiseGen.Noise(pos.X / 20.0, pos.Y / 20.0, pos.Z / 20.0) < NoiseThreshold)
             {   
@@ -167,24 +215,51 @@ namespace Vintagestory.ServerMods
             }
 
             float yrel = (float)pos.Y / mapheight;
-            for (int i = 0; i < BlockCodeByMin.Length; i++)
+
+            if (BlockCodeByBiome != null)
             {
-                BlockLayerCodeByMin blcv = BlockCodeByMin[i];
-
-                float tempDist = Math.Abs(temp - GameMath.Max(temp, blcv.MinTemp));
-                float rainDist = Math.Abs(rainRel - GameMath.Max(rainRel, blcv.MinRain));
-                float fertDist = Math.Abs(fertilityRel - GameMath.Clamp(fertilityRel, blcv.MinFertility, blcv.MaxFertility));
-                float ydist = Math.Abs(yrel - GameMath.Clamp(yrel, blcv.MinY, blcv.MaxY)) * 10f;
-
-                if (tempDist + rainDist + fertDist + ydist <= posRand)
+                for (int i = 0; i < BlockCodeByBiome.Length; i++)
                 {
-                    int mapppedBlockId = blcv.BlockId;
-                    if (blcv.BlockIdMapping != null)
-                    {
-                        blcv.BlockIdMapping.TryGetValue(firstBlockId, out mapppedBlockId);
-                    }
+                    BlockLayerCodeByBiome blcv = BlockCodeByBiome[i];
+                    if (blcv.Biome != biome) continue;
 
-                    return mapppedBlockId;
+                    float ydist = Math.Abs(yrel - GameMath.Clamp(yrel, blcv.MinY, blcv.MaxY)) * 10f;
+                    if (ydist <= posRand)
+                    {
+                        int mapppedBlockId = blcv.BlockId;
+                        if (blcv.BlockIdMapping != null)
+                        {
+                            blcv.BlockIdMapping.TryGetValue(firstBlockId, out mapppedBlockId);
+                        }
+                        return mapppedBlockId;
+                    }
+                }
+            }
+
+            if (BlockCodeByMin != null)
+            {
+                for (int i = 0; i < BlockCodeByMin.Length; i++)
+                {
+                    BlockLayerCodeByMin blcv = BlockCodeByMin[i];
+
+                    float ydist = Math.Abs(yrel - GameMath.Clamp(yrel, blcv.MinY, blcv.MaxY)) * 10f;
+                    float trfDist = 0;
+
+                    float tempDist = Math.Abs(temp - GameMath.Max(temp, blcv.MinTemp));
+                    float rainDist = Math.Abs(rainRel - GameMath.Max(rainRel, blcv.MinRain));
+                    float fertDist = Math.Abs(fertilityRel - GameMath.Clamp(fertilityRel, blcv.MinFertility, blcv.MaxFertility));
+                    trfDist = tempDist + rainDist + fertDist;
+
+                    if (trfDist + ydist <= posRand)
+                    {
+                        int mapppedBlockId = blcv.BlockId;
+                        if (blcv.BlockIdMapping != null)
+                        {
+                            blcv.BlockIdMapping.TryGetValue(firstBlockId, out mapppedBlockId);
+                        }
+
+                        return mapppedBlockId;
+                    }
                 }
             }
 

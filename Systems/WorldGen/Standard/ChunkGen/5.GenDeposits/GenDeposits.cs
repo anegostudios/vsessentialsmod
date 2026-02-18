@@ -53,9 +53,7 @@ namespace Vintagestory.ServerMods
 
             if (TerraGenConfig.DoDecorationPass)
             {
-                api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
-                api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
             }
         }
 
@@ -160,6 +158,8 @@ namespace Vintagestory.ServerMods
             verticalDistortBottom = GenMaps.GetDepositVerticalDistort(seed + 12);
             verticalDistortTop = GenMaps.GetDepositVerticalDistort(seed + 28);
 
+            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
+            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
             api.Logger?.VerboseDebug("Initialised GenDeposits");
         }
 

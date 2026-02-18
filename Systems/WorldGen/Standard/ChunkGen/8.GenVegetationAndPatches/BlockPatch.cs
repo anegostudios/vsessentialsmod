@@ -33,6 +33,11 @@ namespace Vintagestory.ServerMods.NoObf
         public int CategoryHashCode = PatchesHashCode;
 
         [JsonProperty]
+        public int Biome = -1;
+        [JsonProperty]
+        public int[] Biomes;
+
+        [JsonProperty]
         public AssetLocation[] blockCodes;
         [JsonProperty]
         public float Chance = 0.05f;
