@@ -151,7 +151,7 @@ namespace Vintagestory.GameContent
             int generation = entity.WatchedAttributes.GetInt("generation", 0);
             if (SpawnEntityCodes != null)
             {
-                while (q > 1 || rand.NextDouble() < q)
+                while (q >= 1 || rand.NextDouble() < q)
                 {
                     q--;
                     AssetLocation SpawnEntityCode = SpawnEntityCodes[rand.Next(SpawnEntityCodes.Length)];
@@ -159,6 +159,7 @@ namespace Vintagestory.GameContent
                     if (childType == null) continue;
                     Entity childEntity = entity.World.ClassRegistry.CreateEntity(childType);
 
+                    childEntity.Pos.SetFrom(entity.Pos);
                     childEntity.Pos.Motion.X += (rand.NextDouble() - 0.5f) / 20f;
                     childEntity.Pos.Motion.Z += (rand.NextDouble() - 0.5f) / 20f;
 

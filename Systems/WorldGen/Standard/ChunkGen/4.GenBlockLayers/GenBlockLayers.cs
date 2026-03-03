@@ -45,6 +45,11 @@ namespace Vintagestory.ServerMods
             this.api.Event.InitWorldGenerator(InitWorldGen, "superflat"); // Just the Init so that BlockSoil can grow grass; and both these are needed even if DecoPass is off
             //this.api.Event.MapRegionGeneration(OnMapRegionGen, "standard");   // 8.2.24 commented out because the method has no code
 
+
+            if (TerraGenConfig.DoDecorationPass)
+            {
+                this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Terrain, "standard");
+            }
             distort2dx = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 20980);
             distort2dz = new SimplexNoise(new double[] { 14, 9, 6, 3 }, new double[] { 1 / 100.0, 1 / 50.0, 1 / 25.0, 1 / 12.5 }, api.World.SeaLevel + 20981);
         }
@@ -71,10 +76,6 @@ namespace Vintagestory.ServerMods
             }*/
         }
 
-
-
-
-
         public void InitWorldGen()
         {
             LoadGlobalConfig(api);
@@ -88,14 +89,7 @@ namespace Vintagestory.ServerMods
             mapheight = api.WorldManager.MapSizeY;
 
             boilingWaterBlockId = gcfg.boilingWaterBlockId;
-
-            if (TerraGenConfig.DoDecorationPass)
-            {
-                this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Terrain, "standard");
-            }
         }
-
-
 
         private void OnChunkColumnGeneration(IChunkColumnGenerateRequest request)
         {

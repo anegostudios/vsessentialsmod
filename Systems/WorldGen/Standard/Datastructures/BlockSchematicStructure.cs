@@ -16,7 +16,7 @@ namespace Vintagestory.ServerMods
     {
         public Dictionary<int, AssetLocation> BlockCodesTmpForRemap = new();
 
-        public string FromFileName;
+        public AssetLocation FromFile;
 
         public Block[,,] blocksByPos;
         public Dictionary<int, Block> FluidBlocksByPos;
@@ -494,7 +494,7 @@ namespace Vintagestory.ServerMods
             cloned.MaxBelowSealevel = MaxBelowSealevel;
 
             cloned.GameVersion = GameVersion;
-            cloned.FromFileName = FromFileName;
+            cloned.FromFile = FromFile;
 
             cloned.BlockCodes = new Dictionary<int, AssetLocation>(BlockCodes);
             cloned.ItemCodes = new Dictionary<int, AssetLocation>(ItemCodes);
@@ -524,7 +524,7 @@ namespace Vintagestory.ServerMods
             if (blocksByPos == null)
             {
                 Init(api.World.BlockAccessor);
-                LoadMetaInformationAndValidate(api.World.BlockAccessor, api.World, FromFileName);
+                LoadMetaInformationAndValidate(api.World.BlockAccessor, api.World, FromFile);
             }
         }
 

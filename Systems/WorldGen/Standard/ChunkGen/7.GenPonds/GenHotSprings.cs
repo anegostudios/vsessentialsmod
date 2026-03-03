@@ -37,6 +37,8 @@ namespace Vintagestory.ServerMods
 
             if (TerraGenConfig.DoDecorationPass)
             {
+                api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
+
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
                 api.Event.InitWorldGenerator(initWorldGen, "standard");
             }
@@ -60,8 +62,6 @@ namespace Vintagestory.ServerMods
 
             blocksludgygravel = api.World.GetBlock(gcfg.sludgyGravelBlockCode);
             boilingWaterBlockId = gcfg.boilingWaterBlockId;
-
-            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.TerrainFeatures, "standard");
         }
 
 

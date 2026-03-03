@@ -53,6 +53,7 @@ namespace Vintagestory.ServerMods
             {
                 api.Event.InitWorldGenerator(initWorldGen, "standard");
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
+                api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.TerrainFeatures, "standard");
             }
         }
 
@@ -77,8 +78,6 @@ namespace Vintagestory.ServerMods
             var blockLayerConfig = BlockLayerConfig.GetInstance(api);
 
             lakebedLayerConfig = blockLayerConfig.LakeBedLayer;
-
-            api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.TerrainFeatures, "standard");
         }
 
         private void OnChunkColumnGen(IChunkColumnGenerateRequest request)

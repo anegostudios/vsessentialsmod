@@ -39,6 +39,7 @@ namespace Vintagestory.ServerMods
 
                 api.Event.MapChunkGeneration(OnMapChunkGen, "standard");
                 api.Event.MapChunkGeneration(OnMapChunkGen, "superflat");
+                api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
                 api.Event.InitWorldGenerator(initWorldGen, "superflat");
             }
         }
@@ -52,8 +53,6 @@ namespace Vintagestory.ServerMods
             heightvarNoise = NormalizedSimplexNoise.FromDefaultOctaves(3, 1f / 20f, 0.9f, api.World.Seed + 12);
 
             regionsize = api.World.BlockAccessor.RegionSize;
-
-            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
         }
 
 

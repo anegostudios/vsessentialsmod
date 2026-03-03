@@ -315,7 +315,7 @@ namespace Vintagestory.ServerMods
             cloned.OffsetY = OffsetY;
 
             cloned.GameVersion = GameVersion;
-            cloned.FromFileName = FromFileName;
+            cloned.FromFile = FromFile;
 
             cloned.BlockCodes = new Dictionary<int, AssetLocation>(BlockCodes);
             cloned.ItemCodes = new Dictionary<int, AssetLocation>(ItemCodes);

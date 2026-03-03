@@ -65,6 +65,12 @@ namespace Vintagestory.GameContent
         /// </summary>
         string type;
 
+        /// <summary>
+        /// If true, uses the same hitbox as the main block but offseted
+        /// </summary>
+        [DocumentAsJson("Optional", "false")]
+        public bool offsetHitboxes;
+
         public BlockBehaviorMultiblock(Block block) : base(block) { }
 
         public override void Initialize(JsonObject properties)
@@ -76,6 +82,7 @@ namespace Vintagestory.GameContent
             SizeZ = properties["sizez"].AsInt(3);
             type = properties["type"].AsString("monolithic");
             ControllerPositionRel = properties["cposition"].AsObject<Vec3i>(new Vec3i(1, 0, 1));
+            offsetHitboxes = properties["offsetHitboxes"].AsBool(false);
         }
 
         public override bool CanPlaceBlock(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref EnumHandling handling, ref string failureCode)

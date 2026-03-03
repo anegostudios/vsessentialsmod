@@ -590,6 +590,8 @@ namespace Vintagestory.GameContent
 
         public override void RenderToGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)
         {
+            var oldModelMat = new float[16];
+            ModelMat.CopyTo(oldModelMat);
             loadModelMatrixForGui(entity, posX, posY, posZ, yawDelta, size);
 
             if (meshRefOpaque != null)
@@ -603,6 +605,7 @@ namespace Vintagestory.GameContent
             {
                 TesselateShape();
             }
+            ModelMat = oldModelMat;
         }
 
         protected virtual float[] GetModelMatrixForGui(float dt, double posX, double posY, double posZ, float yawDelta, float size)

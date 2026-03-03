@@ -284,7 +284,7 @@ namespace Vintagestory.API.Common
 
         protected virtual bool IsOnCooldown()
         {
-            return cooldownUntilMs <= entity.World.ElapsedMilliseconds && cooldownUntilTotalHours <= entity.World.Calendar.TotalHours;
+            return cooldownUntilMs > entity.World.ElapsedMilliseconds || cooldownUntilTotalHours > entity.World.Calendar.TotalHours;
         }
 
         protected virtual void ResetCooldown()

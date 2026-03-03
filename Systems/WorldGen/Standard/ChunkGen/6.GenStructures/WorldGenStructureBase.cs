@@ -127,7 +127,7 @@ namespace Vintagestory.ServerMods
             }
 
             schematic.OffsetY = offsety;
-            schematic.FromFileName = asset.Location.Domain == GlobalConstants.DefaultDomain ? asset.Name : $"{asset.Location.Domain}:{asset.Name}";
+            schematic.FromFile = asset.Location.Clone();
             schematic.MaxYDiff = struc?.MaxYDiff ?? 3;
             schematic.MaxBelowSealevel = struc?.MaxBelowSealevel ?? 3;
             schematic.StoryLocationMaxAmount = struc?.StoryLocationMaxAmount;
@@ -372,7 +372,7 @@ namespace Vintagestory.ServerMods
                         continue;
                     }
 
-                    schematic.FromFileName = asset.Location.Domain == GlobalConstants.DefaultDomain ? asset.Name : $"{asset.Location.Domain}:{asset.Name}";
+                    schematic.FromFile = asset.Location.Clone();
 
                     schematics.Add(schematic);
                 }
@@ -404,7 +404,7 @@ namespace Vintagestory.ServerMods
             }
             catch (Exception)
             {
-                logger.Warning($"Unable to decode block entity data in schematic: {schematic.FromFileName}");
+                logger.Warning($"Unable to decode block entity data in schematic: {schematic.FromFile}");
             }
 
             return null;

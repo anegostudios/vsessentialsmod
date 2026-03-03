@@ -48,6 +48,9 @@ namespace Vintagestory.ServerMods
             this.api = api;
 
             api.Event.InitWorldGenerator(initWorldGen, "standard");
+            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
+
+            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
         }
 
 
@@ -103,8 +106,6 @@ namespace Vintagestory.ServerMods
                 strataNoises[i] = new MapLayerCustomPerlin(api.World.Seed + 23423 + i, ampls, freq, th);
             }
 
-            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
-            api.Event.ChunkColumnGeneration(GenChunkColumn, EnumWorldGenPass.Terrain, "standard");
             api.Logger.VerboseDebug("Initialised GenRockStrata");
         }
 

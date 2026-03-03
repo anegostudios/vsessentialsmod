@@ -41,6 +41,7 @@ namespace Vintagestory.ServerMods
             {
                 api.Event.InitWorldGenerator(initWorldGen, "standard");
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
+                api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.NeighbourSunLightFlood, "standard");
             }
         }
 
@@ -60,7 +61,6 @@ namespace Vintagestory.ServerMods
             maxTemp = blockLayerConfig.SnowLayer.MaxTemp;
             minTemp = maxTemp - transSize;
 
-            api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.NeighbourSunLightFlood, "standard");
         }
 
         private void OnWorldGenBlockAccessor(IChunkProviderThread chunkProvider)

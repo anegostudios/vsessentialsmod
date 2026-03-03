@@ -81,7 +81,7 @@ namespace Vintagestory.ServerMods
             // schematicData.Init(api.World.BlockAccessor);     // radfast note: do not Init() here for performance; .Init() will be called in BlockSchematicStructure.Unpack()
             schematicData.blockLayerConfig = blockLayerConfig;
 
-            scfg.SchematicYOffsets.TryGetValue("story/" + schematicData.FromFileName.Replace(".json", ""), out var offset);
+            scfg.SchematicYOffsets.TryGetValue("story/" + schematicData.FromFile.GetNameWithDomain().Replace(".json", ""), out var offset);
             schematicData.OffsetY = offset;
 
             if (SkipGenerationCategories != null)

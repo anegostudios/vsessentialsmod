@@ -59,6 +59,11 @@ namespace Vintagestory.ServerMods
             if (TerraGenConfig.DoDecorationPass)
             {
                 api.Event.InitWorldGenerator(initWorldGen, "standard");
+                api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.PreDone, "standard");
+
+                api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
+                api.Event.MapRegionGeneration(OnMapRegionGen, "superflat");
+
                 api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
 
                 api.Event.OnTrySpawnEntity += Event_OnTrySpawnEntity;
@@ -134,10 +139,6 @@ namespace Vintagestory.ServerMods
             }
 
             loadAnimalMaps();
-
-            api.Event.ChunkColumnGeneration(OnChunkColumnGen, EnumWorldGenPass.PreDone, "standard");
-            api.Event.MapRegionGeneration(OnMapRegionGen, "standard");
-            api.Event.MapRegionGeneration(OnMapRegionGen, "superflat");
         }
 
         protected void loadAnimalMaps()

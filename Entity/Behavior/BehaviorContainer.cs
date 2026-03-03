@@ -19,6 +19,7 @@ namespace Vintagestory.GameContent
         public string ElementName;
     }
 
+#nullable enable
     public interface IAttachableToEntity
     {
         bool IsAttachable(Entity toEntity, ItemStack itemStack);
@@ -31,22 +32,22 @@ namespace Vintagestory.GameContent
         /// <param name="texturePrefixCode"></param>
         /// <param name="intoDict"></param>
         void CollectTextures(ItemStack stack, Shape shape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict);
-        string GetCategoryCode(ItemStack stack);
-        CompositeShape GetAttachedShape(ItemStack stack, string slotCode);
-        string[] GetDisableElements(ItemStack stack);
-        string[] GetKeepElements(ItemStack stack);
-        string GetTexturePrefixCode(ItemStack stack);
+        string? GetCategoryCode(ItemStack stack);
+        CompositeShape? GetAttachedShape(ItemStack stack, string slotCode);
+        string[]? GetDisableElements(ItemStack stack);
+        string[]? GetKeepElements(ItemStack stack);
+        string? GetTexturePrefixCode(ItemStack stack);
 
         int RequiresBehindSlots { get; set; }
 
-        public static IAttachableToEntity FromCollectible(CollectibleObject cobj)
+        public static IAttachableToEntity? FromCollectible(CollectibleObject cobj)
         {
             var iate = cobj.GetCollectibleInterface<IAttachableToEntity>();
             if (iate != null) return iate;
             return FromAttributes(cobj);
         }
 
-        public static IAttachableToEntity FromAttributes(CollectibleObject cobj)
+        public static IAttachableToEntity? FromAttributes(CollectibleObject cobj)
         {
             var iattr = cobj.Attributes?["attachableToEntity"].AsObject<AttributeAttachableToEntity>(null, cobj.Code.Domain);
             if (iattr == null && cobj.Attributes?["wearableAttachment"].Exists == true)
@@ -75,6 +76,7 @@ namespace Vintagestory.GameContent
             }
         }
     }
+#nullable disable
 
     public class AttributeAttachableToEntity : IAttachableToEntity
     {

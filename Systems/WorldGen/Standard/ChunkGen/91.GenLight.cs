@@ -1,4 +1,3 @@
-using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -21,14 +20,9 @@ namespace Vintagestory.ServerMods
         {
             this.api = api;
 
-            this.api.Event.InitWorldGenerator(InitWorldGen, "standard");
             this.api.Event.GetWorldgenBlockAccessor(OnWorldGenBlockAccessor);
-        }
-
-        private void InitWorldGen()
-        {
-            this.api.Event.ChunkColumnGeneration(this.OnChunkColumnGeneration, EnumWorldGenPass.Vegetation, "standard");
-            this.api.Event.ChunkColumnGeneration(this.OnChunkColumnGenerationFlood, EnumWorldGenPass.NeighbourSunLightFlood, "standard");
+            this.api.Event.ChunkColumnGeneration(OnChunkColumnGeneration, EnumWorldGenPass.Vegetation, "standard");
+            this.api.Event.ChunkColumnGeneration(OnChunkColumnGenerationFlood, EnumWorldGenPass.NeighbourSunLightFlood, "standard");
         }
 
         private void OnWorldGenBlockAccessor(IChunkProviderThread chunkProvider)
@@ -53,6 +47,6 @@ namespace Vintagestory.ServerMods
             api.WorldManager.SunFloodChunkColumnNeighboursForWorldGen(request.Chunks, request.ChunkX, request.ChunkZ);
         }
 
-     
+
     }
 }

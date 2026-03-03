@@ -123,6 +123,8 @@ namespace Vintagestory.GameContent
         {
             if (metalProps == null) return;
 
+            updateSettleTimestamps(world, itemstack, temperature);
+
             string currentState = GetState(itemstack);
             trySettleWorkItem(world, itemstack, temperature, currentState);
         }
@@ -130,9 +132,7 @@ namespace Vintagestory.GameContent
         public override void SetTemperature(IWorldAccessor world, ItemStack itemstack, float temperature, bool delayCooldown, ref EnumHandling handling)
         {
             if (metalProps == null) return;
-
-            bool nowQuenching = temperature > metalProps.quenchMinTemp && temperature < metalProps.quenchMaxTemp;
-            bool nowTempering = temperature > metalProps.temperMinTemp && temperature < metalProps.temperMaxTemp;
+            updateSettleTimestamps(world, itemstack, temperature);
 
             string currentState = GetState(itemstack);
 
@@ -158,6 +158,21 @@ namespace Vintagestory.GameContent
             }
 
             trySettleWorkItem(world, itemstack, temperature, currentState);
+        }
+
+        private void updateSettleTimestamps(IWorldAccessor world, ItemStack itemstack, float temperature)
+        {
+            bool nowQuenching = temperature > metalProps.quenchMinTemp && temperature < metalProps.quenchMaxTemp;
+            bool nowTempering = temperature > metalProps.temperMinTemp && temperature < metalProps.temperMaxTemp;
+
+            if (nowQuenching)
+            {
+                itemstack.Attributes.SetDouble("lastinquenchrangetotalhours", world.Calendar.ElapsedHours);
+            }
+            if (nowTempering)
+            {
+                itemstack.Attributes.SetDouble("lastintemperrangetotalhours", world.Calendar.ElapsedHours);
+            }
         }
 
         private void IsGettingCooled(IWorldAccessor world, ItemSlot slot, Vec3d pos, float dt, float temperature)
@@ -193,14 +208,12 @@ namespace Vintagestory.GameContent
 
             if (temperature <= metalProps.settledTemperature)
             {
-                double hoursPassed = world.Calendar.ElapsedHours - itemstack.Attributes.GetDouble("statechangetotalhours", -999);
-
-                if (currentState == "quench" && hoursPassed < 0.25)
+                if (currentState == "quench" && world.Calendar.ElapsedHours - itemstack.Attributes.GetDouble("lastinquenchrangetotalhours", -999) < 0.25)
                 {
                     applyQuenchedStats(world, itemstack);
                 }
-
-                if (currentState == "temper" && hoursPassed > 1)
+                
+                if (currentState == "temper" && world.Calendar.ElapsedHours - itemstack.Attributes.GetDouble("lastintemperrangetotalhours", -999) > 1)
                 {
                     applyTemperedStats(world, itemstack);
                 }
@@ -227,7 +240,7 @@ namespace Vintagestory.GameContent
             SetPowerValue(world, itemstack, newPowerValue);
 
             itemstack.Attributes.SetInt("temperIteration", temperIteration + 1);
-            applyBuffs(itemstack);
+            // applyBuffs(itemstack); - why is this here?
         }
 
 
@@ -290,10 +303,15 @@ namespace Vintagestory.GameContent
                 dsc.AppendLine(Lang.Get("Durability gain: {0:\\+0.#%;0.#%}", GetDurationBonus(world, inSlot.Itemstack)));
             }
 
-            if ((world.Api as ICoreClientAPI).Settings.Bool["extendedDebugInfo"])
+            if (GetState(inSlot.Itemstack) == "quench")
             {
-                dsc.AppendLine(string.Format("<font color=\"#ccc\">workitemstate: {0}</font>", GetState(inSlot.Itemstack)));
+                dsc.AppendLine(Lang.Get("<i>Has reached quenching temperature</i>"));
             }
+            if (GetState(inSlot.Itemstack) == "temper")
+            {
+                dsc.AppendLine(Lang.Get("<i>Has reached tempering temperature</i>"));
+            }
+
         }
 
 
@@ -310,7 +328,7 @@ namespace Vintagestory.GameContent
             [JsonProperty]
             public int temperMaxTemp;
             [JsonProperty]
-            public int settledTemperature = 100;
+            public int settledTemperature = 200;
         }
 
         public class MetalWorldProperties : WorldProperty<MetalPropertyVariant>

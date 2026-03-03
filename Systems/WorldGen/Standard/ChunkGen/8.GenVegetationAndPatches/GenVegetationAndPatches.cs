@@ -6,7 +6,6 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
-using Vintagestory.GameContent;
 using Vintagestory.ServerMods.NoObf;
 
 #nullable disable
@@ -158,8 +157,6 @@ namespace Vintagestory.ServerMods
                 int seed = sapi.World.Seed + 112897 + hs;
                 blockPatchMapGens[patch.MapCode] = new MapLayerWobbled(seed, 2, 0.9f, TerraGenConfig.forestMapScale, 4000, -2500);
             }
-
-         
         }
 
         ushort[] heightmap;
@@ -181,7 +178,7 @@ namespace Vintagestory.ServerMods
         BlockPos tmpPos = new BlockPos(API.Config.Dimensions.NormalWorld);
 
         /// <summary>
-        /// Structures generally are sparsely placed in the world, so 99% of the time we can generate block patches unimpeded. 
+        /// Structures generally are sparsely placed in the world, so 99% of the time we can generate block patches unimpeded.
         /// So for performance reasons, lets do a single broad test first, which allows us to skip detail testing later
         /// </summary>
         bool preventBroadly;
@@ -256,7 +253,7 @@ namespace Vintagestory.ServerMods
             // get temp pos to check if we need a story location patch or a regular one
             patchIterRandom.SetWorldSeed(sapi.WorldManager.Seed - subSeed);
             patchIterRandom.InitPositionSeed(chunkX, chunkZ);
-            
+
             BlockPatch[] patches = GetNonTreePatches(chunkX, chunkZ);
 
             var mapregion = sapi?.WorldManager.GetMapRegion((chunkX * chunksize) / regionSize, (chunkZ * chunksize) / regionSize);

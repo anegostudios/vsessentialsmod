@@ -100,7 +100,10 @@ namespace Vintagestory.GameContent
             beforeCollided = reader.ReadBoolean();
             try
             {
-                ProjectileStack = new ItemStack(reader);
+                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                {
+                    ProjectileStack = new ItemStack(reader);
+                }
             }
             catch (Exception)
             {

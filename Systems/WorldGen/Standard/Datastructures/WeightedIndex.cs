@@ -1,5 +1,4 @@
 ﻿
-#nullable disable
 namespace Vintagestory.ServerMods
 {
     public struct WeightedIndex

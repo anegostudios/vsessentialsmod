@@ -148,13 +148,13 @@ namespace Vintagestory.GameContent
                     Code = "hardened",
                     Multiplier = 1 + powervalue,
                     StatCode = "attackpower"
-                });
+                }, true);
                 AddBuff(stack, new AppliedCollectibleBuff()
                 {
                     Code = "hardened",
                     Multiplier = 1 + powervalue,
                     StatCode = "miningspeed"
-                });
+                }, true);
             }
 
             if (durationbonus > 0)
@@ -164,7 +164,7 @@ namespace Vintagestory.GameContent
                     Code = "hardened",
                     Multiplier = 1 + durationbonus,
                     StatCode = "maxdurability"
-                });
+                }, true);
             }
         }
 

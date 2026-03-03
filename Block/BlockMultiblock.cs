@@ -141,46 +141,94 @@ namespace Vintagestory.GameContent
 
         public override Cuboidf[] GetSelectionBoxes(IBlockAccessor ba, BlockPos pos)
         {
+            var basePos = pos.AddCopy(OffsetInv);
+
+            var block = api.World.BlockAccessor.GetBlock(basePos);
+            if (block.GetBehavior<BlockBehaviorMultiblock>()?.offsetHitboxes == true)
+            {
+                var boxes = block.GetSelectionBoxes(ba, basePos);
+                return offsetedCopy(boxes);
+            }
+
             return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
-               pos.AddCopy(OffsetInv),
+               basePos,
                (inf) => inf.MBGetSelectionBoxes(ba, pos, OffsetInv),
-               (block) => new Cuboidf[] { Cuboidf.Default() },
-               (block) => block.Id == 0 ? new Cuboidf[] { Cuboidf.Default() } : block.GetSelectionBoxes(ba, pos.AddCopy(OffsetInv))
+               (block) => [Cuboidf.Default()],
+               (block) => block.Id == 0 ? [Cuboidf.Default()] : block.GetSelectionBoxes(ba, pos.AddCopy(OffsetInv))
            );
         }
 
+
         public override Cuboidf[] GetCollisionBoxes(IBlockAccessor ba, BlockPos pos)
         {
+            var basePos = pos.AddCopy(OffsetInv);
+
+            var block = api.World.BlockAccessor.GetBlock(basePos);
+            if (block.GetBehavior<BlockBehaviorMultiblock>()?.offsetHitboxes == true)
+            {
+                var boxes = block.GetCollisionBoxes(ba, basePos);
+                return offsetedCopy(boxes);
+            }
+
+
             return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                ba,
-               pos.AddCopy(OffsetInv),
+               basePos,
                (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
-               (block) => new Cuboidf[] { Cuboidf.Default() },
+               (block) => [Cuboidf.Default()],
                (block) => block.GetCollisionBoxes(ba, pos.AddCopy(OffsetInv))
            );
         }
 
         public override Cuboidf[] GetParticleCollisionBoxes(IBlockAccessor ba, BlockPos pos)
         {
+            var basePos = pos.AddCopy(OffsetInv);
+
+            var block = api.World.BlockAccessor.GetBlock(basePos);
+            if (block.GetBehavior<BlockBehaviorMultiblock>()?.offsetHitboxes == true)
+            {
+                var boxes = block.GetParticleCollisionBoxes(ba, basePos);
+                return offsetedCopy(boxes);
+            }
+
             return Handle<Cuboidf[], IMultiBlockColSelBoxes>(
                 ba,
                 pos.AddCopy(OffsetInv),
                 (inf) => inf.MBGetCollisionBoxes(ba, pos, OffsetInv),
-                (block) => new Cuboidf[] { Cuboidf.Default() },
+                (block) => [Cuboidf.Default()],
                 (block) => block.GetParticleCollisionBoxes(ba, pos.AddCopy(OffsetInv))
             );
         }
 
         public override bool DoPartialSelection(IWorldAccessor world, BlockPos pos)
         {
+            var basePos = pos.AddCopy(OffsetInv);
+
+            var block = api.World.BlockAccessor.GetBlock(basePos);
+            if (block.GetBehavior<BlockBehaviorMultiblock>()?.offsetHitboxes == true)
+            {
+                return false;
+            }
+
             return Handle<bool, IMultiBlockInteract>(
-                world.BlockAccessor,
-                pos.AddCopy(OffsetInv),
-                (inf) => inf.MBDoPartialSelection(world, pos, OffsetInv),
-                (block) => base.DoPartialSelection(world, pos.AddCopy(OffsetInv)),
-                (block) => block.DoPartialSelection(world, pos.AddCopy(OffsetInv))
+            world.BlockAccessor,
+            basePos,
+            (inf) => inf.MBDoPartialSelection(world, pos, OffsetInv),
+            (block) => base.DoPartialSelection(world, pos.AddCopy(OffsetInv)),
+            (block) => block.DoPartialSelection(world, pos.AddCopy(OffsetInv))
             );
+        }
+
+        protected Cuboidf[] offsetedCopy(Cuboidf[] boxes)
+        {
+            var offsetedBoxes = new Cuboidf[boxes.Length];
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                offsetedBoxes[i] = boxes[i].Clone();
+                offsetedBoxes[i].Offset(OffsetInv.X, OffsetInv.Y, OffsetInv.Z);
+            }
+            return offsetedBoxes;
         }
 
         public override float OnGettingBroken(IPlayer player, BlockSelection blockSel, ItemSlot itemslot, float remainingResistance, float dt, int counter)

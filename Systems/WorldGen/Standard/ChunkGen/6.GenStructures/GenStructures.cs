@@ -414,7 +414,7 @@ namespace Vintagestory.ServerMods
                         }
                         Cuboidi loc = struc.LastPlacedSchematicLocation;
 
-                        string code = (struc.LastPlacedSchematic == null ? "" : struc.LastPlacedSchematic.FromFileName) + "/" + struc.Code;
+                        string code = (struc.LastPlacedSchematic == null ? "" : struc.LastPlacedSchematic.FromFile.GetNameWithDomain()) + "/" + struc.Code;
 
                         region.AddGeneratedStructure(new GeneratedStructure() {
                             Code = code,
@@ -477,7 +477,7 @@ namespace Vintagestory.ServerMods
 
             return struc.TryGenerate(blockAccessor, api.World, pos, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, (loc, schematic) =>
             {
-                string code = (schematic == null ? "" : schematic.FromFileName) + "/" + struc.Code;
+                string code = (schematic == null ? "" : schematic.FromFile.GetNameWithDomain()) + "/" + struc.Code;
 
                 region.AddGeneratedStructure(new GeneratedStructure() { Code = code, Group = struc.Group, Location = loc.Clone() });
 
