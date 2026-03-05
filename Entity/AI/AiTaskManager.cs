@@ -98,12 +98,15 @@ public class AiRuntimeConfig : ModSystem
 
 public sealed class AiTaskManager(Entity entity)
 {
+    public delegate bool OnExecuteTaskDelegate(IAiTask taskToExecute, IAiTask? activeTask);
+
     public event Action<IAiTask>? OnTaskStarted;
     public event Action<IAiTask>? OnTaskStopped;
     /// <summary>
     /// All delegates must return true to execute the task
     /// </summary>
     public event ActionBoolReturn<IAiTask>? OnShouldExecuteTask;
+    public event OnExecuteTaskDelegate? OnExecuteTask;
 
     public const int ActiveTasksSlotsNumber = 8;
 
@@ -168,6 +171,20 @@ public sealed class AiTaskManager(Entity entity)
     public void ExecuteTask(IAiTask task, int slot)
     {
         IAiTask? activeTask = activeTasksBySlot[slot];
+
+        if (OnExecuteTask != null)
+        {
+            bool execute = true;
+            foreach (OnExecuteTaskDelegate dele in OnExecuteTask.GetInvocationList().Cast<OnExecuteTaskDelegate>())
+            {
+                execute &= dele(task, activeTask);
+            }
+            if (!execute)
+            {
+                return;
+            }
+        }
+
         if (activeTask != null)
         {
             activeTask.FinishExecute(true);
@@ -191,10 +208,10 @@ public sealed class AiTaskManager(Entity entity)
     /// <typeparam name="TTask"></typeparam>
     public void ExecuteTask<TTask>() where TTask : IAiTask
     {
-        var task = GetTask<TTask>();
-        if (task != null) {
-            ExecuteTask(task, task.Slot);
-            return;
+        TTask? taskToExecute = GetTask<TTask>();
+        if (taskToExecute != null)
+        {
+            ExecuteTask(taskToExecute, taskToExecute.Slot);
         }
     }
 
@@ -205,10 +222,10 @@ public sealed class AiTaskManager(Entity entity)
     /// <param name="id"></param>
     public void ExecuteTask(string id)
     {
-        var task = GetTask(id);
-        if (task != null)
+        IAiTask? taskToExecute = GetTask(id);
+        if (taskToExecute != null)
         {
-            ExecuteTask(task, task.Slot);
+            ExecuteTask(taskToExecute, taskToExecute.Slot);
         }
     }
 
@@ -309,8 +326,18 @@ public sealed class AiTaskManager(Entity entity)
         return false;
     }
 
+    public bool IsTaskActive<TTask>()
+    {
+        foreach (IAiTask? task in activeTasksBySlot)
+        {
+            if (task is TTask) return true;
+        }
 
-    internal void Notify(string key, object data)
+        return false;
+    }
+
+
+    public void Notify(string key, object data)
     {
         if (key == "starttask")
         {
@@ -371,7 +398,7 @@ public sealed class AiTaskManager(Entity entity)
         }
     }
 
-    internal void OnStateChanged(EnumEntityState beforeState)
+    public void OnStateChanged(EnumEntityState beforeState)
     {
         foreach (IAiTask task in tasks)
         {
@@ -379,7 +406,7 @@ public sealed class AiTaskManager(Entity entity)
         }
     }
 
-    internal void OnEntitySpawn()
+    public void OnEntitySpawn()
     {
         foreach (IAiTask task in tasks)
         {
@@ -387,7 +414,7 @@ public sealed class AiTaskManager(Entity entity)
         }
     }
 
-    internal void OnEntityLoaded()
+    public void OnEntityLoaded()
     {
         foreach (IAiTask task in tasks)
         {
@@ -395,7 +422,7 @@ public sealed class AiTaskManager(Entity entity)
         }
     }
 
-    internal void OnEntityDespawn(EntityDespawnData reason)
+    public void OnEntityDespawn(EntityDespawnData reason)
     {
         foreach (IAiTask task in tasks)
         {
@@ -403,7 +430,7 @@ public sealed class AiTaskManager(Entity entity)
         }
     }
 
-    internal void OnEntityHurt(DamageSource source, float damage)
+    public void OnEntityHurt(DamageSource source, float damage)
     {
         foreach (IAiTask task in tasks)
         {

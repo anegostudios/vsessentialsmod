@@ -34,6 +34,11 @@ namespace Vintagestory.Essentials
         public override Vec3d CurrentTarget {
             get
             {
+                if (waypoints == null)
+                {
+                    return null;
+                }
+
                 return waypoints[waypoints.Count - 1];
             }
         }

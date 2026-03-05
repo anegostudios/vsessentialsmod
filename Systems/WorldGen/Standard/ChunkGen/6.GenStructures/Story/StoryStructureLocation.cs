@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using ProtoBuf;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
-using Vintagestory.ServerMods;
 
 #nullable disable
 
@@ -65,7 +64,7 @@ public class StoryStructureLocation : IStructureLocation, IWorldGenArea
             RockBlockCode = RockBlockCode,
             SkipGenerationFlags = SkipGenerationFlags,
             DidGenerateAdditional = DidGenerateAdditional,
-            SchematicsSpawned = SchematicsSpawned            
+            SchematicsSpawned = SchematicsSpawned
         };
     }
 }
