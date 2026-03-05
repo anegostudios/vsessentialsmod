@@ -4,132 +4,133 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
-namespace Vintagestory.GameContent;
-
 #nullable enable
 
-[ProtoContract]
-public class PacketPlayerPosition
+namespace Vintagestory.GameContent
 {
-    [ProtoMember(1)]
-    public string PlayerUid = "";
-
-    [ProtoMember(2)]
-    public double PosX;
-
-    [ProtoMember(3)]
-    public double PosZ;
-
-    [ProtoMember(4)]
-    public double Yaw;
-
-    [ProtoMember(5)]
-    public bool Despawn;
-
-    public void SetFrom(PacketPlayerPosition packet)
+    [ProtoContract]
+    public class PacketPlayerPosition
     {
-        PosX = packet.PosX;
-        PosZ = packet.PosZ;
-        Yaw = packet.Yaw;
-    }
-}
+        [ProtoMember(1)]
+        public string PlayerUid = "";
 
-public class SystemRemotePlayerTracking : ModSystem
-{
-    private INetworkChannel channel = null!;
-    private readonly Queue<IServerPlayer> playerQueue = [];
-    private readonly Dictionary<string, PacketPlayerPosition> trackedPlayerPackets = new();
+        [ProtoMember(2)]
+        public double PosX;
 
-    /// <summary>
-    /// Gets or creates a tracked player position for a uid on the client.
-    /// </summary>
-    public PacketPlayerPosition? GetPlayerPositionInformation(string uid)
-    {
-        return trackedPlayerPackets.TryGetValue(uid, out PacketPlayerPosition? position) ? position : null;
-    }
+        [ProtoMember(3)]
+        public double PosZ;
 
-    public override void StartPre(ICoreAPI api)
-    {
-        channel = api.Network.RegisterChannel("rpt");
-        channel.RegisterMessageType<PacketPlayerPosition>();
+        [ProtoMember(4)]
+        public double Yaw;
 
-        if (api is ICoreServerAPI sapi && !api.World.Config.GetBool("mapHideOtherPlayers", false))
+        [ProtoMember(5)]
+        public bool Despawn;
+
+        public void SetFrom(PacketPlayerPosition packet)
         {
-            sapi.Event.PlayerJoin += ServerEvent_PlayerJoin;
-            sapi.Event.PlayerLeave += ServerEvent_PlayerLeave;
+            PosX = packet.PosX;
+            PosZ = packet.PosZ;
+            Yaw = packet.Yaw;
+        }
+    }
 
-            sapi.Event.RegisterGameTickListener(OnTick, 100);
+    public class SystemRemotePlayerTracking : ModSystem
+    {
+        private INetworkChannel channel = null!;
+        private readonly Queue<IServerPlayer> playerQueue = [];
+        private readonly Dictionary<string, PacketPlayerPosition> trackedPlayerPackets = new();
+
+        /// <summary>
+        /// Gets or creates a tracked player position for a uid on the client.
+        /// </summary>
+        public PacketPlayerPosition? GetPlayerPositionInformation(string uid)
+        {
+            return trackedPlayerPackets.TryGetValue(uid, out PacketPlayerPosition? position) ? position : null;
         }
 
-        if (api is ICoreClientAPI capi)
+        public override void StartPre(ICoreAPI api)
         {
-            ((IClientNetworkChannel)channel).SetMessageHandler<PacketPlayerPosition>(p =>
+            channel = api.Network.RegisterChannel("rpt");
+            channel.RegisterMessageType<PacketPlayerPosition>();
+
+            if (api is ICoreServerAPI sapi && !api.World.Config.GetBool("mapHideOtherPlayers", false))
             {
-                if (p.PlayerUid == "") return;
+                sapi.Event.PlayerJoin += ServerEvent_PlayerJoin;
+                sapi.Event.PlayerLeave += ServerEvent_PlayerLeave;
 
-                if (p.Despawn) // Player has left!
+                sapi.Event.RegisterGameTickListener(OnTick, 100);
+            }
+
+            if (api is ICoreClientAPI capi)
+            {
+                ((IClientNetworkChannel)channel).SetMessageHandler<PacketPlayerPosition>(p =>
                 {
-                    trackedPlayerPackets.Remove(p.PlayerUid);
-                }
-                else
-                {
-                    trackedPlayerPackets[p.PlayerUid] = p;
-                }
-            });
+                    if (p.PlayerUid == "") return;
+
+                    if (p.Despawn) // Player has left!
+                    {
+                        trackedPlayerPackets.Remove(p.PlayerUid);
+                    }
+                    else
+                    {
+                        trackedPlayerPackets[p.PlayerUid] = p;
+                    }
+                });
+            }
         }
-    }
 
-    private void OnTick(float dt)
-    {
-        if (playerQueue.Count == 0) return;
-
-        IServerPlayer player = playerQueue.Dequeue();
-
-        if (player.Entity != null && player.ConnectionState == EnumClientState.Playing)
+        private void OnTick(float dt)
         {
+            if (playerQueue.Count == 0) return;
+
+            IServerPlayer player = playerQueue.Dequeue();
+
+            if (player.Entity != null && player.ConnectionState == EnumClientState.Playing)
+            {
+                PacketPlayerPosition packet = new()
+                {
+                    PlayerUid = player.PlayerUID,
+                    PosX = player.Entity.Pos.X,
+                    PosZ = player.Entity.Pos.Z,
+                    Yaw = player.Entity.ServerPos.Yaw
+                };
+
+                // Hide spectators.
+                if (player.WorldData.CurrentGameMode == EnumGameMode.Spectator)
+                {
+                    packet.PosX = 0;
+                    packet.PosZ = 0;
+                }
+
+                ((IServerNetworkChannel)channel).BroadcastPacket(packet);
+            }
+
+            playerQueue.Enqueue(player);
+        }
+
+        private void ServerEvent_PlayerJoin(IServerPlayer byPlayer)
+        {
+            playerQueue.Enqueue(byPlayer);
+        }
+
+        private void ServerEvent_PlayerLeave(IServerPlayer byPlayer)
+        {
+            for (int i = playerQueue.Count; i-- > 0; i++)
+            {
+                IServerPlayer sp = playerQueue.Dequeue();
+                if (sp.PlayerUID != byPlayer.PlayerUID)
+                {
+                    playerQueue.Enqueue(sp);
+                }
+            }
+
             PacketPlayerPosition packet = new()
             {
-                PlayerUid = player.PlayerUID,
-                PosX = player.Entity.Pos.X,
-                PosZ = player.Entity.Pos.Z,
-                Yaw = player.Entity.ServerPos.Yaw
+                PlayerUid = byPlayer.PlayerUID,
+                Despawn = true
             };
-
-            // Hide spectators.
-            if (player.WorldData.CurrentGameMode == EnumGameMode.Spectator)
-            {
-                packet.PosX = 0;
-                packet.PosZ = 0;
-            }
 
             ((IServerNetworkChannel)channel).BroadcastPacket(packet);
         }
-
-        playerQueue.Enqueue(player);
-    }
-
-    private void ServerEvent_PlayerJoin(IServerPlayer byPlayer)
-    {
-        playerQueue.Enqueue(byPlayer);
-    }
-
-    private void ServerEvent_PlayerLeave(IServerPlayer byPlayer)
-    {
-        for (int i = playerQueue.Count; i-- > 0; i++)
-        {
-            IServerPlayer sp = playerQueue.Dequeue();
-            if (sp.PlayerUID != byPlayer.PlayerUID)
-            {
-                playerQueue.Enqueue(sp);
-            }
-        }
-
-        PacketPlayerPosition packet = new()
-        {
-            PlayerUid = byPlayer.PlayerUID,
-            Despawn = true
-        };
-
-        ((IServerNetworkChannel)channel).BroadcastPacket(packet);
     }
 }
