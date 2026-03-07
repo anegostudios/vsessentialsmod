@@ -5,28 +5,26 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
-
+    /// <summary>
+    /// This map layer is only added to the WorldMapManager if the server config value for it is enabled.
+    /// </summary>
     public class EntityMapLayer : MarkerMapLayer
     {
-        Dictionary<long, EntityMapComponent> MapComps = new Dictionary<long, EntityMapComponent>();
-        ICoreClientAPI capi;
+        private readonly Dictionary<long, MapComponent> mapComps = new();
+        private readonly ICoreClientAPI? capi;
 
-        LoadedTexture otherTexture;
+        private LoadedTexture? otherTexture;
 
         public override string Title => "Creatures";
         public override EnumMapAppSide DataSide => EnumMapAppSide.Client;
-
         public override string LayerGroupCode => "creatures";
 
         public EntityMapLayer(ICoreAPI api, IWorldMapManager mapsink) : base(api, mapsink)
         {
-            capi = (api as ICoreClientAPI);
+            capi = api as ICoreClientAPI;
         }
-
 
         public override void OnLoaded()
         {
@@ -41,35 +39,36 @@ namespace Vintagestory.GameContent
 
         private void Event_OnEntityDespawn(Entity entity, EntityDespawnData reasonData)
         {
-            if (MapComps.TryGetValue(entity.EntityId, out EntityMapComponent mp))
+            if (mapComps.TryGetValue(entity.EntityId, out MapComponent? mp))
             {
                 mp.Dispose();
-                MapComps.Remove(entity.EntityId);
+                mapComps.Remove(entity.EntityId);
             }
         }
 
         private void Event_OnEntitySpawn(Entity entity)
         {
+            if (capi == null || otherTexture == null) return;
             if (entity is EntityPlayer) return;
             if (entity.Code.Path.Contains("drifter")) return;
 
-            if (mapSink.IsOpened && !MapComps.ContainsKey(entity.EntityId))
+            if (mapSink.IsOpened && !mapComps.ContainsKey(entity.EntityId))
             {
-                EntityMapComponent cmp = new EntityMapComponent(capi, otherTexture, entity, entity.Properties.Color);
-                MapComps[entity.EntityId] = cmp;
+                EntityMapComponent cmp = new(capi, otherTexture, entity, entity.Properties.Color);
+                mapComps[entity.EntityId] = cmp;
             }
         }
 
-        
-
         public override void OnMapOpenedClient()
         {
+            if (capi == null) return;
+
             int size = (int)GuiElement.scaled(32);
-                        
+
             if (otherTexture == null)
             {
-                ImageSurface surface = new ImageSurface(Format.Argb32, size, size);
-                Context ctx = new Context(surface);
+                ImageSurface surface = new(Format.Argb32, size, size);
+                Context ctx = new(surface);
                 ctx.SetSourceRGBA(0, 0, 0, 0);
                 ctx.Paint();
                 capi.Gui.Icons.DrawMapPlayer(ctx, 0, 0, size, size, new double[] { 0.3, 0.3, 0.3, 1 }, new double[] { 0.95, 0.95, 0.95, 1 });
@@ -78,30 +77,27 @@ namespace Vintagestory.GameContent
                 surface.Dispose();
             }
 
-
-
-            foreach (var val in capi.World.LoadedEntities)
+            foreach (KeyValuePair<long, Entity> val in capi.World.LoadedEntities)
             {
-
+                // Players are rendered in PlayerMapLayer
                 if (val.Value is EntityPlayer) continue;
 
-                if (MapComps.TryGetValue(val.Value.EntityId, out EntityMapComponent cmp))
+                if (mapComps.TryGetValue(val.Value.EntityId, out MapComponent? cmp))
                 {
                     cmp?.Dispose();
-                    MapComps.Remove(val.Value.EntityId);
+                    mapComps.Remove(val.Value.EntityId);
                 }
-                
+
                 cmp = new EntityMapComponent(capi, otherTexture, val.Value, val.Value.Properties.Color);
-                MapComps[val.Value.EntityId] = cmp;
+                mapComps[val.Value.EntityId] = cmp;
             }
         }
-
 
         public override void Render(GuiElementMap mapElem, float dt)
         {
             if (!Active) return;
 
-            foreach (var val in MapComps)
+            foreach (var val in mapComps)
             {
                 val.Value.Render(mapElem, dt);
             }
@@ -111,7 +107,7 @@ namespace Vintagestory.GameContent
         {
             if (!Active) return;
 
-            foreach (var val in MapComps)
+            foreach (var val in mapComps)
             {
                 val.Value.OnMouseMove(args, mapElem, hoverText);
             }
@@ -121,7 +117,7 @@ namespace Vintagestory.GameContent
         {
             if (!Active) return;
 
-            foreach (var val in MapComps)
+            foreach (var val in mapComps)
             {
                 val.Value.OnMouseUpOnElement(args, mapElem);
             }
@@ -129,7 +125,7 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
-            foreach (var val in MapComps)
+            foreach (var val in mapComps)
             {
                 val.Value?.Dispose();
             }

@@ -30,7 +30,7 @@ namespace Vintagestory.ServerMods.NoObf
         public CollectibleBehaviorType[] Behaviors = Array.Empty<CollectibleBehaviorType>();
 
         /// <summary>
-        /// For light emitting collectibles: hue, saturation and brightness value.
+        /// For light emitting collectibles: hue, saturation and brightness value. See also http://tyron.at/vs/vslightwheel.html for all possible values.
         /// </summary>
         [JsonProperty]
         [DocumentAsJson("Optional", "[0, 0, 0]")]

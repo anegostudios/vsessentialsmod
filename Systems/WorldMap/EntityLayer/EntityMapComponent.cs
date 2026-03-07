@@ -5,44 +5,37 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
+    // Only used for entity rendering.
     public class EntityMapComponent : MapComponent
     {
-        public Entity entity;
-        internal MeshRef quadModel;
-        public LoadedTexture Texture;
+        private readonly Entity entity;
+        private readonly MeshRef quadModel;
+        private readonly LoadedTexture texture;
+        private Vec2f viewPos = new();
+        private readonly Matrixf mvMat = new();
 
-        Vec2f viewPos = new Vec2f();
-        Matrixf mvMat = new Matrixf();
+        private readonly int color;
 
-        int color;
-
-        public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity, string color = null) : base(capi)
+        public EntityMapComponent(ICoreClientAPI capi, LoadedTexture texture, Entity entity, string? color = null) : base(capi)
         {
             quadModel = capi.Render.UploadMesh(QuadMeshUtil.GetQuad());
-            this.Texture = texture;
+            this.texture = texture;
             this.entity = entity;
-            this.color = color == null ? 0 : (ColorUtil.Hex2Int(color) | 255 << 24);
+            this.color = color == null ? 0 : (ColorUtil.Hex2Int(color) | (255 << 24));
         }
 
         public override void Render(GuiElementMap map, float dt)
         {
-            var player = (entity as EntityPlayer)?.Player;
-            if (player?.WorldData?.CurrentGameMode == EnumGameMode.Spectator == true && capi.World.Player != player) return;
-            if ((entity as EntityPlayer)?.Controls.Sneak == true && player != capi.World.Player) return;
+            if (texture.Disposed || quadModel.Disposed) return;
 
             map.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
             float x = (float)(map.Bounds.renderX + viewPos.X);
             float y = (float)(map.Bounds.renderY + viewPos.Y);
-            
-            ICoreClientAPI api = map.Api;
 
-            if (Texture.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
-            if (quadModel.Disposed) throw new Exception("Fatal. Trying to render a disposed texture");
+            ICoreClientAPI api = map.Api;
 
             capi.Render.GlToggleBlend(true);
 
@@ -50,9 +43,10 @@ namespace Vintagestory.GameContent
             if (color == 0)
             {
                 prog.Uniform("rgbaIn", ColorUtil.WhiteArgbVec);
-            } else
+            }
+            else
             {
-                Vec4f vec = new Vec4f();
+                Vec4f vec = new();
                 ColorUtil.ToRGBAVec4f(color, ref vec);
                 prog.Uniform("rgbaIn", vec);
             }
@@ -60,14 +54,14 @@ namespace Vintagestory.GameContent
             prog.Uniform("applyColor", 0);
             prog.Uniform("extraGlow", 0);
             prog.Uniform("noTexture", 0f);
-            prog.BindTexture2D("tex2d", Texture.TextureId, 0);
+            prog.BindTexture2D("tex2d", texture.TextureId, 0);
 
             mvMat
                 .Set(api.Render.CurrentModelviewMatrix)
-                .Translate(x, y, 60)
-                .Scale(Texture.Width, Texture.Height, 0)
-                .Scale(0.5f, 0.5f, 0)
-                .RotateZ(-entity.Pos.Yaw + 180 * GameMath.DEG2RAD)
+                .Translate(x, y, 60f)
+                .Scale(texture.Width, texture.Height, 0f)
+                .Scale(0.5f, 0.5f, 0f)
+                .RotateZ(-entity.Pos.Yaw + (180f * GameMath.DEG2RAD))
             ;
 
             prog.UniformMatrix("projectionMatrix", api.Render.CurrentProjectionMatrix);
@@ -79,14 +73,13 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             base.Dispose();
-
             quadModel.Dispose();
+            GC.SuppressFinalize(this);
         }
-
 
         public override void OnMouseMove(MouseEvent args, GuiElementMap mapElem, StringBuilder hoverText)
         {
-            Vec2f viewPos = new Vec2f();
+            Vec2f viewPos = new();
             mapElem.TranslateWorldPosToViewPos(entity.Pos.XYZ, ref viewPos);
 
             double mouseX = args.X - mapElem.Bounds.renderX;
@@ -95,16 +88,15 @@ namespace Vintagestory.GameContent
 
             if (Math.Abs(viewPos.X - mouseX) < sc && Math.Abs(viewPos.Y - mouseY) < sc)
             {
-                EntityPlayer eplr = entity as EntityPlayer;
-                if (eplr != null)
+                if (entity is EntityPlayer eplr)
                 {
                     hoverText.AppendLine("Player " + capi.World.PlayerByUid(eplr.PlayerUID)?.PlayerName);
-                } else
+                }
+                else
                 {
                     hoverText.AppendLine(entity.GetName());
                 }
             }
         }
     }
-
 }

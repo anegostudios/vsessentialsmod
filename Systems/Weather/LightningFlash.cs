@@ -55,9 +55,9 @@ namespace Vintagestory.GameContent
             genPoints(weatherSys);
             genMesh(points);
 
-            float b = 200;
+            float b = 50;
             pointLights[0] = new LightiningPointLight(new Vec3f(b,b,b), points[0].AddCopy(origin));
-            pointLights[1] = new LightiningPointLight(new Vec3f(0,0,0), points[points.Count - 1].AddCopy(origin));
+            pointLights[1] = new LightiningPointLight(new Vec3f(b,b,b), points[points.Count - 1].AddCopy(origin));
 
             capi.Render.AddPointLight(pointLights[0]);
             capi.Render.AddPointLight(pointLights[1]);
@@ -161,7 +161,6 @@ namespace Vintagestory.GameContent
             secondsAlive += Math.Max(0, dt - advanceWaitSec);
             advanceWaitSec = Math.Max(0, advanceWaitSec - dt);
 
-
             if (secondsAlive > 0.7)
             {
                 Alive = false;
@@ -192,12 +191,8 @@ namespace Vintagestory.GameContent
                             return true;
                         }, EnumEntitySearchType.Creatures);
                     }
-
-
                 }
-
             }
-
         }
 
         public void Render(float dt)
@@ -229,10 +224,15 @@ namespace Vintagestory.GameContent
                     capi.World.PlaySoundAt(loc, 0, 0, 0, null, EnumSoundType.Weather, 1, 32, Math.Max(0.1f, 1 - dist / 70));
                 }
 
-                if (dist < 100)
+                if (dist < 500)
                 {
-                    (weatherSys as WeatherSystemClient).simLightning.lightningTime = 0.3f + (float)rand.NextDouble() * 0.17f;
-                    (weatherSys as WeatherSystemClient).simLightning.lightningIntensity = 1.5f + (float)rand.NextDouble() * 0.4f;
+                    var sim = (weatherSys as WeatherSystemClient).simLightning;
+                    float atn = GameMath.Clamp(1.02f - dist / 1000, 0, 1);
+
+                    sim.CreateSceneFlash(
+                        0.3f + (float)rand.NextDouble() * 0.17f,
+                        (1.5f + (float)rand.NextDouble() * 0.4f) * atn
+                    );
 
                     int sub = Math.Max(0, (int)dist - 5) * 3;
 
@@ -259,7 +259,8 @@ namespace Vintagestory.GameContent
                 rndVal = (float)rand.NextDouble() / 10;
                 flashAccum = 0;
                 float bnorm = (float)rand.NextDouble();
-                float b = 50 + bnorm * 150;
+                float b = 10 + bnorm * 40;
+                
                 pointLights[0].Color.Set(b, b, b);
 
                 linewidth = (0.4f + 0.6f*bnorm) / 3f;

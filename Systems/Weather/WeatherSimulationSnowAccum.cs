@@ -13,7 +13,7 @@ namespace Vintagestory.GameContent
 {
     public class WeatherSimulationSnowAccum
     {
-        int[][] randomShuffles;
+        ushort[][] randomShuffles;
 
         ICoreServerAPI sapi;
         WeatherSystemBase ws;
@@ -297,14 +297,14 @@ namespace Vintagestory.GameContent
 
         void initRandomShuffles()
         {
-            randomShuffles = new int[50][];
+            randomShuffles = new ushort[50][];
             for (int i = 0; i < randomShuffles.Length; i++)
             {
-                int[] coords = randomShuffles[i] = new int[GlobalConstants.ChunkSize * GlobalConstants.ChunkSize];
+                ushort[] coords = randomShuffles[i] = new ushort[GlobalConstants.ChunkSize * GlobalConstants.ChunkSize];
 
                 for (int j = 0; j < coords.Length; j++)
                 {
-                    coords[j] = j;
+                    coords[j] = (ushort)j;
                 }
 
                 GameMath.Shuffle(sapi.World.Rand, coords);
@@ -523,7 +523,7 @@ namespace Vintagestory.GameContent
             BlockPos placePos = new BlockPos(Dimensions.NormalWorld);
             float aboveSeaLevelHeight = sapi.World.BlockAccessor.MapSizeY - seaLevel;
 
-            int[] posIndices = randomShuffles[sapi.World.Rand.Next(randomShuffles.Length)];
+            ushort[] posIndices = randomShuffles[sapi.World.Rand.Next(randomShuffles.Length)];
 
             int prevChunkY = -99999;
             IWorldChunk chunk = null;
@@ -541,7 +541,7 @@ namespace Vintagestory.GameContent
                     posY,
                     chunkZ * chunksize + posIndex / chunksize
                 );
-
+                
                 if (prevChunkY != chunkY)
                 {
                     chunk = chunksCol?[chunkY] ?? sapi.WorldManager.GetChunk(chunkX, chunkY, chunkZ);
@@ -634,7 +634,7 @@ namespace Vintagestory.GameContent
                 Block newblock = block.GetSnowCoveredVariant(placePos, Math.Min(snowBlocksCount, hereShouldLevel));
                 if (newblock != null)
                 {
-                    if (block.Id != newblock.Id && upBlock.Replaceable > 6000)
+                    if (block.Id != newblock.Id && upBlock.Replaceable >= 6000)
                     {
                         updateChunk.SetBlocks[placePos.ToColumnIndex3d()] = new BlockIdAndSnowLevel(newblock, hereShouldLevel);
                     }

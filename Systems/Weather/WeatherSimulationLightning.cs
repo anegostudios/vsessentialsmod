@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -137,6 +138,20 @@ namespace Vintagestory.GameContent
             }
         }
 
+        protected float prevFogWeight = 0f;
+        protected float prevAmbWeight = 0f;
+
+        public void CreateSceneFlash(float time, float intens)
+        {
+            lightningTime = time;
+            lightningIntensity = intens;
+
+            AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
+
+            prevFogWeight = sunGlowAmb.FogColor.Weight;
+            prevAmbWeight = sunGlowAmb.AmbientColor.Weight;
+        }
+
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (prog.LoadError) return;
@@ -166,9 +181,6 @@ namespace Vintagestory.GameContent
 
             if (stage == EnumRenderStage.Done)
             {
-                AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
-                actualSunGlowAmb.FogColor.Weight = sunGlowAmb.FogColor.Weight;
-
                 dt = Math.Min(0.5f, dt);
 
                 if (nearLightningCoolDown > 0)
@@ -179,9 +191,18 @@ namespace Vintagestory.GameContent
                 return;
             }
 
-            if (lightningTime > 0)
+            var pos = capi.World.Player.Entity.Pos;
+            var daylight = capi.World.Calendar.GetDayLightStrength(pos.X, pos.Z);
+            if (lightningTime > 0 && daylight < 0.55)
             {
-                float mul = Math.Min(10 * lightningIntensity * lightningTime, 1.5f);
+                float mul = Math.Min(5 * lightningIntensity * lightningTime, 1f);
+
+                float bla = 1f;
+                if (capi.World.Rand.NextDouble() < lightningTime / 2)
+                {
+                    bla = (0.5f + (float)capi.World.Rand.NextDouble());
+                    mul *= bla;
+                }
 
                 WeatherDataSnapshot weatherData = weatherSysc.BlendedWeatherData;
 
@@ -196,7 +217,7 @@ namespace Vintagestory.GameContent
                 if (sceneBrightIncrease > 0)
                 {
                     LightningAmbient.SceneBrightness.Weight = Math.Min(1, sceneBrightIncrease);
-                    LightningAmbient.SceneBrightness.Value = 1;
+                    LightningAmbient.SceneBrightness.Value = 1 * bla;
 
                     AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
 
@@ -212,8 +233,8 @@ namespace Vintagestory.GameContent
                 {
                     // Restore previous values
                     AmbientModifier sunGlowAmb = capi.Ambient.CurrentModifiers["sunglow"];
-                    sunGlowAmb.FogColor.Weight = actualSunGlowAmb.FogColor.Weight;
-                    sunGlowAmb.AmbientColor.Weight = actualSunGlowAmb.AmbientColor.Weight;
+                    sunGlowAmb.FogColor.Weight = prevFogWeight;
+                    sunGlowAmb.AmbientColor.Weight = prevAmbWeight;
 
                     LightningAmbient.CloudBrightness.Weight = 0;
                     LightningAmbient.FogBrightness.Weight = 0;
@@ -271,6 +292,8 @@ namespace Vintagestory.GameContent
                 lflash.Dispose();
             }
         }
+
+        
     }
 
 
