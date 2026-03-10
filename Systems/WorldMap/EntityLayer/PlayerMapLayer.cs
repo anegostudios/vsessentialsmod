@@ -66,9 +66,7 @@ namespace Vintagestory.GameContent
         {
             if (!Active || capi == null || ownPlayerTexture == null || otherPlayerTexture == null) return;
 
-            bool hideOtherPlayers = capi.World.Config.GetBool("mapHideOtherPlayers", false);
-            bool showGroupPlayers = capi.World.Config.GetBool("mapShowGroupPlayers", true);
-            double playerRenderDistance = capi.World.Config.GetFloat("mapPlayerRenderDistance", 1000);
+            bool hideOtherPlayers = capi.World.Config.GetBool("mapHideOtherPlayers");
             Vec2f viewPos = new();
             Vec3d worldPos = new();
             Matrixf mvMat = new();
@@ -83,30 +81,22 @@ namespace Vintagestory.GameContent
             capi.Render.GlToggleBlend(true);
 
             var mapPlayer = capi.World.Player;
-            var playerGroups = mapPlayer.GetGroups();
-            foreach (IPlayer player in capi.World.AllOnlinePlayers)
+            var trackedPositions = playerTracking.GetAllTrackedPlayerPositions();
+            foreach (PacketPlayerPosition position in trackedPositions)
             {
-                if (hideOtherPlayers && player.PlayerUID != mapPlayer.PlayerUID) continue;
+                if (hideOtherPlayers && position.PlayerUid != mapPlayer.PlayerUID) continue;
+                if (position.AssociatedPlayer == null) continue;
+                IPlayer player = position.AssociatedPlayer;
 
-                // This entity isn't being tracked, get it from the tracking system.
                 if (player.Entity == null)
                 {
-                    PacketPlayerPosition? pos = playerTracking.GetPlayerPositionInformation(player.PlayerUID);
-                    if (pos == null) continue;
-
-                    worldPos.Set(pos.PosX, 0, pos.PosZ);
-                    yaw = (float)pos.Yaw;
+                    worldPos.Set(position.PosX, 0, position.PosZ);
+                    yaw = (float)position.Yaw;
                 }
                 else
                 {
                     worldPos.Set(player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z);
                     yaw = player.Entity.Pos.Yaw;
-                }
-
-                if (playerRenderDistance >= 0 && mapPlayer.Entity.Pos.HorDistanceTo(worldPos) > playerRenderDistance)
-                {
-                    // Unless we share a group, skip players that are outside the intended map radius
-                    if (!showGroupPlayers || !playerGroups.Overlaps(player.GetGroups())) continue;
                 }
 
                 // Color, white by default for players

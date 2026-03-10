@@ -43,6 +43,8 @@ namespace Vintagestory.GameContent
     public interface IMultiBlockBlockProperties
     {
         bool MBCanAttachBlockAt(IBlockAccessor blockAccessor, Block block, BlockPos pos, BlockFacing blockFace, Cuboidi attachmentArea, Vec3i offsetInv);
+        bool MBSideIsSolid(BlockPos pos, int faceIndex, Vec3i offsetInv) => false;
+        bool MBSideIsSolid(IBlockAccessor blockAccess, BlockPos pos, int faceIndex, Vec3i offsetInv) => false;
         float MBGetLiquidBarrierHeightOnSide(BlockFacing face, BlockPos pos, Vec3i offsetInv);
         int MBGetRetention(BlockPos pos, BlockFacing facing, EnumRetentionType type, Vec3i offsetInv);
         JsonObject MBGetAttributes(IBlockAccessor blockAccessor, BlockPos pos);
@@ -404,6 +406,31 @@ namespace Vintagestory.GameContent
                 (inf) => inf.MBCanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea, OffsetInv),
                 (nblock) => base.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea),
                 (nblock) => nblock.CanAttachBlockAt(blockAccessor, block, pos, blockFace, attachmentArea)
+            );
+        }
+
+
+        public override bool SideIsSolid(BlockPos pos, int faceIndex)
+        {
+            var blockAccessor = api.World.BlockAccessor;
+
+            return Handle<bool, IMultiBlockBlockProperties>(
+                blockAccessor,
+                pos.AddCopy(OffsetInv),
+                (inf) => inf.MBSideIsSolid(pos, faceIndex, OffsetInv),
+                (nblock) => base.SideIsSolid(pos, faceIndex),
+                (nblock) => nblock.SideIsSolid(pos, faceIndex)
+            );
+        }
+
+        public override bool SideIsSolid(IBlockAccessor blockAccessor, BlockPos pos, int faceIndex)
+        {
+            return Handle<bool, IMultiBlockBlockProperties>(
+                blockAccessor,
+                pos.AddCopy(OffsetInv),
+                (inf) => inf.MBSideIsSolid(blockAccessor, pos, faceIndex, OffsetInv),
+                (nblock) => base.SideIsSolid(blockAccessor, pos, faceIndex),
+                (nblock) => nblock.SideIsSolid(blockAccessor, pos, faceIndex)
             );
         }
 

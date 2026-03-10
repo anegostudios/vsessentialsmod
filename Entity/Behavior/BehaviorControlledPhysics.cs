@@ -750,7 +750,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             }
 
             pos.Set(blocks.positions[i]);
-            if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+            if (!block.SideIsSolid(pos, BlockFacing.indexUP) && !block.SideIsSolid(pos, BlockFacing.indexDOWN))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
             {
                 pos.Down();    // Avoid creating a new BlockPos object
                 Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
@@ -800,7 +800,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             }
 
             BlockPos pos = blocks.positions[i];
-            if (!block.SideIsSolid(pos, BlockFacing.indexUP))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
+            if (!block.SideIsSolid(pos, BlockFacing.indexUP) && !block.SideIsSolid(pos, BlockFacing.indexDOWN))    // If we are a non-solid block, check whether the block below is non-steppable, for example lanterns on top of fences
             {
                 pos.Down();    // Avoid creating a new BlockPos object
                 Block blockBelow = entity.World.BlockAccessor.GetMostSolidBlock(pos);
