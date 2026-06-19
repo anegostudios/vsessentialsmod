@@ -280,7 +280,7 @@ namespace Vintagestory.GameContent
 
             if (Inventory != null)
             {
-                var brightestSlot = Inventory.MaxBy(slot => slot.Empty ? 0 : slot.Itemstack.Collectible.LightHsv[2]);
+                var brightestSlot = Inventory.MaxBy(slot => slot.Empty ? 0 : slot.Itemstack.Collectible.GetLightHsv(entity.World.BlockAccessor, null, slot.Itemstack)[2]);
                 if (!brightestSlot.Empty)
                 {
                     entity.LightHsv = brightestSlot.Itemstack.Collectible.GetLightHsv(entity.World.BlockAccessor, null, brightestSlot.Itemstack);
