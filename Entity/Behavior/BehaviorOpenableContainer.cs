@@ -101,7 +101,7 @@ namespace Vintagestory.GameContent
             if (packetid < 1000)
             {
                 var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.Use, true, "entity behavior openable container"))
+                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
                 {
                     inv.InvNetworkUtil.SendInventoryRollback(player, packetid, data);
                     return;
@@ -115,7 +115,7 @@ namespace Vintagestory.GameContent
             if (packetid == 1012)
             {
                 var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.Use, true, "entity behavior openable container"))
+                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
                 {
                     // No need to revert this, just discard the request.
                     return;

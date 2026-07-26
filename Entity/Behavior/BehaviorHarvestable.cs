@@ -447,7 +447,7 @@ namespace Vintagestory.GameContent
             if (packetid < 1000 && inv.HasOpened(player))
             {
                 var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.Use, true, "entity behavior harvestable"))
+                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior harvestable"))
                 {
                     // No need to revert this, just discard the request.
                     return;
