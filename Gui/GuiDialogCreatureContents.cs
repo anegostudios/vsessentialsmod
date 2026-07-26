@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -137,16 +137,11 @@ namespace Vintagestory.GameContent
             base.OnRenderGUI(deltaTime);
         }
 
-        Vec3d entityPos = new Vec3d();
-
         public override void OnFinalizeFrame(float dt)
         {
             base.OnFinalizeFrame(dt);
 
-            entityPos.Set(owningEntity.Pos.X, owningEntity.Pos.Y, owningEntity.Pos.Z);
-            entityPos.Add(owningEntity.SelectionBox.X2 - owningEntity.OriginSelectionBox.X2, 0, owningEntity.SelectionBox.Z2 - owningEntity.OriginSelectionBox.Z2);
-
-            if (!IsInRangeOfBlock())
+            if (!capi.World.Player.IsInInteractionRangeOf(owningEntity))
             {
                 // Because we cant do it in here
                 capi.Event.EnqueueMainThreadTask(() => TryClose(), "closedlg");
@@ -163,12 +158,10 @@ namespace Vintagestory.GameContent
         /// </summary>
         /// <param name="pos">The block's position.</param>
         /// <returns>In range or no?</returns>
+        [Obsolete("Prefer using player."+nameof(IPlayer.IsInInteractionRangeOf)+". The dialog does not have an in-world position.", true)]
         public virtual bool IsInRangeOfBlock()
         {
-            Vec3d playerEye = capi.World.Player.Entity.Pos.XYZ.Add(capi.World.Player.Entity.LocalEyePos);
-            double dist = GameMath.Sqrt(playerEye.SquareDistanceTo(entityPos));
-
-            return dist <= capi.World.Player.WorldData.PickingRange;
+            return capi.World.Player.IsInInteractionRangeOf(owningEntity, 0); // Rennorb 2026.07.06: Slack will change to standardized .25 in 1.23.
         }
 
 

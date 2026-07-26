@@ -223,7 +223,15 @@ namespace Vintagestory.GameContent
         {
             int targetSlotIndex = packetid >> PacketIdBitShift;
 
-            if (slotIndex != targetSlotIndex) return;
+            if (slotIndex != targetSlotIndex) return; // Do this first because it's way cheaper that the perms check.
+
+            var perms = new Entity.CachedAccessPerms(onEntity, player);
+            if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "collectible behavior held bag"))
+            {
+                // Rennorb 23.06.2026 correctness: Since we only handle inventory interactions here this blanket rejection should be ok.
+                // Rennorb 01.07.2026: Tyron called to only do a range check here, since its hard to determine who should be allowed to access the entities.
+                return;
+            }
 
             int first10Bits = (1 << PacketIdBitShift) - 1;
             packetid = packetid & first10Bits;
@@ -407,20 +415,21 @@ namespace Vintagestory.GameContent
 
         public void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ItemSlot bagSlot, int slotIndex, ref EnumHandling handled)
         {
+            // Rennorb 23.06.2026 security: This does not do access checks for any operations - those are validated in the attachable behavior.
             if (packetid < 1000)
             {
-                if (wrapperInv != null && wrapperInv.HasOpened(player))
-                {
-                    wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
-                    handled = EnumHandling.PreventSubsequent;
-                }
+                    if (wrapperInv != null && wrapperInv.HasOpened(player))
+                    {
+                        wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
+                        handled = EnumHandling.PreventSubsequent;
+                    }
 
                 return;
             }
 
             if (packetid == (int)EntityClientPacketId.OpenAttachedInventory)       // radfast 3.3.2025:  Compare BEOpenableContainer.OnReceivedClientPacket(), this is similar
             {
-                OnInteract(bagSlot, slotIndex, entity, player.Entity, null);   // null hitPosition here is ok, it is never used in the OnInteract() method. If we need to use it in future, it would need to be encoded in the packet data byte[]
+                    OnInteract(bagSlot, slotIndex, entity, player.Entity, null);   // null hitPosition here is ok, it is never used in the OnInteract() method. If we need to use it in future, it would need to be encoded in the packet data byte[]
             }
         }
 

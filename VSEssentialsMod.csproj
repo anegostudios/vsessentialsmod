@@ -22,7 +22,7 @@
     <PackageReference Include="AnimatedGif" Version="1.0.5" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="protobuf-net" Version="2.4.9" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.9" />
     <PackageReference Include="OpenTK.Windowing.GraphicsLibraryFramework" Version="4.9.4" />
     <PackageReference Include="OpenTK" Version="4.9.4" />
     <PackageReference Include="Tavis.JsonPatch" Version="0.5.3-vs.2" />

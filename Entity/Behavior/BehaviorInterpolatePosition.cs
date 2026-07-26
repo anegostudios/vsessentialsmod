@@ -37,6 +37,10 @@ public struct PositionSnapshot
         z = pos.Z;
 
         this.interval = interval;
+        if (this.interval == 0)
+        {
+            this.interval = EntityBehaviorInterpolatePosition.interval;
+        }
         this.isTeleport = isTeleport;
     }
 }
@@ -129,7 +133,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         currentYaw = entity.Pos.Yaw;
         targetYaw = entity.Pos.Yaw;
 
-        PushQueue(new PositionSnapshot(entity.Pos, 0, false));
+        PushQueue(new PositionSnapshot(entity.Pos, interval, false));
 
         targetYaw = entity.Pos.Yaw;
         targetPitch = entity.Pos.Pitch;
@@ -290,9 +294,6 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
             }
         }
 
-        float delta = dtAccum / pN.interval;
-        if (wait != 0) delta = 1;
-
         entity.Pos.Yaw = LerpRotation(ref currentYaw, targetYaw, dt);
         entity.Pos.Pitch = LerpRotation(ref currentPitch, targetPitch, dt);
         entity.Pos.Roll = LerpRotation(ref currentRoll, targetRoll, dt);
@@ -307,6 +308,8 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         // Only set position if not mounted.
         if (agent == null || agent.MountedOn == null)
         {
+            float delta = dtAccum / pN.interval;
+            if (wait != 0) delta = 1;
             entity.Pos.X = GameMath.Lerp(pL.x, pN.x, delta);
             entity.Pos.Y = GameMath.Lerp(pL.y, pN.y, delta);
             entity.Pos.Z = GameMath.Lerp(pL.z, pN.z, delta);

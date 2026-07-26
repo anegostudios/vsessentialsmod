@@ -397,6 +397,8 @@ namespace Vintagestory.GameContent
 
         public float ConsumeOnePortion(Entity entity)
         {
+            if (this.entity.Itemstack == null) return 0f;
+
             this.entity.Itemstack.StackSize--;
             if (this.entity.Itemstack.StackSize <= 0) this.entity.Die();
             return this.entity.Itemstack.StackSize >= 0 ? 1f : 0f;
