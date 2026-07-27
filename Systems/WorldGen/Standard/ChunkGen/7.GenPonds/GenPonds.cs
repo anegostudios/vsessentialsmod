@@ -283,6 +283,7 @@ namespace Vintagestory.ServerMods
                 {
                     chunk = (IServerChunk)blockAccessor.GetChunk(curChunkX, pondYPos / chunksize, curChunkZ);
                     if (chunk == null) chunk = api.WorldManager.GetChunk(curChunkX, pondYPos / chunksize, curChunkZ);
+                    if (chunk == null) return;
                     chunk.Unpack();
 
                     if (ly == 0)
