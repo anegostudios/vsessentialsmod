@@ -24,11 +24,24 @@ namespace Vintagestory.ServerMods
         // Tree config
         TreeGenConfig config;
         private readonly ForestFloorSystem forestFloor;
+        
+        private BlockPos[] posStack;    // manual stack for block positions to avoid allocations new BlockPos()
+        private readonly BlockPos vineScratchPos;   // field for temporary vine positions
 
         public TreeGen(TreeGenConfig config, int seed, ForestFloorSystem ffs)
         {
             this.config = config;
             forestFloor = ffs;
+
+            // Initialize the stack and variable once when creating the generator 
+            // The maximum recursion depth in growBranch is limited by the condition depth > 30.
+            posStack = new BlockPos[32];
+            for (int i = 0; i < posStack.Length; i++)
+            {
+                posStack[i] = new BlockPos();
+            }
+
+            vineScratchPos = new BlockPos();
         }
 
         public void GrowTree(IBlockAccessor ba, BlockPos pos, TreeGenParams treeGenParams, IRandom random)
@@ -105,8 +118,9 @@ namespace Vintagestory.ServerMods
 
             // we want to place around the trunk/branch => offset the coordinates when growing stuff from the base
             float trunkOffsetX, trunkOffsetZ;
-
-            BlockPos currentPos = new BlockPos(basePos.dimension);
+            
+            BlockPos currentPos = posStack[depth];  // instead of new BlockPos(...) we take an object from the stack
+            currentPos.dimension = basePos.dimension;   // update the dimension, since the object can be reused
 
             float sinAngleVer, cosAnglerHor, sinAngleHor;
 
@@ -236,8 +250,8 @@ namespace Vintagestory.ServerMods
         private void PlaceBlockEtc(int blockId, BlockPos currentPos, IRandom rand, float dx, float dz)
         {
             blockAccessor.SetBlock(blockId, currentPos);
-
-            if (blockAccessor.GetBlock(blockId).BlockMaterial == EnumBlockMaterial.Wood && treeGenParams.mossGrowthChance > 0 && config.treeBlocks.mossDecorBlock != null)
+            
+            if (treeGenParams.mossGrowthChance > 0 && config.treeBlocks.mossDecorBlock != null && blockAccessor.GetBlock(blockId).BlockMaterial == EnumBlockMaterial.Wood)  // moving cheap conditions forward
             {
                 var rnd = rand.NextDouble();
                 int faceIndex = treeGenParams.hemisphere == EnumHemisphere.North ? 0 : 2; // Prefer north face on the northern hemisphere, and south otherwise (= the shady spot)
@@ -285,7 +299,8 @@ namespace Vintagestory.ServerMods
             {
                 BlockFacing facing = BlockFacing.HORIZONTALS[rand.NextInt(4)];
 
-                BlockPos vinePos = currentPos.AddCopy(facing);
+                BlockPos vinePos = vineScratchPos.Set(currentPos, currentPos.dimension).Offset(facing); // use our field without allocations
+
                 float cnt = 1 + rand.NextInt(11) * (treeGenParams.vinesGrowthChance + 0.2f);
 
                 while (blockAccessor.GetBlockId(vinePos) == 0 && cnt-- > 0)
