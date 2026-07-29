@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -98,10 +98,8 @@ namespace Vintagestory.ServerMods
         /// </summary>
         public float[] WeightsAt(float x, float z, float[] output)
         {
-            for (int i = 0; i < output.Length; i++)
-            {
-                output[i] = 0;
-            }
+            // Quickly clear the array and reuse variables
+            Array.Clear(output, 0, output.Length); 
 
             int posXLeft = (int)Math.Floor(x - 0.5f) + topleftPadding;
             int posXRight = posXLeft + 1;
@@ -112,17 +110,21 @@ namespace Vintagestory.ServerMods
             float fx = x - (posXLeft - topleftPadding + 0.5f);
             float fz = z - (posZLeft - topleftPadding + 0.5f);
 
+            int num1 = posZLeft * sizeX;
+
             HalfBiLerp(   // Top
-                groups[posZLeft * sizeX + posXLeft],
-                groups[posZLeft * sizeX + posXRight],
+                groups[num1 + posXLeft],
+                groups[num1 + posXRight],
                 fx,
                 output,
                 (1 - fz)
             );
 
+            int num2 = posZRight * sizeX;
+
             HalfBiLerp(    // Bottom
-                groups[posZRight * sizeX + posXLeft],
-                groups[posZRight * sizeX + posXRight],
+                groups[num2 + posXLeft],
+                groups[num2 + posXRight],
                 fx,
                 output,
                 fz
