@@ -320,15 +320,21 @@ namespace Vintagestory.ServerMods.NoObf
                         {
                             throw new FormatException("Invalid value at key: " + entry.Key);
                         }
+                        var catchAll = jobj["*"];
                         foreach (var byTypeProperty in jobj)
                         {
-                            if (WildcardUtil.Match(byTypeProperty.Key, codePath))
+                            if(byTypeProperty.Key != "*" && WildcardUtil.Match(byTypeProperty.Key, codePath))
                             {
                                 JToken typedToken = byTypeProperty.Value;    // Unnecessary to solveByType specifically on this new token's contents as we will be doing a solveByType on all the tokens in the jsonObj anyhow, after adding the propertiesToAdd
                                 if (propertiesToAdd == null) propertiesToAdd = new Dictionary<string, JToken>();
                                 propertiesToAdd.Add(trueKey, typedToken);
                                 break;   // Replaces for first matched key only
                             }
+                        }
+                        if(catchAll is not null && (propertiesToAdd is null || !propertiesToAdd.ContainsKey(trueKey)))
+                        {
+                            propertiesToAdd ??= new Dictionary<string, JToken>();
+                            propertiesToAdd.Add(trueKey, catchAll);
                         }
                         if (propertiesToRemove == null) propertiesToRemove = new List<string>();
                         propertiesToRemove.Add(entry.Key);
