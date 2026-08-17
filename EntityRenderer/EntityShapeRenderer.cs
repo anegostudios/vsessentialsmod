@@ -297,7 +297,7 @@ namespace Vintagestory.GameContent
 
         protected void OnDebugInfoChanged()
         {
-            bool showDebuginfo = capi.Settings.Bool["showEntityDebugInfo"];
+            bool showDebuginfo = capi.Settings.Bool["showEntityDebugInfo"] && capi.World.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
 
             if (showDebuginfo && !entity.DebugAttributes.AllDirty && !entity.DebugAttributes.PartialDirty && debugTagTexture != null) return;
 

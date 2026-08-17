@@ -131,11 +131,16 @@ namespace Vintagestory.GameContent
             blockAccessor?.Dispose();
             blockAccessor = null;
 
-            foreach (var ba in disposableBlockAccessors.Values)
+            if (disposableBlockAccessors != null)
             {
-                ba?.Dispose();
+                foreach (var ba in disposableBlockAccessors.Values)
+                {
+                    ba?.Dispose();
+                }
+
+                disposableBlockAccessors.Clear();
             }
-            disposableBlockAccessors.Clear();
+            
             disposableBlockAccessors = null;
         }
 
