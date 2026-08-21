@@ -19,6 +19,12 @@ namespace Vintagestory.ServerMods
         public AssetLocation FromFile;
 
         public Block[,,] blocksByPos;
+
+        // Unpack() lazily initialises this schematic, and the same instance is shared by
+        // every worldgen thread placing that structure, so the initialisation has to be
+        // serialised. See the comment on Unpack for what goes wrong without it.
+        private readonly object unpackLock = new object();
+
         public Dictionary<int, Block> FluidBlocksByPos;
         public BlockLayerConfig blockLayerConfig;
         int mapheight;
@@ -519,20 +525,37 @@ namespace Vintagestory.ServerMods
         /// <br/>From 1.19.4 we do this Unpack() lazily, only when required, to save RAM [maybe also speeds up game start time, especially if mods add more schematics]
         /// </summary>
         /// <param name="api"></param>
+        // The null check and the initialisation have to happen under one lock. Without it two
+        // threads can both see blocksByPos null and both run the initialisation. Worse, Init
+        // assigns blocksByPos partway through its own work, so a thread that finds it non-null
+        // can return and start reading fields LoadMetaInformationAndValidate has not filled in
+        // yet. PathwayStarts is one of those, and reading it early throws.
+        //
+        // No lock-free fast path on purpose: blocksByPos being non-null does not mean unpacking
+        // has finished, so every caller goes through the lock, not just the one that finds null.
         public void Unpack(ICoreAPI api)
         {
-            if (blocksByPos == null)
+            lock (unpackLock)
             {
-                Init(api.World.BlockAccessor);
-                LoadMetaInformationAndValidate(api.World.BlockAccessor, api.World, FromFile);
+                if (blocksByPos == null)
+                {
+                    Init(api.World.BlockAccessor);
+                    LoadMetaInformationAndValidate(api.World.BlockAccessor, api.World, FromFile);
+                }
             }
         }
 
         public void Unpack(ICoreAPI api, int orientation)
         {
-            if (orientation > 0 && blocksByPos == null)
+            if (orientation > 0)
             {
-                TransformWhilePacked(api.World, EnumOrigin.BottomCenter, orientation * 90, null);
+                lock (unpackLock)
+                {
+                    if (blocksByPos == null)
+                    {
+                        TransformWhilePacked(api.World, EnumOrigin.BottomCenter, orientation * 90, null);
+                    }
+                }
             }
             Unpack(api);
         }
