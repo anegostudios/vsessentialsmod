@@ -187,7 +187,7 @@ namespace Vintagestory.ServerMods
                 chunk.RemoveBlockEntity(pos);
             }
             chunk.Data.SetBlockAir(index);
-            chunk.Data.SetFluid(index, y < geoActivityYThreshold ? gcfg.lavaBlockId : gcfg.waterBlockId);
+            chunk.Data.SetFluid(index, y < geoActivityYThreshold ? gcfg.lavaBlockId : gcfg.rivuletWaterBlockId);
 
             blockAccessor.ScheduleBlockUpdate(pos);
         }
