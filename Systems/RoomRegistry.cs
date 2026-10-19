@@ -91,6 +91,14 @@ namespace Vintagestory.GameContent
     public class RoomRegistry : ModSystem
     {
         protected Dictionary<long, ChunkRooms> roomsByChunkIndex = new Dictionary<long, ChunkRooms>();
+        // This dictionary provides a second lookup for chunks that contain rooms that weren't made in them.
+        // The flow is:
+        // Make a room in Chunk A, that extends to Chunk B
+        // Chunk B gets Chunk A's index in the owner
+        // If Chunk A is updated, it doesn't use this dictionary, just its cache
+        // If Chunk B is updated, it finds Chunk A's index in this room, and then clears Chunk A's rooms cache.
+        // Next Dirty event of Chunk A will refresh the room value
+        protected Dictionary<long, FastSetOfLongs> roomOwnersByChunkIndex = new Dictionary<long, FastSetOfLongs>();
         protected object roomsByChunkIndexLock = new object(); 
 
         const int chunksize = GlobalConstants.ChunkSize;
@@ -344,7 +352,44 @@ namespace Vintagestory.GameContent
                         }
                     }
                 }
+                if (roomOwnersByChunkIndex.Remove(index3d, out FastSetOfLongs owners))
+                {
+                    foreach (long index in owners) set.Add(index);
+                }
                 foreach (long index in set) roomsByChunkIndex.Remove(index);
+            }
+        }
+
+        private void addRoomOwner(Room room, long ownerIndex3d)
+        {
+            Cuboidi cuboid = room.Location;
+            int x1 = cuboid.Start.X / chunksize;
+            int x2 = cuboid.End.X / chunksize;
+            int y1 = cuboid.Start.Y / chunksize;
+            int y2 = cuboid.End.Y / chunksize;
+            int z1 = cuboid.Start.Z / chunksize;
+            int z2 = cuboid.End.Z / chunksize;
+            if (x1 == x2 && y1 == y2 && z1 == z2) return;
+
+            lock (roomsByChunkIndexLock)
+            {
+                for (int cx = x1; cx <= x2; cx++)
+                {
+                    for (int cy = y1; cy <= y2; cy++)
+                    {
+                        for (int cz = z1; cz <= z2; cz++)
+                        {
+                            long index3d = MapUtil.Index3dL(cx, cy, cz, chunkMapSizeX, chunkMapSizeZ);
+                            if (index3d == ownerIndex3d) continue;
+
+                            if (!roomOwnersByChunkIndex.TryGetValue(index3d, out FastSetOfLongs owners))
+                            {
+                                roomOwnersByChunkIndex[index3d] = owners = new FastSetOfLongs();
+                            }
+                            owners.Add(ownerIndex3d);
+                        }
+                    }
+                }
             }
         }
 
@@ -386,6 +431,7 @@ namespace Vintagestory.GameContent
 
                 room = FindRoomForPosition(pos, chunkrooms);
                 chunkrooms.AddRoom(room);
+                addRoomOwner(room, index3d);
 
                 return room;
             }
@@ -400,6 +446,7 @@ namespace Vintagestory.GameContent
             {
                 roomsByChunkIndex[index3d] = rooms;
             }
+            addRoomOwner(room, index3d);
 
             return room;
         }
