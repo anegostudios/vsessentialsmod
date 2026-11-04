@@ -127,6 +127,11 @@ namespace Vintagestory.GameContent
         Vec3f surfaceWindSpeedSmoothed = new Vec3f();
         double surfaceWindRandCounter;
 
+        int windFrameCounter;
+        const int windUpdateInterval = 4;
+        Vec3d cachedWindSpeed = new Vec3d();
+        Vec3d cachedSurfaceWindSpeed = new Vec3d();
+
         float wetnessScanAccum2s = 0;
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
@@ -143,7 +148,8 @@ namespace Vintagestory.GameContent
 
             if (stage == EnumRenderStage.Before)
             {
-                EntityPlayer eplr = capi.World.Player.Entity;
+                EntityPlayer eplr = capi.World.Player?.Entity;
+                if (eplr == null || WeatherDataAtPlayer == null) return;
                 plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
                 plrPosd.Set(eplr.Pos.X, eplr.Pos.Y, eplr.Pos.Z);
 
@@ -153,11 +159,16 @@ namespace Vintagestory.GameContent
 
                 dt = Math.Min(0.5f, dt);
 
+                bool doWindLookup = windFrameCounter % windUpdateInterval == 0;
+
                 // Windspeed should be stored inside ClimateConditions and not be a global constant
-                var windspeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd); // WeatherDataAtPlayer.GetWindSpeed(plrPosd.Y);
-                windSpeedSmoothed.X += ((float)windspeed.X - windSpeedSmoothed.X) * dt;
-                windSpeedSmoothed.Y += ((float)windspeed.Y - windSpeedSmoothed.Y) * dt;
-                windSpeedSmoothed.Z += ((float)windspeed.Z - windSpeedSmoothed.Z) * dt;
+                if (doWindLookup)
+                {
+                    cachedWindSpeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd);
+                }
+                windSpeedSmoothed.X += ((float)cachedWindSpeed.X - windSpeedSmoothed.X) * dt;
+                windSpeedSmoothed.Y += ((float)cachedWindSpeed.Y - windSpeedSmoothed.Y) * dt;
+                windSpeedSmoothed.Z += ((float)cachedWindSpeed.Z - windSpeedSmoothed.Z) * dt;
 
                 windRandCounter = (windRandCounter + dt) % (2000 * Math.PI);
                 double rndx = (2 * Math.Sin(windRandCounter / 8) + Math.Sin(windRandCounter / 2) + Math.Sin(0.5 + 2 * windRandCounter)) / 10.0;
@@ -166,11 +177,15 @@ namespace Vintagestory.GameContent
                 var rainy = capi.World.BlockAccessor.GetRainMapHeightAt(plrPos.X, plrPos.Z);
                 plrPosd.Y = rainy;
 
+                if (doWindLookup)
+                {
+                    cachedSurfaceWindSpeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd);
+                }
+                windFrameCounter++;
 
-                var surfacewindspeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPosd); // WeatherDataAtPlayer.GetWindSpeed(plrPos);
-                surfaceWindSpeedSmoothed.X += ((float)surfacewindspeed.X - surfaceWindSpeedSmoothed.X) * dt;
-                surfaceWindSpeedSmoothed.Y += ((float)surfacewindspeed.Y - surfaceWindSpeedSmoothed.Y) * dt;
-                surfaceWindSpeedSmoothed.Z += ((float)surfacewindspeed.Z - surfaceWindSpeedSmoothed.Z) * dt;
+                surfaceWindSpeedSmoothed.X += ((float)cachedSurfaceWindSpeed.X - surfaceWindSpeedSmoothed.X) * dt;
+                surfaceWindSpeedSmoothed.Y += ((float)cachedSurfaceWindSpeed.Y - surfaceWindSpeedSmoothed.Y) * dt;
+                surfaceWindSpeedSmoothed.Z += ((float)cachedSurfaceWindSpeed.Z - surfaceWindSpeedSmoothed.Z) * dt;
 
                 surfaceWindRandCounter = (surfaceWindRandCounter + dt) % (2000 * Math.PI);
                 rndx = (2 * Math.Sin(surfaceWindRandCounter / 8) + Math.Sin(surfaceWindRandCounter / 2) + Math.Sin(0.5 + 2 * surfaceWindRandCounter)) / 10.0;
@@ -197,7 +212,7 @@ namespace Vintagestory.GameContent
                 }
 
                 // Fade out flat fog in deep caves, it breaks stuff
-                var sunlight = capi.World.BlockAccessor.GetLightLevel(capi.World.Player.Entity.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
+                var sunlight = capi.World.BlockAccessor.GetLightLevel(eplr.Pos.AsBlockPos, EnumLightLevelType.OnlySunLight);
                 var weatherflatfogd = WeatherDataAtPlayer.BlendedWeatherData.Ambient.FlatFogDensity.Weight;
                 targetFlatFogd = Math.Min(weatherflatfogd, GameMath.Clamp(sunlight / 5f, 0, 1));
                 flatFogd += (targetFlatFogd - flatFogd) * dt;
