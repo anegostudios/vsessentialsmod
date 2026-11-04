@@ -25,6 +25,7 @@ namespace Vintagestory.GameContent
 
         public EntityBehaviorCollectEntities(Entity entity) : base(entity)
         {
+            waitTicks = (int)((ulong)entity.EntityId % 3);
         }
 
 
@@ -51,6 +52,7 @@ namespace Vintagestory.GameContent
             if (entities.Length == 0)
             {
                 unconsumedDeltaTime = 0;
+                waitTicks = 2;
                 return;
             }
 
