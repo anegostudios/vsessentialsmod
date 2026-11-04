@@ -106,6 +106,13 @@ namespace Vintagestory.GameContent
             // Optimization: If this item is out of view, lets not render its shadow, since its very likely not gonna contribute to the scene anyway
             if (isShadowPass && !entity.IsRendered || entityitem.Itemstack == null) return;
 
+            EntityPlayer plr = capi.World.Player?.Entity;
+            if (plr == null) return;
+
+            double dx = entity.Pos.X - plr.Pos.X;
+            double dz = entity.Pos.Z - plr.Pos.Z;
+            if (dx * dx + dz * dz > 4096.0) return;
+
             if (RunWittySkipRenderAlgorithm)
             {
                 int x = (int)entity.Pos.X;
