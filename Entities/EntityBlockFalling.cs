@@ -110,6 +110,8 @@ namespace Vintagestory.GameContent
 
         private void genMesh(EntityBlockFalling entity)
         {
+            mesh.Clear();
+
             int posx = entity.blockEntityAttributes?.GetInt("posx", entity.initialPos.X) ?? entity.initialPos.X;
             int posy = entity.blockEntityAttributes?.GetInt("posy", entity.initialPos.Y) ?? entity.initialPos.Y;
             int posz = entity.blockEntityAttributes?.GetInt("posz", entity.initialPos.Z) ?? entity.initialPos.Z;
@@ -142,6 +144,7 @@ namespace Vintagestory.GameContent
                 entity.reusedMeshRef = true;
                 if (!dict.TryGetValue(cacheKey, out entity.meshRef))
                 {
+                    MeshData meshToUpload;
                     if (ifbms != null)
                     {
                         ifbms.OnFallingBlockTesselation(entity, this, capi.Tesselator);
@@ -152,13 +155,20 @@ namespace Vintagestory.GameContent
                             mesh.CustomInts = null;
                             entity.meshRef = capi.Render.UploadMultiTextureMesh(mesh);
                         }
+
+                        meshToUpload = mesh;
                     }
                     else
                     {
-                        mesh = capi.TesselatorManager.GetDefaultBlockMesh(entity.Block);
+                        meshToUpload = capi.TesselatorManager.GetDefaultBlockMesh(entity.Block);
                     }
 
-                    dict[cacheKey] = entity.meshRef = capi.Render.UploadMultiTextureMesh(mesh);
+                    if (entity.meshRef == null)
+                    {
+                        entity.meshRef = capi.Render.UploadMultiTextureMesh(meshToUpload);
+                    }
+
+                    dict[cacheKey] = entity.meshRef;
                 }
             }
         }
