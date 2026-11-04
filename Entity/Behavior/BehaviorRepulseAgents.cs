@@ -217,6 +217,19 @@ namespace Vintagestory.GameContent
             if (eagent?.MountedOn != null) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
 
+            if (cworld != null)
+            {
+                var plr = cworld.Player?.Entity;
+                if (plr == null) return;
+
+                if (entity != plr)
+                {
+                    double dx = entity.Pos.X - plr.Pos.X;
+                    double dz = entity.Pos.Z - plr.Pos.Z;
+                    if (dx * dx + dz * dz > 4096.0) return;
+                }
+            }
+
             var pushVector = this.pushVector;
             pushVector.Set(0, 0, 0);
 
