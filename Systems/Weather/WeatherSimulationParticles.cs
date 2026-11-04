@@ -66,6 +66,8 @@ namespace Vintagestory.GameContent
         Random rand;
         static int[,] lowResRainHeightMap = new int[16, 16];
         static BlockPos centerPos = new BlockPos(API.Config.Dimensions.NormalWorld);
+        static int lastHeightmapCenterX = int.MinValue;
+        static int lastHeightmapCenterZ = int.MinValue;
 
         #region Particle
 
@@ -227,6 +229,8 @@ namespace Vintagestory.GameContent
 
         public WeatherSimulationParticles(ICoreClientAPI capi, WeatherSystemClient ws)
         {
+            lastHeightmapCenterX = int.MinValue;
+            lastHeightmapCenterZ = int.MinValue;
             this.capi = capi;
             this.ws = ws;
             rand = new Random(capi.World.Seed + 223123123);
@@ -369,15 +373,24 @@ namespace Vintagestory.GameContent
             byte[] col = ColorUtil.ToBGRABytes(onwaterSplashParticleColor);
             onwaterSplashParticleColor = ColorUtil.ToRgba(94, col[0], col[1], col[2]);
 
-            centerPos.Set((int)particlePos.X, 0, (int)particlePos.Z);
-            for (int lx = 0; lx < 16; lx++)
-            {
-                int dx = (lx - 8) * 4;
-                for (int lz = 0; lz < 16; lz++)
-                {
-                    int dz = (lz - 8) * 4;
+            int currentCenterX = (int)particlePos.X;
+            int currentCenterZ = (int)particlePos.Z;
 
-                    lowResRainHeightMap[lx, lz] = capi.World.BlockAccessor.GetRainMapHeightAt(centerPos.X + dx, centerPos.Z + dz);
+            if (lastHeightmapCenterX == int.MinValue || Math.Abs(currentCenterX - lastHeightmapCenterX) >= 4 || Math.Abs(currentCenterZ - lastHeightmapCenterZ) >= 4)
+            {
+                lastHeightmapCenterX = currentCenterX;
+                lastHeightmapCenterZ = currentCenterZ;
+                centerPos.Set(currentCenterX, 0, currentCenterZ);
+
+                for (int lx = 0; lx < 16; lx++)
+                {
+                    int dx = (lx - 8) * 4;
+                    for (int lz = 0; lz < 16; lz++)
+                    {
+                        int dz = (lz - 8) * 4;
+
+                        lowResRainHeightMap[lx, lz] = capi.World.BlockAccessor.GetRainMapHeightAt(centerPos.X + dx, centerPos.Z + dz);
+                    }
                 }
             }
 
