@@ -47,6 +47,11 @@ namespace Vintagestory.ServerMods
             public float[] landformWeights;
             public bool[] LocalLayerFullySolid;   // Thread-local buffer to avoid false sharing
             public bool[] LocalLayerFullyEmpty;   // Thread-local buffer to avoid false sharing
+            // Compact (reused across columns, no per-column allocation) list of nonzero landform
+            // indices/weights. Built once per column before the posY loop; the hot threshold loop
+            // iterates only these entries.
+            public int[] LandformNzIndices;
+            public float[] LandformNzWeights;
         }
         ThreadLocal<ThreadLocalTempData> tempDataThreadLocal;
 
@@ -142,7 +147,9 @@ namespace Vintagestory.ServerMods
                 LerpedThresholds = new double[terrainGenOctaves],
                 landformWeights = new float[NoiseLandforms.landforms.LandFormsByIndex.Length],
                 LocalLayerFullySolid = new bool[api.WorldManager.MapSizeY], // initialize the local buffer
-                LocalLayerFullyEmpty = new bool[api.WorldManager.MapSizeY]  // initialize the local buffer
+                LocalLayerFullyEmpty = new bool[api.WorldManager.MapSizeY],  // initialize the local buffer
+                LandformNzIndices = new int[NoiseLandforms.landforms.LandFormsByIndex.Length],
+                LandformNzWeights = new float[NoiseLandforms.landforms.LandFormsByIndex.Length]
             });
             columnResults = new ColumnResult[chunksize * chunksize];
             layerFullyEmpty = new bool[api.WorldManager.MapSizeY];
@@ -219,7 +226,7 @@ namespace Vintagestory.ServerMods
                             var neibMap = neibHeightMaps[i];
                             if (neibMap == null) continue;
 
-                            float distToEdge=0;
+                            float distToEdge = 0;
 
                             switch (i)
                             {
@@ -303,10 +310,10 @@ namespace Vintagestory.ServerMods
             int climateBotLeft = climateMap.GetUnpaddedInt((int)(rlX * cfac), (int)(rlZ * cfac + cfac));
             int climateBotRight = climateMap.GetUnpaddedInt((int)(rlX * cfac + cfac), (int)(rlZ * cfac + cfac));
 
-            int oceanUpLeft=0;
-            int oceanUpRight=0;
-            int oceanBotLeft=0;
-            int oceanBotRight=0;
+            int oceanUpLeft = 0;
+            int oceanUpRight = 0;
+            int oceanBotLeft = 0;
+            int oceanBotRight = 0;
             if (oceanMap != null && oceanMap.Data.Length > 0)
             {
                 float ofac = (float)oceanMap.InnerSize / regionChunkSize;
@@ -368,8 +375,6 @@ namespace Vintagestory.ServerMods
             Array.Fill(layerFullyEmpty, true);  // Fill with true; later if any block in the layer is non-solid we will set it to false
             layerFullyEmpty[mapsizeY - 1] = false;  // The top block is always empty (air), leaving space for grass, snowlayer etc.
 
-            object mergeLock = new object(); // to block threads
-
             Parallel.For(0, chunksize * chunksize, new ParallelOptions() { MaxDegreeOfParallelism = maxThreads },
                 // localInit: Initialize Thread-Local buffers once per thread, without allocations
                 () =>
@@ -396,6 +401,8 @@ namespace Vintagestory.ServerMods
 
                     double[] lerpedAmps = data.LerpedAmplitudes;
                     double[] lerpedTh = data.LerpedThresholds;
+                    int[] landformNzIndices = data.LandformNzIndices;
+                    float[] landformNzWeights = data.LandformNzWeights;
 
                     float[] columnLandformIndexedWeights = data.landformWeights;
                     landLerpMap.WeightsAt(baseX + lX * chunkPixelBlockStep, baseZ + lZ * chunkPixelBlockStep, columnLandformIndexedWeights);
@@ -426,6 +433,21 @@ namespace Vintagestory.ServerMods
 
                     WeightedTaper wtaper = taperMap[chunkIndex2d];
 
+                    // Build a compact list of nonzero landforms once per column (reused buffers, no allocation).
+                    // The hot threshold loop below iterates only these, in the same ascending order as before,
+                    // so the accumulated threshold is bit-for-bit identical to the previous full scan.
+                    int nzCount = 0;
+                    for (int i = 0; i < columnLandformIndexedWeights.Length; i++)
+                    {
+                        float w = columnLandformIndexedWeights[i];
+                        if (w != 0f)
+                        {
+                            landformNzIndices[nzCount] = i;
+                            landformNzWeights[nzCount] = w;
+                            nzCount++;
+                        }
+                    }
+
                     float distortedPosYSlide = distY - (int)Math.Floor(distY);  // This value will be unchanged throughout the posY loop
                     for (int posY = 1; posY <= mapsizeYm2; posY++)
                     {
@@ -434,13 +456,11 @@ namespace Vintagestory.ServerMods
 
                         // Value starts as the landform Y threshold.
                         double threshold = 0;
-                        for (int i = 0; i < columnLandformIndexedWeights.Length; i++)
+                        for (int k = 0; k < nzCount; k++)
                         {
-                            float weight = columnLandformIndexedWeights[i];
-                            if (weight == 0) continue;
                             // Sample the two values to lerp between. The value of distortedPosYBase is clamped in such a way that this always works.
                             // Underflow and overflow of distortedPosY result in linear extrapolation.
-                            threshold += weight * ContinueSampleDisplacedYThreshold(distortedPosYBase, distortedPosYSlide, terrainYThresholds[i]);
+                            threshold += landformNzWeights[k] * ContinueSampleDisplacedYThreshold(distortedPosYBase, distortedPosYSlide, terrainYThresholds[landformNzIndices[k]]);
                         }
 
                         // Geo Upheaval modifier for threshold
@@ -464,8 +484,8 @@ namespace Vintagestory.ServerMods
                         else if (!(threshold < noiseBoundMax))  // Second case also catches NaN if it were to ever happen.
                         {
                             data.LocalLayerFullySolid[posY] = false; // No terrain block. Without False Sharing
-                            //We can now exit the loop early, because empirical testing shows that once the threshold has exceeded the max noise bound, it never returns to a negative noise value at any higher y value in the same blocks column.  This represents air well above the "interesting" part of the terrain.  Tested for all world heights in the range 256-1536, tested with arches, overhangs etc.
-                            for (int yAbove = posY + 1; yAbove <= mapsizeYm2; yAbove++) data.LocalLayerFullySolid[yAbove] = false;
+                            // Fill the layers above in one call (equivalent to the previous manual loop, bit-for-bit identical).
+                            Array.Fill<bool>(data.LocalLayerFullySolid, false, posY + 1, mapsizeYm2 - posY);
                             break;
                         }
                         // But sometimes we do.
@@ -488,21 +508,24 @@ namespace Vintagestory.ServerMods
                     return data;
                 },
 
-                // localFinally: merge local results into global arrays (1 time per thread, under lock)
+                // localFinally: merge local results into global arrays (1 time per thread).
+                // Merging is idempotent (only true->false transitions) and order-independent,
+                // so no lock is needed: the final value of layerFullySolid/Empty[i] is false
+                // iff any thread had its local copy false. The thread-local buffers in
+                // ThreadLocalTempData still prevent false sharing during the body; this merge
+                // runs once per thread after the body has finished, so there is no competing
+                // cache-line contention here.
                 data =>
                 {
-                    lock (mergeLock)
+                    for (int i = 0; i < layerFullySolid.Length; i++)
                     {
-                        for (int i = 0; i < layerFullySolid.Length; i++)
-                        {
-                            if (!data.LocalLayerFullySolid[i]) layerFullySolid[i] = false;
-                            if (!data.LocalLayerFullyEmpty[i]) layerFullyEmpty[i] = false;
-                        }
+                        if (!data.LocalLayerFullySolid[i]) layerFullySolid[i] = false;
+                        if (!data.LocalLayerFullyEmpty[i]) layerFullyEmpty[i] = false;
                     }
                 }
             );
 
-            
+
 
             IChunkBlocks chunkBlockData = chunks[0].Data;
 
