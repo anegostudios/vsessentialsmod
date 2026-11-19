@@ -36,10 +36,14 @@ namespace Vintagestory.GameContent
         protected Matrixf ItemModelMat;    // No value assigned by default, as it is only relevant to a few entities which hold items
         protected List<MessageTexture> messageTextures = null;
         protected EntityAgent eagent;
+        protected PhysicsBehaviorBase entityPhysics;
         protected IInventory gearInv;
         protected ITexPositionSource defaultTexSource;
         protected Vec4f lightrgbs;
         protected float intoxIntensity;
+        readonly HeldItemAnimator leftHeldItemAnimator = new HeldItemAnimator();
+        readonly HeldItemAnimator rightHeldItemAnimator = new HeldItemAnimator();
+        private readonly Matrixf animatedAttachmentModelMat = new Matrixf();
 
         public bool DoRenderHeldItem;
         public virtual bool DisplayChatMessages { get; set; }
@@ -127,6 +131,7 @@ namespace Vintagestory.GameContent
         public override void OnEntityLoaded()
         {
             loaded = true;
+            entityPhysics = entity.GetBehavior<PhysicsBehaviorBase>();
             prevY = entity.Pos.Y;
             prevPosXSwing = entity.Pos.X;
             prevPosZSwing = entity.Pos.Z;
@@ -297,7 +302,7 @@ namespace Vintagestory.GameContent
 
         protected void OnDebugInfoChanged()
         {
-            bool showDebuginfo = capi.Settings.Bool["showEntityDebugInfo"] && capi.World.Player?.WorldData.CurrentGameMode == EnumGameMode.Creative;
+            bool showDebuginfo = capi.World.EntityDebugMode;
 
             if (showDebuginfo && !entity.DebugAttributes.AllDirty && !entity.DebugAttributes.PartialDirty && debugTagTexture != null) return;
 
@@ -389,6 +394,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
+            ResetHeldItemAnimations();
             if (isSpectator) return;
 
             loadModelMatrix(entity, dt, isShadowPass);
@@ -425,50 +431,93 @@ namespace Vintagestory.GameContent
 
         protected virtual void RenderHeldItem(float dt, bool isShadowPass, bool right)
         {
+            HeldItemAnimator itemAnimator = right ? rightHeldItemAnimator : leftHeldItemAnimator;
             ItemSlot slot = right ? eagent?.RightHandItemSlot : eagent?.LeftHandItemSlot;
             ItemStack stack = slot?.Itemstack;
-            if (stack == null || slot is ItemSlotSkill) return;
+            if (stack == null || slot is ItemSlotSkill)
+            {
+                itemAnimator.Clear();
+                return;
+            }
 
             AttachmentPointAndPose apap = entity.AnimManager?.Animator?.GetAttachmentPointPose(right ? "RightHand" : "LeftHand");
             if (apap == null) return;
 
             ItemRenderInfo renderInfo = capi.Render.GetItemStackRenderInfo(slot, right ? EnumItemRenderTarget.HandTp : EnumItemRenderTarget.HandTpOff, dt);
 
+            RenderItem(dt, isShadowPass, stack, apap, renderInfo, right);
+        }
+
+        protected void ResetHeldItemAnimations()
+        {
+            leftHeldItemAnimator.Reset();
+            rightHeldItemAnimator.Reset();
+        }
+
+        protected void RenderItem(float dt, bool isShadowPass, ItemStack stack, AttachmentPointAndPose apap, ItemRenderInfo renderInfo, bool right)
+        {
+            HeldItemAnimator itemAnimator = right ? rightHeldItemAnimator : leftHeldItemAnimator;
+            IAnimationManager sourceAnimationManager = (entity as EntityPlayer)?.TpAnimManager ?? entity.AnimManager;
+            if (renderInfo?.AnimationShape != null && sourceAnimationManager?.Animator != null)
+            {
+                if (renderInfo.AnimationModelRef == null)
+                {
+                    if (!itemAnimator.MatchesWereCheckedFor(renderInfo.AnimationShape, sourceAnimationManager))
+                    {
+                        string[] animationCodes = capi.TesselatorManager.GetAnimationCodes(stack, renderInfo.AnimationModelVariant);
+                        itemAnimator.FindAnimationMatches(renderInfo.AnimationShape, sourceAnimationManager, animationCodes);
+                    }
+
+                    if (itemAnimator.HasRunningAnimation())
+                    {
+                        capi.TesselatorManager.GetAnimationModel(stack, renderInfo.AnimationModelVariant, out renderInfo.AnimationModelRef, out renderInfo.AnimationShape);
+                    }
+                }
+
+                if (renderInfo.AnimationModelRef != null && renderInfo.AnimationShape != null && itemAnimator.Sync(renderInfo.AnimationShape, sourceAnimationManager))
+                {
+                    if (!LoadHeldItemModelMatrix(apap, renderInfo)) return;
+
+                    itemAnimator.ModelRef = renderInfo.AnimationModelRef;
+                    ItemModelMat.Values.CopyTo(itemAnimator.ModelMatrix, 0);
+                    itemAnimator.CullFaces = renderInfo.CullFaces;
+                    itemAnimator.AlphaTest = renderInfo.AlphaTest;
+                    int temperature = (int)stack.Collectible.GetTemperature(capi.World, stack);
+                    itemAnimator.ExtraGlow = GameMath.Clamp((temperature - 500) / 3, 0, 255);
+                    itemAnimator.ShouldRender = true;
+
+                    RenderAnimatedAttachment(dt, isShadowPass, renderInfo, itemAnimator, right);
+                    if (!isShadowPass) SpawnHeldItemParticles(dt, stack);
+                    return;
+                }
+            }
+            else
+            {
+                itemAnimator.Clear();
+            }
+
             RenderItem(dt, isShadowPass, stack, apap, renderInfo);
         }
 
         protected virtual void RenderItem(float dt, bool isShadowPass, ItemStack stack, AttachmentPointAndPose apap, ItemRenderInfo renderInfo)
         {
+            if (!LoadHeldItemModelMatrix(apap, renderInfo)) return;
+
+            DrawItemModel(isShadowPass, stack, renderInfo, ItemModelMat.Values);
+            if (!isShadowPass) SpawnHeldItemParticles(dt, stack);
+        }
+
+        private void DrawItemModel(bool isShadowPass, ItemStack stack, ItemRenderInfo renderInfo, float[] modelMatrix)
+        {
             IRenderAPI rapi = capi.Render;
-            AttachmentPoint ap = apap?.AttachPoint;
             IShaderProgram prog = null;
-
-            if (renderInfo?.Transform == null || renderInfo.ModelRef == null || ap == null) return; // Happens with unknown items/blocks, or perhaps apap is null for other players in some situations (see Github #6783)
-
-            var itemTransform = renderInfo.Transform.EnsureDefaultValues();
-            var itemOrigin = itemTransform.Origin;
-            var itemTranslation = itemTransform.Translation;
-            var itemRotation = itemTransform.Rotation;
-            var itemScaleXYZ = itemTransform.ScaleXYZ;
-            ItemModelMat ??= new();
-            ItemModelMat
-                .Set(ModelMat)
-                .Mul(apap.AnimModelMatrix)
-                .Translate(itemOrigin.X, itemOrigin.Y, itemOrigin.Z)
-                .Scale(itemScaleXYZ.X, itemScaleXYZ.Y, itemScaleXYZ.Z)
-                .Translate(ap.PosX / 16f + itemTranslation.X, ap.PosY / 16f + itemTranslation.Y, ap.PosZ / 16f + itemTranslation.Z)
-                .Rotate((float)(ap.RotationX + itemRotation.X) * GameMath.DEG2RAD,
-                        (float)(ap.RotationY + itemRotation.Y) * GameMath.DEG2RAD,
-                        (float)(ap.RotationZ + itemRotation.Z) * GameMath.DEG2RAD)
-                .Translate(-itemOrigin.X, -itemOrigin.Y, -itemOrigin.Z)
-            ;
 
             string samplername = "tex";
             if (isShadowPass)
             {
                 samplername = "tex2d";
                 prog = rapi.CurrentActiveShader;
-                float[] mvpMat = ItemModelMat.Values;
+                float[] mvpMat = modelMatrix;
                 Mat4f.Multiply(mvpMat, capi.Render.CurrentModelviewMatrix, mvpMat);
                 Mat4f.Multiply(mvpMat, capi.Render.CurrentProjectionMatrix, mvpMat);
 
@@ -523,7 +572,7 @@ namespace Vintagestory.GameContent
 
                 prog.UniformMatrix("projectionMatrix", rapi.CurrentProjectionMatrix);
                 prog.UniformMatrix("viewMatrix", rapi.CameraMatrixOriginf);
-                prog.UniformMatrix("modelMatrix", ItemModelMat.Values);
+                prog.UniformMatrix("modelMatrix", modelMatrix);
             }
 
 
@@ -544,47 +593,117 @@ namespace Vintagestory.GameContent
             {
                 prog.Uniform("damageEffect", 0f);
                 prog.Stop();
+            }
+        }
 
-                float windAffectednessAtPos = Math.Max(0, 1 - capi.World.BlockAccessor.GetDistanceToRainFall(entity.Pos.AsBlockPos) / 5f);
+        private void RenderAnimatedAttachment(float dt, bool isShadowPass, ItemRenderInfo renderInfo, HeldItemAnimator itemAnimator, bool right)
+        {
+            ItemStack stack = renderInfo.AnimatedAttachmentStack;
+            ModelTransform transform = renderInfo.AnimatedAttachmentTransform;
+            if (stack == null || transform == null || renderInfo.AnimatedAttachmentElement == null) return;
 
-                AdvancedParticleProperties[] ParticleProperties = stack.Collectible?.ParticleProperties;
+            ElementPose pose = itemAnimator.GetPosebyName(renderInfo.AnimatedAttachmentElement);
+            if (pose?.AnimModelMatrix == null) return;
 
-                if (stack.Collectible != null && !capi.IsGamePaused)
+            ItemRenderInfo attachedRenderInfo = capi.Render.GetItemStackRenderInfo(new DummySlot(stack), right ? EnumItemRenderTarget.HandTp : EnumItemRenderTarget.HandTpOff, dt);
+            if (attachedRenderInfo?.ModelRef == null) return;
+
+            transform = transform.EnsureDefaultValues();
+            var origin = transform.Origin;
+            var translation = transform.Translation;
+            var rotation = transform.Rotation;
+            var scale = transform.ScaleXYZ;
+
+            animatedAttachmentModelMat
+                .Set(itemAnimator.ModelMatrix)
+                .Mul(pose.AnimModelMatrix)
+                .Translate(translation.X, translation.Y, translation.Z)
+                .Translate(origin.X, origin.Y, origin.Z)
+                .RotateX(rotation.X * GameMath.DEG2RAD)
+                .RotateY(rotation.Y * GameMath.DEG2RAD)
+                .RotateZ(rotation.Z * GameMath.DEG2RAD)
+                .Scale(scale.X, scale.Y, scale.Z)
+                .Translate(-origin.X, -origin.Y, -origin.Z);
+
+            DrawItemModel(isShadowPass, stack, attachedRenderInfo, animatedAttachmentModelMat.Values);
+        }
+
+        private bool LoadHeldItemModelMatrix(AttachmentPointAndPose apap, ItemRenderInfo renderInfo)
+        {
+            AttachmentPoint ap = apap?.AttachPoint;
+            if (renderInfo?.Transform == null || renderInfo.ModelRef == null || ap == null) return false; // Happens with unknown items/blocks, or perhaps apap is null for other players in some situations (see Github #6783)
+
+            var itemTransform = renderInfo.Transform.EnsureDefaultValues();
+            var itemOrigin = itemTransform.Origin;
+            var itemTranslation = itemTransform.Translation;
+            var itemRotation = itemTransform.Rotation;
+            var itemScaleXYZ = itemTransform.ScaleXYZ;
+            ItemModelMat ??= new();
+            ItemModelMat
+                .Set(ModelMat)
+                .Mul(apap.AnimModelMatrix)
+                .Translate(itemOrigin.X, itemOrigin.Y, itemOrigin.Z)
+                .Scale(itemScaleXYZ.X, itemScaleXYZ.Y, itemScaleXYZ.Z)
+                .Translate(ap.PosX / 16f + itemTranslation.X, ap.PosY / 16f + itemTranslation.Y, ap.PosZ / 16f + itemTranslation.Z)
+                .Rotate((float)(ap.RotationX + itemRotation.X) * GameMath.DEG2RAD,
+                        (float)(ap.RotationY + itemRotation.Y) * GameMath.DEG2RAD,
+                        (float)(ap.RotationZ + itemRotation.Z) * GameMath.DEG2RAD)
+                .Translate(-itemOrigin.X, -itemOrigin.Y, -itemOrigin.Z)
+            ;
+
+            return true;
+        }
+
+        private void SpawnHeldItemParticles(float dt, ItemStack stack)
+        {
+            float windAffectednessAtPos = Math.Max(0, 1 - capi.World.BlockAccessor.GetDistanceToRainFall(entity.Pos.AsBlockPos) / 5f);
+
+            AdvancedParticleProperties[] ParticleProperties = stack.Collectible?.ParticleProperties;
+
+            if (stack.Collectible != null && !capi.IsGamePaused)
+            {
+                if (stack.Collectible is IHeldParticleEmitter emitter)
                 {
-                    const float weirdMultiplier = 5f; // for some reason we need to spawn roughly 5 times fewer particles to have the same amount as a placed block
-
-                    accum += dt;
-                    if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > ParticlePhysics.AsyncSpawnTime * weirdMultiplier)
-                    {
-                        accum = Math.Min(1, accum - ParticlePhysics.AsyncSpawnTime * weirdMultiplier);
-
-                        Vec4f pos = ItemModelMat.TransformVector(new Vec4f(stack.Collectible.TopMiddlePos.X, stack.Collectible.TopMiddlePos.Y, stack.Collectible.TopMiddlePos.Z, 1));
-                        if (pMatrixHandFov != null)
-                        {
-                            Matrixf tmpMatrix = new Matrixf();
-                            Vec4f screenSpaceCoordNormalFov = tmpMatrix.Set(pMatrixHandFov).Mul(rapi.CameraMatrixOriginf).TransformVector(pos);
-                            Matrixf unprojectMatrix = new Matrixf(rapi.CameraMatrixOriginf).Invert().Mul(tmpMatrix.Set(pMatrixNormalFov).Invert());
-                            pos = unprojectMatrix.TransformVector(screenSpaceCoordNormalFov);
-                        }
-
-                        EntityPlayer entityPlayer = capi.World.Player.Entity;
-                        for (int i = 0; i < ParticleProperties.Length; i++)
-                        {
-                            AdvancedParticleProperties bps = ParticleProperties[i];
-
-                            bps.WindAffectednesAtPos = windAffectednessAtPos;
-                            bps.WindAffectednes = windAffectednessAtPos;
-
-                            bps.basePos.X = pos.X + entityPlayer.CameraPos.X;
-                            bps.basePos.Y = pos.Y + entityPlayer.CameraPos.Y;
-                            bps.basePos.Z = pos.Z + entityPlayer.CameraPos.Z;
-
-                            eagent.World.SpawnParticles(bps);
-                        }
-                    }
+                    emitter.SpawnHeldParticles(stack, eagent, GetHeldItemParticlePosition(stack), dt);
                 }
 
+                const float weirdMultiplier = 5f; // for some reason we need to spawn roughly 5 times fewer particles to have the same amount as a placed block
+
+                accum += dt;
+                if (ParticleProperties != null && ParticleProperties.Length > 0 && accum > ParticlePhysics.AsyncSpawnTime * weirdMultiplier)
+                {
+                    accum = Math.Min(1, accum - ParticlePhysics.AsyncSpawnTime * weirdMultiplier);
+
+                    Vec3d pos = GetHeldItemParticlePosition(stack);
+                    for (int i = 0; i < ParticleProperties.Length; i++)
+                    {
+                        AdvancedParticleProperties bps = ParticleProperties[i];
+
+                        bps.WindAffectednesAtPos = windAffectednessAtPos;
+                        bps.WindAffectednes = windAffectednessAtPos;
+
+                        bps.basePos.Set(pos);
+
+                        eagent.World.SpawnParticles(bps);
+                    }
+                }
             }
+        }
+
+        private Vec3d GetHeldItemParticlePosition(ItemStack stack)
+        {
+            var origin = stack.Collectible.TopMiddlePos;
+            Vec4f pos = ItemModelMat.TransformVector(new Vec4f(origin.X, origin.Y, origin.Z, 1));
+            if (pMatrixHandFov != null)
+            {
+                Matrixf tmpMatrix = new Matrixf();
+                Vec4f screenSpaceCoordNormalFov = tmpMatrix.Set(pMatrixHandFov).Mul(capi.Render.CameraMatrixOriginf).TransformVector(pos);
+                Matrixf unprojectMatrix = new Matrixf(capi.Render.CameraMatrixOriginf).Invert().Mul(tmpMatrix.Set(pMatrixNormalFov).Invert());
+                pos = unprojectMatrix.TransformVector(screenSpaceCoordNormalFov);
+            }
+
+            Vec3d cameraPos = capi.World.Player.Entity.CameraPos;
+            return new Vec3d(pos.X + cameraPos.X, pos.Y + cameraPos.Y, pos.Z + cameraPos.Z);
         }
 
 
@@ -665,6 +784,41 @@ namespace Vintagestory.GameContent
             {
                 capi.Render.RenderMultiTextureMesh(meshRefOpaque, "entityTex");
             }
+
+            RenderAnimatedHeldItem(leftHeldItemAnimator, prog, isShadowPass);
+            RenderAnimatedHeldItem(rightHeldItemAnimator, prog, isShadowPass);
+        }
+
+        private void RenderAnimatedHeldItem(HeldItemAnimator itemAnimator, IShaderProgram prog, bool isShadowPass)
+        {
+            if (!itemAnimator.ShouldRender) return;
+
+            if (isShadowPass)
+            {
+                Mat4f.Mul(tmpMvMat, capi.Render.CurrentModelviewMatrix, itemAnimator.ModelMatrix);
+                prog.UniformMatrix("modelViewMatrix", tmpMvMat);
+            }
+            else
+            {
+                prog.Uniform("rgbaLightIn", lightrgbs);
+                prog.Uniform("extraGlow", itemAnimator.ExtraGlow);
+                prog.UniformMatrix("modelMatrix", itemAnimator.ModelMatrix);
+                prog.UniformMatrix("viewMatrix", capi.Render.CurrentModelviewMatrix);
+                prog.Uniform("addRenderFlags", 0);
+                prog.Uniform("windWaveIntensity", 0f);
+                prog.Uniform("glitchEffectStrength", 0f);
+                prog.Uniform("glitchFlicker", 0);
+                prog.Uniform("frostAlpha", 0f);
+                prog.Uniform("renderColor", ColorUtil.WhiteArgbVec);
+                prog.Uniform("alphaTest", itemAnimator.AlphaTest);
+            }
+
+            itemAnimator.UploadMatrices(prog);
+            if (itemAnimator.CullFaces) capi.Render.GlEnableCullFace();
+            else capi.Render.GlDisableCullFace();
+            capi.Render.RenderMultiTextureMesh(itemAnimator.ModelRef, "entityTex");
+            capi.Render.GlDisableCullFace();
+            if (!isShadowPass) prog.Uniform("alphaTest", 0.05f);
         }
 
         public override void DoRender2D(float dt)
@@ -804,13 +958,32 @@ namespace Vintagestory.GameContent
             float rotY = entity.Properties.Client.Shape?.rotateY ?? 0;
             float rotZ = entity.Properties.Client.Shape?.rotateZ ?? 0;
 
+            long carrierId = entityPhysics?.StandingColliderId ?? 0;
+            Collider carrier = null;
+            bool onCarrier = carrierId != 0 && entity.World.CollisionScene.TryGetCollider(carrierId, out carrier);
+            double[] quat = Quaterniond.Create();
+            if (onCarrier)
+            {
+                ApplyStandingColliderTransform(ModelMat, quat, carrier.Transform, entity.Pos.Yaw, entity.CollisionBox);
+                quat[0] = quat[1] = quat[2] = 0;
+                quat[3] = 1;
+                stepPitch = 0;
+                stepingAccum = fallingAccum = 0;
+                prevY = entity.Pos.Y;
+                nowSwivelRad = targetSwivelRad = 0;
+                prevPosXSwing = entity.Pos.X;
+                prevPosZSwing = entity.Pos.Z;
+                xangle = yangle = zangle = 0;
+                if (eagent != null) eagent.sidewaysSwivelAngle = 0;
+            }
+
             Mat4f.Translate(ModelMat, ModelMat, 0, entity.SelectionBox.Y2 / 2, 0);
 
             if (!isShadowPass)
             {
-                updateStepPitch(dt);
+                if (!onCarrier) updateStepPitch(dt);
 
-                if (waterBobbing && entity.Swimming)
+                if (!onCarrier && waterBobbing && entity.Swimming)
                 {
                     long ellapseMs = capi.World.ElapsedMilliseconds;
                     xangle = GameMath.DEG2RAD * GameMath.Sin((float)(ellapseMs / 1000.0)) * 8;
@@ -819,7 +992,6 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            double[] quat = Quaterniond.Create();
             float bodyPitch = entity is EntityPlayer ? 0 : entity.Pos.Pitch;
             float yaw = entity.Pos.Yaw + (rotY + 90) * GameMath.DEG2RAD;
 
@@ -855,6 +1027,22 @@ namespace Vintagestory.GameContent
 
 
 
+
+        public static void ApplyStandingColliderTransform(float[] modelMatrix, double[] rotation, ColliderTransform transform, float worldYaw, Cuboidf collisionBox)
+        {
+            transform.TransformDirection(0, 1, 0, out double upX, out double upY, out double upZ);
+            if (upY <= 0.5) return;
+
+            // The upright box rests on its highest foot corner, while the tilted model rests at its center.
+            double footLift = (Math.Abs(upX) * collisionBox.Width + Math.Abs(upZ) * collisionBox.Length) / (2 * upY);
+            Mat4f.Translate(modelMatrix, modelMatrix, 0, (float)-footLift, 0);
+            rotation[0] = transform.QuaternionX;
+            rotation[1] = transform.QuaternionY;
+            rotation[2] = transform.QuaternionZ;
+            rotation[3] = transform.QuaternionW;
+            Quaterniond.RotateY(rotation, rotation, StandingColliderSync.GetLocalYaw(transform, worldYaw) - worldYaw);
+            Mat4f.MulQuat(modelMatrix, rotation);
+        }
 
         protected void loadModelMatrixForGui(Entity entity, double posX, double posY, double posZ, double yawDelta, float size)
         {

@@ -15,7 +15,7 @@ namespace Vintagestory.GameContent
         public List<MapLayer> mapLayers;
         public bool IsDragingMap;
         public float ZoomLevel = 1;
-
+        public float ScaledZoomLevel => ZoomLevel * RuntimeEnv.DPIHScale;
 
         public Vec3d prevPlayerPos = new Vec3d();
         public Cuboidi chunkViewBoundsBefore = new Cuboidi();
@@ -53,8 +53,8 @@ namespace Vintagestory.GameContent
 
             BlockPos start = api.World.Player.Entity.Pos.AsBlockPos;
             CurrentBlockViewBounds = new Cuboidd(
-                start.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ZoomLevel,
-                start.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ZoomLevel
+                start.X - Bounds.InnerWidth / 2 / ScaledZoomLevel, 0, start.Z - Bounds.InnerHeight / 2 / ScaledZoomLevel,
+                start.X + Bounds.InnerWidth / 2 / ScaledZoomLevel, 0, start.Z + Bounds.InnerHeight / 2 / ScaledZoomLevel
             );
         }
 
@@ -89,10 +89,10 @@ namespace Vintagestory.GameContent
                 if (snapToPlayer)
                 {
                     var start = api.World.Player.Entity.Pos;
-                    CurrentBlockViewBounds.X1 = start.X - Bounds.InnerWidth / 2 / ZoomLevel;
-                    CurrentBlockViewBounds.Z1 = start.Z - Bounds.InnerHeight / 2 / ZoomLevel;
-                    CurrentBlockViewBounds.X2 = start.X + Bounds.InnerWidth / 2 / ZoomLevel;
-                    CurrentBlockViewBounds.Z2 = start.Z + Bounds.InnerHeight / 2 / ZoomLevel;
+                    CurrentBlockViewBounds.X1 = start.X - Bounds.InnerWidth / 2 / ScaledZoomLevel;
+                    CurrentBlockViewBounds.Z1 = start.Z - Bounds.InnerHeight / 2 / ScaledZoomLevel;
+                    CurrentBlockViewBounds.X2 = start.X + Bounds.InnerWidth / 2 / ScaledZoomLevel;
+                    CurrentBlockViewBounds.Z2 = start.Z + Bounds.InnerHeight / 2 / ScaledZoomLevel;
                 } else
                 {
                     CurrentBlockViewBounds.Translate(diffx, 0, diffz);
@@ -129,7 +129,7 @@ namespace Vintagestory.GameContent
 
                 if (Math.Abs(skeyDeltaX) > 0.5f || Math.Abs(skeyDeltaY) > 0.5f)
                 {
-                    CurrentBlockViewBounds.Translate(-skeyDeltaX / ZoomLevel, 0, -skeyDeltaY / ZoomLevel);
+                    CurrentBlockViewBounds.Translate(-skeyDeltaX / ScaledZoomLevel, 0, -skeyDeltaY / ScaledZoomLevel);
                 }
             }
         }
@@ -159,7 +159,7 @@ namespace Vintagestory.GameContent
         {
             if (IsDragingMap)
             {
-                CurrentBlockViewBounds.Translate(-(args.X - prevMouseX) / ZoomLevel, 0, -(args.Y - prevMouseY) / ZoomLevel);
+                CurrentBlockViewBounds.Translate(-(args.X - prevMouseX) / ScaledZoomLevel, 0, -(args.Y - prevMouseY) / ScaledZoomLevel);
                 prevMouseX = args.X;
                 prevMouseY = args.Y;
             }
@@ -175,19 +175,19 @@ namespace Vintagestory.GameContent
             float px = (float)((api.Input.MouseX - Bounds.absX) / Bounds.InnerWidth);
             float py = (float)((api.Input.MouseY - Bounds.absY) / Bounds.InnerHeight);
 
-            ZoomAdd(args.delta > 0 ? 0.25f : -0.25f, px, py);
+            float zoomDiff = args.DeltaY * 0.25f;
+            ZoomAdd(zoomDiff, px, py);
             args.SetHandled(true);
         }
 
 
         public void ZoomAdd(float zoomDiff, float px, float pz)
         {
-            if (zoomDiff < 0 && ZoomLevel + zoomDiff < 0.25f) return;
-            if (zoomDiff > 0 && ZoomLevel + zoomDiff > 6f) return;
+            if (zoomDiff == 0) return;
+            zoomDiff = (float)(Math.Round(zoomDiff * 32) / 32);
+            ZoomLevel = Math.Clamp(ZoomLevel + zoomDiff, 0.25f, 6f);
 
-            ZoomLevel += zoomDiff;
-
-            double nowRelSize = 1 / ZoomLevel;
+            double nowRelSize = 1 / ScaledZoomLevel;
             double diffX = Bounds.InnerWidth * nowRelSize - CurrentBlockViewBounds.Width;
             double diffZ = Bounds.InnerHeight * nowRelSize - CurrentBlockViewBounds.Length;
             CurrentBlockViewBounds.X2 += diffX;
@@ -257,7 +257,7 @@ namespace Vintagestory.GameContent
 
             if (chunkViewBoundsBefore.Equals(chunkviewBounds)) return;
             viewChangedSync(chunkviewBounds.X1, chunkviewBounds.Z1, chunkviewBounds.X2, chunkviewBounds.Z2);
-            
+
             FastVec3i cur = new();
 
             bool beforeBoundsEmpty = chunkViewBoundsBefore.SizeX == 0 && chunkViewBoundsBefore.SizeZ == 0;
@@ -351,8 +351,8 @@ namespace Vintagestory.GameContent
         public void CenterMapTo(BlockPos pos)
         {
             CurrentBlockViewBounds = new Cuboidd(
-                pos.X - Bounds.InnerWidth / 2 / ZoomLevel, 0, pos.Z - Bounds.InnerHeight / 2 / ZoomLevel,
-                pos.X + Bounds.InnerWidth / 2 / ZoomLevel, 0, pos.Z + Bounds.InnerHeight / 2 / ZoomLevel
+                pos.X - Bounds.InnerWidth / 2 / ScaledZoomLevel, 0, pos.Z - Bounds.InnerHeight / 2 / ScaledZoomLevel,
+                pos.X + Bounds.InnerWidth / 2 / ScaledZoomLevel, 0, pos.Z + Bounds.InnerHeight / 2 / ScaledZoomLevel
             );
         }
 

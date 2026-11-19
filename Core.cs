@@ -21,7 +21,7 @@ namespace Vintagestory.ServerMods
         }
 
         public override bool ShouldLoad(EnumAppSide side)
-        {   
+        {
             return true;
         }
 
@@ -38,13 +38,13 @@ namespace Vintagestory.ServerMods
 
             api.RegisterEntityRendererClass("Shape", typeof(EntityShapeRenderer));
             api.RegisterEntityRendererClass("PlayerShape", typeof(EntityPlayerShapeRenderer));
-            
+
 
             api.Event.BlockTexturesLoaded += Event_BlockTexturesLoaded;
 
             capi = api;
 
-            
+
         }
 
         private void Event_BlockTexturesLoaded()
@@ -80,6 +80,8 @@ namespace Vintagestory.ServerMods
             RegisterDefaultBlockEntities();
 
             api.RegisterCollectibleBehaviorClass("AnimationAuthoritative", typeof(CollectibleBehaviorAnimationAuthoritative));
+            api.RegisterCollectibleBehaviorClass("DamageModes", typeof(CollectibleBehaviorDamageModes));
+            api.RegisterCollectibleBehaviorClass("ObbMeleeSweep", typeof(CollectibleBehaviorObbMeleeSweep));
             api.RegisterCollectibleBehaviorClass("HeldBag", typeof(CollectibleBehaviorHeldBag));
             api.RegisterCollectibleBehaviorClass("Throwable", typeof(CollectibleBehaviorThrowable));
             api.RegisterCollectibleBehaviorClass("Buffable", typeof(CollectibleBehaviorBuffable));
@@ -116,14 +118,14 @@ namespace Vintagestory.ServerMods
 
         private void RegisterDefaultCropBehaviors()
         {
-            
+
         }
 
 
         private void RegisterDefaultItems()
         {
-            
-           
+
+
         }
 
 
@@ -133,9 +135,10 @@ namespace Vintagestory.ServerMods
 
 
         private void RegisterDefaultEntities()
-        {    
+        {
             api.RegisterEntity("EntityBlockfalling", typeof(EntityBlockFalling));
             api.RegisterEntity("EntityThrownItem", typeof(EntityThrownItem));
+            api.RegisterEntity("AbilityEntityProjectile", typeof(AbilityEntityProjectile));
         }
 
 
@@ -143,13 +146,16 @@ namespace Vintagestory.ServerMods
         {
             api.RegisterEntityBehaviorClass("collectitems", typeof(EntityBehaviorCollectEntities));
             api.RegisterEntityBehaviorClass("health", typeof(EntityBehaviorHealth));
+            api.RegisterEntityBehaviorClass("damagereactions", typeof(EntityBehaviorDamageReactions));
+            api.RegisterEntityBehaviorClass("hitboxgroups", typeof(EntityBehaviorHitboxGroups));
             api.RegisterEntityBehaviorClass("hunger", typeof(EntityBehaviorHunger));
             api.RegisterEntityBehaviorClass("drunktyping", typeof(EntityBehaviorDrunkTyping));
             api.RegisterEntityBehaviorClass("breathe", typeof(EntityBehaviorBreathe));
 
             api.RegisterEntityBehaviorClass("playerphysics", typeof(EntityBehaviorPlayerPhysics));
             api.RegisterEntityBehaviorClass("controlledphysics", typeof(EntityBehaviorControlledPhysics));
-            
+            api.RegisterEntityBehaviorClass("kinematiccollider", typeof(EntityBehaviorKinematicCollider));
+
             api.RegisterEntityBehaviorClass("taskai", typeof(EntityBehaviorTaskAI));
             api.RegisterEntityBehaviorClass("interpolateposition", typeof(EntityBehaviorInterpolatePosition));
             api.RegisterEntityBehaviorClass("despawn", typeof(EntityBehaviorDespawn));
@@ -158,11 +164,12 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("multiply", typeof(EntityBehaviorMultiply));
             api.RegisterEntityBehaviorClass("multiplybase", typeof(EntityBehaviorMultiplyBase));
             api.RegisterEntityBehaviorClass("gait", typeof(EntityBehaviorGait));
+            api.RegisterEntityBehaviorClass("genetics", typeof(EntityBehaviorGenetics));
 
             api.RegisterEntityBehaviorClass("aimingaccuracy", typeof(EntityBehaviorAimingAccuracy));
             api.RegisterEntityBehaviorClass("emotionstates", typeof(EntityBehaviorEmotionStates));
             api.RegisterEntityBehaviorClass("repulseagents", typeof(EntityBehaviorRepulseAgents));
-            api.RegisterEntityBehaviorClass("ellipsoidalrepulseagents", typeof(EntityBehaviorEllipsoidalRepulseAgents));            
+            api.RegisterEntityBehaviorClass("ellipsoidalrepulseagents", typeof(EntityBehaviorEllipsoidalRepulseAgents));
             api.RegisterEntityBehaviorClass("tiredness", typeof(EntityBehaviorTiredness));
             api.RegisterEntityBehaviorClass("nametag", typeof(EntityBehaviorNameTag));
             api.RegisterEntityBehaviorClass("placeblock", typeof(EntityBehaviorPlaceBlock));
@@ -170,18 +177,22 @@ namespace Vintagestory.ServerMods
             api.RegisterEntityBehaviorClass("floatupwhenstuck", typeof(EntityBehaviorFloatUpWhenStuck));
             api.RegisterEntityBehaviorClass("harvestable", typeof(EntityBehaviorHarvestable));
             api.RegisterEntityBehaviorClass("reviveondeath", typeof(EntityBehaviorReviveOnDeath));
+            api.RegisterEntityBehaviorClass("animate",  typeof(EntityBehaviorAnimate));
 
             api.RegisterEntityBehaviorClass("mouthinventory", typeof(EntityBehaviorMouthInventory));
             api.RegisterEntityBehaviorClass("openablecontainer", typeof(EntityBehaviorOpenableContainer));
 
             api.RegisterEntityBehaviorClass("playerinventory", typeof(EntityBehaviorPlayerInventory));
             api.RegisterEntityBehaviorClass("entitystatetags", typeof(EntityBehaviorEntityStateTags));
+
+            api.RegisterEntityBehaviorClass("abilities", typeof(EntityBehaviorAbilities));
+            api.RegisterEntityBehaviorClass("timers", typeof(EntityBehaviorTimers));
+
+            api.RegisterEntityBehaviorClass("sight", typeof(EntityBehaviorSight));
+            api.RegisterEntityBehaviorClass("memory", typeof(EntityBehaviorMemory));
+            api.RegisterEntityBehaviorClass("state-tree", typeof(EntityBehaviorStateTree));
+            api.RegisterEntityBehaviorClass("states", typeof(EntityBehaviorStates));
+            api.RegisterEntityBehaviorClass("visibility", typeof(EntityBehaviorVisibility));
         }
-
-
-
-
-
-
     }
 }

@@ -58,7 +58,7 @@ namespace Vintagestory.GameContent
             prog.Uniform("noTexture", 0f);
 
 
-            float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ZoomLevel);
+            float hover = (mouseOver ? 6 : 0) - 1.5f * Math.Max(1, 1 / map.ScaledZoomLevel);
 
             if (!wpLayer.texturesByIcon.TryGetValue(waypoint.Icon, out LoadedTexture tex))
             {

@@ -31,7 +31,17 @@ namespace Vintagestory.GameContent
 
         public override void OnEntityInside(IWorldAccessor world, Entity entity, BlockPos pos)
         {
-            base.OnEntityInside(world, entity, pos);
+            bool preventDefault = false;
+            foreach (BlockBehavior behavior in BlockBehaviors)
+            {
+                EnumHandling handled = EnumHandling.PassThrough;
+
+                behavior.OnEntityInside(world, entity, pos, ref handled);
+                if (handled == EnumHandling.PreventDefault) preventDefault = true;
+                if (handled == EnumHandling.PreventSubsequent) return;
+            }
+
+            if (preventDefault) return;
 
             if (InsideDamage > 0 && world.Side == EnumAppSide.Server)
             {

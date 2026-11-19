@@ -79,7 +79,7 @@ namespace Vintagestory.ServerMods
                 val.Value.Init(val.Key, sapi.Server.Logger);
 
 
-                sapi.RegisterTreeGenerator(name, new TreeGen(val.Value, sapi.WorldManager.Seed, forestFloorSystem));
+                sapi.RegisterTreeGenerator(name, new TreeGen(val.Value, sapi.WorldManager.SeedWorldgen, forestFloorSystem));
                 val.Value.treeBlocks.ResolveBlockNames(sapi, name.Path);
 
                 treetypes.TryGetValue(sapi.World.GetBlock(val.Value.treeBlocks.logBlockId).Variant["wood"], out val.Value.Treetype);

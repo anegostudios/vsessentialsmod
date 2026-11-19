@@ -18,16 +18,6 @@ namespace Vintagestory.GameContent
             SetInitialRotation();
         }
 
-        public override bool ApplyGravity
-        {
-            get { return !Stuck;}
-        }
-
-        public override bool IsInteractable
-        {
-            get { return false; }
-        }
-
         public override void Initialize(EntityProperties properties, ICoreAPI api, long InChunkIndex3d)
         {
             base.Initialize(properties, api, InChunkIndex3d);

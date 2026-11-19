@@ -96,7 +96,7 @@ namespace Vintagestory.ServerMods
 
 
 
-                 
+
 
                     variants.Add(depo);
 
@@ -117,12 +117,12 @@ namespace Vintagestory.ServerMods
             depositShapeDistortNoise = NormalizedSimplexNoise.FromDefaultOctaves(3, 1 / 10f, 0.9f, 1);
             regionSize = api.WorldManager.RegionSize;
 
-            depositRand = new LCGRandom(api.WorldManager.Seed + 34613);
+            depositRand = new LCGRandom(api.WorldManager.SeedWorldgen + 34613);
 
             for (int i = 0; i < Deposits.Length; i++)
             {
                 DepositVariant variant = Deposits[i];
-                
+
                 variant.addHandbookAttributes = addHandbookAttributes;
                 variant.Init(api, depositRand, depositShapeDistortNoise);
             }
@@ -132,7 +132,7 @@ namespace Vintagestory.ServerMods
         {
             base.initWorldGen();
 
-            int seed = api.WorldManager.Seed;
+            int seed = api.WorldManager.SeedWorldgen;
             Dictionary<string, MapLayerBase> maplayersByCode = new Dictionary<string, MapLayerBase>();
 
             for (int i = 0; i < Deposits.Length; i++)
@@ -223,7 +223,7 @@ namespace Vintagestory.ServerMods
             for (int i = 0; i < Deposits.Length; i++)
             {
                 DepositVariant variant = Deposits[i];
-                
+
                 float quantityFactor = variant.WithOreMap ? variant.GetOreMapFactor(fromChunkx, fromChunkz) : 1;
 
                 float qModified = variant.TriesPerChunk * quantityFactor * chanceMultiplier * (variant.ScaleWithWorldheight ? scaleAdjustMul : 1);

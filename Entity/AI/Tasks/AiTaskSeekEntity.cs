@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,8 +23,19 @@ namespace Vintagestory.GameContent
         protected Vec3d targetPos;
         private readonly Vec3d ownPos = new Vec3d();
 
-        protected float moveSpeed = 0.02f;
-        protected float seekingRange = 25f;
+        [JsonProperty("preferredGait")]
+        private string gaitCode = null;
+        public GaitMeta PreferredGait { get; set; } = null;
+        protected float moveSpeed;
+
+        [Obsolete("Use searchRange instead")]
+        [JsonProperty]
+        protected float seekingRange
+        {
+            get => searchRange;
+            set => searchRange = value;
+        }
+
         protected float belowTempSeekingRange = 25f;
         protected float belowTempThreshold = -999;
         protected float maxFollowTime = 60;
@@ -67,8 +79,6 @@ namespace Vintagestory.GameContent
 
         public ActionBoolReturn<Entity> OnIsSuitableTarget;
 
-        EnumEntitySearchType searchType;
-
         public AiTaskSeekEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             if (Id == null) Id = "seekentity";
@@ -80,18 +90,12 @@ namespace Vintagestory.GameContent
             leapHeightMul = taskConfig["leapHeightMul"].AsFloat(1);
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
             extraTargetDistance = taskConfig["extraTargetDistance"].AsFloat(0f);
-            seekingRange = taskConfig["seekingRange"].AsFloat(25);
             belowTempSeekingRange = taskConfig["belowTempSeekingRange"].AsFloat(25);
             belowTempThreshold = taskConfig["belowTempThreshold"].AsFloat(-999);
             maxFollowTime = taskConfig["maxFollowTime"].AsFloat(60);
             alarmHerd = taskConfig["alarmHerd"].AsBool(false);
             leapAtTarget = taskConfig["leapAtTarget"].AsBool(false);
             searchWaitMs = taskConfig["searchWaitMs"].AsInt(4000);
-
-            if (!Enum.TryParse(taskConfig["searchType"].AsString(), out searchType))
-            {
-                searchType = EnumEntitySearchType.Creatures;
-            }
 
             if (taskConfig["aiCreatureType"].Exists)
             {
@@ -105,6 +109,19 @@ namespace Vintagestory.GameContent
             ExecutionChance = 0.1;
         }
 
+        public override void AfterInitialize()
+        {
+            base.AfterInitialize();
+            if (gaitCode != null)
+            {
+                EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+                if (gaitBehavior != null)
+                {
+                    PreferredGait = gaitBehavior.Gaits[gaitCode];
+                    moveSpeed = PreferredGait.MoveSpeed;
+                }
+            }
+        }
 
         public override bool ShouldExecute()
         {
@@ -151,7 +168,7 @@ namespace Vintagestory.GameContent
                     EntityTags.IsEmpty ? targetEntityFirstLetters.Length == 0 ? (e) => noTagMatchAll(e, isTamed)
                     : (e) => noTagMatchNoAll(e, isTamed)
                     : (e) => tagMatch(e, isTamed)
-                , searchType);
+                , SearchType);
 
                 if (targetEntity == null) return false;
 
@@ -205,7 +222,7 @@ namespace Vintagestory.GameContent
 
         protected float getSeekRange()
         {
-            float nowRange = seekingRange;
+            float nowRange = searchRange;
             if (belowTempThreshold > -99)
             {
                 float temperature = entity.World.BlockAccessor.GetClimateAt(entity.Pos.AsBlockPos, EnumGetClimateMode.ForSuppliedDate_TemperatureOnly, entity.World.Calendar.TotalDays).Temperature;
@@ -243,7 +260,7 @@ namespace Vintagestory.GameContent
                 searchDepth = 10000;
             }
 
-            pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSeekUnable, searchDepth, 1, creatureType);
+            pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnSeekUnable, searchDepth, 1, creatureType, PreferredGait);
         }
 
         private void OnSeekUnable()
@@ -322,7 +339,7 @@ namespace Vintagestory.GameContent
 
                 if (ok)
                 {
-                    pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnCircleTargetUnable, searchDepth, 1);
+                    pathTraverser.NavigateTo_Async(targetPos.Clone(), moveSpeed, MinDistanceToTarget(), OnGoalReached, OnStuck, OnCircleTargetUnable, searchDepth, 1, creatureType, PreferredGait);
                     return true;
                 }
             }
@@ -380,7 +397,7 @@ namespace Vintagestory.GameContent
                 lastPathUpdateSeconds = 0;
             }
 
-            if (leapAtTarget && !entity.AnimManager.IsAnimationActive(animMeta.Code) && entity.AnimManager.Animator.GetAnimationState(leapAnimationCode)?.Active != true)
+            if (leapAtTarget && animMeta != null && !entity.AnimManager.IsAnimationActive(animMeta.Animation) && entity.AnimManager.Animator.GetAnimationState(leapAnimationCode)?.Active != true)
             {
                 animMeta.EaseInSpeed = 1f;
                 animMeta.EaseOutSpeed = 1f;
@@ -390,16 +407,17 @@ namespace Vintagestory.GameContent
             if (jumpAnimOn && entity.World.ElapsedMilliseconds - finishedMs > 2000)
             {
                 entity.AnimManager.StopAnimation(leapAnimationCode);
-                animMeta.EaseInSpeed = 1f;
-                animMeta.EaseOutSpeed = 1f;
-                entity.AnimManager.StartAnimation(animMeta);
+                if (animMeta != null)
+                {
+                    animMeta.EaseInSpeed = 1f;
+                    animMeta.EaseOutSpeed = 1f;
+                    entity.AnimManager.StartAnimation(animMeta);
+                }
             }
 
             if (attackPattern == EnumAttackPattern.DirectAttack/* || attackPattern == EnumAttackPattern.BesiegeTarget*/)
             {
-                pathTraverser.CurrentTarget.X = targetEntity.Pos.X;
-                pathTraverser.CurrentTarget.Y = targetEntity.Pos.InternalY;
-                pathTraverser.CurrentTarget.Z = targetEntity.Pos.Z;
+                pathTraverser.CurrentTarget!.Set(targetEntity.Pos.X, targetEntity.Pos.InternalY, targetEntity.Pos.Z);
             }
 
 
@@ -426,10 +444,16 @@ namespace Vintagestory.GameContent
 
                     jumpedMS = entity.World.ElapsedMilliseconds;
                     finishedMs = entity.World.ElapsedMilliseconds;
+
                     if (leapAnimationCode != null)
                     {
-                        entity.AnimManager.StopAnimation("walk");
-                        entity.AnimManager.StopAnimation("run");
+                        EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+                        // If there is a gait behavior, expect animation weights to be set up so blending looks ok. Otherwise, stop movement animation while we jump.
+                        if (gaitBehavior == null)
+                        {
+                            entity.AnimManager.StopAnimation("walk");
+                            entity.AnimManager.StopAnimation("run");
+                        }
                         entity.AnimManager.StartAnimation(new AnimationMetaData() { Animation = leapAnimationCode, Code = leapAnimationCode }.Init());
                         jumpAnimOn = true;
                     }

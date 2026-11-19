@@ -264,7 +264,7 @@ namespace Vintagestory.ServerMods
 
                         if (found)
                         {
-                            var blockPatchRandom = new LCGRandom(sapi.WorldManager.Seed + i);
+                            var blockPatchRandom = new LCGRandom(sapi.WorldManager.SeedWorldgen + i);
                             blockPatchRandom.InitPositionSeed(tmpPos.X, tmpPos.Z);
                             // Pass null - no structure intersection check needed here
                             bPatch.Generate(blockAccessor, rnd, tmpPos.X, tmpPos.Y, tmpPos.Z, firstBlockId, null);

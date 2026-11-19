@@ -29,6 +29,10 @@ namespace Vintagestory.GameContent
         [JsonProperty]
         protected float maxTargetInjury = 1;
 
+        // <summary>Look for a target entity within this distance.</summary>
+        [JsonProperty]
+        public float searchRange = 25;
+
         protected string[] targetEntityCodesBeginsWith = Array.Empty<string>();
         protected string[] targetEntityCodesExact = null!;
 
@@ -67,9 +71,15 @@ namespace Vintagestory.GameContent
         [JsonProperty]
         public bool TargetOnlyInteractableEntities = true;
 
+        /// <summary>
+        /// Entities are stored in two different lists: 'creatures' and 'inanimate'. This sets which type of entity should be targeted. Case sensitive.
+        /// </summary>
+        [JsonProperty]
+        public EnumEntitySearchType SearchType = EnumEntitySearchType.Creatures;
+
         protected AiTaskBaseTargetable(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>() ?? throw new Exception("Expected the entity to have an EntityPartitioning partitionUtil");
 
             creatureHostility = entity.World.Config.GetString("creatureHostility") switch
             {
@@ -89,7 +99,7 @@ namespace Vintagestory.GameContent
                     throw new ArgumentNullException(GetType().ToString() + " on entity " + entity.Code + " was initialized with a null target code at index " + i);
                 }
             }
-            InitializeTargetCodes(codes!, ref targetEntityCodesExact!, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
+            InitializeTargetCodes(codes!, ref targetEntityCodesExact, ref targetEntityCodesBeginsWith, ref targetEntityFirstLetters);
 
             var tags = taskConfig["entityTags"];
             if (tags.Exists)
@@ -105,7 +115,7 @@ namespace Vintagestory.GameContent
         /// <param name="targetEntityCodesExact"></param>
         /// <param name="targetEntityCodesBeginsWith"></param>
         /// <param name="targetEntityFirstLetters"></param>
-        public static void InitializeTargetCodes(string[] codes, ref string[]? targetEntityCodesExact, ref string[] targetEntityCodesBeginsWith, ref string targetEntityFirstLetters)
+        public static void InitializeTargetCodes(string[] codes, ref string[] targetEntityCodesExact, ref string[] targetEntityCodesBeginsWith, ref string targetEntityFirstLetters)
         {
             List<string> targetEntityCodesList = new List<string>();
             List<string> beginswith = new List<string>();
@@ -157,11 +167,6 @@ namespace Vintagestory.GameContent
             if (triggerEmotionState != null)
             {
                 entity.GetBehavior<EntityBehaviorEmotionStates>()?.TryTriggerState(triggerEmotionState, 1, targetEntity?.EntityId ?? 0);
-            }
-            var physics = entity.GetBehavior<EntityBehaviorControlledPhysics>();
-            if (physics != null)
-            {
-                stepHeight = physics.StepHeight;
             }
         }
 
@@ -419,12 +424,6 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public int GetOwnGeneration()
-        {
-            int generation = entity.WatchedAttributes.GetInt("generation", 0);
-            if (entity.Properties.Attributes?.IsTrue("tamed") == true) generation += 10;
-            return generation;
-        }
         protected bool isNonAttackingPlayer(Entity e)
         {
             return (attackedByEntity == null || (attackedByEntity != null && attackedByEntity.EntityId != e.EntityId)) && e is EntityPlayer;

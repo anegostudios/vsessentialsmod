@@ -87,6 +87,7 @@ namespace Vintagestory.GameContent
             capi.Event.RegisterGameTickListener(OnClientGameTick, 50);
 
             capi.Event.LevelFinalize += LevelFinalizeInit;
+            capi.Event.MapRegionUnloaded += RemoveWeatherSimForRegion;
 
             capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "weatherSystem");
             capi.Event.RegisterRenderer(this, EnumRenderStage.Done, "weatherSystem");
@@ -115,9 +116,12 @@ namespace Vintagestory.GameContent
             this.WindConfigs = p.WindConfigs;
             this.WeatherEventConfigs = p.WeatherEventConfigs;
 
-            foreach (var val in weatherSimByMapRegion)
+            lock (weatherSimByMapRegionLock)
             {
-                val.Value.ReloadPatterns(api.World.Seed);
+                foreach (var val in weatherSimByMapRegion)
+                {
+                    val.Value.ReloadPatterns(api.World.Seed);
+                }
             }
         }
 
@@ -340,6 +344,8 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
+            if (capi != null) capi.Event.MapRegionUnloaded -= RemoveWeatherSimForRegion;
+            lock (weatherSimByMapRegionLock) weatherSimByMapRegion.Clear();
             base.Dispose();
 
             simSounds?.Dispose();

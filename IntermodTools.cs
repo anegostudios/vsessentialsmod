@@ -46,6 +46,16 @@ namespace Vintagestory.ServerMods
                     // Remap the original asset path to the new path
                     var origPath = new AssetLocation(mod.Info.ModID, asset.Location.Path.Remove(0, prefix.Length));
 
+                    // Skip invalid asset categories instead of crashing the utility
+                    if (origPath.Category == null)
+                    {
+                        api.World.Logger.Error("Compatibility lib: unknown asset category {0}", origPath.FirstPathPart());
+                        continue;
+                    }
+                    
+                    // Some asset categories are not loaded on the client or server. In those cases, we don't have to patch anything anyway
+                    if ((origPath.Category.SideType & api.Side) == 0) continue;
+
                     if (api.Assets.AllAssets.ContainsKey(origPath))
                     {
                         quantityReplaced++;
@@ -54,10 +64,7 @@ namespace Vintagestory.ServerMods
                     {
                         quantityAdded++;
                     }
-
-                    // Some asset categories are not loaded on the client or server. In those cases, we don't have to patch anything anyway
-                    if ((origPath.Category.SideType & api.Side) == 0) continue;
-
+                    
                     api.Assets.Add(origPath, asset);
                 }
             }

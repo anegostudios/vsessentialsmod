@@ -13,31 +13,41 @@ using Vintagestory.API.Server;
 namespace Vintagestory.GameContent;
 
 /// <summary>
-/// Client-side player physics. This class has no further properties.
+/// Client-side player physics.
 /// <br/>Uses the "playerphysics" code
 /// </summary>
 /// <example><code lang="json">
 /// "behaviors": [
 ///  {
-///     "code": "playerphysics"
+///     "code": "playerphysics",
+///     "maxWalkableSlopeGrade": 1
 ///  }
 /// ]
 /// </code></example>
 [DocumentAsJson]
-public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRenderer, IRemotePhysics
+public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRemotePhysics
 {
+    private const double stepClearance = 0.03;
+    private const int stepClearanceIterations = 12;
+    private const double slopeRiseTolerance = 1 / 1024d;
+    private const double walkStepUpSpeed = 0.05;
+    private const double sprintStepUpSpeed = 0.10;
+    private const double sneakStepUpSpeed = 0.025;
+
     private IPlayer player;
     private IServerPlayer serverPlayer;
     private EntityPlayer entityPlayer;
+    private readonly List<Collider> stepColliders = new();
+    private readonly Cuboidd stepTestBox = new();
+    private readonly Cuboidd stepTargetBox = new();
+    private readonly Cuboidd stepLiftBox = new();
+    private readonly Cuboidf stepTerrainBox = new();
+    private readonly Vec3d stepPosition = new();
 
     // 60/s client-side updates.
     private const float interval = 1 / 60f;
     private float accum = 0;
     private int currentTick;
-
-    public double RenderOrder => 1;
-
-    public int RenderRange => 9999;
 
     private int prevDimension = 0;
     public const float ClippingToleranceOnDimensionChange = 0.0625f;
@@ -60,9 +70,11 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             smoothStepping = true;
 
             capi.Event.RegisterRenderer(this, EnumRenderStage.Before, "playerphysics");
+            initializeStandingColliderState(true);
         }
         else
         {
+            initializeStandingColliderState(false);
             EnumHandling handling = EnumHandling.Handled;
             OnReceivedServerPos(true, ref handling);
         }
@@ -135,7 +147,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         EntityAgent eagent = entity as EntityAgent;
         if (eagent.MountedOn != null)
         {
+            clearColliderMotion();
             entity.Swimming = false;
+            entity.FeetInLiquid = false;
             entity.OnGround = false;
 
             if (capi != null)
@@ -160,19 +174,11 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
 
         EntityControls controls = eagent.Controls;
-        if (!controls.NoClip)
-        {
-            if (sapi != null)
-            {
-                collisionTester.ApplyTerrainCollision(entity, lPos, dtFactor, ref newPos, 0, 0);
-            }
-
-            RemoteMotionAndCollision(lPos, dtFactor);
-            ApplyTests(lPos, eagent.Controls, dt, true);
-        } else
+        if (controls.NoClip)
         {
             var pos = entity.Pos;
 
+            clearColliderMotion(pos);
             pos.X += pos.Motion.X * dt * 60f;
             pos.Y += pos.Motion.Y * dt * 60f;
             pos.Z += pos.Motion.Z * dt * 60f;
@@ -180,7 +186,16 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             entity.FeetInLiquid = false;
             entity.OnGround = false;
             controls.Gliding = false;
+            return;
         }
+
+        if (sapi != null)
+        {
+            collisionTester.ApplyTerrainCollision(entity, lPos, dtFactor, ref newPos, 0, 0);
+        }
+
+        RemoteMotionAndCollision(lPos, dtFactor);
+        ApplyTests(lPos, eagent.Controls, dt, true);
     }
 
 
@@ -197,9 +212,21 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         {
             callOnEntityInside();
             entity.AfterPhysicsTick?.Invoke();
+            syncStandingColliderState();
+        }
+        else if (capi.World.Player.Entity != entity)
+        {
+            // Remote players skip SimPhysics, but their animator still reads the controls' move speed.
+            player ??= entityPlayer.Player;
+            if (player != null)
+            {
+                entityPlayer.Controls.MovespeedMultiplier = player.WorldData.MoveSpeedMultiplier;
+            }
+
+            entity.AfterPhysicsTick?.Invoke();
         }
 
-        // note: no need to invoke AfterPhysicsTick on the client, as client-side it will be called from this behavior's OnRenderFrame() method
+        // The local client invokes AfterPhysicsTick from OnRenderFrame().
     }
 
 
@@ -224,7 +251,9 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         // If mounted on something, set position to it and return.
         if (eagent.MountedOn != null)
         {
+            clearColliderMotion();
             entity.Swimming = false;
+            entity.FeetInLiquid = false;
             entity.OnGround = false;
 
             pos.SetPos(eagent.MountedOn.SeatPosition);
@@ -235,14 +264,20 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             return;
         }
 
+        moveWithStandingCollider(pos, controls);
+
+        bool colliderMotionSuspended = suspendInheritedColliderMotion(pos);
         MotionAndCollision(pos, controls, dt);
+        restoreInheritedColliderMotion(pos, colliderMotionSuspended);
         if (!controls.NoClip)
         {
+            inheritStandingColliderMotion(pos, controls);
             collisionTester.NewTick(pos);
 
             if (prevDimension != pos.Dimension)
             {
                 prevDimension = pos.Dimension;
+                clearColliderMotion();
 
                 // Dimension changes are allowed a small amount of clipping into terrain, so we need to push out on the client here, we add 20% for rounding/sync errors
                 collisionTester.PushOutFromBlocks(entity.World.BlockAccessor, entity, pos.XYZ, ClippingToleranceOnDimensionChange * 1.2f);
@@ -358,16 +393,25 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     }
 
     // Do physics every frame on the client.
-    public void OnRenderFrame(float dt, EnumRenderStage stage)
+    public override void OnRenderFrame(float dt, EnumRenderStage stage)
     {
         if (capi.IsGamePaused) return;
 
-        // Unregister the entity if it isn't the player.
         if (capi.World.Player.Entity != entity)
         {
             smoothStepping = false;
-            capi.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+            releaseRemoteStandingColliderRenderer();
             return;
+        }
+
+        // Keep camera interpolation in the collider's frame between fixed physics steps, this should help on moving platforms.
+        if (entityPlayer.MountedOn == null && player?.WorldData.FreeMove != true)
+        {
+            moveWithStandingCollider(entityPlayer.Pos, entityPlayer.Controls, prevPos);
+        }
+        else
+        {
+            clearColliderMotion(entityPlayer.Pos);
         }
 
         accum += dt;
@@ -378,16 +422,18 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         }
 
         var mountedEntity = entityPlayer.MountedOn?.Entity;
+        var mountedCollider = mountedEntity?.GetBehavior<EntityBehaviorKinematicCollider>();
+        bool controlsMount = entityPlayer.MountedOn?.MountSupplier.Controller == entityPlayer;
         IPhysicsTickable tickable = null;
-        if (entityPlayer.MountedOn?.MountSupplier.Controller == entityPlayer)
+        if (controlsMount)
         {
             tickable = mountedEntity?.SidedProperties.Behaviors.Find(b => b is IPhysicsTickable) as IPhysicsTickable;
         }
 
         while (accum >= interval)
         {
-            OnPhysicsTick(interval);
             tickable?.OnPhysicsTick(interval);
+            OnPhysicsTick(interval);
 
             accum -= interval;
             currentTick++;
@@ -407,6 +453,15 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
             AfterPhysicsTick(interval);
             tickable?.AfterPhysicsTick(interval);
+        }
+
+        if (controlsMount) mountedCollider?.UpdateCollider(dt);
+
+        if (entityPlayer.MountedOn != null && mountedCollider != null)
+        {
+            // The mount mesh and collider use this frame's seat pose, including frames without a physics step!
+            entityPlayer.Pos.SetPos(entityPlayer.MountedOn.SeatPosition);
+            prevPos.Set(entityPlayer.Pos);
         }
 
         // For camera, lerps from prevPos to current pos by 1 + accum.
@@ -434,8 +489,8 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         const double max = 0.5;
         double searchBoxLength = max + (controls.Sprint ? 0.25 : controls.Sneak ? 0.05 : 0.2);
 
-        double centerX = (entityCollisionBox.X1 + entityCollisionBox.X2) / 2;
-        double centerZ = (entityCollisionBox.Z1 + entityCollisionBox.Z2) / 2;
+        double centerX = entityCollisionBox.MidX;
+        double centerZ = entityCollisionBox.MidZ;
         double searchHeight = Math.Max(entityCollisionBox.Y1 + StepHeight, entityCollisionBox.Y2);
 
         Vec3d walkVec = controls.WalkVector.Clone();
@@ -443,8 +498,8 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
 
         double outerX = walkVecNormalized.X * searchBoxLength;
         double outerZ = walkVecNormalized.Z * searchBoxLength;
-        double entityHalfWidth = entityCollisionBox.Width / 2;
-        double entityHalfLength = entityCollisionBox.Length / 2;
+        double entityHalfWidth = entityCollisionBox.HalfExtentX;
+        double entityHalfLength = entityCollisionBox.HalfExtentZ;
         outerX += Math.Sign(outerX) * entityHalfWidth;
         outerZ += Math.Sign(outerZ) * entityHalfLength;
         Cuboidd entitySensorBox = new Cuboidd
@@ -455,7 +510,7 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             Z1 = Math.Min(-entityHalfLength, outerZ),
             Z2 = Math.Max(entityHalfLength, outerZ),
 
-            Y1 = entity.CollisionBox.Y1 + 0.01 - (!entity.CollidedVertically && !controls.Jump ? 0.05 : 0),
+            Y1 = entity.CollisionBox.Y1 - (!entity.CollidedVertically && !controls.Jump ? 0.05 : 0),
 
             Y2 = searchHeight
         };
@@ -498,7 +553,189 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
             if (TryStepSmooth(controls, pos, testMotion.Set(0, walkVec.Z), dtFac, FindSteppableCollisionboxSmooth(entityCollisionBox, entitySensorBoxXZAligned, moveDelta.Y, testVec.Set(0, walkVec.Y, walkVec.Z)), entityCollisionBox)) return true;
         }
 
+        if (tryStepOnColliders(controls, pos, moveDelta.X, moveDelta.Z, dtFac, out bool shouldTrySeparateAxes)) return true;
+
+        if (controls.IsStepping && tryStepOnColliders(controls, pos, controls.WalkVector.X * dtFac, controls.WalkVector.Z * dtFac, dtFac, out _)) return true;
+
+        if (!shouldTrySeparateAxes) return false;
+
+        if (tryStepOnColliders(controls, pos, moveDelta.X, 0, dtFac, out _)) return true;
+
+        if (tryStepOnColliders(controls, pos, 0, moveDelta.Z, dtFac, out _)) return true;
+
         return false;
+    }
+
+    private bool tryStepOnColliders(EntityControls controls, EntityPos pos, double motionX, double motionZ, float dtFac, out bool shouldTrySeparateAxes)
+    {
+        shouldTrySeparateAxes = false;
+        if (motionX == 0 && motionZ == 0) return false;
+
+        var world = entity.World;
+        var entityBox = entity.CollisionBox;
+        double targetX = pos.X + motionX;
+        double targetZ = pos.Z + motionZ;
+        stepTargetBox.SetAndTranslate(entityBox, targetX, pos.Y, targetZ);
+        stepTestBox.Set(stepTargetBox);
+        stepTestBox.Y2 += StepHeight;
+        world.CollisionScene.GetColliders(stepTestBox, pos.Dimension, stepColliders, new CollisionQueryFilter(CollisionLayer.Entity, excludedOwnerEntityId: entity.EntityId));
+        if (!intersectsStepColliders(stepTargetBox)) return false;
+        shouldTrySeparateAxes = true;
+
+        stepTestBox.SetAndTranslate(entityBox, pos.X, pos.Y - stepClearance - slopeRiseTolerance, pos.Z);
+        bool staysOnSameCollisionBox = staysOnStepCollisionBoxes(stepTestBox, stepTargetBox);
+        double currentLift = 0;
+        if (staysOnSameCollisionBox)
+        {
+            stepTestBox.SetAndTranslate(entityBox, pos.X, pos.Y, pos.Z);
+            if (!tryGetColliderStepLift(stepTestBox, out currentLift)) return false;
+        }
+
+        stepTestBox.Set(stepTargetBox);
+        if (!tryGetColliderStepLift(stepTestBox, out double targetColliderLift)) return false;
+
+        stepTestBox.Translate(0, targetColliderLift, 0);
+        bool walkable = false;
+        for (int colliderIndex = 0; colliderIndex < stepColliders.Count && !walkable; colliderIndex++)
+        {
+            Collider collider = stepColliders[colliderIndex];
+            for (int boxIndex = 0; boxIndex < collider.CollisionBoxCount; boxIndex++)
+            {
+                if (collider.TryGetAABBContact(boxIndex, stepTestBox, slopeRiseTolerance, out CuboidContact contact)
+                    && contact.Separation >= -slopeRiseTolerance && CollisionTester.IsWalkableColliderSurface(contact.Normal, MaxWalkableSlopeGrade))
+                {
+                    walkable = true;
+                    break;
+                }
+            }
+        }
+        if (!walkable) return false;
+
+        double horizontalDistance = Math.Sqrt(motionX * motionX + motionZ * motionZ);
+        double allowedLift = horizontalDistance * MaxWalkableSlopeGrade + slopeRiseTolerance;
+        double slopeLift = targetColliderLift - currentLift;
+        if (staysOnSameCollisionBox && slopeLift > allowedLift)
+        {
+            shouldTrySeparateAxes = false;
+            return false;
+        }
+
+        double targetClearance = staysOnSameCollisionBox ? slopeRiseTolerance : stepClearance;
+        double targetLift = targetColliderLift + targetClearance;
+        double movementLift = targetLift;
+        if (staysOnSameCollisionBox)
+        {
+            // Preserve the target clearance after the second collision pass applies gravity.
+            movementLift += Math.Max(0, -pos.Motion.Y * dtFac);
+            if (movementLift > StepHeight) return false;
+        }
+
+        stepPosition.Set(targetX, pos.Y + movementLift, targetZ);
+        if (collisionTester.IsColliding(world.BlockAccessor, entityBox, stepPosition, pos.Dimension, false)) return false;
+
+        stepTestBox.SetAndTranslate(entityBox, targetX, pos.Y + movementLift, targetZ);
+        if (intersectsStepColliders(stepTestBox)) return false;
+
+        double appliedLift = staysOnSameCollisionBox ? movementLift : Math.Min(getStepUpSpeed(controls) * dtFac, targetLift);
+        if (!canStepUp(pos, appliedLift)) return false;
+        pos.Y += appliedLift;
+
+        collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref newPos);
+        return true;
+    }
+
+    private bool canStepUp(EntityPos pos, double lift)
+    {
+        var world = entity.World;
+        stepTerrainBox.Set(entity.CollisionBox);
+        stepTerrainBox.Y2 += (float)lift;
+        stepPosition.Set(pos.X, pos.Y, pos.Z);
+        if (collisionTester.IsColliding(world.BlockAccessor, stepTerrainBox, stepPosition, pos.Dimension, false)) return false;
+
+        stepTestBox.SetAndTranslate(entity.CollisionBox, pos.X, pos.Y, pos.Z);
+        stepLiftBox.Set(stepTestBox);
+        stepLiftBox.Y2 += lift;
+        world.CollisionScene.GetColliders(stepLiftBox, pos.Dimension, stepColliders, new CollisionQueryFilter(CollisionLayer.Entity, excludedOwnerEntityId: entity.EntityId));
+        stepLiftBox.Set(stepTestBox);
+        stepLiftBox.Translate(0, lift, 0);
+        for (int i = 0; i < stepColliders.Count; i++)
+        {
+            if (stepColliders[i].TrySweepAABB(stepTestBox, 0, lift, 0, out _) || stepColliders[i].Intersects(stepLiftBox)) return false;
+        }
+        return true;
+    }
+
+    private bool tryGetColliderStepLift(Cuboidd collisionBox, out double lift)
+    {
+        lift = 0;
+        for (int colliderIndex = 0; colliderIndex < stepColliders.Count; colliderIndex++)
+        {
+            Collider collider = stepColliders[colliderIndex];
+            for (int boxIndex = 0; boxIndex < collider.CollisionBoxCount; boxIndex++)
+            {
+                if (!collider.GetCollisionBoxBounds(boxIndex).Intersects(collisionBox)) continue;
+                Cuboidd obstacle = collider.GetCollisionBox(boxIndex);
+                if (!obstacle.Intersects(collisionBox)) continue;
+
+                // Find the top of each intersected box so a ceiling cannot hide a gap above the step.
+                stepLiftBox.Set(collisionBox);
+                stepLiftBox.Translate(0, StepHeight, 0);
+                if (obstacle.Intersects(stepLiftBox)) return false;
+
+                double lowerLift = 0;
+                double upperLift = StepHeight;
+                for (int i = 0; i < stepClearanceIterations; i++)
+                {
+                    double testLift = (lowerLift + upperLift) * 0.5;
+                    stepLiftBox.Y1 = collisionBox.Y1 + testLift;
+                    stepLiftBox.Y2 = collisionBox.Y2 + testLift;
+
+                    if (obstacle.Intersects(stepLiftBox)) lowerLift = testLift;
+                    else upperLift = testLift;
+                }
+                lift = Math.Max(lift, upperLift);
+            }
+        }
+
+        stepLiftBox.Set(collisionBox);
+        stepLiftBox.Translate(0, lift, 0);
+        return !intersectsStepColliders(stepLiftBox);
+    }
+
+    private bool intersectsStepColliders(Cuboidd collisionBox)
+    {
+        for (int i = 0; i < stepColliders.Count; i++)
+        {
+            if (stepColliders[i].Intersects(collisionBox)) return true;
+        }
+
+        return false;
+    }
+
+    private bool staysOnStepCollisionBoxes(Cuboidd firstBox, Cuboidd secondBox)
+    {
+        bool foundContact = false;
+        for (int colliderIndex = 0; colliderIndex < stepColliders.Count; colliderIndex++)
+        {
+            Collider collider = stepColliders[colliderIndex];
+            for (int boxIndex = 0; boxIndex < collider.CollisionBoxCount; boxIndex++)
+            {
+                Cuboidd bounds = collider.GetCollisionBoxBounds(boxIndex);
+                if (!bounds.Intersects(secondBox)) continue;
+
+                Cuboidd collisionBox = collider.GetCollisionBox(boxIndex);
+                if (!collisionBox.Intersects(secondBox)) continue;
+                if (!bounds.Intersects(firstBox) || !collisionBox.Intersects(firstBox)) return false;
+                foundContact = true;
+            }
+        }
+
+        return foundContact;
+    }
+
+    private static double getStepUpSpeed(EntityControls controls)
+    {
+        return controls.Sprint ? sprintStepUpSpeed : controls.Sneak ? sneakStepUpSpeed : walkStepUpSpeed;
     }
 
 
@@ -506,7 +743,6 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
     public bool TryStepSmooth(EntityControls controls, EntityPos pos, Vec2d walkVec, float dtFac, List<Cuboidd> steppableBoxes, Cuboidd entityCollisionBox)
     {
         if (steppableBoxes == null || steppableBoxes.Count == 0) return false;
-        double gravityOffset = 0.03;
 
         Vec2d walkVecOrtho = new Vec2d(walkVec.Y, -walkVec.X).Normalize();
 
@@ -517,44 +753,40 @@ public class EntityBehaviorPlayerPhysics : EntityBehaviorControlledPhysics, IRen
         Cuboidf col = new((float)minX, entity.CollisionBox.Y1, (float)minZ, (float)maxX, entity.CollisionBox.Y2, (float)maxZ);
 
         double newYPos = pos.Y;
-        bool foundStep = false;
         foreach (Cuboidd steppableBox in steppableBoxes)
         {
-            double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + gravityOffset;
-            Vec3d stepPos = new(GameMath.Clamp(newPos.X, steppableBox.MinX, steppableBox.MaxX), newPos.Y + heightDiff + pos.DimensionYAdjustment, GameMath.Clamp(newPos.Z, steppableBox.MinZ, steppableBox.MaxZ));
+            if (steppableBox.Y2 <= entityCollisionBox.Y1) continue;
 
-            bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, col, stepPos, false);
+            double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + stepClearance;
+            Vec3d stepPos = new(GameMath.Clamp(newPos.X, steppableBox.MinX, steppableBox.MaxX), newPos.Y + heightDiff, GameMath.Clamp(newPos.Z, steppableBox.MinZ, steppableBox.MaxZ));
+
+            bool canStep = !collisionTester.IsColliding(entity.World, col, stepPos, pos.Dimension, false);
 
             if (canStep)
             {
-                double elevateFactor = controls.Sprint ? 0.10 : controls.Sneak ? 0.025 : 0.05;
+                double stepUpSpeed = getStepUpSpeed(controls);
                 if (!steppableBox.IntersectsOrTouches(entityCollisionBox))
                 {
-                    newYPos = Math.Max(newYPos, Math.Min(pos.Y + (elevateFactor * dtFac), steppableBox.Y2 - entity.CollisionBox.Y1 + gravityOffset));
+                    newYPos = Math.Max(newYPos, Math.Min(pos.Y + stepUpSpeed * dtFac, steppableBox.Y2 - entity.CollisionBox.Y1 + stepClearance));
                 }
                 else
                 {
-                    newYPos = Math.Max(newYPos, pos.Y + (elevateFactor * dtFac));
+                    newYPos = Math.Max(newYPos, pos.Y + stepUpSpeed * dtFac);
                 }
-                foundStep = true;
             }
         }
-        if (foundStep)
-        {
-            pos.Y = newYPos;
-            collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref newPos);
-        }
-        return foundStep;
+        if (newYPos <= pos.Y || !canStepUp(pos, newYPos - pos.Y)) return false;
+
+        pos.Y = newYPos;
+        collisionTester.ApplyTerrainCollision(entity, pos, dtFac, ref newPos);
+        return true;
     }
     #endregion
 
 
     public override void OnEntityDespawn(EntityDespawnData despawn)
     {
-        capi?.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+        disposeRemoteStandingCollider();
     }
-
-    public void Dispose() { }
-
 
 }

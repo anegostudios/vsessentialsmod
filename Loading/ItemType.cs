@@ -80,9 +80,7 @@ namespace Vintagestory.ServerMods.NoObf
 
         public void InitItem(IClassRegistryAPI instancer, ILogger logger, Item item, API.Datastructures.OrderedDictionary<string, string> searchReplace)
         {
-
             item.CreativeInventoryTabs = BlockType.GetCreativeTabs(item.Code, CreativeInventory, searchReplace);
-
 
             CollectibleBehaviorType[] behaviorTypes = Behaviors;
 
@@ -139,6 +137,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
             item.Code = this.Code;
+            item.SourceFilePath = this.SourceFilePath;
             item.VariantStrict = this.Variant;
             item.Variant = new RelaxedReadOnlyDictionary<string, string>(this.Variant);
             item.Class = this.Class;
@@ -165,6 +164,8 @@ namespace Vintagestory.ServerMods.NoObf
             item.Shape = this.Shape;
             item.Tool = this.Tool;
             item.AttackPower = this.AttackPower;
+            item.KnockbackStrength = this.KnockbackStrength;
+            item.DamageType = this.DamageType;
             item.LiquidSelectable = this.LiquidSelectable;
             item.ToolTier = this.ToolTier;
             item.HeldSounds = this.HeldSounds?.Clone();
@@ -175,12 +176,18 @@ namespace Vintagestory.ServerMods.NoObf
             item.StorageFlags = (EnumItemStorageFlags)this.StorageFlags;
             item.RenderAlphaTest = this.RenderAlphaTest;
             item.HeldTpHitAnimation = this.HeldTpHitAnimation;
+            item.HeldTpHitCombo = this.HeldTpHitCombo;
+            item.HeldTpHitSprintAnimation = this.HeldTpHitSprintAnimation;
+            if (this.HeldTpHitComboAim != null)
+            {
+                this.HeldTpHitComboAim.TryGetValue("high", out item.HeldTpHitComboHigh);
+                this.HeldTpHitComboAim.TryGetValue("mid", out item.HeldTpHitComboMid);
+                this.HeldTpHitComboAim.TryGetValue("low", out item.HeldTpHitComboLow);
+            }
             item.HeldRightTpIdleAnimation = this.HeldRightTpIdleAnimation;
             item.HeldLeftTpIdleAnimation = this.HeldLeftTpIdleAnimation;
-
             item.HeldLeftReadyAnimation = this.HeldLeftReadyAnimation;
             item.HeldRightReadyAnimation = this.HeldRightReadyAnimation;
-
             item.HeldTpUseAnimation = this.HeldTpUseAnimation;
             item.CreativeInventoryStacks = this.CreativeInventoryStacks == null ? null : (CreativeTabAndStackList[])this.CreativeInventoryStacks.Clone();
             item.MatterState = this.MatterState;

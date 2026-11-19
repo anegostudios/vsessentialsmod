@@ -13,10 +13,12 @@ using Vintagestory.GameContent;
 
 namespace Vintagestory.ServerMods
 {
-    public class SpawnOppurtunity
+    public struct SpawnOpportunity(EntityProperties forType, Vec3d pos, bool generatingChunk, AssetLocation originalType = null)
     {
-        public EntityProperties ForType;
-        public Vec3d Pos;
+        public EntityProperties ForType = forType;
+        public Vec3d Pos = pos;
+        public bool InGeneratingChunk = generatingChunk;
+        public AssetLocation OriginalType = originalType;
     }
 
     public class GenCreatures : ModStdWorldGen
@@ -46,7 +48,7 @@ namespace Vintagestory.ServerMods
         protected int shrubsUpRight;
         protected int shrubsBotLeft;
         protected int shrubsBotRight;
-        protected List<SpawnOppurtunity> spawnPositions = new List<SpawnOppurtunity>();
+        protected List<SpawnOpportunity> spawnPositions = [];
 
 
         public override bool ShouldLoad(EnumAppSide side) => side == EnumAppSide.Server;
@@ -98,7 +100,7 @@ namespace Vintagestory.ServerMods
         protected void initWorldGen()
         {
             LoadGlobalConfig(api);
-            rnd = new Random(api.WorldManager.Seed - 18722);
+            rnd = new Random(api.WorldManager.SeedWorldgen - 18722);
             worldheight = api.WorldManager.MapSizeY;
 
             Dictionary<AssetLocation, EntityProperties> entityTypesByCode = new Dictionary<AssetLocation, EntityProperties>();
@@ -111,7 +113,7 @@ namespace Vintagestory.ServerMods
             Dictionary<AssetLocation, Block[]> searchCache = new Dictionary<AssetLocation, Block[]>();
 
             LCGRandom lcgrnd = new LCGRandom();
-            lcgrnd.SetWorldSeed(api.WorldManager.Seed); // Must be the same seed as in EntitySpawner.cs
+            lcgrnd.SetWorldSeed(api.WorldManager.SeedWorldgen); // Must be the same seed as in EntitySpawner.cs
 
             for (int i = 0; i < api.World.EntityTypes.Count; i++)
             {
@@ -167,7 +169,7 @@ namespace Vintagestory.ServerMods
             foreach (var mapcode in mapCodes)
             {
                 int hs = mapcode.GetHashCode();
-                int seed = api.World.Seed + 12897 + hs;
+                int seed = api.World.SeedWorldgen + 12897 + hs;
                 animalMapGens[mapcode] = new MapLayerWobbled(seed, 2, 0.9f, TerraGenConfig.animalMapScale, 4000, -2500);
             }
         }
@@ -255,6 +257,7 @@ namespace Vintagestory.ServerMods
             float xRel, zRel;
 
             int spawned = 0;
+            long herdId = api.WorldManager.GetNextUniqueId();
 
             WorldGenSpawnConditions sc = entityType.Server.SpawnConditions.Worldgen;
             string mapcode = entityType.Server.SpawnConditions.Climate?.MapCode ?? entityType.Server.SpawnConditions.Worldgen.MapCode;
@@ -270,7 +273,7 @@ namespace Vintagestory.ServerMods
 #if PERFTEST
                 val *= 40;
 #endif
-                nextGroupSize = (int)val + ((val - (int)val) > rnd.NextDouble() ? 1 : 0);
+                nextGroupSize = GameMath.RoundRandom(rnd, val);
             }
 
 
@@ -288,7 +291,8 @@ namespace Vintagestory.ServerMods
                     typeToSpawn = grouptypes[1 + rnd.Next(grouptypes.Length - 1)];
                 }
 
-                IBlockAccessor blockAccessor = wgenBlockAccessor.GetChunkAtBlockPos(pos) == null ? api.World.BlockAccessor : wgenBlockAccessor;
+                bool generatingChunk = wgenBlockAccessor.GetChunkAtBlockPos(pos) != null;
+                IBlockAccessor blockAccessor = generatingChunk ? wgenBlockAccessor : api.World.BlockAccessor;
 
                 IMapChunk mapchunk = blockAccessor.GetMapChunkAtBlockPos(pos);
                 if (mapchunk != null)
@@ -299,27 +303,29 @@ namespace Vintagestory.ServerMods
                         pos.Y = heightMap[(pos.Z % chunksize) * chunksize + (pos.X % chunksize)] + 1;
                     }
 
-                    if (CanSpawnAtPosition(blockAccessor, typeToSpawn, pos, sc))
+                    posAsVec.Set(pos.X + 0.5, pos.Y + 0.005, pos.Z + 0.5);
+                    var originalType = typeToSpawn.Code;
+                    if (api.Event.TriggerTrySpawnEntity(blockAccessor, ref typeToSpawn, posAsVec, herdId))
                     {
-                        posAsVec.Set(pos.X + 0.5, pos.Y + 0.005, pos.Z + 0.5);
-
-                        xRel = (float)(posAsVec.X % chunksize) / chunksize;
-                        zRel = (float)(posAsVec.Z % chunksize) / chunksize;
-
-                        // We check temperature at 109% of sea level for the sake of consistency (no polar bears on tall mountains)
-                        climate = GameMath.BiLerpRgbColor(xRel, zRel, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight);
-                        temp = Climate.GetScaledAdjustedTemperatureFloat((climate >> 16) & 0xff, (int)(TerraGenConfig.seaLevel * 0.09));
-                        rain = ((climate >> 8) & 0xff) / 255f;
-                        forestDensity = GameMath.BiLerp(forestUpLeft, forestUpRight, forestBotLeft, forestBotRight, xRel, zRel) / 255f;
-                        shrubDensity = GameMath.BiLerp(shrubsUpLeft, shrubsUpRight, shrubsBotLeft, shrubsBotRight, xRel, zRel) / 255f;
-
-
-                        if (CanSpawnAtConditions(blockAccessor, typeToSpawn, pos, posAsVec, sc, rain, temp, forestDensity, shrubDensity))
+                        if (CanSpawnAtPosition(blockAccessor, typeToSpawn, pos, sc))
                         {
-                            spawnPositions.Add(new SpawnOppurtunity() { ForType = typeToSpawn, Pos = posAsVec.Clone() });
-                            spawned++;
-                        }
+                            xRel = (float)(posAsVec.X % chunksize) / chunksize;
+                            zRel = (float)(posAsVec.Z % chunksize) / chunksize;
 
+                            // We check temperature at 109% of sea level for the sake of consistency (no polar bears on tall mountains)
+                            climate = GameMath.BiLerpRgbColor(xRel, zRel, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight);
+                            temp = Climate.GetScaledAdjustedTemperatureFloat((climate >> 16) & 0xff, (int)(TerraGenConfig.seaLevel * 0.09));
+                            rain = ((climate >> 8) & 0xff) / 255f;
+                            forestDensity = GameMath.BiLerp(forestUpLeft, forestUpRight, forestBotLeft, forestBotRight, xRel, zRel) / 255f;
+                            shrubDensity = GameMath.BiLerp(shrubsUpLeft, shrubsUpRight, shrubsBotLeft, shrubsBotRight, xRel, zRel) / 255f;
+
+
+                            if (CanSpawnAtConditions(blockAccessor, typeToSpawn, pos, posAsVec, sc, rain, temp, forestDensity, shrubDensity))
+                            {
+                                spawnPositions.Add(new SpawnOpportunity(typeToSpawn, posAsVec.Clone(), generatingChunk, originalType));
+                                spawned++;
+                            }
+                        }
                     }
                 }
 
@@ -331,41 +337,38 @@ namespace Vintagestory.ServerMods
             // Only spawn if the group reached the minimum group size
             if (spawnPositions.Count >= nextGroupSize)
             {
-                long herdId = api.WorldManager.GetNextUniqueId();
+                List<Entity> spawningEntities = [];
 
-                foreach (SpawnOppurtunity so in spawnPositions)
+                foreach (SpawnOpportunity so in spawnPositions)
                 {
-                    Entity ent = CreateEntity(so.ForType, so.Pos);
-                    if (ent is EntityAgent)
-                    {
-                        (ent as EntityAgent).HerdId = herdId;
-                    }
-
-                    if (!api.Event.TriggerTrySpawnEntity(wgenBlockAccessor, ref so.ForType, so.Pos, herdId)) continue;
+                    Entity ent = CreateEntity(so.ForType, so.Pos, so.OriginalType);
+                    (ent as EntityAgent)?.HerdId = herdId;
 #if DEBUG
-                    api.Logger.VerboseDebug("worldgen spawned one " + so.ForType.Code.Path);
+                    api.Logger.VerboseDebug($"Worldgen spawned one {so.ForType.Code.Path} at {so.Pos} in {(so.InGeneratingChunk ? "generating" : "generated")} chunk");
 #endif
 
-                    if (wgenBlockAccessor.GetChunkAtBlockPos(pos) == null)
+                    if (so.InGeneratingChunk)
                     {
-                        api.World.SpawnEntity(ent);
-                    }
-                    else
-                    {
+                        ent.DespawnReason = null;
+                        ent.Attributes.SetBool("onFirstSpawn", true);
                         wgenBlockAccessor.AddEntity(ent);
                     }
+                    else api.World.SpawnEntity(ent);
+                    spawningEntities.Add(ent);
                 }
 
+                api.Event.TriggerEntityGroupSpawning(spawningEntities.ToArray(), herdId);
             }
         }
 
 
-        protected Entity CreateEntity(EntityProperties entityType, Vec3d spawnPosition)
+        protected Entity CreateEntity(EntityProperties entityType, Vec3d spawnPosition, AssetLocation originalType)
         {
             Entity entity = api.ClassRegistry.CreateEntity(entityType);
             entity.Pos.SetPosWithDimension(spawnPosition);
             entity.Pos.SetYaw((float)rnd.NextDouble() * GameMath.TWOPI);
             entity.PositionBeforeFalling.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
+            if (entityType.Code != originalType) entity.Attributes.SetString("originaltype", originalType.ToString());
             entity.Attributes.SetString("origin", "worldgen");
             return entity;
         }
@@ -395,9 +398,9 @@ namespace Vintagestory.ServerMods
 
         protected bool CanSpawnAtConditions(IBlockAccessor blockAccessor, EntityProperties type, BlockPos pos, Vec3d posAsVec, BaseSpawnConditions sc, float rain, float temp, float forestDensity, float shrubsDensity)
         {
-            float? lightLevel = blockAccessor.GetLightLevel(pos, EnumLightLevelType.MaxLight);
+            float lightLevel = blockAccessor.GetLightLevel(pos, EnumLightLevelType.MaxLight);
 
-            if (lightLevel == null) return false;
+            if (lightLevel < 0) return false;
             if (sc.MinLightLevel > lightLevel || sc.MaxLightLevel < lightLevel) return false;
             if (sc.MinTemp > temp || sc.MaxTemp < temp) return false;
             if (sc.MinRain > rain || sc.MaxRain < rain) return false;

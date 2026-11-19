@@ -178,21 +178,21 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            float targetRainVolumeLeafy=0;
+            float targetRainVolumeLeafy = 0;
             float targetRainVolumeLeafless = 0;
-            float targetHailVolume=0;
-            float targetTrembleVolume=0;
+            float targetHailVolume = 0;
+            float targetTrembleVolume = 0;
 
             float targetTremblePitch = 0;
-            float targetRainPitch=1;
-            float targetHailPitch=1;
+            float targetRainPitch = 1;
+            float targetHailPitch = 1;
 
             WeatherDataSnapshot weatherData = weatherSys.BlendedWeatherData;
 
+            EntityPlayer eplr = capi.World.Player.Entity;
+            plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
             if (searchComplete)
             {
-                EntityPlayer eplr = capi.World.Player.Entity;
-                plrPos.Set((int)eplr.Pos.X, (int)eplr.Pos.Y, (int)eplr.Pos.Z);
                 searchComplete = false;
 
                 TyronThreadPool.QueueTask(() =>
@@ -225,10 +225,10 @@ namespace Vintagestory.GameContent
                     targetRainVolumeLeafless = GameMath.Max(0, targetRainVolumeLeafless - roomVolumePitchLoss);
 
                     targetRainPitch = Math.Max(0.7f, 1.25f - conds.Rainfall * 0.7f);
-                    targetRainPitch = Math.Max(0, targetRainPitch - roomVolumePitchLoss/4f);
+                    targetRainPitch = Math.Max(0, targetRainPitch - roomVolumePitchLoss / 4f);
 
-                    targetTrembleVolume = GameMath.Clamp(conds.Rainfall * 1.6f - 0.8f - roomVolumePitchLoss*0.25f, 0, 1);
-                    targetTremblePitch = GameMath.Clamp(1 - roomVolumePitchLoss*0.65f, 0, 1);
+                    targetTrembleVolume = GameMath.Clamp(conds.Rainfall * 1.6f - 0.8f - roomVolumePitchLoss * 0.25f, 0, 1);
+                    targetTremblePitch = GameMath.Clamp(1 - roomVolumePitchLoss * 0.65f, 0, 1);
 
                     if (!rainSoundsOn && (targetRainVolumeLeafy > 0.01 || targetRainVolumeLeafless > 0.01))
                     {
@@ -241,7 +241,8 @@ namespace Vintagestory.GameContent
                         curRainPitch = targetRainPitch;
                     }
 
-                    if (capi.World.Player.Entity.IsEyesSubmerged()) {
+                    if (capi.World.Player.Entity.IsEyesSubmerged())
+                    {
                         curRainPitch = targetRainPitch / 2;
                         targetRainVolumeLeafy *= 0.75f;
                         targetRainVolumeLeafless *= 0.75f;
@@ -295,7 +296,6 @@ namespace Vintagestory.GameContent
             lowTrembleSound?.SetVolume(curTrembleVolume);
             lowTrembleSound?.SetPitch(curTremblePitch);
 
-
             if (hailSoundsOn)
             {
                 hailSound?.SetVolume(curHailVolume);
@@ -317,8 +317,13 @@ namespace Vintagestory.GameContent
             }
 
 
+            handleWindLeavesRustleSound(dt, weatherData, nearbyLeaviness);
 
+            playTreeCreakSounds(weatherData);
+        }
 
+        protected void handleWindLeavesRustleSound(float dt, WeatherDataSnapshot weatherData, float nearbyLeaviness)
+        {
             float wstr = (1 - roomVolumePitchLoss) * weatherData.curWindSpeed.X - 0.3f;
             if (wstr > 0.03f || curWindVolumeLeafy > 0.01f || curWindVolumeLeafless > 0.01f)
             {
@@ -348,7 +353,47 @@ namespace Vintagestory.GameContent
                     windSoundsOn = false;
                 }
             }
+        }
 
+        protected void playTreeCreakSounds(WeatherDataSnapshot weatherData)
+        {
+            // Sounds like shit
+            return;
+
+            float windStrength = weatherData.curWindSpeed.Length();
+            if (windStrength >= 0.5f)
+            {
+                int tries = GameMath.RoundRandom(capi.World.Rand, 1.5f + 5 * (windStrength - 0.5f));
+                while (tries-- > 0)
+                {
+                    int dx = capi.World.Rand.Next(-20, 21);
+                    int dy = capi.World.Rand.Next(-20, 21);
+                    int dz = capi.World.Rand.Next(-20, 21);
+
+                    BlockPos pos = plrPos.AddCopy(dx, dy, dz);
+
+                    if (capi.World.BlockAccessor.GetBlock(pos).Attributes?.IsTrue("playTreeCreak") == true && pos.Y - capi.World.BlockAccessor.GetTerrainMapheightAt(pos) > 4)
+                    {
+                        float pitch = (float)(0.4f + 0.4f * capi.World.Rand.NextDouble());
+                        var sound = capi.World.LoadSound(new SoundParams()
+                        {
+                            Location = new AssetLocation("sounds/environment/treecreak*"),
+                            ShouldLoop = false,
+                            DisposeOnFinish = true,
+                            Position = new Vec3f(pos.X + 0.5f, pos.Y + 0.5f, pos.Z + 0.5f),
+                            RelativePosition = false,
+                            Range = 64,
+                            SoundType = EnumSoundType.Ambient,
+                            Volume = 1
+                        });
+
+                        var dist = GameMath.Sqrt(dx * dx + dy * dy + dz * dz);
+                        sound.SetPitch(pitch);
+                        sound.SetReverb(0.75f + 0.3f * Math.Min(1f, dist / 30f));
+                        sound.Start();
+                    }
+                }
+            }
         }
 
         public void Dispose()

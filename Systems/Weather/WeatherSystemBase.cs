@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -231,7 +232,23 @@ namespace Vintagestory.GameContent
             return getOrCreateWeatherSimForRegion(index2d, mapregion);
         }
 
-        object weatherSimByMapRegionLock = new object();
+        protected readonly object weatherSimByMapRegionLock = new object();
+        // Weak keys prevent late cloud-reader lookups from resurrecting an unloaded region
+        // without retaining a history of all visited regions ourselves.
+        private readonly ConditionalWeakTable<IMapRegion, object> unloadedWeatherRegions = new();
+
+        protected void RemoveWeatherSimForRegion(Vec2i coords, IMapRegion region)
+        {
+            lock (weatherSimByMapRegionLock)
+            {
+                unloadedWeatherRegions.GetValue(region, _ => new object());
+                long index = MapRegionIndex2D(coords.X, coords.Y);
+                if (weatherSimByMapRegion.TryGetValue(index, out var sim) && ReferenceEquals(sim.MapRegion, region))
+                {
+                    weatherSimByMapRegion.Remove(index);
+                }
+            }
+        }
 
         public WeatherSimulationRegion getOrCreateWeatherSimForRegion(long index2d, IMapRegion mapregion)
         {
@@ -240,47 +257,44 @@ namespace Vintagestory.GameContent
 
             lock (weatherSimByMapRegionLock)
             {
-                if (weatherSimByMapRegion.TryGetValue(index2d, out weatherSim))
+                if (unloadedWeatherRegions.TryGetValue(mapregion, out _)) return null;
+                if (weatherSimByMapRegion.TryGetValue(index2d, out weatherSim) && ReferenceEquals(weatherSim.MapRegion, mapregion))
                 {
                     return weatherSim;
                 }
-            }
 
-            weatherSim = new WeatherSimulationRegion(this, regioncoord.X, regioncoord.Z);
-            weatherSim.Initialize();
+                weatherSim = new WeatherSimulationRegion(this, regioncoord.X, regioncoord.Z);
+                weatherSim.Initialize();
 
-            mapregion.RemoveModdata("weather"); // Old pre 1.18 format
+                mapregion.RemoveModdata("weather"); // Old pre 1.18 format
 
-            byte[] data = mapregion.GetModdata("weatherState");
-            if (data != null)
-            {
-                try
+                byte[] data = mapregion.GetModdata("weatherState");
+                if (data != null)
                 {
-                    weatherSim.FromBytes(data);
-                    //api.World.Logger.Notification("{2}: Loaded weather pattern @{0}/{1}", regioncoord.X, regioncoord.Z, api.Side);
-                }
-                catch (Exception)
+                    try
+                    {
+                        weatherSim.FromBytes(data);
+                        //api.World.Logger.Notification("{2}: Loaded weather pattern @{0}/{1}", regioncoord.X, regioncoord.Z, api.Side);
+                    }
+                    catch (Exception)
+                    {
+                        //api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one. Likely due to game version change.", regioncoord.X, regioncoord.Z);
+                        weatherSim.LoadRandomPattern();
+                        weatherSim.NewWePattern.OnBeginUse();
+                    }
+                } else
                 {
-                    //api.World.Logger.Warning("Unable to load weather pattern from region {0}/{1}, will load a random one. Likely due to game version change.", regioncoord.X, regioncoord.Z);
+                    //api.World.Logger.Notification("{2}: Random weather pattern @{0}/{1}", regioncoord.X, regioncoord.Z, api.Side);
                     weatherSim.LoadRandomPattern();
                     weatherSim.NewWePattern.OnBeginUse();
+                    mapregion.SetModdata("weatherState", weatherSim.ToBytes());
                 }
-            } else
-            {
-                //api.World.Logger.Notification("{2}: Random weather pattern @{0}/{1}", regioncoord.X, regioncoord.Z, api.Side);
-                weatherSim.LoadRandomPattern();
-                weatherSim.NewWePattern.OnBeginUse();
-                mapregion.SetModdata("weatherState", weatherSim.ToBytes());
-            }
 
-            weatherSim.MapRegion = mapregion;
+                weatherSim.MapRegion = mapregion;
 
-            lock (weatherSimByMapRegionLock)
-            {
                 weatherSimByMapRegion[index2d] = weatherSim;
+                return weatherSim;
             }
-
-            return weatherSim;
         }
 
 

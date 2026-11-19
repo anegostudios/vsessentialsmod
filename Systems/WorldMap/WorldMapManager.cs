@@ -195,10 +195,10 @@ namespace Vintagestory.GameContent
                 capi.RegisterLinkProtocol("worldmap", onWorldMapLinkClicked);
             }
 
-            foreach (var val in MapLayerRegistry)
+            foreach (var (layerKey, layerType) in MapLayerRegistry)
             {   
-                if (val.Key == "entities" && !api.World.Config.GetAsBool("entityMapLayer")) continue;
-                MapLayers.Add((MapLayer)Activator.CreateInstance(val.Value, api, this));
+                if (layerKey == "entities" && !api.World.Config.GetAsBool("entityMapLayer")) continue;
+                MapLayers.Add((MapLayer)Activator.CreateInstance(layerType, api, this));
             }
 
 

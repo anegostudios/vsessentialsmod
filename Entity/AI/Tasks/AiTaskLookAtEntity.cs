@@ -11,7 +11,13 @@ namespace Vintagestory.GameContent
     {
         public bool manualExecute;
         public float moveSpeed = 0.02f;
-        public float seekingRange = 25f;
+        [Obsolete("Use searchRange instead")]
+        // This was never read from json, so no need for backwards compatibiltiy
+        protected float seekingRange
+        {
+            get => searchRange;
+            set => searchRange = value;
+        }
         public float maxFollowTime = 60;
 
         float minTurnAnglePerSec;
@@ -34,7 +40,7 @@ namespace Vintagestory.GameContent
                 if (!PreconditionsSatisfied()) return false;
                 if (rand.NextDouble() > ExecutionChance) return false;
 
-                targetEntity = partitionUtil.GetNearestEntity(entity.Pos.XYZ, seekingRange, (e) => IsTargetableEntity(e, seekingRange), EnumEntitySearchType.Creatures);
+                targetEntity = partitionUtil.GetNearestEntity(entity.Pos.XYZ, searchRange, (e) => IsTargetableEntity(e, searchRange), SearchType);
                 return targetEntity != null;
             }
             return false;

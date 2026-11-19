@@ -161,7 +161,7 @@ namespace Vintagestory.GameContent
         [Obsolete("Prefer using player."+nameof(IPlayer.IsInInteractionRangeOf)+". The dialog does not have an in-world position.", true)]
         public virtual bool IsInRangeOfBlock()
         {
-            return capi.World.Player.IsInInteractionRangeOf(owningEntity, 0); // Rennorb 2026.07.06: Slack will change to standardized .25 in 1.23.
+            return capi.World.Player.IsInInteractionRangeOf(owningEntity);
         }
 
 

@@ -4,6 +4,7 @@ using System.IO;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -16,6 +17,7 @@ namespace Vintagestory.GameContent
         public float Damage { get; set; }
         public int DamageTier { get; set; } = 0;
         public EnumDamageType DamageType { get; set; } = EnumDamageType.PiercingAttack;
+        public bool ApplyUnderwaterPenalty { get; set; }
         public bool IgnoreInvFrames { get; set; } = false;
         public ItemStack? ProjectileStack { get; set; }
         public ItemStack? WeaponStack { get; set; }
@@ -40,6 +42,7 @@ namespace Vintagestory.GameContent
             Damage = config.Damage;
             DamageTier = config.DamageTier;
             DamageType = config.DamageType;
+            ApplyUnderwaterPenalty = config.ApplyUnderwaterPenalty ?? (DamageType != EnumDamageType.PiercingAttack);
             IgnoreInvFrames = config.IgnoreInvFrames;
             DropOnImpactChance = config.DropOnImpactChance;
             DamageStackOnImpact = config.DamageStackOnImpact;
@@ -94,18 +97,18 @@ namespace Vintagestory.GameContent
             ProjectileStack?.ToBytes(writer);
         }
 
-        public override void FromBytes(BinaryReader reader, bool isSync)
+        public override void FromBytes(ref BinarySpanReader reader, bool isSync)
         {
-            base.FromBytes(reader, isSync);
+            base.FromBytes(ref reader, isSync);
             beforeCollided = reader.ReadBoolean();
             try
             {
-                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                if (reader.RemainingBytes.Length > 0)
                 {
-                    ProjectileStack = new ItemStack(reader);
+                    ProjectileStack = new ItemStack(ref reader);
                 }
             }
-            catch (Exception)
+            catch (Exception) // Rennorb 11.08.2026: Not sure if this is still needed, but better safe then sorry.
             {
                 // If projectile stack was 'null' when calling 'ToBytes', lets leave it 'null' here and not cause a crash.
             }
@@ -358,7 +361,25 @@ namespace Vintagestory.GameContent
             entity.Pos.Motion.Set(direction * speed);
             entity.World = byEntity.World;
 
-            (entity as IProjectile)?.PreInitialize();
+            if (entity is IProjectile projectile)
+            {
+                projectile.PreInitialize();
+
+                if (byEntity.Swimming && projectile.WeaponStack == null)
+                {
+                    projectile.Damage *= (float)byEntity.World.Config.GetDecimal("underwaterDamageMultiplier", 0.7);
+
+                    if (!byEntity.OnGround)
+                    {
+                        projectile.Damage *= (float)byEntity.World.Config.GetDecimal("underwaterFloatingDamageMultiplier", 0.8);
+                    }
+
+                    if (projectile.ApplyUnderwaterPenalty)
+                    {
+                        projectile.Damage *= (float)byEntity.World.Config.GetDecimal("underwaterSevereDamageMultiplier", 0.2);
+                    }
+                }
+            }
 
             byEntity.World?.SpawnPriorityEntity(entity);
         }

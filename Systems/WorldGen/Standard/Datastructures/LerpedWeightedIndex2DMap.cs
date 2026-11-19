@@ -8,8 +8,8 @@ namespace Vintagestory.ServerMods
 {
     /// <summary>
     /// This datastructure can provide a list of weighted indices (e.g. biome index, geologic province index) for a given x/y coordinate using bilinear interpolation for coordinates with fractional values.
-    /// 
-    /// This datastructure is an essential part for the generation of very large scale terrain generation maps. The challenge we are facing is that we require smooth transitions from one discrete state to another. How do we do it? We turn it into a list of states connected with a weighting factor. E.g. 90% mountain, 10% plains. 
+    ///
+    /// This datastructure is an essential part for the generation of very large scale terrain generation maps. The challenge we are facing is that we require smooth transitions from one discrete state to another. How do we do it? We turn it into a list of states connected with a weighting factor. E.g. 90% mountain, 10% plains.
     /// This requires us to:
     /// - Turn scalar values into lists of values + weight
     /// - Perform bilienar interpolation to create smooth transitions
@@ -98,10 +98,8 @@ namespace Vintagestory.ServerMods
         /// </summary>
         public float[] WeightsAt(float x, float z, float[] output)
         {
-            for (int i = 0; i < output.Length; i++)
-            {
-                output[i] = 0;
-            }
+            // Quickly clear the array and reuse variables
+            Array.Clear(output, 0, output.Length);
 
             int posXLeft = (int)Math.Floor(x - 0.5f) + topleftPadding;
             int posXRight = posXLeft + 1;
@@ -112,17 +110,21 @@ namespace Vintagestory.ServerMods
             float fx = x - (posXLeft - topleftPadding + 0.5f);
             float fz = z - (posZLeft - topleftPadding + 0.5f);
 
+            int indexZLeft = posZLeft * sizeX;
+
             HalfBiLerp(   // Top
-                groups[posZLeft * sizeX + posXLeft],
-                groups[posZLeft * sizeX + posXRight],
+                groups[indexZLeft + posXLeft],
+                groups[indexZLeft + posXRight],
                 fx,
                 output,
                 (1 - fz)
             );
 
+            int indexZRight = posZRight * sizeX;
+
             HalfBiLerp(    // Bottom
-                groups[posZRight * sizeX + posXLeft],
-                groups[posZRight * sizeX + posXRight],
+                groups[indexZRight + posXLeft],
+                groups[indexZRight + posXRight],
                 fx,
                 output,
                 fz

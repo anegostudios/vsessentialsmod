@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Client;
@@ -109,32 +110,10 @@ namespace Vintagestory.GameContent
 
         public override bool ThreadSafe { get { return true; } }
 
-        bool GotCrushed
-        {
-            get
-            {
-                return
-                    (entity.WatchedAttributes.HasAttribute("deathReason") && (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason") == EnumDamageSource.Fall) ||
-                    (entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Crushing)
-                ;
-            }
-        }
-
-        bool GotElectrocuted
-        {
-            get
-            {
-                return entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Electricity;
-            }
-        }
-
-        bool GotAcidified
-        {
-            get
-            {
-                return entity.WatchedAttributes.HasAttribute("deathDamageType") && (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Acid;
-            }
-        }
+        bool GotCrushed => (EnumDamageSource)entity.WatchedAttributes.GetInt("deathReason") == EnumDamageSource.Fall || (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Crushing;
+        bool GotElectrocuted => (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Electricity;
+        bool GotAcidified => (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Acid;
+        bool DiedByLava => (EnumDamageType)entity.WatchedAttributes.GetInt("deathDamageType") == EnumDamageType.Lava;
 
         public float AnimalWeight
         {
@@ -165,13 +144,17 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                if (GotCrushed)
+                if (DiedByLava)
                 {
-                    return 0.5f;
+                    return 0.15f;
                 }
                 if (GotAcidified)
                 {
                     return 0.25f;
+                }
+                if (GotCrushed)
+                {
+                    return 0.5f;
                 }
 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");
@@ -188,10 +171,17 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public bool IsHarvestable(ItemSlot withItem, Entity forEntity)
+        public bool IsHarvested => entity.WatchedAttributes.GetBool("harvested", false);
+        public override InventoryBase Inventory => this.inv;
+        public override string InventoryClassName => "harvestableInv";
+
+        public bool DropsGenerated
         {
-            return !entity.Alive && !IsHarvested;
+            get { return entity.WatchedAttributes.GetBool("dropsgenerated"); }
+            set { entity.WatchedAttributes.SetBool("dropsgenerated", value); }
         }
+
+        public bool IsHarvestable(ItemSlot withItem, Entity forEntity) => !entity.Alive && !IsHarvested;
 
         /// <summary>
         /// <!--<jsonalias>duration</jsonalias>-->
@@ -202,24 +192,6 @@ namespace Vintagestory.GameContent
         public float GetHarvestDuration(ItemSlot withItem, Entity forEntity)
         {
             return baseHarvestDuration * forEntity.Stats.GetBlended("animalHarvestingTime");
-        }
-
-        public bool IsHarvested
-        {
-            get
-            {
-                return entity.WatchedAttributes.GetBool("harvested", false);
-            }
-        }
-
-        public override InventoryBase Inventory => this.inv;
-        public override string InventoryClassName => "harvestableInv";
-
-
-        public bool DropsGenerated
-        {
-            get { return entity.WatchedAttributes.GetBool("dropsgenerated"); }
-            set { entity.WatchedAttributes.SetBool("dropsgenerated", value); }
         }
 
 
@@ -233,10 +205,7 @@ namespace Vintagestory.GameContent
             harshWinters = entity.World.Config.GetString("harshWinters").ToBool(true);
         }
 
-        public override bool ShouldEarlyLoadCollectibleMappings()
-        {
-            return false;
-        }
+        public override bool ShouldEarlyLoadCollectibleMappings() => false;
 
         public override void AfterInitialized(bool onSpawn)
         {
@@ -441,21 +410,26 @@ namespace Vintagestory.GameContent
             }
         }
 
-
-        public override void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled)
+        public override void OnReceivedClientPacket(IServerPlayer player, int packetId, SerializedData packetData, ref EnumHandling handled, ref Entity.CachedAccessPerms perms)
         {
-            if (packetid < 1000 && inv.HasOpened(player))
+            switch(packetId)
             {
-                var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior harvestable"))
-                {
-                    // No need to revert this, just discard the request.
-                    return;
-                }
+                case < 1000:
+                    if(!inv.HasOpened(player))
+                    {
+                        break;
+                    }
 
-                inv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
-                handled = EnumHandling.PreventSubsequent;
-                return;
+                    if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior harvestable"))
+                    {
+                        // No need to revert this, just discard the request.
+                        break;
+                    }
+
+                    inv.InvNetworkUtil.HandleClientPacket(player, packetId, packetData);
+                    handled = EnumHandling.PreventSubsequent;
+
+                    break;
             }
         }
 
@@ -608,6 +582,10 @@ namespace Vintagestory.GameContent
                 if (GotAcidified)
                 {
                     infotext.AppendLine(Lang.Get("deadcreature-aciddissolved"));
+                }
+                if (DiedByLava)
+                {
+                    infotext.AppendLine(Lang.Get("deadcreature-diedbylava"));
                 }
 
                 string deathByEntityCode = entity.WatchedAttributes.GetString("deathByEntity");

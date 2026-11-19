@@ -26,7 +26,7 @@ namespace Vintagestory.ServerMods
 
             for (int i = 0; i < VillageTypes.Length; i++)
             {
-                LCGRandom rand = new LCGRandom(api.World.Seed + i + 512);
+                LCGRandom rand = new LCGRandom(api.World.SeedWorldgen + i + 512);
                 VillageTypes[i].Init(api, blockLayerConfig, structureConfig, resolvedRocktypeRemapGroups, schematicYOffsets, null, blockLayerConfig.RockStrata, rand);
             }
         }

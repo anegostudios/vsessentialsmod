@@ -43,7 +43,7 @@ namespace Vintagestory.GameContent
         }
 
         public float TTL = MaxTTL;
-        public static float MaxTTL = 30f;   // Allow map chunk textures to survive off-screen for 30 seconds before being unloaded; gives more lee-way for players who are panning zoomed-out maps 
+        public static float MaxTTL = 30f;   // Allow map chunk textures to survive off-screen for 30 seconds before being unloaded; gives more lee-way for players who are panning zoomed-out maps
 
         public bool IsChunkSet(int dx, int dz)
         {
@@ -65,7 +65,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        
+
         int[][] pixelsToSet;
         public void setChunk(int dx, int dz, int[] pixels)
         {
@@ -132,8 +132,8 @@ namespace Vintagestory.GameContent
                 Texture.TextureId,
                 (int)(map.Bounds.renderX + viewPos.X),
                 (int)(map.Bounds.renderY + viewPos.Y),
-                (int)(Texture.Width * map.ZoomLevel),
-                (int)(Texture.Height * map.ZoomLevel),
+                (int)(Texture.Width * map.ScaledZoomLevel),
+                (int)(Texture.Height * map.ScaledZoomLevel),
                 renderZ
             );
         }
@@ -141,7 +141,7 @@ namespace Vintagestory.GameContent
         public override void Dispose()
         {
             base.Dispose();
-            
+
         }
 
         public void ActuallyDispose()

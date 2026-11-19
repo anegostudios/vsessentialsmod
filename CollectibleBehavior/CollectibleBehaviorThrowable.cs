@@ -62,6 +62,11 @@ namespace Vintagestory.GameContent
                 return false;
             }
 
+            if (byEntity.World.Side == EnumAppSide.Client && byEntity.Controls.LeftMouseDown)
+            {
+                byEntity.RequestedHandUseCancelReason = EnumItemUseCancelReason.PlayerTriggered;
+            }
+
             return true;
         }
 
@@ -107,6 +112,9 @@ namespace Vintagestory.GameContent
                 entity.Pos.Yaw = entity.Pos.Yaw = GameMath.TWOPI * (float)byEntity.World.Rand.NextDouble();
             }
             projectile.SetFromConfig(config);
+            projectile.ApplyUnderwaterPenalty = stack.Attributes.TryGetBool("applyUnderwaterPenalty")
+                ?? stack.ItemAttributes?["applyUnderwaterPenalty"].AsBool(projectile.ApplyUnderwaterPenalty)
+                ?? projectile.ApplyUnderwaterPenalty;
             projectile.FiredBy = byEntity;
             projectile.ProjectileStack = stack;
 
@@ -126,6 +134,12 @@ namespace Vintagestory.GameContent
         public override WorldInteraction[] GetHeldInteractionHelp(ItemSlot inSlot, ref EnumHandling handling)
         {
             handling = EnumHandling.Handled;
+            if (((ICoreClientAPI)inSlot.Inventory.Api).World.Player.Entity.Attributes.GetInt("aiming") != 0)
+            {
+                handling = EnumHandling.PreventSubsequent;
+                return [new WorldInteraction { ActionLangCode = "general-cancel", MouseButton = EnumMouseButton.Left }];
+            }
+
             return [
                 new WorldInteraction()
                 {

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -14,14 +13,34 @@ namespace Vintagestory.ServerMods
 {
     public class TreeGen : ITreeGenerator
     {
-        // "Temporary Values" linked to currently generated tree
-        IBlockAccessor blockAccessor;
-        TreeGenParams treeGenParams;
-        float size;
+        /// <summary>
+        /// Thread-local state for each tree
+        /// </summary>
+        private sealed class State
+        {
+            public IBlockAccessor blockAccessor;
+            public TreeGenParams treeGenParams;
+            public readonly List<TreeGenBranch> branchesByDepth = [];
 
-        List<TreeGenBranch> branchesByDepth = new List<TreeGenBranch>();
+            /// <summary>
+            /// Buffer for block positions to avoid allocations
+            /// </summary>
+            public readonly BlockPos[] posStack = new BlockPos[32];
 
-        // Tree config
+            /// <summary>
+            /// Field for temporary vine positions
+            /// </summary>
+            public readonly BlockPos vineScratchPos = new(0);
+
+            public State()
+            {
+                // The maximum recursion depth in growBranch is limited by the condition depth > 30.
+                for (int i = 0; i < posStack.Length; i++) posStack[i] = new BlockPos(0);
+            }
+        }
+
+        private readonly ThreadLocal<State> state = new(() => new State());
+
         TreeGenConfig config;
         private readonly ForestFloorSystem forestFloor;
 
@@ -34,18 +53,18 @@ namespace Vintagestory.ServerMods
         public void GrowTree(IBlockAccessor ba, BlockPos pos, TreeGenParams treeGenParams, IRandom random)
         {
             int treeSubType = random.NextInt(8);
-
-            this.blockAccessor = ba;
-            this.treeGenParams = treeGenParams;
-            this.size = treeGenParams.size * config.sizeMultiplier + config.sizeVar.nextFloat(1, random);
+            float size = treeGenParams.size * config.sizeMultiplier + config.sizeVar.nextFloat(1, random);
 
             pos.Up(config.yOffset);
 
             TreeGenTrunk[] trunks = config.trunks;
 
-            branchesByDepth.Clear();
-            branchesByDepth.Add(null);
-            branchesByDepth.AddRange(config.branches);
+            State st = state.Value;
+            st.blockAccessor = ba;
+            st.treeGenParams = treeGenParams;
+            st.branchesByDepth.Clear();
+            st.branchesByDepth.Add(null);
+            st.branchesByDepth.AddRange(config.branches);
 
             forestFloor.ClearOutline();
 
@@ -58,7 +77,7 @@ namespace Vintagestory.ServerMods
 
                 if (random.NextDouble() <= trunk.probability)
                 {
-                    branchesByDepth[0] = trunk;
+                    st.branchesByDepth[0] = trunk;
 
                     growBranch(
                         random,
@@ -85,7 +104,9 @@ namespace Vintagestory.ServerMods
                 forestFloor.sapi.Logger.Warning("TreeGen.growBranch() aborted, too many branches!"); return;
             }
 
-            TreeGenBranch branch = branchesByDepth[Math.Min(depth, branchesByDepth.Count - 1)];
+            State st = state.Value;
+
+            TreeGenBranch branch = st.branchesByDepth[Math.Min(depth, st.branchesByDepth.Count - 1)];
 
             float widthloss = depth == 0 ? trunkWidthLoss : branch.WidthLoss(rand);
             float widthlossCurve = branch.widthlossCurve;
@@ -106,7 +127,8 @@ namespace Vintagestory.ServerMods
             // we want to place around the trunk/branch => offset the coordinates when growing stuff from the base
             float trunkOffsetX, trunkOffsetZ;
 
-            BlockPos currentPos = new BlockPos(basePos.dimension);
+            BlockPos currentPos = st.posStack[depth]; // instead of new BlockPos(...) we take an object from the stack
+            currentPos.dimension = basePos.dimension; // update the dimension, since the object can be reused
 
             float sinAngleVer, cosAnglerHor, sinAngleHor;
 
@@ -142,13 +164,13 @@ namespace Vintagestory.ServerMods
 
                 currentPos.Set(basePos.X + dx, basePos.Y + dy, basePos.Z + dz);
 
-                PlaceResumeState state = getPlaceResumeState(currentPos, blockId, wideTrunk);
+                PlaceResumeState resumeState = getPlaceResumeState(currentPos, blockId, wideTrunk);
 
-                if (state == PlaceResumeState.CanPlace)
+                if (resumeState == PlaceResumeState.CanPlace)
                 {
-                    PlaceBlockEtc(blockId, currentPos, rand, dx, dz);
+                    PlaceBlocks(blockId, currentPos, rand, dx, dz);
                 }
-                else if (state == PlaceResumeState.Stop)
+                else if (resumeState == PlaceResumeState.Stop)
                 {
                     return;
                 }
@@ -233,27 +255,49 @@ namespace Vintagestory.ServerMods
         /// <summary>
         /// Place one tree block and any consequentials from that: maybe apply moss; maybe update the canopy outline for forest floor purposes; maybe place vines
         /// </summary>
-        private void PlaceBlockEtc(int blockId, BlockPos currentPos, IRandom rand, float dx, float dz)
+        protected virtual void PlaceBlocks(int blockId, BlockPos currentPos, IRandom rand, float dx, float dz)
         {
-            blockAccessor.SetBlock(blockId, currentPos);
+            State st = state.Value;
 
-            if (blockAccessor.GetBlock(blockId).BlockMaterial == EnumBlockMaterial.Wood && treeGenParams.mossGrowthChance > 0 && config.treeBlocks.mossDecorBlock != null)
+            if (config.GenMode == EnumTreeGenMode.Willow)
+            {
+                if (blockId == config.treeBlocks.logBlockId)
+                {
+                    st.blockAccessor.SetBlock(config.treeBlocks.topLeavesBlockId, currentPos.UpCopy());
+                }
+                else
+                {
+                    int rainy = st.blockAccessor.GetRainMapHeightAt(currentPos);
+                    if (currentPos.Y >= rainy)
+                    {
+                        blockId = config.treeBlocks.topLeavesBlockId;
+                        var belowPos = currentPos.DownCopy();
+                        if (st.blockAccessor.GetBlock(belowPos).Id == config.treeBlocks.topLeavesBlockId)
+                        {
+                            st.blockAccessor.SetBlock(config.treeBlocks.leavesBlockId, belowPos);
+                        }
+                    }
+                }
+            }
+
+            st.blockAccessor.SetBlock(blockId, currentPos);
+            
+            if (st.treeGenParams.mossGrowthChance > 0 && config.treeBlocks.mossDecorBlock != null && st.blockAccessor.GetBlock(blockId).BlockMaterial == EnumBlockMaterial.Wood)
             {
                 var rnd = rand.NextDouble();
-                int faceIndex = treeGenParams.hemisphere == EnumHemisphere.North ? 0 : 2; // Prefer north face on the northern hemisphere, and south otherwise (= the shady spot)
+                int faceIndex = st.treeGenParams.hemisphere == EnumHemisphere.North ? 0 : 2; // Prefer north face on the northern hemisphere, and south otherwise (= the shady spot)
                 for (int i = 2; i >= 0; i--)
                 {
-                    if (rnd > treeGenParams.mossGrowthChance * i) break;
+                    if (rnd > st.treeGenParams.mossGrowthChance * i) break;
                     var face = BlockFacing.HORIZONTALS[faceIndex % 4];
-                    var block = blockAccessor.GetBlockOnSide(currentPos, face);
+                    var block = st.blockAccessor.GetBlockOnSide(currentPos, face);
                     if (!block.SideSolid[face.Opposite.Index])
                     {
-                        blockAccessor.SetDecor(config.treeBlocks.mossDecorBlock, currentPos, face);
+                        st.blockAccessor.SetDecor(config.treeBlocks.mossDecorBlock, currentPos, face);
                     }
                     faceIndex += rand.NextInt(4);
                 }
             }
-
 
             // Update the canopy outline of the tree for this block position
             int idz = (int)(dz + ForestFloorSystem.Range);
@@ -281,14 +325,15 @@ namespace Vintagestory.ServerMods
                 outline[canopyIndex + ForestFloorSystem.GridRowSize]++;
             }
 
-            if (treeGenParams.vinesGrowthChance > 0 && rand.NextDouble() < treeGenParams.vinesGrowthChance && config.treeBlocks.vinesBlock != null)
+            if (st.treeGenParams.vinesGrowthChance > 0 && rand.NextDouble() < st.treeGenParams.vinesGrowthChance && config.treeBlocks.vinesBlock != null)
             {
                 BlockFacing facing = BlockFacing.HORIZONTALS[rand.NextInt(4)];
 
-                BlockPos vinePos = currentPos.AddCopy(facing);
-                float cnt = 1 + rand.NextInt(11) * (treeGenParams.vinesGrowthChance + 0.2f);
+                BlockPos vinePos = st.vineScratchPos.Set(currentPos, currentPos.dimension).Offset(facing); // use our field without allocations
 
-                while (blockAccessor.GetBlockId(vinePos) == 0 && cnt-- > 0)
+                float cnt = 1 + rand.NextInt(11) * (st.treeGenParams.vinesGrowthChance + 0.2f);
+
+                while (st.blockAccessor.GetBlockId(vinePos) == 0 && cnt-- > 0)
                 {
                     Block block = config.treeBlocks.vinesBlock;
 
@@ -297,7 +342,7 @@ namespace Vintagestory.ServerMods
                         block = config.treeBlocks.vinesEndBlock;
                     }
 
-                    block.TryPlaceBlockForWorldGen(blockAccessor, vinePos, facing, rand);
+                    block.TryPlaceBlockForWorldGen(st.blockAccessor, vinePos, facing, rand);
                     vinePos.Down();
                 }
             }
@@ -305,20 +350,28 @@ namespace Vintagestory.ServerMods
 
         internal bool TriggerRandomOtherBlock(IRandom lcgRandom)
         {
-            return lcgRandom.NextDouble() < treeGenParams.otherBlockChance * config.treeBlocks.otherLogChance;
+            return lcgRandom.NextDouble() < state.Value.treeGenParams.otherBlockChance * config.treeBlocks.otherLogChance;
         }
 
 
         PlaceResumeState getPlaceResumeState(BlockPos targetPos, int desiredblockId, bool wideTrunk)
         {
-            if (targetPos.X < 0 || targetPos.Y < 0 || targetPos.Z < 0 || targetPos.X >= blockAccessor.MapSizeX || targetPos.Y >= blockAccessor.MapSizeY || targetPos.Z >= blockAccessor.MapSizeZ) return PlaceResumeState.Stop;
+            State st = state.Value;
 
-            int currentblockId = blockAccessor.GetBlockId(targetPos);
+            if (targetPos.X < 0 || targetPos.Y < 0 || targetPos.Z < 0
+                || targetPos.X >= st.blockAccessor.MapSizeX
+                || targetPos.Y >= st.blockAccessor.MapSizeY
+                || targetPos.Z >= st.blockAccessor.MapSizeZ)
+            {
+                return PlaceResumeState.Stop;
+            }
+
+            int currentblockId = st.blockAccessor.GetBlockId(targetPos);
             if (currentblockId == -1) return PlaceResumeState.CannotPlace;
             if (currentblockId == 0) return PlaceResumeState.CanPlace;
 
-            Block currentBlock = blockAccessor.GetBlock(currentblockId);
-            Block desiredBock = blockAccessor.GetBlock(desiredblockId);
+            Block currentBlock = st.blockAccessor.GetBlock(currentblockId);
+            Block desiredBock = st.blockAccessor.GetBlock(desiredblockId);
 
             // For everything except redwood trunks, abort the treegen if it encounters a non-replaceable, non-soil, non-same-tree block.  Redwood trunks continue regardless, otherwise we get 3/4 chunks because of some other random worldgen block near the base etc.
             if ((currentBlock.Fertility == 0 || desiredBock.BlockMaterial != EnumBlockMaterial.Wood) && currentBlock.BlockMaterial != EnumBlockMaterial.Leaves && currentBlock.Replaceable < 6000 && !wideTrunk && !config.treeBlocks.blockIds.Contains(currentBlock.BlockId) /* Allow logs to replace soil */)

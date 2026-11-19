@@ -91,7 +91,7 @@ namespace Vintagestory.GameContent
     public class RoomRegistry : ModSystem
     {
         protected Dictionary<long, ChunkRooms> roomsByChunkIndex = new Dictionary<long, ChunkRooms>();
-        protected object roomsByChunkIndexLock = new object(); 
+        protected object roomsByChunkIndexLock = new object();
 
         const int chunksize = GlobalConstants.ChunkSize;
         int chunkMapSizeX;
@@ -99,15 +99,16 @@ namespace Vintagestory.GameContent
 
         ICoreAPI api;
 
-        [ThreadStatic]
-        static ICachingBlockAccessor blockAccessor;   // We need a separate blockaccessor per thread, to prevent rare race conditions leading to crashes
-        ICachingBlockAccessor blockAccess { get {
-                if (blockAccessor != null) return blockAccessor;
+        ICachingBlockAccessor TSBlockAccessor
+        {
+            get
+            {
+                var threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                if (disposableBlockAccessors.TryGetValue(threadID, out var blockAccessor)) return blockAccessor;
+                return disposableBlockAccessors[threadID] = api.World.GetCachingBlockAccessor(false, false);
+            }
+        }
 
-                blockAccessor = api.World.GetCachingBlockAccessor(false, false);
-                disposableBlockAccessors[System.Threading.Thread.CurrentThread.ManagedThreadId] = blockAccessor;
-                return blockAccessor;
-            }}
         // Looks a bit heavy, but we write to this only once per game per thread; then later we can ensure that we dispose of all the blockAccessors even if the thread itself is *not* disposed (ThreadPool threads for example are not disposed)
         private System.Collections.Concurrent.ConcurrentDictionary<int, ICachingBlockAccessor> disposableBlockAccessors = new(4, 16);
 
@@ -126,11 +127,6 @@ namespace Vintagestory.GameContent
 
         public override void Dispose()
         {
-            // This entire method designed to prevent memory leaks when the game exits: no thread should retain a CachingBlockAccessor
-
-            blockAccessor?.Dispose();
-            blockAccessor = null;
-
             if (disposableBlockAccessors != null)
             {
                 foreach (var ba in disposableBlockAccessors.Values)
@@ -140,7 +136,7 @@ namespace Vintagestory.GameContent
 
                 disposableBlockAccessors.Clear();
             }
-            
+
             disposableBlockAccessors = null;
         }
 
@@ -231,7 +227,7 @@ namespace Vintagestory.GameContent
                 int sizex = room.Location.X2 - room.Location.X1 + 1;
                 int sizey = room.Location.Y2 - room.Location.Y1 + 1;
                 int sizez = room.Location.Z2 - room.Location.Z1 + 1;
-                
+
                 for (int dx = 0; dx < sizex; dx++)
                 {
                     for (int dy = 0; dy < sizey; dy++)
@@ -250,7 +246,7 @@ namespace Vintagestory.GameContent
                 }
 
                 api.World.HighlightBlocks(player, 50, poses, colors);
-            }   
+            }
             return TextCommandResult.Success();
         }
 
@@ -351,7 +347,7 @@ namespace Vintagestory.GameContent
         public Room GetRoomForPosition(BlockPos pos)
         {
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
-            
+
             ChunkRooms chunkrooms;
             Room room;
 
@@ -359,7 +355,7 @@ namespace Vintagestory.GameContent
             {
                 roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
-            
+
             if (chunkrooms != null)
             {
                 Room firstEnclosedRoom=null;
@@ -434,7 +430,8 @@ namespace Vintagestory.GameContent
             int nonSkyLightCount = 0;
             int exitCount = 0;
 
-            blockAccess.Begin();
+            var bs = TSBlockAccessor;
+            bs.Begin();
 
             bool allChunksLoaded = true;
 
@@ -464,7 +461,7 @@ namespace Vintagestory.GameContent
                 if (dz < minz) minz = dz;
                 else if (dz > maxz) maxz = dz;
 
-                Block bBlock = blockAccess.GetBlock(bpos);
+                Block bBlock = bs.GetBlock(bpos);
 
                 foreach (BlockFacing facing in BlockFacing.ALLFACES)
                 {
@@ -480,14 +477,14 @@ namespace Vintagestory.GameContent
                         continue;
                     }
 
-                    if (!blockAccess.IsValidPos(npos))
+                    if (!bs.IsValidPos(npos))
                     {
                         nonCoolingWallCount++;
                         continue;
                     }
 
-                    Block nBlock = blockAccess.GetBlock(npos);
-                    allChunksLoaded &= blockAccess.LastChunkLoaded;
+                    Block nBlock = bs.GetBlock(npos);
+                    allChunksLoaded &= bs.LastChunkLoaded;
                     heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
                     // We hit a wall, no need to scan further
@@ -545,7 +542,7 @@ namespace Vintagestory.GameContent
                     if (skyLightXZChecked[skyLightIndex] < iteration)
                     {
                         skyLightXZChecked[skyLightIndex] = iteration;
-                        int light = blockAccess.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
+                        int light = bs.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
 
                         if (light >= api.World.SunBrightness - 1)
                         {

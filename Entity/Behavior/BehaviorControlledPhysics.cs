@@ -28,7 +28,7 @@ namespace Vintagestory.GameContent;
 /// </code></example>
 [DocumentAsJson]
 [AddDocumentationProperty("physics", "A set of properties used for physics modules", "Vintagestory.API.Datastructures.JsonObject", "Optional", "None", true)]
-public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTickable, IRemotePhysics
+public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTickable, IRemotePhysics, IRenderer
 {
     protected const double collisionboxReductionForInsideBlocksCheck = 0.009;
 
@@ -41,8 +41,6 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     protected bool smoothStepping = false;
     protected readonly List<PModule> physicsModules = new();
     protected readonly List<PModule> customModules = new();
-    protected Vec3d newPos = new();
-    protected readonly Vec3d prevPos = new();
     protected readonly BlockPos tmpPos = new(Dimensions.WillSetLater);
     protected readonly Cuboidd entityBox = new();
     protected readonly List<FastVec3i> traversed = new(4);
@@ -108,7 +106,11 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
         traversed.Clear();
         traversedBlocks.Clear();
-        if (entity.AdjustCollisionBoxToAnimation)
+        if (resettingMountedCollisionBox)
+        {
+            resettingMountedCollisionBox = entity.AdjustCollisionBoxToAnimation;
+        }
+        else if (entity.AdjustCollisionBoxToAnimation)
         {
             AdjustCollisionBoxToAnimation(dtFactor);
         }
@@ -136,6 +138,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         {
             esapi.Server.AddPhysicsTickable(this);
         }
+        initializeStandingColliderState(false);
 
         entity.PhysicsUpdateWatcher?.Invoke(0, entity.Pos.XYZ);
 
@@ -172,6 +175,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 entity.AfterPhysicsTick?.Invoke();
             }
 
+            syncStandingColliderState();
             return;
         }
 
@@ -179,9 +183,27 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         entity.AfterPhysicsTick?.Invoke();
     }
 
+    public virtual void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+    {
+        if (capi.IsGamePaused) return;
+
+        applyRemoteStandingColliderPose(deltaTime);
+    }
+
+    // Local player physics follows collider publication at 0.01 and precedes remote riders at 0.025.
+    public virtual double RenderOrder => 0.02;
+
+    public virtual int RenderRange => 9999;
+
+    public virtual void Dispose()
+    {
+        disposeRemoteStandingCollider();
+    }
+
     public void SetProperties(EntityProperties properties, JsonObject attributes)
     {
         StepHeight = attributes["stepHeight"].AsFloat(0.6f);
+        MaxWalkableSlopeGrade = attributes["maxWalkableSlopeGrade"].AsDouble(MaxWalkableSlopeGrade);
         stepUpSpeed = attributes["stepUpSpeed"].AsFloat(0.07f);
         climbUpSpeed = attributes["climbUpSpeed"].AsFloat(0.07f);
         climbDownSpeed = attributes["climbDownSpeed"].AsFloat(0.035f);
@@ -244,6 +266,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         if (agent?.MountedOn != null)
         {
             entity.Swimming = false;
+            entity.FeetInLiquid = false;
             entity.OnGround = false;
 
             if (capi != null)
@@ -350,7 +373,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 for (int i = 0; i < collisionBoxes.Length; i++)
                 {
                     double distance = entityBox.ShortestDistanceFrom(collisionBoxes[i], tmpPos);
-                    
+
                     controls.IsClimbing |= distance < entityProperties.ClimbTouchDistance;
 
                     if (controls.IsClimbing)
@@ -361,7 +384,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 }
             }
 
-            
+
 
             if (canClimbAnywhere && controls.WalkVector.LengthSq() > 0.00001)
             {
@@ -460,7 +483,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
             if (entity.CollidedHorizontally && !controls.IsClimbing && !controls.IsStepping && entityProperties.Habitat != EnumHabitat.Underwater)
             {
-                if (blockAccessor.GetBlockRaw(x, (int)(pos.InternalY + 0.5), z, BlockLayersAccess.Fluid).LiquidLevel >= 7 || blockAccessor.GetBlockRaw(x, (int)pos.InternalY, z, BlockLayersAccess.Fluid).LiquidLevel >= 7 || blockAccessor.GetBlockRaw(x, (int)(pos.InternalY - 0.05), z, BlockLayersAccess.Fluid).LiquidLevel >= 7)
+                if (entity.FeetInLiquid && (blockAccessor.GetBlockRaw(x, (int)(pos.InternalY + 0.5), z, BlockLayersAccess.Fluid).LiquidLevel >= 7 || blockAccessor.GetBlockRaw(x, (int)pos.InternalY, z, BlockLayersAccess.Fluid).LiquidLevel >= 7 || blockAccessor.GetBlockRaw(x, (int)(pos.InternalY - 0.05), z, BlockLayersAccess.Fluid).LiquidLevel >= 7))
                 {
                     // Climb out of pool sides
                     motion.Y += 0.2 * dt;
@@ -487,16 +510,23 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
                 throw new Exception("Proposed motion contains NaN: " + motion + " for entity " + entity?.Code);
             }
             // The halfWidth adjustment should prevent entities clipping into blocks in unloaded chunks
-            float halfWidth = entity.CollisionBox.Width / 2;
-            if (blockAccessor.IsNotTraversable((int)(nextX + halfWidth * Math.Sign(motion.X)), y, z, pos.Dimension)) newPos.X = pos.X;
-            if (blockAccessor.IsNotTraversable(x, (int)nextY, z, pos.Dimension)) newPos.Y = pos.Y;
-            if (blockAccessor.IsNotTraversable(x, y, (int)(nextZ + halfWidth * Math.Sign(motion.Z)), pos.Dimension)) newPos.Z = pos.Z;
+            float halfWidth = entity.CollisionBox.HalfExtentX;
+            bool blockedByUnloadedX = blockAccessor.IsNotTraversable((int)(nextX + halfWidth * Math.Sign(motion.X)), y, z, pos.Dimension);
+            bool blockedByUnloadedZ = blockAccessor.IsNotTraversable(x, y, (int)(nextZ + halfWidth * Math.Sign(motion.Z)), pos.Dimension);
+            if (blockedByUnloadedX) newPos.X = pos.X;
+            bool blockedByUnloadedY = blockAccessor.IsNotTraversable(x, (int)nextY, z, pos.Dimension);
+            if (blockedByUnloadedY) newPos.Y = pos.Y;
+            if (blockedByUnloadedZ) newPos.Z = pos.Z;
+
+            bool motionXWasClipped = (nextX < newPos.X && motion.X < 0) || (nextX > newPos.X && motion.X > 0);
+            bool motionZWasClipped = (nextZ < newPos.Z && motion.Z < 0) || (nextZ > newPos.Z && motion.Z > 0);
+            bool colliderVelocityClipped = collisionTester.ClipColliderVelocity(motion);
 
             pos.SetPos(newPos);
 
-            if ((nextX < newPos.X && motion.X < 0) || (nextX > newPos.X && motion.X > 0)) motion.X = 0;
-            if ((nextY < newPos.Y && motion.Y < 0) || (nextY > newPos.Y && motion.Y > 0)) motion.Y = 0;
-            if ((nextZ < newPos.Z && motion.Z < 0) || (nextZ > newPos.Z && motion.Z > 0)) motion.Z = 0;
+            if (blockedByUnloadedX || (!colliderVelocityClipped && motionXWasClipped)) motion.X = 0;
+            if (blockedByUnloadedY || ((!collisionTester.SlidingOnSteepCollider || controls.IsStepping) && ((nextY < newPos.Y && motion.Y < 0) || (nextY > newPos.Y && motion.Y > 0)))) motion.Y = 0;
+            if (blockedByUnloadedZ || (!colliderVelocityClipped && motionZWasClipped)) motion.Z = 0;
         }
 
         bool falling = prevYMotion <= 0;
@@ -510,24 +540,41 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         int posZ = (int)(pos.Z + offZ);
         int swimmingY = (int)(pos.InternalY + entity.SwimmingOffsetY);
 
-        Block blockFluid = blockAccessor.GetBlockRaw(posX, posY, posZ, BlockLayersAccess.Fluid);
-        Block middleWOIBlock = (swimmingY == posY) ? blockFluid : blockAccessor.GetBlockRaw(posX, swimmingY, posZ, BlockLayersAccess.Fluid);
-        entity.Swimming = middleWOIBlock.IsLiquid();
-
         entity.OnGround = (entity.CollidedVertically && falling && !controls.IsClimbing) || controls.IsStepping;
 
-        if (blockFluid.IsLiquid())
+        Collider supportingCollider = collisionTester.SupportingCollider;
+        if (supportingCollider == null && !entity.CollidedVertically && (falling || controls.IsStepping) && (onGroundBefore || controls.IsStepping) && !controls.IsClimbing && !controls.IsFlying && !controls.NoClip)
         {
-            Block aboveBlock = blockAccessor.GetBlockRaw(posX, posY + 1, posZ, BlockLayersAccess.Fluid);
-            entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
-            entity.InLava = blockFluid.LiquidCode == "lava";
+            // Smooth stepping leaves a small clearance above the deck, so a downward collision is not guaranteed each tick.
+            supportingCollider = probeStandingCollider(pos);
+            if (supportingCollider != null) entity.OnGround = true;
+        }
 
-            if (!feetInLiquidBefore && entity.FeetInLiquid && !IsFirstTick(entity)) entity.OnCollideWithLiquid();
+        if (supportingCollider?.KeepsSupportedEntitiesDry == true)
+        {
+            entity.Swimming = false;
+            entity.FeetInLiquid = false;
+            entity.InLava = false;
         }
         else
         {
-            entity.FeetInLiquid = false;
-            entity.InLava = false;
+            Block blockFluid = blockAccessor.GetBlockRaw(posX, posY, posZ, BlockLayersAccess.Fluid);
+            Block middleWOIBlock = swimmingY == posY ? blockFluid : blockAccessor.GetBlockRaw(posX, swimmingY, posZ, BlockLayersAccess.Fluid);
+            entity.Swimming = middleWOIBlock.IsLiquid();
+
+            if (blockFluid.IsLiquid())
+            {
+                Block aboveBlock = blockAccessor.GetBlockRaw(posX, posY + 1, posZ, BlockLayersAccess.Fluid);
+                entity.FeetInLiquid = (blockFluid.LiquidLevel + (aboveBlock.LiquidLevel > 0 ? 1 : 0)) / 8f >= pos.Y - (int)pos.Y;
+                entity.InLava = blockFluid.LiquidCode == "lava";
+
+                if (!feetInLiquidBefore && entity.FeetInLiquid && !IsFirstTick(entity)) entity.OnCollideWithLiquid();
+            }
+            else
+            {
+                entity.FeetInLiquid = false;
+                entity.InLava = false;
+            }
         }
 
         if (!onGroundBefore && entity.OnGround)
@@ -541,6 +588,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         }
 
         if (!falling || entity.OnGround || controls.IsClimbing) entity.PositionBeforeFalling.Set(pos);
+        updateStandingCollider(pos, controls, supportingCollider);
 
         Cuboidd testedEntityBox = collisionTester.entityBox;
         int xMax = (int)(testedEntityBox.X2 - collisionboxReductionForInsideBlocksCheck);
@@ -581,12 +629,17 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         EntityAgent agent = entity as EntityAgent;
         if (agent?.MountedOn != null)
         {
+            clearColliderMotion();
             AdjustMountedPositionFor(agent);
             return;
         }
 
         SetState(pos, dt);
+        moveWithStandingCollider(pos, controls);
+        bool colliderMotionSuspended = suspendInheritedColliderMotion(pos);
         MotionAndCollision(pos, controls, dt);
+        restoreInheritedColliderMotion(pos, colliderMotionSuspended);
+        inheritStandingColliderMotion(pos, controls);
         ApplyTests(pos, controls, dt, false);
 
         // We make the same adjustment to all the passengers' positions when ticking the mount, because we might tick the SeatPosition later than ticking the passenger entity
@@ -621,7 +674,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
         var entity = this.entity;
         if (entity.State != EnumEntityState.Active) return;
 
-        if (mountableSupplier != null && capi == null && mountableSupplier.IsBeingControlled()) return;
+        if (capi == null && !entity.IsControlledByServer(mountableSupplier)) return;
 
         // Call OnEntityInside events.
         var tmpPos = this.tmpPos;
@@ -638,25 +691,31 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
     public void HandleSneaking(EntityPos pos, EntityControls controls, float dt)
     {
-        if (!controls.Sneak || !entity.OnGround || pos.Motion.Y > 0) return;
+        bool guardCreatureOnCarrier = standingColliderId != 0 && !controls.Jump && !controls.IsClimbing && entity is not EntityPlayer;
+        if ((!controls.Sneak && !guardCreatureOnCarrier) || !entity.OnGround || pos.Motion.Y > 0) return;
+        if (newPos.X == pos.X && newPos.Z == pos.Z) return;
 
-        // Sneak to prevent falling off blocks.
-        Vec3d testPosition = new();
-        testPosition.Set(pos.X, pos.InternalY - (GlobalConstants.GravityPerSecond * dt), pos.Z);
+        Vec3d testPosition = steppingTestVec;
+        double probeDepth = GlobalConstants.GravityPerSecond * dt;
+        testPosition.Set(pos.X, pos.Y - probeDepth, pos.Z);
 
-        // Only apply this if the entity is on the ground in the first place.
-        if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition)) return;
+        if (!hasSneakingSupport(testPosition, pos, false)) return;
+
+        double resolvedX = newPos.X;
+        double resolvedZ = newPos.Z;
+        testPosition.Set(resolvedX, newPos.Y - probeDepth, resolvedZ);
+        if (hasSneakingSupport(testPosition, pos, guardCreatureOnCarrier)) return;
 
         tmpPos.Set((int)pos.X, (int)pos.Y - 1, (int)pos.Z);
         Block belowBlock = entity.World.BlockAccessor.GetBlock(tmpPos);
 
         // Test for X.
-        testPosition.Set(newPos.X, newPos.Y - (GlobalConstants.GravityPerSecond * dt) + pos.DimensionYAdjustment, pos.Z);
-        if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+        testPosition.Set(resolvedX, testPosition.Y, pos.Z);
+        if (!hasSneakingSupport(testPosition, pos, guardCreatureOnCarrier))
         {
             if (belowBlock.IsClimbable(tmpPos))
             {
-                newPos.X += (pos.X - newPos.X) / 10;
+                newPos.X = resolvedX + (pos.X - resolvedX) / 10;
             }
             else
             {
@@ -664,23 +723,87 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
             }
         }
 
-        // Test for Z.
-        testPosition.Set(pos.X, newPos.Y - (GlobalConstants.GravityPerSecond * dt) + pos.DimensionYAdjustment, newPos.Z);
-        if (!collisionTester.IsColliding(entity.World.BlockAccessor, sneakTestCollisionbox, testPosition))
+        // Test the combined destination so diagonal movement cannot pass an unsupported corner.
+        testPosition.Set(newPos.X, testPosition.Y, resolvedZ);
+        if (!hasSneakingSupport(testPosition, pos, guardCreatureOnCarrier))
         {
             if (belowBlock.IsClimbable(tmpPos))
             {
-                newPos.Z += (pos.Z - newPos.Z) / 10;
+                newPos.Z = resolvedZ + (pos.Z - resolvedZ) / 10;
             }
             else
             {
                 newPos.Z = pos.Z;
             }
         }
+
+        if (newPos.X != resolvedX || newPos.Z != resolvedZ)
+        {
+            // Resolve the clipped path again because changing horizontal motion changes the floor height on slopes.
+            float dtFactor = dt * 60;
+            steppingTestMotion.Set(newPos.X - pos.X, pos.Motion.Y * dtFactor, newPos.Z - pos.Z);
+            collisionTester.ApplyTerrainCollision(entity, pos, steppingTestMotion, dtFactor, ref newPos, 0, 0, CollisionYExtra);
+        }
+    }
+
+    private bool hasSneakingSupport(Vec3d position, EntityPos pos, bool requireFootCenter)
+    {
+        var world = entity.World;
+        int dimension = pos.Dimension;
+        if (collisionTester.IsColliding(world.BlockAccessor, sneakTestCollisionbox, position, dimension)) return true;
+
+        var filter = new CollisionQueryFilter(CollisionLayer.Entity, excludedOwnerEntityId: entity.EntityId);
+        colliderSupportBox.SetAndTranslate(entity.CollisionBox, position);
+        if (requireFootCenter)
+        {
+            // A corner-only foothold disappears as the boat turns beneath an upright collision box.
+            var origin = new FastVec3d(colliderSupportBox.MidX, colliderSupportBox.Y1 + colliderSupportDistance, colliderSupportBox.MidZ);
+            world.CollisionScene.Raycast(origin, new FastVec3d(0, -2 * colliderSupportDistance, 0), dimension, colliderSupportHits, filter);
+        }
+        else
+        {
+            // A small foot probe sometimes misses slanted or thin floors which support the full collision box.
+            world.CollisionScene.Sweep(colliderSupportBox, 0, -colliderSupportDistance, 0, dimension, colliderSupportHits, filter);
+        }
+        for (int i = 0; i < colliderSupportHits.Count; i++)
+        {
+            if (CollisionTester.IsWalkableColliderSurface(colliderSupportHits[i].Normal, MaxWalkableSlopeGrade)) return true;
+        }
+        if (!requireFootCenter || !world.CollisionScene.TryGetCollider(standingColliderId, out Collider collider)) return false;
+
+        double centerX = colliderSupportBox.MidX;
+        double centerZ = colliderSupportBox.MidZ;
+        colliderSupportBox.SetAndTranslate(entity.CollisionBox, pos.X, pos.Y, pos.Z);
+        double halfWidth = colliderSupportBox.HalfExtentX;
+        double halfLength = colliderSupportBox.HalfExtentZ;
+        for (int boxIndex = 0; boxIndex < collider.CollisionBoxCount; boxIndex++)
+        {
+            if (!collider.TryGetAABBContact(boxIndex, colliderSupportBox, colliderSupportDistance, out CuboidContact contact)
+                || contact.Separation < -colliderSupportDistance || !CollisionTester.IsWalkableColliderSurface(contact.Normal, MaxWalkableSlopeGrade))
+            {
+                continue;
+            }
+
+            // Follow the supporting plane, then check the actual surface below the foot centre.
+            FastVec3d normal = contact.Normal;
+            double horizontalOffset = normal.X * (position.X - pos.X) + normal.Z * (position.Z - pos.Z)
+                + Math.Abs(normal.X) * halfWidth + Math.Abs(normal.Z) * halfLength;
+            double floorY = colliderSupportBox.Y1 - (contact.Separation + horizontalOffset) / normal.Y;
+            if (floorY >= position.Y + entity.CollisionBox.Y1) continue;
+
+            var origin = new FastVec3d(centerX, floorY + colliderSupportDistance, centerZ);
+            world.CollisionScene.Raycast(origin, new FastVec3d(0, -2 * colliderSupportDistance, 0), dimension, colliderSupportHits, filter);
+            for (int i = 0; i < colliderSupportHits.Count; i++)
+            {
+                if (CollisionTester.IsWalkableColliderSurface(colliderSupportHits[i].Normal, MaxWalkableSlopeGrade)) return true;
+            }
+        }
+        return false;
     }
 
     protected virtual bool HandleSteppingOnBlocks(EntityPos pos, Vec3d moveDelta, float dtFac, EntityControls controls)
     {
+        if (collisionTester.SlidingOnSteepCollider) return false;
         if (controls.WalkVector.X == 0 && controls.WalkVector.Z == 0) return false;
 
         if ((!entity.OnGround && !entity.Swimming) || entity.Properties.Habitat == EnumHabitat.Underwater) return false;
@@ -718,7 +841,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
 
         double heightDiff = steppableBox.Y2 - entityCollisionBox.Y1 + (0.01 * 3f);
         Vec3d stepPos = newPos.OffsetCopy(moveDelta.X, heightDiff, moveDelta.Z);
-        bool canStep = !collisionTester.IsColliding(entity.World.BlockAccessor, entity.CollisionBox, stepPos, false);
+        bool canStep = !collisionTester.IsColliding(entity.World, entity.CollisionBox, stepPos, pos.Dimension, false);
 
         if (canStep)
         {
@@ -974,6 +1097,7 @@ public class EntityBehaviorControlledPhysics : PhysicsBehaviorBase, IPhysicsTick
     public override void OnEntityDespawn(EntityDespawnData despawn)
     {
         if (sapi != null) sapi.Server.RemovePhysicsTickable(this);
+        disposeRemoteStandingCollider();
     }
 
     public override string PropertyName()

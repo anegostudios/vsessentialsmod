@@ -229,9 +229,7 @@ public class AiTaskFleeEntityR : AiTaskBaseTargetableR
             tmpVec3.Set(targetPos);
 
             UpdateTargetPosFleeMode(tmpVec3, yaw);
-            pathTraverser.CurrentTarget.X = tmpVec3.X;
-            pathTraverser.CurrentTarget.Y = tmpVec3.Y;
-            pathTraverser.CurrentTarget.Z = tmpVec3.Z;
+            pathTraverser.CurrentTarget!.Set(tmpVec3);
             pathTraverser.Retarget();
         }
 

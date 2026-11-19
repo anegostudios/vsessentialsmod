@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using System.ComponentModel;
+using ProtoBuf;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -6,19 +7,28 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
-    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    [ProtoContract]
     public class WeatherEventState
     {
+        [ProtoMember(4)]
         public int Index;
+        [ProtoMember(2)]
         public float BaseStrength;
+        [ProtoMember(1)]
         public double ActiveUntilTotalHours;
 
+        [ProtoMember(6)]
         public float LightningRate;
+        [ProtoMember(7)]
         public float NearThunderRate;
+        [ProtoMember(3)]
         public float DistantThunderRate;
+        [ProtoMember(5)]
         public float LightningMinTemp;
+        [ProtoMember(9), DefaultValue(EnumPrecipitationType.Auto)]
         public EnumPrecipitationType PrecType = EnumPrecipitationType.Auto;
 
+        [ProtoMember(8)]
         public float ParticleSize;
     }
 

@@ -1,7 +1,8 @@
-﻿using Vintagestory.API.Common;
+using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using static Vintagestory.API.Common.EntityAgent;
 
 #nullable disable
 
@@ -23,12 +24,13 @@ namespace Vintagestory.GameContent
                 .Create("emote")
                 .RequiresPrivilege(Privilege.chat)
                 .WithDescription("Execute an emote on your player")
-                .WithArgs(parsers.OptionalWord("emote"))
+                .WithArgs(parsers.OptionalWord("emote"), parsers.OptionalWord("stop"))
                 .HandleWith(args =>
                 {
                     var entity = args.Caller.Entity as EntityAgent;
                     var emotes = entity.Properties.Attributes["emotes"].AsArray<string>();
                     string emote = (string)args[0];
+                    string stop = args.ArgCount > 1 ? (string)args[1] : null;
 
                     if (emote == null || !emotes.Contains(emote))
                     {
@@ -45,12 +47,55 @@ namespace Vintagestory.GameContent
                         }
                     }
 
-                    api.Network.BroadcastEntityPacket(entity.EntityId, 197, SerializerUtil.Serialize(emote));
+                    if (stop == "stop")
+                    {
+                        api.Network.BroadcastEntityPacket(entity.EntityId, (int)EntityServerPacketId.EmoteStop, SerializerUtil.Serialize(emote));
+                    } else
+                    {
+                        api.Network.BroadcastEntityPacket(entity.EntityId, (int)EntityServerPacketId.Emote, SerializerUtil.Serialize(emote));
+                    }
+
+                    
 
                     return TextCommandResult.Success();
-                })
-                ;
+                });
+
+
+            cmdapi
+                .GetOrCreate("dev")
+                .RequiresPrivilege(Privilege.controlserver)
+                .BeginSubCommand("playanim")
+                    .WithDescription("Play an animation on your player")
+                    .WithArgs(parsers.Word("anim"))
+                    .HandleWith(args =>
+                    {
+                        var entity = args.Caller.Entity as EntityAgent;
+                        string animationcode = (string)args[0];
+                        string stop = args.ArgCount > 1 ? (string)args[1] : null;
+
+                        api.Network.BroadcastEntityPacket(entity.EntityId, (int)EntityServerPacketId.Emote, SerializerUtil.Serialize(animationcode));
+                        return TextCommandResult.Success();
+                    })
+                .EndSubCommand()
+            ;
+
+            cmdapi
+                .GetOrCreate("dev")
+                .RequiresPrivilege(Privilege.controlserver)
+                .BeginSubCommand("stopanim")
+                    .WithDescription("Play an animation on your player")
+                    .WithArgs(parsers.Word("anim"))
+                    .HandleWith(args =>
+                    {
+                        var entity = args.Caller.Entity as EntityAgent;
+                        string animationcode = (string)args[0];
+                        api.Network.BroadcastEntityPacket(entity.EntityId, (int)EntityServerPacketId.EmoteStop, SerializerUtil.Serialize(animationcode));
+                        return TextCommandResult.Success();
+                    })
+                .EndSubCommand()
+            ;
         }
+
     }
 
 

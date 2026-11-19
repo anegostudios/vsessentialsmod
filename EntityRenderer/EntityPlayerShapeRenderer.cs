@@ -27,8 +27,10 @@ namespace Vintagestory.GameContent
         protected RenderMode renderMode;
         protected bool guiAnimations = false;
 
+        public RenderMode CurrentRenderMode => renderMode;
+
         public float? HeldItemPitchFollowOverride { get; set; } = null;
-        protected float smoothedBodyYaw;
+        public float smoothedBodyYaw;
 
 
         protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
@@ -159,10 +161,10 @@ namespace Vintagestory.GameContent
             var prevRenderMode = renderMode;
             determineRenderMode();
 
-            if ((prevRenderMode == RenderMode.FirstPerson && renderMode == RenderMode.ImmersiveFirstPerson) || (prevRenderMode == RenderMode.ImmersiveFirstPerson && renderMode == RenderMode.FirstPerson))
+            if (prevRenderMode != renderMode && (prevRenderMode == RenderMode.ImmersiveFirstPerson || renderMode == RenderMode.ImmersiveFirstPerson))
             {
                 entity.MarkShapeModified();
-                (entityPlayer.AnimManager as PlayerAnimationManager).OnIfpModeChanged(previfpMode, renderMode == RenderMode.ImmersiveFirstPerson);
+                entityPlayer.SelfFpAnimManager.OnIfpModeChanged(prevRenderMode == RenderMode.ImmersiveFirstPerson, renderMode == RenderMode.ImmersiveFirstPerson);
             }
 
             base.BeforeRender(dt);
@@ -239,6 +241,7 @@ namespace Vintagestory.GameContent
 
         public override void DoRender3DOpaque(float dt, bool isShadowPass)
         {
+            ResetHeldItemAnimations();
             if (IsSelf) entityPlayer.selfNowShadowPass = isShadowPass;
 
             bool isHandRender = renderMode == RenderMode.FirstPerson && !isShadowPass;
@@ -351,7 +354,7 @@ namespace Vintagestory.GameContent
                     if (stack.ItemAttributes?[transformCode]?.Exists != true) transformCode = "onTongTransform";
 
                     renderInfo.Transform = stack.ItemAttributes?[transformCode].AsObject(DefaultTongTransform) ?? DefaultTongTransform;
-                    RenderItem(dt, isShadowPass, stack, apap, renderInfo);
+                    RenderItem(dt, isShadowPass, stack, apap, renderInfo, true);
                     return;
                 }
             }
@@ -424,7 +427,8 @@ namespace Vintagestory.GameContent
             {
                 smoothedBodyYaw = bodyYawLerped = entityPlayer.MountedOn.Entity.Pos.Yaw;
             }
-            else if (player?.CameraMode != EnumCameraMode.FirstPerson)
+            // Remote players follow their interpolated body yaw; camera smoothing is local-only.
+            else if (!isSelf || player?.CameraMode != EnumCameraMode.FirstPerson)
             {
                 float yawDist = GameMath.AngleRadDistance(bodyYawLerped, eagent.BodyYaw);
 

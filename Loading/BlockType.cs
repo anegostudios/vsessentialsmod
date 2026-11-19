@@ -1,16 +1,15 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using Vintagestory.API;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Common;
-using Vintagestory.API.Client;
-using Vintagestory.API.Config;
-using Newtonsoft.Json.Linq;
-using Vintagestory.API.Util;
 using Vintagestory.API.Server;
-using Vintagestory.API;
-using System.Linq;
+using Vintagestory.API.Util;
 
 #nullable disable
 
@@ -56,6 +55,8 @@ namespace Vintagestory.ServerMods.NoObf
     {
         public static Cuboidf DefaultCollisionBox = new Cuboidf(0, 0, 0, 1, 1, 1);
         public static RotatableCube DefaultCollisionBoxR = new RotatableCube(0, 0, 0, 1, 1, 1);
+
+        [ThreadStatic] private static List<string> reusableCreativeTabsList;
 
         public BlockType()
         {
@@ -276,10 +277,19 @@ namespace Vintagestory.ServerMods.NoObf
 
         /// <summary>
         /// 9-slice overlay texture path, e.g. "game:block/sand_overlay". Null disables overlay blending.
+        /// Ending the path in a wildcard (e.g. "game:block/grass_overlay*") bakes all matching textures as random variants.
         /// </summary>
         [JsonProperty]
         [DocumentAsJson("Optional", "null")]
         public string BleedOverlayTexture = null;
+
+        /// <summary>
+        /// Single-tile overlay drawn at inverted (inside) corners, e.g. "game:block/grass_corner_overlay".
+        /// Same trailing-wildcard random-variant support as BleedOverlayTexture. Null disables inside-corner blending.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "null")]
+        public string BleedCornerOverlayTexture = null;
 
         /// <summary>
         /// Only top face (UP) receives bleeding. For grass-type blocks.
@@ -505,6 +515,7 @@ namespace Vintagestory.ServerMods.NoObf
 
 
             block.Code = this.Code;
+            block.SourceFilePath = this.SourceFilePath;
             block.VariantStrict = this.Variant;
             block.Variant = new RelaxedReadOnlyDictionary<string, string>(this.Variant);
             block.Class = this.Class;
@@ -530,6 +541,7 @@ namespace Vintagestory.ServerMods.NoObf
             block.BleedPriority = this.BleedPriority;
             block.CanReceiveBleed = this.CanReceiveBleed;
             block.BleedOverlayTexture = this.BleedOverlayTexture;
+            block.BleedCornerOverlayTexture = this.BleedCornerOverlayTexture;
             block.BleedTopFaceOnly = this.BleedTopFaceOnly;
             block.BleedGroup = this.BleedGroup;
             block.BlocksTextureBleed = this.BlocksTextureBleed;
@@ -579,6 +591,8 @@ namespace Vintagestory.ServerMods.NoObf
             block.CrushingProps = this.CrushingProps;
             block.LiquidLevel = this.LiquidLevel;
             block.AttackPower = this.AttackPower;
+            block.KnockbackStrength = this.KnockbackStrength;
+            block.DamageType = this.DamageType;
             block.MiningSpeed = this.MiningSpeed;
             block.ToolTier = this.ToolTier;
             block.RequiredMiningTier = this.RequiredMiningTier;
@@ -642,7 +656,7 @@ namespace Vintagestory.ServerMods.NoObf
         {
             base.OnDeserialized();
 
-            // Only one collision/selectionbox 
+            // Only one collision/selectionbox
             if (CollisionBoxR != null) CollisionBoxes = ToCuboidf(CollisionBoxR);
             if (SelectionBoxR != null) SelectionBoxes =  ToCuboidf(SelectionBoxR);
             if (ParticleCollisionBoxR != null) ParticleCollisionBoxes = ToCuboidf(ParticleCollisionBoxR);
@@ -857,25 +871,20 @@ namespace Vintagestory.ServerMods.NoObf
             }
         }
 
-        [ThreadStatic]
-        private static List<string> reusableStringList;
-        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, API.Datastructures.OrderedDictionary<string, string> searchReplace)
+        public static string[] GetCreativeTabs(AssetLocation code, Dictionary<string, string[]> CreativeInventory, API.Datastructures.OrderedDictionary<string, string> variants)
         {
-            List<string> tabs = reusableStringList ??= new();
+            List<string> tabs = reusableCreativeTabsList ??= [];
             tabs.Clear();
 
-            foreach (var val in CreativeInventory)
+            foreach ((string tabCode, string[] blockCodes) in CreativeInventory)
             {
-                for (int i = 0; i < val.Value.Length; i++)
+                for (int i = 0; i < blockCodes.Length; i++)
                 {
-                    string blockCode = RegistryObject.FillPlaceHolder(val.Value[i], searchReplace);
+                    string blockCode = RegistryObject.FillPlaceHolderOptimized(blockCodes[i], variants);
 
-                    if (WildcardUtil.Match(blockCode, code.Path))
-                    //if (WildCardMatch(blockCode, code.Path))
-                    {
-                        string tabCode = val.Key;
-                        tabs.Add(String.Intern(tabCode));
-                    }
+                    if (!WildcardUtil.Match(blockCode, code.Path)) continue;
+
+                    tabs.Add(string.Intern(tabCode));
                 }
             }
 
@@ -911,7 +920,7 @@ namespace Vintagestory.ServerMods.NoObf
                     if (!stringBoolDict.ContainsKey(facing.Code)) stringBoolDict[facing.Code] = stringBoolDict["all"];
                 }
             }
-            
+
         }
     }
 }

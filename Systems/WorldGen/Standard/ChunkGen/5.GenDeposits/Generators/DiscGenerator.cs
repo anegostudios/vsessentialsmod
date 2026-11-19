@@ -203,7 +203,7 @@ namespace Vintagestory.ServerMods
                 Api.Server.LogWarning("Deposit in file {0} has no inblock defined, it will never spawn.", variant.fromFile);
             }
 
-            var rnd = new LCGRandom(Api.World.Seed);
+            var rnd = new LCGRandom(Api.World.SeedWorldgen);
             absAvgQuantity = GetAbsAvgQuantity(rnd);
         }
 
@@ -477,7 +477,7 @@ namespace Vintagestory.ServerMods
         [Obsolete("Use GetAbsAvgQuantity(LCGRandom rnd) instead to ensure your code is seed deterministic.")]
         public float GetAbsAvgQuantity()
         {
-            return GetAbsAvgQuantity(new LCGRandom(Api.World.Seed));
+            return GetAbsAvgQuantity(new LCGRandom(Api.World.SeedWorldgen));
         }
 
         public float GetAbsAvgQuantity(LCGRandom rnd)

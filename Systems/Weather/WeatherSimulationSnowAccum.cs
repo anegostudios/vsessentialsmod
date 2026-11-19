@@ -593,6 +593,10 @@ namespace Vintagestory.GameContent
                     else if (block.GetSnowLevel(pos) == 0) continue;  // No snow layer should form on blocks which are in liquids
                 }
 
+                if (block is ICustomSnowAccumBehavior csnab)
+                {
+                    if (!csnab.SnowAccumAffected) continue;
+                }
 
                 Vec2iStruct vec = new Vec2iStruct(pos.X, pos.Z);
                 float hereAccum = mc.SnowAccum[vec.ToInChunkIndex];

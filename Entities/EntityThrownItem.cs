@@ -18,15 +18,12 @@ namespace Vintagestory.GameContent
         public float ImpactParticleSize = 1f;
         public int ImpactParticleCount = 20;
 
-
-        public override bool IsInteractable
+        Cuboidf testHitBox;
+        public override void AfterInitialized(bool onFirstSpawn)
         {
-            get { return false; }
-        }
+            base.AfterInitialized(onFirstSpawn);
 
-        public override void Initialize(EntityProperties properties, ICoreAPI api, long InChunkIndex3d)
-        {
-            base.Initialize(properties, api, InChunkIndex3d);
+            testHitBox = CollisionBox.Clone().OmniGrowBy(0.01f);
         }
 
         public override void OnTesselation(ref Shape entityShape, string shapePathForLogging)
@@ -65,10 +62,8 @@ namespace Vintagestory.GameContent
             // This seems to work properly.
             // Does not work: Testing for Collided (does not trigger always)
             // Does not work: Testing for motion only (can be 0 in some cases, even while mid-air)
-            Stuck = Api.Side == EnumAppSide.Server
-                && (pos.Motion.LengthSq() < 0.01 * 0.01)
-                && World.CollisionTester.IsColliding(World.BlockAccessor, this.CollisionBox, this.Pos.XYZ, true)
-            ;
+            bool moving = pos.Motion.LengthSq() < 0.01 * 0.01;
+            Stuck = moving && World.CollisionTester.IsColliding(World.BlockAccessor, this.testHitBox, this.Pos.XYZ, true);
 
             if (Stuck)
             {

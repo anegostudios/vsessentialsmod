@@ -13,6 +13,8 @@ namespace Vintagestory.GameContent
         public Vec3d MainTarget;
 
         bool done;
+        private string gaitCode;
+        public GaitMeta PreferredGait { get; set; } = null;
         float moveSpeed = 0.03f;
         float maxHeight = 7f;
         float? preferredLightLevel;
@@ -71,12 +73,26 @@ namespace Vintagestory.GameContent
 
             preferredLightLevel = taskConfig["preferredLightLevel"].AsFloat(-99);
             if (preferredLightLevel < 0) preferredLightLevel = null;
+
+            gaitCode = taskConfig["preferredGait"].AsString();
         }
 
         protected override void SetDefaultValues()
         {
             base.SetDefaultValues();
             ExecutionChance = 0.02;
+        }
+
+        public override void AfterInitialize()
+        {
+            if (gaitCode != null)
+            {
+                EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+                if (gaitBehavior != null)
+                {
+                    PreferredGait = gaitBehavior.Gaits[gaitCode];
+                }
+            }
         }
 
         public override void OnEntityLoaded()
@@ -345,7 +361,7 @@ namespace Vintagestory.GameContent
             }
 
             done = false;
-            pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck);
+            pathTraverser.WalkTowards(MainTarget, moveSpeed, targetDistance, OnGoalReached, OnStuck, EnumAICreatureType.Default, PreferredGait);
 
             tryStartAnimAgain = 0.1f;
         }
@@ -379,20 +395,21 @@ namespace Vintagestory.GameContent
             if (entity.Controls.IsClimbing && entity.Properties.CanClimbAnywhere && entity.ClimbingIntoFace != null)
             {
                 BlockFacing facing = entity.ClimbingIntoFace; // ?? entity.ClimbingOnFace;
+                Vec3d currentTarget = pathTraverser.CurrentTarget;
 
-                if (Math.Sign(facing.Normali.X) == Math.Sign(pathTraverser.CurrentTarget.X - entity.Pos.X))
+                if (Math.Sign(facing.Normali.X) == Math.Sign(currentTarget.X - entity.Pos.X))
                 {
-                    pathTraverser.CurrentTarget.X = entity.Pos.X;
+                    currentTarget.X = entity.Pos.X;
                 }
 
-                if (Math.Sign(facing.Normali.Y) == Math.Sign(pathTraverser.CurrentTarget.Y - entity.Pos.Y))
+                if (Math.Sign(facing.Normali.Y) == Math.Sign(currentTarget.Y - entity.Pos.Y))
                 {
-                    pathTraverser.CurrentTarget.Y = entity.Pos.Y;
+                    currentTarget.Y = entity.Pos.Y;
                 }
 
-                if (Math.Sign(facing.Normali.Z) == Math.Sign(pathTraverser.CurrentTarget.Z - entity.Pos.Z))
+                if (Math.Sign(facing.Normali.Z) == Math.Sign(currentTarget.Z - entity.Pos.Z))
                 {
-                    pathTraverser.CurrentTarget.Z = entity.Pos.Z;
+                    currentTarget.Z = entity.Pos.Z;
                 }
             }
 

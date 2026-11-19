@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API;
-using System.Xml.Linq;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -13,6 +13,11 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    public interface IMountedHungerProvider
+    {
+        float OnMountedHungerTick(EntityAgent mountedEntity, float deltaTime);
+    }
+
     /// <summary>
     /// Adds hunger to entity. Allows it to eat and die from starvation.
     /// <br/>Uses the "hunger" code
@@ -33,10 +38,10 @@ namespace Vintagestory.GameContent
         EntityAgent entityAgent;
 
         float hungerCounter;
-        float sprintCounter;
+        float movementPenalty;
+        float accumGameSpeedMul;
 
         long listenerId;
-        long lastMoveMs;
 
         public float SaturationLossDelayFruit
         {
@@ -88,7 +93,42 @@ namespace Vintagestory.GameContent
             get { return hungerTree.GetFloat("maxsaturation"); }
             set { hungerTree.SetFloat("maxsaturation", value); entity.WatchedAttributes.MarkPathDirty("hunger"); }
         }
-        
+
+        /// <summary>
+        /// <!--<jsonalias>SatLossPerSec</jsonalias>-->
+        /// How many satiety points will be consumed per second of hunger.
+        /// </summary>
+        [DocumentAsJson("Optional", "0.24")]
+        protected virtual float SatietyLossPerSecond { get; set; } = 0.24f;
+
+        /// <summary>
+        /// <!--<jsonalias>SatLossPerMoveSec</jsonalias>-->
+        /// How many satiety points will be consumed per second of movement.
+        /// </summary>
+        [DocumentAsJson("Optional", "0.72")]
+        protected virtual float SatietyLossPerMovementSecond { get; set; } = 0.72f;
+
+        /// <summary>
+        /// <!--<jsonalias>SatLossPerSwimSec</jsonalias>-->
+        /// How many satiety points will be consumed per second of swimming.
+        /// </summary>
+        [DocumentAsJson("Optional", "0.72")]
+        protected virtual float SatietyLossPerSwimSecond { get; set; } = 0.72f;
+
+        /// <summary>
+        /// <!--<jsonalias>SatLossPerSprintSec</jsonalias>-->
+        /// How many satiety points will be consumed per second of sprinting.
+        /// </summary>
+        [DocumentAsJson("Optional", "2.22")]
+        protected virtual float SatietyLossPerSprintSecond { get; set; } = 2.22f;
+
+        /// <summary>
+        /// <!--<jsonalias>SatLossPerJump</jsonalias>-->
+        /// How many satiety points will be consumed per second of sprinting.
+        /// </summary>
+        [DocumentAsJson("Optional", "0.1")]
+        protected virtual float SatietyLossPerJump { get; set; } = 0.1f;
+
         public float FruitLevel
         {
             get { return hungerTree.GetFloat("fruitLevel"); }
@@ -150,6 +190,12 @@ namespace Vintagestory.GameContent
                 DairyLevel = 0;
             }
 
+            SatietyLossPerSecond = typeAttributes["satLossPerSec"].AsFloat(SatietyLossPerSecond);
+            SatietyLossPerMovementSecond = typeAttributes["satLossPerMoveSec"].AsFloat(SatietyLossPerMovementSecond);
+            SatietyLossPerSwimSecond = typeAttributes["satLossPerSwimSec"].AsFloat(SatietyLossPerSwimSecond);
+            SatietyLossPerSprintSecond = typeAttributes["satLossPerSprintSec"].AsFloat(SatietyLossPerSprintSecond);
+            SatietyLossPerJump = typeAttributes["satLossPerJump"].AsFloat(SatietyLossPerJump);
+
             listenerId = entity.World.RegisterGameTickListener(SlowTick, 6000);
 
             UpdateNutrientHealthBoost();
@@ -165,6 +211,11 @@ namespace Vintagestory.GameContent
         public override void DidAttack(DamageSource source, EntityAgent targetEntity, ref EnumHandling handled)
         {
             ConsumeSaturation(3f);
+        }
+
+        public override void OnEntityJump()
+        {
+            movementPenalty += SatietyLossPerJump;
         }
 
 
@@ -183,7 +234,7 @@ namespace Vintagestory.GameContent
             bool full = Saturation >= maxsat;
 
             Saturation = Math.Min(maxsat, Saturation + saturation);
-            
+
             switch (foodCat)
             {
                 case EnumFoodCategory.Fruit:
@@ -213,7 +264,7 @@ namespace Vintagestory.GameContent
             }
 
             UpdateNutrientHealthBoost();
-            
+
 
         }
 
@@ -227,63 +278,90 @@ namespace Vintagestory.GameContent
                 if (world.PlayerByUid(plr.PlayerUID).WorldData.CurrentGameMode is EnumGameMode.Creative or EnumGameMode.Spectator) return;
             }
 
+            var gameSpeedMul = world.Calendar.SpeedOfTime * world.Calendar.CalendarSpeedMul / 30;
+
             var controls = entityAgent?.Controls;
-            if (controls != null)
+            var mountedHungerProviders = entityAgent?.MountedOn?.Entity?.GetInterfaces<IMountedHungerProvider>();
+            if (mountedHungerProviders == null && controls != null && !controls.FloorSitting)
             {
-                if (controls.TriesToMove || controls.Jump || controls.LeftMouseDown || controls.RightMouseDown)
+                if (controls.TriesToMove & controls.Sprint)
                 {
-                    lastMoveMs = world.ElapsedMilliseconds;
+                    // Check if the player is trying to sprint
+                    movementPenalty += SatietyLossPerSprintSecond * deltaTime * gameSpeedMul;
                 }
-                if (controls.TriesToMove & controls.Sprint) sprintCounter += deltaTime; // Only apply the penalty if the player is trying to move.
+                else if (controls.TriesToMove || controls.Up || controls.Down)
+                {
+                    // If not, are they moving normal speed, factoring in whether they're swimming
+                    if (entity.Swimming) movementPenalty += SatietyLossPerSwimSecond * deltaTime * gameSpeedMul;
+                    else movementPenalty += SatietyLossPerMovementSecond * deltaTime * gameSpeedMul;
+                }
             }
 
-            if (hungerCounter < 0) hungerCounter = 0f; // Just in case the value is somehow negative, including from mods
-            hungerCounter += deltaTime;
-
-            // Once every 10s
-            if (hungerCounter > 10)
+            if (mountedHungerProviders != null)
             {
-                // First we set up how much satiety we actually want to remove
-                var satietyDrain = 0.96f * hungerCounter; // First how much satiety to drain per total seconds
-                satietyDrain += 1.5f * sprintCounter; // Second how much satiety to drain per second we were sprinting
+                foreach (var provider in mountedHungerProviders)
+                {
+                    movementPenalty += provider.OnMountedHungerTick(entityAgent, deltaTime * gameSpeedMul);
+                }
+            }
 
-                // We give a bonus when the entity is not moving
-                var isStandingStill = (world.ElapsedMilliseconds - lastMoveMs) > 3000;
-                if (isStandingStill) satietyDrain /= 4;
+            if (hungerCounter < 0)
+            {
+                hungerCounter = 0f; // Just in case the value is somehow negative, including from mods
+                accumGameSpeedMul = 1f;
+            }
 
-                // 60 * 0.5 = 30 (SpeedOfTime * CalendarSpeedMul) is the default, so we scale according to the default time multiplier
-                satietyDrain *= world.Calendar.SpeedOfTime * world.Calendar.CalendarSpeedMul / 30;
+            accumGameSpeedMul *= hungerCounter;            // We normalize the total time passed with the multiplier
+            accumGameSpeedMul += deltaTime * gameSpeedMul; // Add the extra adjusted amount of time passed
+            hungerCounter += deltaTime;                    // We add the actual delta time passed to the counter
+            accumGameSpeedMul /= hungerCounter;            // And reduce the multiplier back down from the total seconds
+
+            // Once every 10s when awake or 1s when players are sleeping through the night
+            int secondsPassed = gameSpeedMul > 2 ? 1 : 10;
+            if (hungerCounter > secondsPassed)
+            {
+                // First how much satiety to drain for the total seconds, given the accumulated game speed multiplier
+                var satietyDrain = SatietyLossPerSecond * hungerCounter * accumGameSpeedMul;
+                // Second we apply the total penalty we've gathered for all types of movement actions
+                satietyDrain += movementPenalty;
+
                 ReduceSaturation(satietyDrain / 10f); // Divided by 10 to offset the 10x multiplication inside the method
 
                 hungerCounter = 0;
-                sprintCounter = 0;
+                movementPenalty = 0;
+                accumGameSpeedMul = 1;
             }
         }
 
         float detoxCounter = 0f;
+        float detoxAccumGameSpeedMul = 0;
 
         private void detox(float dt)
         {
-            detoxCounter += dt;
+            var gameSpeedMul = entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul / 30;
+            detoxAccumGameSpeedMul *= detoxCounter;      // We normalize the total time passed with the multiplier
+            detoxAccumGameSpeedMul += dt * gameSpeedMul; // Add the extra adjusted amount of time passed
+            detoxCounter += dt;                     // We add the actual delta time passed to the counter
+            detoxAccumGameSpeedMul /= detoxCounter;      // And reduce the multiplier back down from the total seconds
+
             if (detoxCounter > 1)
             {
-                // 60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul) is the default, so we scale according to the default time multiplier
-                var gameSpeedMultiplier = entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul / 30;
-                if (gameSpeedMultiplier == 0)  gameSpeedMultiplier = 1; // To make sure sobering up still happens with time paused
+                if (detoxAccumGameSpeedMul == 0)  detoxAccumGameSpeedMul = 1; // To make sure sobering up still happens with time paused
 
                 float intox = entity.WatchedAttributes.GetFloat("intoxication");
                 if (intox > 0)
                 {
-                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f * gameSpeedMultiplier));
+                    entity.WatchedAttributes.SetFloat("intoxication", Math.Max(0, intox - 0.005f * detoxAccumGameSpeedMul));
                 }
 
                 float psyche = entity.WatchedAttributes.GetFloat("psychedelic");
                 if (psyche > 0)
                 {
-                    entity.WatchedAttributes.SetFloat("psychedelic", Math.Max(0, psyche - 0.005f * gameSpeedMultiplier));
+                    entity.WatchedAttributes.SetFloat("psychedelic", Math.Max(0, psyche - 0.005f * detoxAccumGameSpeedMul));
                 }
 
                 detoxCounter = 0;
+                detoxAccumGameSpeedMul = 1;
             }
         }
 
@@ -429,13 +507,14 @@ namespace Vintagestory.GameContent
             SaturationLossDelayGrain = 60;
             SaturationLossDelayDairy = 60;
 
-            Saturation = MaxSaturation / 2;
-            VegetableLevel /= 2;
-            ProteinLevel /= 2;
-            FruitLevel /= 2;
-            DairyLevel /= 2;
-            GrainLevel /= 2;
+            float satietyRate = entity.World.Config.GetString("playerReviveSatiety").ToFloat(0.5f);
+            Saturation = MaxSaturation * satietyRate;
+            VegetableLevel *= satietyRate;
+            ProteinLevel *= satietyRate;
+            FruitLevel *= satietyRate;
+            DairyLevel *= satietyRate;
+            GrainLevel *= satietyRate;
         }
     }
- 
+
 }

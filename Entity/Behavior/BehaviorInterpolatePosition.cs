@@ -7,6 +7,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.GameContent;
 
 #nullable disable
 
@@ -55,6 +56,8 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
     public ICoreClientAPI capi;
     public EntityAgent agent;
     public IMountable mountableSupplier;
+    public IRemotePhysics physics;
+    private PhysicsBehaviorBase entityPhysics;
 
     public EntityBehaviorInterpolatePosition(Entity entity) : base(entity)
     {
@@ -65,10 +68,50 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         agent = entity as EntityAgent;
     }
 
+    public override void Initialize(EntityProperties properties, JsonObject attributes)
+    {
+        pN = pL = new PositionSnapshot(entity.Pos, interval, false);
+        // Wait for a real target instead of queuing another copy of the spawn position.
+        wait = 1;
+
+        targetYaw = entity.Pos.Yaw;
+        targetPitch = entity.Pos.Pitch;
+        targetRoll = entity.Pos.Roll;
+
+        currentYaw = entity.Pos.Yaw;
+        currentPitch = entity.Pos.Pitch;
+        currentRoll = entity.Pos.Roll;
+
+        if (agent != null)
+        {
+            targetHeadYaw = entity.Pos.HeadYaw;
+            targetHeadPitch = entity.Pos.HeadPitch;
+            targetBodyYaw = agent.BodyYawServer;
+
+            currentHeadYaw = entity.Pos.HeadYaw;
+            currentHeadPitch = entity.Pos.HeadPitch;
+            currentBodyYaw = agent.BodyYawServer;
+        }
+
+        foreach (EntityBehavior behavior in entity.SidedProperties.Behaviors)
+        {
+            if (behavior is IRemotePhysics)
+            {
+                physics = behavior as IRemotePhysics;
+                entityPhysics = physics as PhysicsBehaviorBase;
+                break;
+            }
+        }
+    }
+
     public override void AfterInitialized(bool onFirstSpawn)
     {
         mountableSupplier = entity.GetInterface<IMountable>();
     }
+
+    private bool wasLocallyControlled;
+    private bool resetRemotePhysics;
+    private bool awaitingInitialPosition = true;
 
     public float dtAccum = 0;
 
@@ -117,53 +160,18 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         pN = positionQueue.Dequeue();
         queueCount--;
 
+        bool controlledByServer = entity.IsControlledByServer(mountableSupplier);
+
         // Clear flooded queue.
         if (clear && queueCount > 1) PopQueue(true);
 
-        if (mountableSupplier?.IsBeingControlled() == true) return;
-
-        entity.Pos.SetPos(pN.x, pN.y, pN.z);
-        physics?.HandleRemotePhysics(Math.Max(pN.interval, interval), pN.isTeleport);
-    }
-
-    public IRemotePhysics physics;
-
-    public override void Initialize(EntityProperties properties, JsonObject attributes)
-    {
-        currentYaw = entity.Pos.Yaw;
-        targetYaw = entity.Pos.Yaw;
-
-        PushQueue(new PositionSnapshot(entity.Pos, interval, false));
-
-        targetYaw = entity.Pos.Yaw;
-        targetPitch = entity.Pos.Pitch;
-        targetRoll = entity.Pos.Roll;
-
-        currentYaw = entity.Pos.Yaw;
-        currentPitch = entity.Pos.Pitch;
-        currentRoll = entity.Pos.Roll;
-
-        if (agent != null)
+        if (controlledByServer)
         {
-            targetHeadYaw = entity.Pos.HeadYaw;
-            targetHeadPitch = entity.Pos.HeadPitch;
-            targetBodyYaw = agent.BodyYawServer;
-
-            currentHeadYaw = entity.Pos.HeadYaw;
-            currentHeadPitch = entity.Pos.HeadPitch;
-            currentBodyYaw = agent.BodyYawServer;
-        }
-
-        foreach (EntityBehavior behavior in entity.SidedProperties.Behaviors)
-        {
-            if (behavior is IRemotePhysics)
-            {
-                physics = behavior as IRemotePhysics;
-                break;
-            }
+            entity.Pos.SetPos(pN.x, pN.y, pN.z);
+            physics?.HandleRemotePhysics(Math.Max(pN.interval, interval), pN.isTeleport || resetRemotePhysics);
+            resetRemotePhysics = false;
         }
     }
-
     /// <summary>
     /// Called when the client receives a new position.
     /// Move the positions forward and reset the accumulation.
@@ -197,6 +205,18 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
                 currentBodyYaw = agent.BodyYawServer;
             }
         }
+        else if (awaitingInitialPosition)
+        {
+            // Start the spawn-to-first-update segment immediately, without a stationary interval.
+            dtAccum = 0;
+            PopQueue(false);
+        }
+
+        if (awaitingInitialPosition)
+        {
+            awaitingInitialPosition = false;
+            wait = 0;
+        }
 
         targetYaw = entity.Pos.Yaw;
         targetPitch = entity.Pos.Pitch;
@@ -221,7 +241,38 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
 
     public void OnRenderFrame(float dt, EnumRenderStage stage)
     {
+        // Local player rotation and head pose are driven by input, even when the position queue is empty.
+        if (entity == capi.World.Player.Entity)
+        {
+            capi.Event.UnregisterRenderer(this, EnumRenderStage.Before);
+            return;
+        }
+
         if (capi.IsGamePaused) return;
+
+        if (entity.WatchedAttributes.GetBool("clearPosLerp"))
+        {
+            entity.WatchedAttributes.SetBool("clearPosLerp", false);
+            dtAccum = 0;
+            positionQueue.Clear();
+            queueCount = 0;
+        }
+
+        bool locallyControlled = entity.IsControlledByClient(capi.World.Player.Entity);
+        if (wasLocallyControlled && !locallyControlled)
+        {
+            // Remote interpolation must restart from the pose where local control ended.
+            positionQueue.Clear();
+            queueCount = 0;
+            pL = pN = new PositionSnapshot(entity.Pos, interval, false);
+            dtAccum = 0;
+            wait = 1;
+            currentYaw = targetYaw = entity.Pos.Yaw;
+            currentPitch = targetPitch = entity.Pos.Pitch;
+            currentRoll = targetRoll = entity.Pos.Roll;
+            resetRemotePhysics = true;
+        }
+        wasLocallyControlled = locallyControlled;
 
         if (queueCount < wait)
         {
@@ -237,6 +288,8 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
                     entity.Pos.HeadPitch = LerpRotation(ref currentHeadPitch, targetHeadPitch, dt);
                     agent.BodyYaw = LerpRotation(ref currentBodyYaw, targetBodyYaw, dt);
                 }
+
+                entityPhysics?.SetInterpolatedRemotePose(pN.x, pN.y, pN.z, entity.Pos.Yaw);
             }
 
             return;
@@ -248,14 +301,6 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
         {
             if (queueCount > 0)
             {
-                // This is the most convenient place to check this.
-                // It should be done when the client creates it's own player somewhere.
-                if (entity == capi.World.Player.Entity)
-                {
-                    capi.Event.UnregisterRenderer(this, EnumRenderStage.Before);
-                    return;
-                }
-
                 PopQueue(false);
                 wait = 0;
             }
@@ -313,6 +358,7 @@ public class EntityBehaviorInterpolatePosition : EntityBehavior, IRenderer
             entity.Pos.X = GameMath.Lerp(pL.x, pN.x, delta);
             entity.Pos.Y = GameMath.Lerp(pL.y, pN.y, delta);
             entity.Pos.Z = GameMath.Lerp(pL.z, pN.z, delta);
+            entityPhysics?.SetInterpolatedRemotePose(entity.Pos.X, entity.Pos.Y, entity.Pos.Z, entity.Pos.Yaw);
         }
     }
 

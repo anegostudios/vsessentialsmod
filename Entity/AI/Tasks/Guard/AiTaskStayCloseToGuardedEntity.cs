@@ -36,6 +36,8 @@ namespace Vintagestory.GameContent
 
         public override void StartExecute()
         {
+            if (targetEntity == null) return;
+
             base.StartExecute();
 
             float size = targetEntity.SelectionBox.XSize;
@@ -50,20 +52,6 @@ namespace Vintagestory.GameContent
         public override bool CanContinueExecute()
         {
             return pathTraverser.Ready;
-        }
-
-        public Entity? GetGuardedEntity()
-        {
-            var uid = entity.WatchedAttributes.GetString("guardedPlayerUid");
-            if (uid != null)
-            {
-                return entity.World.PlayerByUid(uid)?.Entity;
-            }
-            else
-            {
-                var id = entity.WatchedAttributes.GetLong("guardedEntityId");
-                return entity.World.GetEntityById(id);
-            }
         }
     }
 }

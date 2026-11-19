@@ -1,6 +1,7 @@
 using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 using Vintagestory.API.MathTools;
 
 #nullable disable
@@ -101,7 +102,14 @@ namespace Vintagestory.Essentials
                 nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max((float)sqDistToTarget, 0.2f));
             }
 
-            yawToMotion(dt, controls, desiredYaw, nowMoveSpeed);
+            if (gaitBehavior?.NavigateUsingGaits == true)
+            {
+                gaitBehavior.SetMotion(dt, controls, desiredYaw, nowMoveSpeed, preferredGait);
+            }
+            else
+            {
+                yawToMotion(dt, controls, desiredYaw, nowMoveSpeed);
+            }
         }
 
         private void yawToMotion(float dt, EntityControls controls, float desiredYaw, float nowMoveSpeed)
@@ -161,6 +169,12 @@ namespace Vintagestory.Essentials
             entity.ServerControls.Forward = false;
             entity.Controls.WalkVector.Set(0, 0, 0);
             stuckCounter = 0;
+
+            EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+            if (gaitBehavior != null)
+            {
+                gaitBehavior.SetIdle();
+            }
         }
     }
 }

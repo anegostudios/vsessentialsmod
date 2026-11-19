@@ -140,7 +140,16 @@ namespace Vintagestory.API.Common
         public string? WhenNotInEmotionState { get => WhenNotInEmotionStates?[0]; set => WhenNotInEmotionStates = value?.Split("|"); }
 
         protected long cooldownUntilMs;
+
+        /// <summary>
+        /// Minimum generation for the entity to start this task.<br/>
+        /// If entity has attribute 'tamed' set to 'true', then its generation is considered 10 higher.
+        /// </summary>
         protected int? minGeneration;
+        /// <summary>
+        /// Maximum generation for the entity to start this task.<br/>
+        /// If entity has attribute 'tamed' set to 'true', then its generation is considered 10 higher.
+        /// </summary>
         protected int? maxGeneration;
 
         protected double cooldownUntilTotalHours;
@@ -200,11 +209,7 @@ namespace Vintagestory.API.Common
             this.world = entity.World;
             randTL ??= new Random((int)entity.EntityId);
 
-            this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>()!.PathTraverser!;
-            if (pathTraverser == null)
-            {
-                throw new ArgumentNullException("No PathTraverser found for entity " + entity.Code);
-            }
+            this.pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>()!.PathTraverser;
 
             bhEmo = entity.GetBehavior<EntityBehaviorEmotionStates>();
 
@@ -321,8 +326,9 @@ namespace Vintagestory.API.Common
             if (WhenSwimming != null && WhenSwimming != entity.Swimming) return false;
             if (WhenInEmotionStates != null && !IsInEmotionState(WhenInEmotionStates)) return false;
             if (WhenNotInEmotionStates != null && IsInEmotionState(WhenNotInEmotionStates)) return false;
-            if (minGeneration != null && entity.WatchedAttributes.GetInt("generation") < minGeneration) return false;
-            if (maxGeneration != null && entity.WatchedAttributes.GetInt("generation") > maxGeneration) return false;
+            int generation = GetOwnGeneration();
+            if (minGeneration != null && minGeneration > generation) return false;
+            if (maxGeneration != null && maxGeneration < generation) return false;
             if (!IsValidTemperature()) return false;
             if (!IsValidLightLevel()) return false;
             if (!IsInValidDayTimeHours(true)) return false;
@@ -367,6 +373,13 @@ namespace Vintagestory.API.Common
             if (emotionState == null) return false;
 
             return bhEmo.IsInEmotionState(emotionState);
+        }
+
+        public int GetOwnGeneration()
+        {
+            int generation = entity.WatchedAttributes.GetInt("generation", 0);
+            if (entity.Properties.Attributes?.IsTrue("tamed") == true) generation += 10;
+            return generation;
         }
 
         public virtual void AfterInitialize()
@@ -429,7 +442,7 @@ namespace Vintagestory.API.Common
             // Ugly hack to fix attack animation sometimes not playing - it seems it gets stopped even before it gets sent to the client?
             if (animMeta != null && animMeta.Code != "attack" && animMeta.Code != "idle")
             {
-                entity.AnimManager.StopAnimation(animMeta.Code);
+                entity.AnimManager.StopAnimation(animMeta.Animation);
             }
 
             if (finishSound != null)

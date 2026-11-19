@@ -39,8 +39,6 @@ public class MapDB : SQLiteDBConnection
 
     public override void OnOpened()
     {
-        base.OnOpened();
-
         setMapPieceCmd = sqliteConn.CreateCommand();
         setMapPieceCmd.CommandText = "INSERT OR REPLACE INTO mappiece (position, data) VALUES (@pos, @data)";
         setMapPieceCmd.Parameters.Add("@pos", SqliteType.Integer, 1);
@@ -53,7 +51,7 @@ public class MapDB : SQLiteDBConnection
         getMapPieceCmd.Prepare();
     }
 
-    protected override void CreateTablesIfNotExists(SqliteConnection sqliteConn)
+    protected override void CreateTablesIfNotExists()
     {
         using (var sqlite_cmd = sqliteConn.CreateCommand())
         {

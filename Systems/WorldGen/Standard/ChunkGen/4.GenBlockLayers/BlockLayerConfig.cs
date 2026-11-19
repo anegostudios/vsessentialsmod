@@ -71,7 +71,7 @@ namespace Vintagestory.ServerMods
         {
             for (int i = 0; i < Blocklayers.Length; i++)
             {
-                Random rnd = new Random(api.WorldManager.Seed + i);
+                Random rnd = new Random(api.WorldManager.SeedWorldgen + i);
 
                 Blocklayers[i].Init(api, RockStrata, rnd);
             }
@@ -96,15 +96,15 @@ namespace Vintagestory.ServerMods
 
             for (int i = 0; i < LakeBedLayer.BlockCodeByMin.Length; i++)
             {
-                Random rnd = new Random(api.WorldManager.Seed + i);
+                Random rnd = new Random(api.WorldManager.SeedWorldgen + i);
                 LakeBedLayer.BlockCodeByMin[i].Init(api, RockStrata, rnd);
             }
             for (int i = 0; i < OceanBedLayer.BlockCodeByMin.Length; i++)
             {
-                Random rnd = new Random(api.WorldManager.Seed + i);
+                Random rnd = new Random(api.WorldManager.SeedWorldgen + i);
                 OceanBedLayer.BlockCodeByMin[i].Init(api, RockStrata, rnd);
             }
-            
+
             BeachLayer.ResolveBlockIds(api, RockStrata);
         }
     }

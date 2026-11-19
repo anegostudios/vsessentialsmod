@@ -51,19 +51,11 @@ namespace Vintagestory.GameContent
         [DocumentAsJson("Optional", "false")]
         [JsonProperty] protected bool eatAnyway = false;
 
-        public virtual bool ShouldEat
-        {
-            get
-            {
-                return 
-                    eatAnyway || 
-                    (
-                        GetSaturation() < PortionsEatenForMultiply 
-                        && TotalDaysCooldownUntil <= entity.World.Calendar.TotalDays
-                    )
-                ;
-            }
-        }
+        public virtual bool ShouldEat => eatAnyway ||
+            (
+                GetSaturation() < PortionsEatenForMultiply
+                && TotalDaysCooldownUntil <= entity.World.Calendar.TotalDays
+            );
 
         public virtual float PortionsLeftToEat
         {
@@ -86,7 +78,7 @@ namespace Vintagestory.GameContent
             {
                 // Note that the generic type here is only used for proving the target is a class rather than a struct,
                 // and does not limit which fields will be populated
-                JsonUtil.Populate<EntityBehaviorMultiplyBase>(attributes.Token, this);
+                JsonUtil.PopulateObject(this, attributes.Token, JsonUtil.CreateSerializerForDomain(entity.Code.Domain));
             }
 
             multiplyTree = entity.WatchedAttributes.GetTreeAttribute("multiply");

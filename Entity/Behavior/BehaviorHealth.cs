@@ -176,6 +176,8 @@ public class EntityBehaviorHealth : EntityBehavior
     [DocumentAsJson("Optional", "false")]
     protected virtual bool ReceiveHailDamage { get; set; } = false;
 
+    protected float[]? DamageMultipliers = null;
+
     /// <summary>
     /// Health regeneration speed will be slowed down when saturation is below this fraction of total saturation.
     /// </summary>
@@ -204,13 +206,14 @@ public class EntityBehaviorHealth : EntityBehavior
     protected float timeSinceLastDoTTickSec = 0;
 
     /// <summary>
-    /// The amount of time between each damage-over-time tick. 
+    /// The amount of time between each damage-over-time tick.
     /// </summary>
     [DocumentAsJson("Optional","0.5")]
     protected float timeBetweenDoTTicksSec = 0.5f;
 
 
     private float secondsSinceLastUpdate;
+    private float accumGameSpeedMul; // We track the speed multiplier each tick for the sake of sleeping
 
     private ITreeAttribute healthTree => entity.WatchedAttributes.GetTreeAttribute("health");
 
@@ -281,6 +284,16 @@ public class EntityBehaviorHealth : EntityBehavior
 
         timeBetweenDoTTicksSec = attributes["timeBetweenTicksSec"].AsFloat(0.5f);
 
+        var damageMultipliers = attributes["damageMultipliers"].AsObject<Dictionary<EnumDamageType, float>>();
+        if (damageMultipliers != null)
+        {
+            DamageMultipliers = new float[damageMultipliers.Keys.Max(key => (int)key) + 1].Fill(1);
+            foreach (var val in damageMultipliers)
+            {
+                DamageMultipliers[(int)val.Key] = val.Value;
+            }
+        }        
+
         TimeSpan currentTime = TimeSpan.FromMilliseconds(entity.World.ElapsedMilliseconds);
         byte[] data = entity.WatchedAttributes.GetBytes("damageovertime-activeeffects");
         if (data != null)
@@ -303,13 +316,19 @@ public class EntityBehaviorHealth : EntityBehavior
 
         DamageIfFallingIntoVoid();
 
-        secondsSinceLastUpdate += deltaTime;
+        float multiplierPerGameSec = entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul / 30;
+        accumGameSpeedMul *= secondsSinceLastUpdate;           // We normalize the total time passed with the multiplier
+        accumGameSpeedMul += deltaTime * multiplierPerGameSec; // Add the extra adjusted amount of time passed
+        secondsSinceLastUpdate += deltaTime;                   // We add the actual delta time passed to the counter
+        accumGameSpeedMul /= secondsSinceLastUpdate;           // And reduce the multiplier back down from the total seconds
+
         if (secondsSinceLastUpdate < HealthUpdateCooldownSec) return;
 
         ApplyRegenAndHunger();
         ApplyHailDamage();
 
         secondsSinceLastUpdate = 0;
+        accumGameSpeedMul = 1;
     }
 
     public override void OnEntityDeath(DamageSource damageSourceForDeath)
@@ -326,6 +345,12 @@ public class EntityBehaviorHealth : EntityBehavior
         if (TurnIntoDoTEffect(damageSource, damage)) return;
 
         float damageBeforeDelegatesApplied = damage;
+
+        int dmgTypeIndex = (int)damageSource.Type;
+        if (dmgTypeIndex < 0 && this.DamageMultipliers != null && dmgTypeIndex < this.DamageMultipliers.Length)
+        {
+            damage *= this.DamageMultipliers[dmgTypeIndex];
+        }
 
         ApplyOnDamageDelegates(damageSource, ref damage);
 
@@ -358,7 +383,7 @@ public class EntityBehaviorHealth : EntityBehavior
         }
         else
         {
-            if (damage > 1f && HurtAnimationCode != null)
+            if (damage > 1f && HurtAnimationCode != null && (HurtAnimationCode != "hurt" || damageSource.TicksPerDuration >= 2))
             {
                 entity.AnimManager.StartAnimation(HurtAnimationCode);
             }
@@ -426,10 +451,26 @@ public class EntityBehaviorHealth : EntityBehavior
 
     public override void GetInfoText(StringBuilder infotext)
     {
+        if (!entity.Alive) return;
+
         ICoreClientAPI? capi = entity.Api as ICoreClientAPI;
         if (capi?.World.Player?.WorldData?.CurrentGameMode == EnumGameMode.Creative)
         {
             infotext.AppendLine(Lang.Get("Health: {0}/{1}", Health, MaxHealth));
+        }
+
+        if (DamageMultipliers != null)
+        {
+            for (int i = 0; i < DamageMultipliers.Length; i++)
+            {
+                var mul = DamageMultipliers[i];
+                if (Math.Abs(mul - 1) > 0.1)
+                {
+                    var dmgtype = Lang.Get("damagetype-" + ((EnumDamageType)i).ToString().ToLowerInvariant());
+                    if (mul > 1) infotext.AppendLine(Lang.Get("Weak against {0} damage", dmgtype));
+                    else infotext.AppendLine(Lang.Get("Resistant to {0} damage", dmgtype));
+                }
+            }
         }
     }
 
@@ -622,9 +663,7 @@ public class EntityBehaviorHealth : EntityBehavior
 
         float healthRegenSpeed = entity is EntityPlayer ? entity.Api.World.Config.GetString("playerHealthRegenSpeed", "1").ToFloat() : entity.WatchedAttributes.GetFloat("regenSpeed", 1);
 
-        // previous value = 0.01 , -> 0.01 / 30 = 0.000333333f (60 * 0,5 = 30 (SpeedOfTime * CalendarSpeedMul))
-        float healthRegenPerGameSecond = 0.000333333f * healthRegenSpeed;
-        float multiplierPerGameSec = secondsSinceLastUpdate * entity.Api.World.Calendar.SpeedOfTime * entity.Api.World.Calendar.CalendarSpeedMul;
+        float healthRegenPerGameSecond = 0.01f * healthRegenSpeed;
 
         // Only players have the hunger behavior, and the different nutrient saturations
         if (entity is EntityPlayer player)
@@ -636,11 +675,11 @@ public class EntityBehaviorHealth : EntityBehavior
                 // When below 75% satiety, autoheal starts dropping
                 healthRegenPerGameSecond = GameMath.Clamp(healthRegenPerGameSecond * hungerBehavior.Saturation / hungerBehavior.MaxSaturation * 1 / AutoRegenSaturationThreshold, 0, healthRegenPerGameSecond);
 
-                hungerBehavior.ConsumeSaturation(SaturationPerHealthPoint * multiplierPerGameSec * healthRegenPerGameSecond);
+                hungerBehavior.ConsumeSaturation(SaturationPerHealthPoint * accumGameSpeedMul * secondsSinceLastUpdate * healthRegenPerGameSecond);
             }
         }
 
-        Health = Math.Min(health + multiplierPerGameSec * healthRegenPerGameSecond, maxHealth);
+        Health = Math.Min(health + accumGameSpeedMul * secondsSinceLastUpdate * healthRegenPerGameSecond, maxHealth);
     }
 
     protected virtual void ApplyOnDamageDelegates(DamageSource damageSource, ref float damage)

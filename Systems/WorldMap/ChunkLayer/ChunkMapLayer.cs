@@ -90,10 +90,7 @@ namespace Vintagestory.GameContent
 
         public string getMapDbFilePath()
         {
-            string path = Path.Combine(GamePaths.DataPath, "Maps");
-            GamePaths.EnsurePathExists(path);
-
-            return Path.Combine(path, api.World.SavegameIdentifier + ".db");
+            return Path.Join(api.GetOrCreateDataPath("Maps"), api.World.SavegameIdentifier + ".db");
         }
 
         
@@ -121,11 +118,11 @@ namespace Vintagestory.GameContent
                 api.World.Logger.Notification("Loading world map cache db...");
                 mapdb = new MapDB(api.World.Logger);
                 string errorMessage = null;
-                string mapdbfilepath = getMapDbFilePath();
-                mapdb.OpenOrCreate(mapdbfilepath, ref errorMessage, true, true, false);
+                string mapDbFilepath = getMapDbFilePath();
+                mapdb.OpenOrCreate(mapDbFilepath, ref errorMessage, true, true, false);
                 if (errorMessage != null)
                 {
-                    throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapdbfilepath));
+                    throw new Exception(string.Format("Cannot open {0}, possibly corrupted. Please fix manually or delete this file to continue playing", mapDbFilepath));
                 }
                 
                 api.ChatCommands.GetOrCreate("map")

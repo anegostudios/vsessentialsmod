@@ -150,7 +150,7 @@ namespace Vintagestory.ServerMods
             var maxz = (positionZ + radius) * noiseSizeOcean / regionSize;
 
             // randomly grow the square into a more natural looking shape if all surroundings are ocean
-            var lcgRandom = new LCGRandom(sapi.World.Seed);
+            var lcgRandom = new LCGRandom(sapi.World.SeedWorldgen);
             lcgRandom.InitPositionSeed(positionX, positionZ);
             var naturalShape = new NaturalShape(lcgRandom);
             var sizeX = maxx - minx;
@@ -204,7 +204,7 @@ namespace Vintagestory.ServerMods
         {
             requireLandAt.Clear();
             forceLandforms.Clear();
-            long seed = sapi.WorldManager.Seed;
+            long seed = sapi.WorldManager.SeedWorldgen;
             noiseSizeOcean = sapi.WorldManager.RegionSize / TerraGenConfig.oceanMapScale;
             noiseSizeUpheavel = sapi.WorldManager.RegionSize / TerraGenConfig.climateMapScale;
             noiseSizeClimate = sapi.WorldManager.RegionSize / TerraGenConfig.climateMapScale;

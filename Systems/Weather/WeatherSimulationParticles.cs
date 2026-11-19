@@ -208,8 +208,11 @@ namespace Vintagestory.GameContent
 
         Block lblock;
         Vec3f parentVeloSnow = new Vec3f();
-        BlockPos tmpPos = new BlockPos(API.Config.Dimensions.NormalWorld);
-        Vec3d particlePos = new Vec3d();
+        BlockPos tmpPos = new BlockPos(Dimensions.NormalWorld);
+        Vec3d playerPosRainheight = new Vec3d();
+
+        public float precipParticleMul = 1f;
+
 
         #region desert storm ambient
         AmbientModifier desertStormAmbient;
@@ -238,6 +241,16 @@ namespace Vintagestory.GameContent
             desertStormAmbient.FogMin = new WeightedFloat();
 
             capi.Ambient.CurrentModifiers["desertstorm"] = desertStormAmbient;
+
+            capi.ChatCommands.GetOrCreate("dev").BeginSubCommand("precipParticleMul")
+                .WithDescription("Adjust the multiplier for precipitation particles")
+                .WithArgs(capi.ChatCommands.Parsers.Float("multiplier"))
+                .HandleWith(args =>
+                {
+                    precipParticleMul = (float) args[0];
+                    return TextCommandResult.Success();
+                })
+            ;
         }
 
         public void Initialize()
@@ -336,13 +349,14 @@ namespace Vintagestory.GameContent
 
         Vec3f windSpeed;
         float windSpeedIntensity;
+        float asyncAccum = 0f;
         private bool asyncParticleSpawn(float dt, IAsyncParticleManager manager)
         {
             WeatherDataSnapshot weatherData = ws.BlendedWeatherData;
 
             ClimateCondition conds = ws.clientClimateCond;
-            if (conds == null || !ws.playerChunkLoaded) return true; 
-            
+            if (conds == null || !ws.playerChunkLoaded) return true;
+
             EntityPos plrPos = capi.World.Player.Entity.Pos;
             float precIntensity = conds.Rainfall;
 
@@ -361,26 +375,22 @@ namespace Vintagestory.GameContent
                 precType = conds.Temperature < weatherData.snowThresholdTemp ? EnumPrecipitationType.Snow : EnumPrecipitationType.Rain;
             }
 
-            int rainYPos = capi.World.BlockAccessor.GetRainMapHeightAt((int)particlePos.X, (int)particlePos.Z);
-            particlePos.Set(capi.World.Player.Entity.Pos.X, rainYPos, capi.World.Player.Entity.Pos.Z);
+            int rainYPos = capi.World.BlockAccessor.GetRainMapHeightAt((int)playerPosRainheight.X, (int)playerPosRainheight.Z);
+            playerPosRainheight.Set(capi.World.Player.Entity.Pos.X, rainYPos, capi.World.Player.Entity.Pos.Z);
 
-            
-            int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapResolved, lblock.SeasonColorMapResolved, ColorUtil.WhiteArgb, (int)particlePos.X, (int)particlePos.Y, (int)particlePos.Z, false);
+
+            int onwaterSplashParticleColor = capi.World.ApplyColorMapOnRgba(lblock.ClimateColorMapResolved, lblock.SeasonColorMapResolved, ColorUtil.WhiteArgb, (int)playerPosRainheight.X, (int)playerPosRainheight.Y, (int)playerPosRainheight.Z, false);
             byte[] col = ColorUtil.ToBGRABytes(onwaterSplashParticleColor);
             onwaterSplashParticleColor = ColorUtil.ToRgba(94, col[0], col[1], col[2]);
 
-            centerPos.Set((int)particlePos.X, 0, (int)particlePos.Z);
-            for (int lx = 0; lx < 16; lx++)
+            asyncAccum += dt;
+            if (asyncAccum > 2f)
             {
-                int dx = (lx - 8) * 4;
-                for (int lz = 0; lz < 16; lz++)
-                {
-                    int dz = (lz - 8) * 4;
-
-                    lowResRainHeightMap[lx, lz] = capi.World.BlockAccessor.GetRainMapHeightAt(centerPos.X + dx, centerPos.Z + dz);
-                }
+                asyncAccum = 0f;
+                lastHeightmapCenterX = int.MinValue;
             }
 
+            updateLowResRainmapIfStale();
 
             windSpeed = capi.World.BlockAccessor.GetWindSpeedAt(plrPos.XYZ).ToVec3f();
             windSpeedIntensity = (float)windSpeed.Length();
@@ -389,17 +399,18 @@ namespace Vintagestory.GameContent
             parentVeloSnow.Y = 0;
             parentVeloSnow.Z = -Math.Max(0, (float)windSpeed.Z / 2f - 0.15f) * 2f;
 
-            
+
             // Don't spawn if wind speed below 50% or if the player is 10 blocks above ground
             if (windSpeedIntensity > 0.5f) // && particlePos.Y - rainYPos < 10
             {
                 SpawnDustParticles(manager, conds, plrPos, dryness, onwaterSplashParticleColor);
-            } else
+            }
+            else
             {
                 spawnCount = -1;
             }
 
-            particlePos.Y = capi.World.Player.Entity.Pos.Y;
+            playerPosRainheight.Y = capi.World.Player.Entity.Pos.Y;
 
             if (precIntensity <= 0.02) return true;
 
@@ -424,6 +435,31 @@ namespace Vintagestory.GameContent
             return true;
         }
 
+        int lastHeightmapCenterX = int.MinValue;
+        int lastHeightmapCenterZ = int.MinValue;
+        private void updateLowResRainmapIfStale()
+        {
+            int currentCenterX = (int)playerPosRainheight.X;
+            int currentCenterZ = (int)playerPosRainheight.Z;
+
+            if (lastHeightmapCenterX == int.MinValue || Math.Abs(currentCenterX - lastHeightmapCenterX) >= 4 || Math.Abs(currentCenterZ - lastHeightmapCenterZ) >= 4)
+            {
+                centerPos.Set((int)playerPosRainheight.X, 0, (int)playerPosRainheight.Z);
+                for (int lx = 0; lx < 16; lx++)
+                {
+                    int dx = (lx - 8) * 4;
+                    for (int lz = 0; lz < 16; lz++)
+                    {
+                        int dz = (lz - 8) * 4;
+
+                        lowResRainHeightMap[lx, lz] = capi.World.BlockAccessor.GetRainMapHeightAt(centerPos.X + dx, centerPos.Z + dz);
+                    }
+                }
+
+                lastHeightmapCenterX = currentCenterX;
+                lastHeightmapCenterZ = currentCenterZ;
+            }
+        }
 
         private void SpawnDustParticles(IAsyncParticleManager manager, ClimateCondition conds, EntityPos plrPos, float dryness, int onwaterSplashParticleColor)
         {
@@ -438,7 +474,7 @@ namespace Vintagestory.GameContent
 
             float intensity = windSpeed.Length();
 
-            stormDustParticles.MinPos.Set(particlePos.X - range + dx, particlePos.Y + 20 + 5 * intensity + dy, particlePos.Z - range + dz);
+            stormDustParticles.MinPos.Set(playerPosRainheight.X - range + dx, playerPosRainheight.Y + 20 + 5 * intensity + dy, playerPosRainheight.Z - range + dz);
             stormDustParticles.AddPos.Set(2*range, -30, 2*range);
             stormDustParticles.GravityEffect = 0.1f;
             stormDustParticles.ParticleModel = EnumParticleModel.Quad;
@@ -461,8 +497,8 @@ namespace Vintagestory.GameContent
             {
                 for (int i = 0; i < cnt; i++)
                 {
-                    double px = particlePos.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-                    double pz = particlePos.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                    double px = playerPosRainheight.X + dx + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                    double pz = playerPosRainheight.Z + dz + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
 
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
                     Block block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz);
@@ -479,7 +515,7 @@ namespace Vintagestory.GameContent
                     }
                     if (block.BlockMaterial == EnumBlockMaterial.Snow && conds.Temperature > 5) continue;
 
-                    if (Math.Abs(py - particlePos.Y) > 15) continue;
+                    if (Math.Abs(py - playerPosRainheight.Y) > 15) continue;
 
                     tmpPos.Set((int)px, py, (int)pz);
                     stormDustParticles.Color = ColorUtil.ReverseColorBytes(block.GetColor(capi, tmpPos));
@@ -516,8 +552,8 @@ namespace Vintagestory.GameContent
 
                 for (int i = 0; i < 20; i++)
                 {
-                    double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
-                    double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
+                    double px = playerPosRainheight.X + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
+                    double pz = playerPosRainheight.Z + (rand.NextDouble() * rand.NextDouble()) * 40 * (1 - 2 * rand.Next(2));
                     int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
                     Block block = capi.World.BlockAccessor.GetBlockRaw((int)px, py, (int)pz, BlockLayersAccess.Fluid);
@@ -549,7 +585,7 @@ namespace Vintagestory.GameContent
             float dy = (float)(plrPos.Motion.Y * 40);
             float dz = (float)(plrPos.Motion.Z * 40) - 4 * windSpeed.Z;
 
-            hailParticle.MinPos.Set(particlePos.X + dx, particlePos.Y + 15 + dy, particlePos.Z + dz);
+            hailParticle.MinPos.Set(playerPosRainheight.X + dx, playerPosRainheight.Y + 15 + dy, playerPosRainheight.Z + dz);
 
             hailParticle.MinSize = 0.3f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
             hailParticle.MaxSize = 1f * (0.5f + conds.Rainfall); // * weatherData.PrecParticleSize;
@@ -557,8 +593,8 @@ namespace Vintagestory.GameContent
 
             hailParticle.Color = ColorUtil.ToRgba(220, 210, 230, 255);
 
-            hailParticle.MinQuantity = 100 * plevel;
-            hailParticle.AddQuantity = 25 * plevel;
+            hailParticle.MinQuantity = 100 * plevel * precipParticleMul;
+            hailParticle.AddQuantity = 25 * plevel * precipParticleMul;
             hailParticle.MinVelocity.Set(-0.025f + 7.5f * windSpeed.X, -5f, -0.025f + 7.5f * windSpeed.Z);
             hailParticle.AddVelocity.Set(0.05f + 7.5f * windSpeed.X, 0.05f, 0.05f + 7.5f * windSpeed.Z);
 
@@ -571,11 +607,11 @@ namespace Vintagestory.GameContent
             float dy = (float)(plrPos.Motion.Y * 80);
             float dz = (float)(plrPos.Motion.Z * 80);
 
-            rainParticle.MinPos.Set(particlePos.X - 30 + dx, particlePos.Y + 15 + dy, particlePos.Z - 30 + dz);
+            rainParticle.MinPos.Set(playerPosRainheight.X - 30 + dx, playerPosRainheight.Y + 15 + dy, playerPosRainheight.Z - 30 + dz);
             rainParticle.WithTerrainCollision = false;
-            rainParticle.MinQuantity = 1200 * plevel;
+            rainParticle.MinQuantity = 1200 * plevel * precipParticleMul;
             rainParticle.LifeLength = 1f;
-            rainParticle.AddQuantity = 25 * plevel;
+            rainParticle.AddQuantity = 25 * plevel * precipParticleMul;
             rainParticle.MinSize = 1.3f*0.15f * (0.5f + conds.Rainfall * 0.7f); // * weatherData.PrecParticleSize;
             rainParticle.MaxSize = 1.3f*0.22f * (0.5f + conds.Rainfall * 0.7f); // weatherData.PrecParticleSize;
             rainParticle.Color = rainParticleColor;
@@ -594,12 +630,12 @@ namespace Vintagestory.GameContent
             splashParticles.ShouldSwimOnLiquid = true;
             splashParticles.Color = rainParticleColor;
 
-            float cnt = 300 * plevel;
+            float cnt = 300 * plevel * precipParticleMul;
 
             for (int i = 0; i < cnt; i++)
             {
-                double px = particlePos.X + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
-                double pz = particlePos.Z + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                double px = playerPosRainheight.X + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
+                double pz = playerPosRainheight.Z + (rand.NextDouble() * rand.NextDouble()) * 60 * (1 - 2 * rand.Next(2));
 
                 int py = capi.World.BlockAccessor.GetRainMapHeightAt((int)px, (int)pz);
 
@@ -655,8 +691,8 @@ namespace Vintagestory.GameContent
             snowParticle.AddVelocity.Set(1f + 10 * windSpeed.X, 0.05f, 1f + 10 * windSpeed.Z);
             snowParticle.Color = ColorUtil.ToRgba(255, 255, 255, 255);
 
-            snowParticle.MinQuantity = 100 * plevel * (1 + wetness / 3);
-            snowParticle.AddQuantity = 25 * plevel * (1 + wetness / 3);
+            snowParticle.MinQuantity = 100 * plevel * (1 + wetness / 3) * precipParticleMul;
+            snowParticle.AddQuantity = 25 * plevel * (1 + wetness / 3) * precipParticleMul;
             snowParticle.ParentVelocity = parentVeloSnow;
             snowParticle.ShouldDieInLiquid = true;
 
@@ -673,7 +709,7 @@ namespace Vintagestory.GameContent
 
             snowParticle.MinVelocity.Y = -2f;
 
-            snowParticle.MinPos.Set(particlePos.X - hrange + dx, particlePos.Y + vrange + dy, particlePos.Z - hrange + dz);
+            snowParticle.MinPos.Set(playerPosRainheight.X - hrange + dx, playerPosRainheight.Y + vrange + dy, playerPosRainheight.Z - hrange + dz);
             snowParticle.AddPos.Set(2 * hrange + dx, -0.66f * vrange + dy, 2 * hrange + dz);
 
             manager.Spawn(snowParticle);

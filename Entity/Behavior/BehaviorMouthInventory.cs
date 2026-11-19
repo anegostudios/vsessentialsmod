@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -60,12 +61,16 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void OnReceivedServerPacket(int packetid, byte[] data, ref EnumHandling handled)
+        public override void OnReceivedServerPacket(int packetId, SerializedData packetData, ref EnumHandling handled)
         {
-            if (packetid == 1235)
+            if (packetId == 1235)
             {
-                TreeAttribute tree = new TreeAttribute();
-                SerializerUtil.FromBytes(data, (r) => tree.FromBytes(r));
+                var tree = new TreeAttribute();
+
+                var reader = packetData.AsBinaryReader();
+
+                tree.FromBytes(ref reader);
+
                 mouthInv.FromTreeAttributes(tree);
             }
         }

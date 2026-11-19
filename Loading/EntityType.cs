@@ -200,7 +200,7 @@ namespace Vintagestory.ServerMods.NoObf
         /// </summary>
         [JsonProperty]
         [DocumentAsJson("Optional", "None")]
-        public BlockDropItemStack[] Drops;
+        public EntityDropItemStack[] Drops;
 
         /// <summary>
         /// List of tags that entity has. Used for categorizing.
@@ -209,19 +209,29 @@ namespace Vintagestory.ServerMods.NoObf
         [DocumentAsJson("Optional", "None")]
         public TagSetFast Tags;
 
+        /// <summary>
+        /// A color to use for entities during debugging such as the entity map layer or the heatmap command.
+        /// Needs to be a hexcode for the desired color as a string with # at the beginning.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public string DebugColor;
+
 
         public EntityProperties CreateProperties(ICoreAPI api)
         {
-            BlockDropItemStack[] DropsCopy;
+            EntityDropItemStack[] DropsCopy;
             if (Drops == null)
             {
                 DropsCopy = null;
             }
             else
             {
-                DropsCopy = new BlockDropItemStack[Drops.Length];
+                DropsCopy = new EntityDropItemStack[Drops.Length];
                 for (int i = 0; i < DropsCopy.Length; i++)
+                {
                     DropsCopy[i] = Drops[i].Clone();
+                }
             }
 
 
@@ -230,6 +240,7 @@ namespace Vintagestory.ServerMods.NoObf
                 Code = Code,
                 Variant = new (Variant),
                 Class = Class,
+                Color = DebugColor,
                 Habitat = Habitat,
                 CollisionBoxSize = CollisionBoxSize,
                 DeadCollisionBoxSize = DeadCollisionBoxSize,
@@ -309,7 +320,7 @@ namespace Vintagestory.ServerMods.NoObf
                 if (jIdleSound != null && (jIdleSound as JObject)?["pitch"] == null)
                 {
                     SoundAttributes idleSound = type.Sounds["idle"];
-                    idleSound.Pitch = SoundAttributes.RandomPitch;
+                    idleSound.Pitch = INatFloat.Var25Random;
                     type.Sounds["idle"] = idleSound;
                 }
             }

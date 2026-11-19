@@ -65,6 +65,20 @@ namespace Vintagestory.ServerMods.NoObf
         public float AttackPower = 0.5f;
 
         /// <summary>
+        /// How much knockback this collectible deals when used as a weapon.
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "1")]
+        public float KnockbackStrength = 1f;
+
+        /// <summary>
+        /// The type of damage dealth when used as a weapon
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "SlashingAttack")]
+        public EnumDamageType DamageType = EnumDamageType.SlashingAttack;
+
+        /// <summary>
         /// How many uses does this collectible has when being used. Item disappears at durability 0.
         /// </summary>
         [JsonProperty]
@@ -278,6 +292,27 @@ namespace Vintagestory.ServerMods.NoObf
         [JsonProperty]
         [DocumentAsJson("Optional", "breakhand")]
         public string HeldTpHitAnimation = "breakhand";
+
+        /// <summary>
+        /// The combo animation chain to play in 3rd person mode when hitting with this collectible
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public string[] HeldTpHitCombo;
+
+        /// <summary>
+        /// The aim based combo animation chains to play in 3rd person mode when hitting with this collectible
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public Dictionary<string, string[]> HeldTpHitComboAim;
+
+        /// <summary>
+        /// The animation to play in 3rd person mode when attacking while sprinting with this collectible
+        /// </summary>
+        [JsonProperty]
+        [DocumentAsJson("Optional", "None")]
+        public string HeldTpHitSprintAnimation;
 
         /// <summary>
         /// The animation to play in 3rd person mode when holding this collectible in the right hand

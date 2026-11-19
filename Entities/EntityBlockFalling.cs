@@ -110,6 +110,8 @@ namespace Vintagestory.GameContent
 
         private void genMesh(EntityBlockFalling entity)
         {
+            mesh.Clear();
+
             int posx = entity.blockEntityAttributes?.GetInt("posx", entity.initialPos.X) ?? entity.initialPos.X;
             int posy = entity.blockEntityAttributes?.GetInt("posy", entity.initialPos.Y) ?? entity.initialPos.Y;
             int posz = entity.blockEntityAttributes?.GetInt("posz", entity.initialPos.Z) ?? entity.initialPos.Z;
@@ -153,12 +155,13 @@ namespace Vintagestory.GameContent
                             entity.meshRef = capi.Render.UploadMultiTextureMesh(mesh);
                         }
                     }
-                    else
+
+                    if (entity.meshRef == null)
                     {
-                        mesh = capi.TesselatorManager.GetDefaultBlockMesh(entity.Block);
+                        entity.meshRef = capi.Render.UploadMultiTextureMesh(capi.TesselatorManager.GetDefaultBlockMesh(entity.Block));
                     }
 
-                    dict[cacheKey] = entity.meshRef = capi.Render.UploadMultiTextureMesh(mesh);
+                    dict[cacheKey] = entity.meshRef;
                 }
             }
         }
@@ -824,11 +827,11 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override void OnReceivedServerPacket(int packetid, byte[] data)
+        public override void OnReceivedServerPacket(int packetId, SerializedData packetData)
         {
-            base.OnReceivedServerPacket(packetid, data);
+            base.OnReceivedServerPacket(packetId, packetData);
 
-            if (packetid == packetIdMagicNumber)
+            if (packetId == packetIdMagicNumber)
             {
                 World.BlockAccessor.MarkBlockDirty(Pos.AsBlockPos, () => OnChunkRetesselated(false));
                 lingerTicks = 50;
@@ -887,9 +890,9 @@ namespace Vintagestory.GameContent
             writer.Write(DoRemoveBlock);
         }
 
-        public override void FromBytes(BinaryReader reader, bool forClient)
+        public override void FromBytes(ref BinarySpanReader reader, bool forClient)
         {
-            base.FromBytes(reader, forClient);
+            base.FromBytes(ref reader, forClient);
 
             initialPos = new BlockPos(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
             blockCode = new AssetLocation(reader.ReadString());
@@ -898,7 +901,7 @@ namespace Vintagestory.GameContent
             if (!beIsNull)
             {
                 blockEntityAttributes = new TreeAttribute();
-                blockEntityAttributes.FromBytes(reader);
+                blockEntityAttributes.FromBytes(ref reader);
                 blockEntityClass = reader.ReadString();
             }
 

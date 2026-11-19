@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -23,8 +25,16 @@ namespace Vintagestory.GameContent
         float itemsPerSecond = 23f;
         float unconsumedDeltaTime;
 
+        protected EntityPartitioning partitionUtil;
+
         public EntityBehaviorCollectEntities(Entity entity) : base(entity)
         {
+        }
+
+        public override void Initialize(EntityProperties properties, JsonObject attributes)
+        {
+            base.Initialize(properties, attributes);
+            partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
         }
 
 
@@ -47,8 +57,11 @@ namespace Vintagestory.GameContent
             if (player?.WorldData.CurrentGameMode == EnumGameMode.Spectator) return;
 
             tmp.Set(entity.Pos.X, entity.Pos.InternalY + entity.SelectionBox.Y1 + entity.SelectionBox.Y2 / 2, entity.Pos.Z);
-            Entity[] entities = entity.World.GetEntitiesAround(tmp, 1.5f, 1.5f, entityMatcher);
-            if (entities.Length == 0)
+
+            List<Entity> entities = new List<Entity>();
+            partitionUtil.WalkEntities(entity.Pos.X, entity.Pos.Y, entity.Pos.Z, 1.5, (e) => { entities.Add(e); return true; }, onRangeTest, EnumEntitySearchType.Inanimate);
+            
+            if (entities.Count == 0)
             {
                 unconsumedDeltaTime = 0;
                 return;
@@ -62,7 +75,7 @@ namespace Vintagestory.GameContent
                 Entity targetItem = null;
                 int targetIndex = 0;
 
-                for (; targetIndex < entities.Length; targetIndex++)
+                for (; targetIndex < entities.Count; targetIndex++)
                 {
                     if (entities[targetIndex] == null) continue;
 
@@ -82,7 +95,7 @@ namespace Vintagestory.GameContent
 
                 if (!OnFoundCollectible(targetItem))
                 {
-                    lastCollectedEntityIndex = (lastCollectedEntityIndex + 1) % entities.Length;
+                    lastCollectedEntityIndex = (lastCollectedEntityIndex + 1) % entities.Count;
                 } else
                 {
                     entities[targetIndex] = null;
@@ -94,6 +107,16 @@ namespace Vintagestory.GameContent
             unconsumedDeltaTime = deltaTime;
         }
 
+        private bool onRangeTest(Entity e, double posX, double posY, double posZ, double radiusSq)
+        {
+            if (!e.CanCollect(entity)) return false;
+            var ePos = e.Pos;
+            double dx = ePos.X - posX;
+            double dy = ePos.InternalY - posY;
+            double dz = ePos.Z - posZ;
+
+            return (dx * dx + dy * dy + dz * dz) < radiusSq;
+        }
 
         public virtual bool OnFoundCollectible(Entity foundEntity)
         {

@@ -83,7 +83,7 @@ namespace Vintagestory.ServerMods
             api.ObjectCache.Remove(BlockLayerConfig.cacheKey);
             blockLayerConfig = BlockLayerConfig.GetInstance(api);
 
-            rnd = new LCGRandom(api.WorldManager.Seed);
+            rnd = new LCGRandom(api.WorldManager.SeedWorldgen);
             grassDensity = new ClampedSimplexNoise(new double[] { 4 }, new double[] { 0.5 }, rnd.NextInt());
             grassHeight = new ClampedSimplexNoise(new double[] { 1.5 }, new double[] { 0.5 }, rnd.NextInt());
 
@@ -266,7 +266,7 @@ namespace Vintagestory.ServerMods
             bool underIce = false;
             bool first = true;
             int startPosY = pos.Y;
-            
+
             while (pos.Y > 0)
             {
                 int chunkY = pos.Y / chunksize;

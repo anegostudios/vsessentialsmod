@@ -55,7 +55,7 @@ namespace Vintagestory.ServerMods
 
             LoadGlobalConfig(api);
 
-            rnd = new LCGRandom(api.WorldManager.Seed - 87698);
+            rnd = new LCGRandom(api.WorldManager.SeedWorldgen - 87698);
             chunksize = api.WorldManager.ChunkSize;
 
             treeSupplier.LoadTrees();

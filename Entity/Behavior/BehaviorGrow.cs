@@ -163,10 +163,16 @@ namespace Vintagestory.GameContent
             adult.WatchedAttributes.SetInt("generation", entity.WatchedAttributes.GetInt("generation", 0));
             adult.WatchedAttributes.SetDouble("birthTotalDays", entity.World.Calendar.TotalDays);
             // Transfer the textureIndex of the child to the adult, if both have same number of alternates (e.g. used for pullets)
-            if (keepTextureIndex && entity.WatchedAttributes.HasAttribute("textureIndex"))
+            if (keepTextureIndex)
             {
-                adult.WatchedAttributes.SetAttribute("textureIndex", entity.WatchedAttributes.GetAttribute("textureIndex"));
+                adult.WatchedAttributes.TryCopyAttribute("textureIndex", entity.WatchedAttributes);
             }
+            adult.WatchedAttributes.TryCopyAttribute("nametag", entity.WatchedAttributes);
+            adult.WatchedAttributes.TryCopyAttribute("genetics", entity.WatchedAttributes);
+            adult.WatchedAttributes.TryCopyAttribute("motherId", entity.WatchedAttributes);
+            adult.WatchedAttributes.TryCopyAttribute("fatherId", entity.WatchedAttributes);
+            adult.WatchedAttributes.TryCopyAttribute("fosterId", entity.WatchedAttributes);
+            adult.LogicalId = entity.LogicalId;
 
             entity.Die(EnumDespawnReason.Expire, null);
             entity.World.SpawnEntity(adult);

@@ -103,7 +103,7 @@ namespace Vintagestory.ServerMods
                     th[j] *= api.WorldManager.MapSizeY;
                 }
 
-                strataNoises[i] = new MapLayerCustomPerlin(api.World.Seed + 23423 + i, ampls, freq, th);
+                strataNoises[i] = new MapLayerCustomPerlin(api.World.SeedWorldgen + 23423 + i, ampls, freq, th);
             }
 
             api.Logger.VerboseDebug("Initialised GenRockStrata");
@@ -138,6 +138,7 @@ namespace Vintagestory.ServerMods
         #region
         float[] rockGroupMaxThickness = new float[4];
         int[] rockGroupCurrentThickness = new int[4];
+        float[] indicesBuf; // reused buffer
 
         IMapChunk mapChunk;
         ushort[] heightMap;
@@ -194,15 +195,21 @@ namespace Vintagestory.ServerMods
             rockGroupMaxThickness[0] = rockGroupMaxThickness[1] = rockGroupMaxThickness[2] = rockGroupMaxThickness[3] = 0;
             rockGroupCurrentThickness[0] = rockGroupCurrentThickness[1] = rockGroupCurrentThickness[2] = rockGroupCurrentThickness[3] = 0;
 
-            float[] indices = new float[provinces.Variants.Length];
+            // Use a buffer to reduce allocations, but check the dimensions, just in case
+            if (indicesBuf == null || indicesBuf.Length != provinces.Variants.Length)
+            {
+                indicesBuf = new float[provinces.Variants.Length];
+            }
+
             map.WeightsAt(
                 chunkInRegionX + lx * lerpMapInv,
                 chunkInRegionZ + lz * lerpMapInv,
-                indices
+                indicesBuf
             );
-            for (int i = 0; i < indices.Length; i++)
+
+            for (int i = 0; i < indicesBuf.Length; i++)
             {
-                float w = indices[i];
+                float w = indicesBuf[i];
                 if (w == 0) continue;
 
                 GeologicProvinceRockStrata[] localstrata = provinces.Variants[i].RockStrataIndexed;

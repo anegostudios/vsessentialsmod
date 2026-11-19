@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using static OpenTK.Graphics.OpenGL.GL;
 
 #nullable disable
 
@@ -310,7 +312,14 @@ namespace Vintagestory.GameContent
                 hoveredWorldPos.Y = yAbs;
 
                 StringBuilder hoverText = new StringBuilder();
-                hoverText.AppendLine(string.Format("{0}, {1}, {2}", (int)hoveredWorldPos.X, (int)hoveredWorldPos.Y, (int)hoveredWorldPos.Z));
+                if (hoveredWorldPos.Y > 0)
+                {
+                    hoverText.AppendLine(string.Format("{0}, {1}, {2}", (int)hoveredWorldPos.X, (int)hoveredWorldPos.Y, (int)hoveredWorldPos.Z));
+                }
+                else
+                {
+                    hoverText.AppendLine(string.Format("{0}, {1}", (int)hoveredWorldPos.X, (int)hoveredWorldPos.Z));
+                }
 
                 var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
                 var hoverTextElem = SingleComposer.GetHoverText("hoverText");
@@ -332,7 +341,16 @@ namespace Vintagestory.GameContent
 
             var mpc = SingleComposer.GetElement("mapElem") as GuiElementMap;
             mpc.TranslateViewPosToWorldPos(new Vec2f((float)x, (float)y), ref worldPos);
-            worldPos.Y++;
+
+            bool bmcapbinn = capi.World.BlockAccessor.GetMapChunkAtBlockPos(worldPos.AsBlockPos) != null;
+            if (!bmcapbinn)
+            {
+                worldPos.Y = -1;
+            }
+            else
+            {
+                worldPos.Y++;
+            }
         }
 
         public override void OnMouseDown(MouseEvent args)

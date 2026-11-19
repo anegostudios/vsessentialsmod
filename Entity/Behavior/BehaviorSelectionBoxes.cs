@@ -1,5 +1,8 @@
+using Newtonsoft.Json.Linq;
 using System;
+using System.Linq;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Client;
@@ -13,6 +16,20 @@ using Vintagestory.Client.NoObf;
 
 namespace Vintagestory.GameContent
 {
+    public struct SelectionBoxConfig
+    {
+        [DocumentAsJson("Required")]
+        public required string Name;
+
+        [DocumentAsJson("Optional", "0")]
+        public double MinTraining;
+
+        public bool ValidFor(Entity entity)
+        {
+            return entity.WatchedAttributes.GetDouble("training") >= MinTraining;
+        }
+    }
+
     /// <summary>
     /// Allows to define interactable hitboxes directly from entity shape elements.
     /// <br/>Uses the "selectionboxes" code
@@ -28,12 +45,12 @@ namespace Vintagestory.GameContent
     [DocumentAsJson]
     public class EntityBehaviorSelectionBoxes : EntityBehavior, IRenderer
     {
-        ICoreClientAPI capi;
-        Matrixf mvmat = new Matrixf();
+        protected ICoreClientAPI capi;
+        protected Matrixf mvmat = new Matrixf();
         [ThreadStatic]
-        static Matrixf mvMatInv;
-        bool debug = false;
-        bool rendererRegistered=false;
+        protected static Matrixf mvMatInv;
+        protected bool debug = false;
+        protected bool rendererRegistered=false;
 
         public AttachmentPointAndPose[] selectionBoxes = Array.Empty<AttachmentPointAndPose>();
 
@@ -42,7 +59,7 @@ namespace Vintagestory.GameContent
         /// A list of attachment points from entity shape used to define hitboxes
         /// </summary>
         [DocumentAsJson("Required")]
-        string[] selectionBoxCodes;
+        protected SelectionBoxConfig[] selectionBoxConfigs;
 
         public EntityBehaviorSelectionBoxes(Entity entity) : base(entity) { }
         public double RenderOrder => 1;
@@ -66,11 +83,17 @@ namespace Vintagestory.GameContent
             entity.trickleDownRayIntersects = true;
             entity.requirePosesOnServer = true;
 
-            selectionBoxCodes = attributes["selectionBoxes"].AsArray<string>(Array.Empty<string>());
-            if (selectionBoxCodes.Length == 0)
+            JsonObject[] jsonBoxes = attributes["selectionBoxes"].AsArray();
+            if (jsonBoxes == null || jsonBoxes.Length == 0)
             {
-                capi.World.Logger.Warning("EntityBehaviorSelectionBoxes, missing selectionBoxes property. Will ignore.");
+                entity.World.Logger.Warning(entity.Code + " EntityBehaviorSelectionBoxes, missing selectionBoxes. Will ignore.");
+                selectionBoxConfigs = [];
+                return;
             }
+
+            selectionBoxConfigs = jsonBoxes.Select(jsonBox => jsonBox.Token is JValue ? new SelectionBoxConfig() { Name = jsonBox.AsString() } : jsonBox.AsObject<SelectionBoxConfig>() ).ToArray();
+
+            entity.WatchedAttributes.RegisterModifiedListener("training", loadSelectionBoxes);
         }
 
         public override void OnTesselated()
@@ -78,16 +101,18 @@ namespace Vintagestory.GameContent
             loadSelectionBoxes();
         }
 
-        private void loadSelectionBoxes()
+        protected virtual void loadSelectionBoxes()
         {
             List<AttachmentPointAndPose> list = new List<AttachmentPointAndPose>();
 
-            foreach (var code in selectionBoxCodes)
+            foreach (var config in selectionBoxConfigs)
             {
-                var apap = entity.AnimManager?.Animator?.GetAttachmentPointPose(code);
+                if (!config.ValidFor(entity)) continue;
+
+                var apap = entity.AnimManager?.Animator?.GetAttachmentPointPose(config.Name);
                 if (apap == null)
                 {
-                    //capi.World.Logger.Warning("EntityBehaviorSelectionBoxes, selection box with code " + code + " defined, but the shape file does not contain such attachment point. Will ignore.");
+                    entity.World.Logger.VerboseDebug($"EntityBehaviorSelectionBoxes for entity '{entity.Code}', selection box with code '{apap?.AttachPoint?.Code}' defined, but the shape file does not contain such attachment point. Will ignore.");
                     continue;
                 }
 
@@ -104,7 +129,7 @@ namespace Vintagestory.GameContent
             selectionBoxes = list.ToArray();
         }
 
-        float accum = 0;
+        protected float accum = 0;
         public override void OnGameTick(float deltaTime)
         {
             if (capi != null && (accum += deltaTime) >= 1)
@@ -116,20 +141,20 @@ namespace Vintagestory.GameContent
             base.OnGameTick(deltaTime);
         }
 
-        private void setupWireframe()
+        protected virtual void setupWireframe()
         {
             if (!rendererRegistered)
             {
                 if (capi != null)
                 {
-                    capi.Event.RegisterRenderer(this, EnumRenderStage.AfterFinalComposition, "selectionboxesbhdebug");
+                    capi.Event.RegisterRenderer(this, EnumRenderStage.AfterOIT, "selectionboxesbhdebug");
                     BoxWireframe = WireframeCube.CreateUnitCube(capi, ColorUtil.WhiteArgb);
                 }
                 rendererRegistered = true;
             }
         }
 
-        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        public virtual void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             if (capi.HideGuis) return;
 
@@ -158,7 +183,7 @@ namespace Vintagestory.GameContent
             }
         }
 
-        private void Render(EntityPlayer eplr, int i, Vec4f color)
+        protected virtual void Render(EntityPlayer eplr, int i, Vec4f color)
         {
             var apap = selectionBoxes[i];
             var pos = entity.Pos;
@@ -184,7 +209,7 @@ namespace Vintagestory.GameContent
             BoxWireframe.Render(capi, mvmat, 1.6f, color);
         }
 
-        private int getHitIndex()
+        protected virtual int getHitIndex()
         {
             var eplr = capi.World.Player.Entity;
             // Lets pretend our 0/0/0 is at the center point of our creatures feet
@@ -193,7 +218,7 @@ namespace Vintagestory.GameContent
             return getHitIndex(pickingray);
         }
 
-        private void applyBoxTransform(Matrixf mvmat, AttachmentPointAndPose apap)
+        protected virtual void applyBoxTransform(Matrixf mvmat, AttachmentPointAndPose apap)
         {
             var esr = entity.Properties.Client.Renderer as EntityShapeRenderer;
 
@@ -246,8 +271,12 @@ namespace Vintagestory.GameContent
         }
 
 
-        static Cuboidd standardbox = new Cuboidd(0, 0, 0, 1, 1, 1);
-        private int getHitIndex(Ray pickingray)
+        protected static Cuboidd standardbox = new Cuboidd(0, 0, 0, 1, 1, 1);
+        protected Vec3d hitPositionOBBSpace;
+        protected Vec3d hitPositionAABBSpace;
+
+
+        protected virtual int getHitIndex(Ray pickingray)
         {
             int foundIndex = -1;
             double foundDistance = double.MaxValue;
@@ -264,11 +293,13 @@ namespace Vintagestory.GameContent
                 applyBoxTransform(mvmat, apap);
                 mvMatInv.Set(mvmat.Values).Invert();
 
+                // Here's the big trick: Instead of transforming the box into world space, we inverse transform the picking ray into the box's local space.
+                // This way, we can use a simple AABB intersection test in the box's local space.
                 var obbSpaceOrigin = mvMatInv.TransformVector(rayOrigin);
                 var obbSpaceDirection = mvMatInv.TransformVector(rayDirection);
                 Ray obbSpaceRay = new Ray(obbSpaceOrigin.XYZ, obbSpaceDirection.XYZ);
 
-                if (Testintersection(standardbox, obbSpaceRay))
+                if (AABBIntersectionTest.Testintersection(standardbox, obbSpaceRay, ref hitPositionOBBSpace))
                 {
                     var tf = mvmat.TransformVector(new Vec4d(hitPositionOBBSpace.X, hitPositionOBBSpace.Y, hitPositionOBBSpace.Z, 1));
 
@@ -284,7 +315,7 @@ namespace Vintagestory.GameContent
             return foundIndex;
         }
 
-        public Vec3d GetCenterPosOfBox(int selectionBoxIndex)
+        public virtual Vec3d GetCenterPosOfBox(int selectionBoxIndex)
         {
             if (selectionBoxIndex >= selectionBoxes.Length) return null;
             var apap = selectionBoxes[selectionBoxIndex];
@@ -306,67 +337,15 @@ namespace Vintagestory.GameContent
             return mvmat.TransformVector(centerPos).XYZ.Add(basePos);
         }
 
-        Vec3d hitPositionOBBSpace;
-        Vec3d hitPositionAABBSpace;
-
-        public bool Testintersection(Cuboidd b, Ray r)
-        {
-            double w = b.X2 - b.X1;
-            double h = b.Y2 - b.Y1;
-            double l = b.Z2 - b.Z1;
-
-            for (int i = 0; i < BlockFacing.NumberOfFaces; i++)
-            {
-                BlockFacing blockSideFacing = BlockFacing.ALLFACES[i];
-                Vec3i planeNormal = blockSideFacing.Normali;
-
-                // Dot product of 2 vectors
-                // If they are parallel the dot product is 1
-                // At 90 degrees the dot product is 0
-                double demon = planeNormal.X * r.dir.X + planeNormal.Y * r.dir.Y + planeNormal.Z * r.dir.Z;
-
-                // Does intersect this plane somewhere (only negative because we are not interested in the ray leaving a face, negative because the ray points into the cube, the plane normal points away from the cube)
-                if (demon < -0.00001)
-                {
-                    Vec3d planeCenterPosition = blockSideFacing.PlaneCenter
-                        .ToVec3d()
-                        .Mul(w, h, l)
-                        .Add(b.X1, b.Y1, b.Z1)
-                    ;
-
-                    Vec3d pt = Vec3d.Sub(planeCenterPosition, r.origin);
-                    double t = (pt.X * planeNormal.X + pt.Y * planeNormal.Y + pt.Z * planeNormal.Z) / demon;
-
-                    if (t >= 0)
-                    {
-                        hitPositionOBBSpace = new Vec3d(r.origin.X + r.dir.X * t, r.origin.Y + r.dir.Y * t, r.origin.Z + r.dir.Z * t);
-                        var lastExitedBlockFacePos = Vec3d.Sub(hitPositionOBBSpace, planeCenterPosition);
-
-                        // Does intersect this plane within the block
-                        if (Math.Abs(lastExitedBlockFacePos.X) <= w / 2 && Math.Abs(lastExitedBlockFacePos.Y) <= h / 2 && Math.Abs(lastExitedBlockFacePos.Z) <= l / 2)
-                        {
-                            //hitOnBlockFace = blockSideFacing;
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            return false;
-        }
-
-
-
-        public bool IsAPCode(EntitySelection es, string apcode)
+        public virtual bool IsAPCode(EntitySelection es, string apcode)
         {
             var ebs = entity.GetBehavior<EntityBehaviorSelectionBoxes>();
             if (ebs != null)
             {
                 int seleBox = es?.SelectionBoxIndex - 1 ?? -1;
-                var seleBoxes = ebs.selectionBoxes;
-                if (seleBox > 0 && seleBoxes.Length >= seleBox)
+                if (seleBox >= 0 && ebs.selectionBoxes.Length > seleBox)
                 {
-                    string apCode = seleBoxes[seleBox].AttachPoint.Code;
+                    string apCode = ebs.selectionBoxes[seleBox].AttachPoint.Code;
                     return apCode == apcode;
                 }
             }
@@ -391,7 +370,7 @@ namespace Vintagestory.GameContent
         {
             base.OnEntityDespawn(despawn);
 
-            capi?.Event.UnregisterRenderer(this, EnumRenderStage.AfterFinalComposition);
+            capi?.Event.UnregisterRenderer(this, EnumRenderStage.AfterOIT);
             BoxWireframe?.Dispose();
         }
 

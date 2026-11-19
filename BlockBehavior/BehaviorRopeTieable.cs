@@ -114,7 +114,7 @@ namespace Vintagestory.GameContent
 
                 if (ropestack == null)
                 {
-                    if (hotbarslot.Empty)
+                    if (hotbarslot.Empty && hotbarslot.CanHold(new DummySlot(stack)))
                     {
                         hotbarslot.Itemstack = stack;
                         hotbarslot.MarkDirty();

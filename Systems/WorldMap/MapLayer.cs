@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
@@ -74,11 +74,6 @@ namespace Vintagestory.GameContent
 
         }
 
-        [Obsolete("Receiving the OnViewChangedPacket now calls: OnViewChangedServer(fromPlayer, int x1, int z1, int x2, int z2) but retained in 1.20.10 for backwards compatibility")]
-        public virtual void OnViewChangedServer(IServerPlayer fromPlayer, List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
-        {
-        }
-            
         public virtual void OnViewChangedServer(IServerPlayer fromPlayer, int x1, int z1, int x2, int z2)
         {
         }

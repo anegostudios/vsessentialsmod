@@ -67,7 +67,7 @@ namespace Vintagestory.ServerMods
         {
             LoadGlobalConfig(api);
 
-            rand = new LCGRandom(api.WorldManager.Seed - 12);
+            rand = new LCGRandom(api.WorldManager.SeedWorldgen - 12);
             searchSize = 3 * chunksize;
             mapOffset = chunksize;
             minBoundary = -chunksize + 1;

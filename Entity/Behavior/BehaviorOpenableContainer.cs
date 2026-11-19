@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Client;
@@ -95,33 +96,33 @@ namespace Vintagestory.GameContent
             }
         }
 
-
-        public override void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled)
+        public override void OnReceivedClientPacket(IServerPlayer player, int packetId, SerializedData packetData, ref EnumHandling handled, ref Entity.CachedAccessPerms perms)
         {
-            if (packetid < 1000)
+            switch (packetId)
             {
-                var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
-                {
-                    inv.InvNetworkUtil.SendInventoryRollback(player, packetid, data);
-                    return;
-                }
+                case < 1000:
+                    if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
+                    {
+                        inv.InvNetworkUtil.SendInventoryRollback(player, packetId, packetData);
+                        break;
+                    }
 
-                inv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
-                handled = EnumHandling.PreventSubsequent;
-                return;
-            }
+                    inv.InvNetworkUtil.HandleClientPacket(player, packetId, packetData);
+                    handled = EnumHandling.PreventSubsequent;
 
-            if (packetid == 1012)
-            {
-                var perms = new Entity.CachedAccessPerms(this.entity, player);
-                if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
-                {
-                    // No need to revert this, just discard the request.
-                    return;
-                }
+                    break;
 
-                player.InventoryManager.OpenInventory(inv);
+
+                case 1012:
+                    if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "entity behavior openable container"))
+                    {
+                        // No need to revert this, just discard the request.
+                        break;
+                    }
+
+                    player.InventoryManager.OpenInventory(inv);
+
+                    break;
             }
         }
 

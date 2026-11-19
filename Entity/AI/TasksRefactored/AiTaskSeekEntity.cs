@@ -312,9 +312,7 @@ public class AiTaskSeekEntityR : AiTaskBaseTargetableR
 
         if (attackPattern == EnumAttackPattern.DirectAttack)
         {
-            pathTraverser.CurrentTarget.X = targetEntity.Pos.X;
-            pathTraverser.CurrentTarget.Y = targetEntity.Pos.InternalY;
-            pathTraverser.CurrentTarget.Z = targetEntity.Pos.Z;
+            pathTraverser.CurrentTarget!.Set(targetEntity.Pos.X, targetEntity.Pos.InternalY, targetEntity.Pos.Z);
         }
 
         if (PerformJump())

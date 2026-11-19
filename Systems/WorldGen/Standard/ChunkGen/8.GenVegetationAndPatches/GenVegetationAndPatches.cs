@@ -114,7 +114,7 @@ namespace Vintagestory.ServerMods
 
             LoadGlobalConfig(sapi);
 
-            rnd = new LCGRandom(sapi.WorldManager.Seed - subSeed);
+            rnd = new LCGRandom(sapi.WorldManager.SeedWorldgen - subSeed);
 
             treeSupplier.LoadTrees();
 
@@ -154,7 +154,7 @@ namespace Vintagestory.ServerMods
                 if (patch.MapCode == null || blockPatchMapGens.ContainsKey(patch.MapCode)) continue;
 
                 int hs = patch.MapCode.GetHashCode();
-                int seed = sapi.World.Seed + 112897 + hs;
+                int seed = sapi.World.SeedWorldgen + 112897 + hs;
                 blockPatchMapGens[patch.MapCode] = new MapLayerWobbled(seed, 2, 0.9f, TerraGenConfig.forestMapScale, 4000, -2500);
             }
         }
@@ -251,7 +251,7 @@ namespace Vintagestory.ServerMods
             var blockPatchRandom = new LCGRandom();
 
             // get temp pos to check if we need a story location patch or a regular one
-            patchIterRandom.SetWorldSeed(sapi.WorldManager.Seed - subSeed);
+            patchIterRandom.SetWorldSeed(sapi.WorldManager.SeedWorldgen - subSeed);
             patchIterRandom.InitPositionSeed(chunkX, chunkZ);
 
             BlockPatch[] patches = GetNonTreePatches(chunkX, chunkZ);
@@ -262,7 +262,7 @@ namespace Vintagestory.ServerMods
                 var blockPatch = patches[i];
                 if (blockPatch.PostPass != postPass) continue;
 
-                patchIterRandom.SetWorldSeed(sapi.WorldManager.Seed - subSeed + i);
+                patchIterRandom.SetWorldSeed(sapi.WorldManager.SeedWorldgen - subSeed + i);
                 patchIterRandom.InitPositionSeed(chunkX, chunkZ);
 
                 float chance = blockPatch.Chance * bpc.ChanceMultiplier.nextFloat(1f, patchIterRandom);
@@ -316,11 +316,11 @@ namespace Vintagestory.ServerMods
 
                         if (found)
                         {
-                            blockPatchRandom.SetWorldSeed(sapi.WorldManager.Seed - subSeed + i);
+                            blockPatchRandom.SetWorldSeed(sapi.WorldManager.SeedWorldgen - subSeed + i);
                             blockPatchRandom.InitPositionSeed(x, z);
                             blockPatch.Generate(
                                 blockAccessor, patchIterRandom, x, y, z, firstBlockId,
-                                !preventBroadly ? null : (tx, tz) => canGenerateAt(tx, tz, PatchesHashCode)
+                                !preventBroadly ? null : (tx, tz) => !canGenerateAt(tx, tz, PatchesHashCode)
                             );
                         }
                     }
@@ -372,7 +372,7 @@ namespace Vintagestory.ServerMods
 
             while (triesShrubs > 0)
             {
-                shrubTryRandom.SetWorldSeed(sapi.World.Seed - subSeed + triesShrubs);
+                shrubTryRandom.SetWorldSeed(sapi.World.SeedWorldgen - subSeed + triesShrubs);
                 shrubTryRandom.InitPositionSeed(chunkX, chunkZ);
                 triesShrubs--;
 
@@ -434,7 +434,7 @@ namespace Vintagestory.ServerMods
             var treeTryRandom = new LCGRandom();
             while (triesTrees > 0)
             {
-                treeTryRandom.SetWorldSeed(sapi.World.Seed - subSeed + triesTrees);
+                treeTryRandom.SetWorldSeed(sapi.World.SeedWorldgen - subSeed + triesTrees);
                 treeTryRandom.InitPositionSeed(chunkX, chunkZ);
                 triesTrees--;
 

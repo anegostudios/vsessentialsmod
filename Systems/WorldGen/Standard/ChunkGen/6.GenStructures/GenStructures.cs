@@ -7,6 +7,7 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.Datastructures;
 using Vintagestory.ServerMods.NoObf;
 
 #nullable disable
@@ -113,7 +114,7 @@ namespace Vintagestory.ServerMods
             regionChunkSize = api.WorldManager.RegionSize / chunksize;
             chunkMapSizeY = api.WorldManager.MapSizeY / chunksize;
 
-            strucRand = new LCGRandom(api.WorldManager.Seed + 1090);
+            strucRand = new LCGRandom(api.WorldManager.SeedWorldgen + 1090);
 
             LoadStructures();
             LoadVillages();
@@ -277,11 +278,10 @@ namespace Vintagestory.ServerMods
 
 
             float facf = (float)forestMap.InnerSize / regionChunkSize;
-            forestUpLeft = forestMap.GetUnpaddedInt((int)(rlX * facC), (int)(rlZ * facC));
-            forestUpRight = forestMap.GetUnpaddedInt((int)(rlX * facC + facC), (int)(rlZ * facC));
-            forestBotLeft = forestMap.GetUnpaddedInt((int)(rlX * facC), (int)(rlZ * facC + facC));
-            forestBotRight = forestMap.GetUnpaddedInt((int)(rlX * facC + facC), (int)(rlZ * facC + facC));
-
+            forestUpLeft = forestMap.GetUnpaddedInt((int)(rlX * facf), (int)(rlZ * facf));
+            forestUpRight = forestMap.GetUnpaddedInt((int)(rlX * facf + facf), (int)(rlZ * facf));
+            forestBotLeft = forestMap.GetUnpaddedInt((int)(rlX * facf), (int)(rlZ * facf + facf));
+            forestBotRight = forestMap.GetUnpaddedInt((int)(rlX * facf + facf), (int)(rlZ * facf + facf));
 
             heightmap = chunks[0].MapChunk.WorldGenTerrainHeightMap;
 
@@ -326,7 +326,6 @@ namespace Vintagestory.ServerMods
             {
                 maxQuantityModTree = chunkGenParams["structureMaxCount"] as TreeAttribute;
             }
-
 
             strucRand.InitPositionSeed(chunkX, chunkZ);
 
@@ -384,19 +383,32 @@ namespace Vintagestory.ServerMods
                     if (locationCode != null)
                     {
                         location = GetIntersectingStructure(chunkX * chunksize + chunksize / 2, chunkZ * chunksize + chunksize / 2) as StoryStructureLocation;
-                        if (location.SchematicsSpawned?.TryGetValue(struc.Group, out var spawnedSchematics) == true && spawnedSchematics >= struc.StoryLocationMaxAmount)
+                        if (location != null)
                         {
-                            continue;
-                        }
+                            if (location.SchematicsSpawned?.TryGetValue(struc.Group, out var spawnedSchematics) == true && spawnedSchematics >= struc.StoryLocationMaxAmount)
+                            {
+                                continue;
+                            }
 
-                        if (struc.StoryMaxFromCenter != 0 &&  !startPos.InRangeHorizontally(location.CenterPos.X, location.CenterPos.Z, struc.StoryMaxFromCenter))
-                        {
-                            continue;
+                            if (struc.StoryMaxFromCenter != 0 &&  !startPos.InRangeHorizontally(location.CenterPos.X, location.CenterPos.Z, struc.StoryMaxFromCenter))
+                            {
+                                continue;
+                            }
                         }
                     }
 
+                    var data = new SchematicPlacementData(worldgenBlockAccessor, api.World)
+                    {
+                        StartPos = startPos,
+                        StoryStructureLocationCode = locationCode,
+                        ClimateUpLeft = climateUpLeft,
+                        ClimateUpRight = climateUpRight,
+                        ClimateBotLeft = climateBotLeft,
+                        ClimateBotRight = climateBotRight,
+                        ReplaceMeta = GlobalConfig.ReplaceMetaBlocks,
+                    };
                     int forest = GameMath.BiLerpRgbColor((float)(startPos.X % chunksize) / chunksize, (float)(startPos.Z % chunksize) / chunksize, forestUpLeft, forestUpRight, forestBotLeft, forestBotRight);
-                    if (struc.TryGenerate(worldgenBlockAccessor, api.World, startPos, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, forest, locationCode))
+                    if (struc.TryGenerate(data, forest))
                     {
                         if(locationCode != null && location != null)
                         {

@@ -59,9 +59,7 @@ public class AiTaskGotoEntityConversable : AiTaskBaseR
     {
         currentFollowTime += dt;
 
-        pathTraverser.CurrentTarget.X = TargetEntity.Pos.X;
-        pathTraverser.CurrentTarget.Y = TargetEntity.Pos.Y;
-        pathTraverser.CurrentTarget.Z = TargetEntity.Pos.Z;
+        pathTraverser.CurrentTarget!.Set(TargetEntity.Pos.X, TargetEntity.Pos.Y, TargetEntity.Pos.Z);
 
         Cuboidd targetBox = TargetEntity.SelectionBox.ToDouble().Translate(TargetEntity.Pos.X, TargetEntity.Pos.Y, TargetEntity.Pos.Z);
         Vec3d pos = entity.Pos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.Pos.Yaw);

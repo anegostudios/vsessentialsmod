@@ -4,6 +4,7 @@ using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -26,7 +27,14 @@ namespace Vintagestory.GameContent
         void OnInteract(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityAgent byEntity, Vec3d hitPosition, EnumInteractMode mode, ref EnumHandling handled, Action onRequireSave);
         void OnEntityDespawn(ItemSlot itemslot, int slotIndex, Entity onEntity, EntityDespawnData despawn);
         void OnEntityDeath(ItemSlot itemslot, int slotIndex, Entity onEntity, DamageSource damageSourceForDeath);
-        void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave);
+        [Obsolete("Use the CachedAccessPerms overload. Never override both.")] // Rennorb 03.07.2026: We call this for at least one more version to give mods time.
+        void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetId, byte[] data, ref EnumHandling handled, Action onRequireSave)
+        {
+        }
+        void OnReceivedClientPacket(ItemSlot itemslot, int slotIndex, Entity onEntity, IServerPlayer player, int packetId, SerializedData packetData, ref EnumHandling handled, ref Entity.CachedAccessPerms perms, Action onRequireSave)
+        {
+            // Empty default to be compatible with older mods.
+        }
     }
 
 
@@ -122,6 +130,49 @@ namespace Vintagestory.GameContent
             return StorageTags;
         }
 
+        public static bool HasEmptyBackpackAttribute(ItemStack stack)
+        {
+            ITreeAttribute backpackTree = stack?.Attributes?.GetTreeAttribute("backpack");
+            if (backpackTree == null || backpackTree.Count == 0) return true;
+
+            ITreeAttribute slotsTree = backpackTree.GetTreeAttribute("slots");
+            if (backpackTree.Count > 1 || slotsTree == null) return false;
+
+            foreach (var slot in slotsTree)
+            {
+                if (slot.Value?.GetValue() != null) return false;
+            }
+            return true;
+        }
+
+        public override int GetMergableQuantity(ItemStack sinkStack, ItemStack sourceStack, EnumMergePriority priority, ref EnumHandling handling)
+        {
+            string[] ignored = new string[GlobalConstants.IgnoredStackAttributes.Length + 1];
+            ignored[0] = "backpack";
+            Array.Copy(GlobalConstants.IgnoredStackAttributes, 0, ignored, 1, GlobalConstants.IgnoredStackAttributes.Length);
+            if (sinkStack.Collectible.Equals(sinkStack, sourceStack, ignored) && sinkStack.StackSize < sinkStack.Collectible.MaxStackSize && HasEmptyBackpackAttribute(sinkStack) && HasEmptyBackpackAttribute(sourceStack))
+            {
+                handling = EnumHandling.PreventDefault;
+                return Math.Min(sinkStack.Collectible.MaxStackSize - sinkStack.StackSize, sourceStack.StackSize);
+            }
+
+            return 0;
+        }
+
+        public override void TryMergeStacks(ItemStackMergeOperation op, ref EnumHandling handling)
+        {
+            handling = EnumHandling.PassThrough;
+
+            if (HasEmptyBackpackAttribute(op.SourceSlot.Itemstack))
+            {
+                op.SourceSlot.Itemstack?.Attributes?.RemoveAttribute("backpack");
+            }
+            if (HasEmptyBackpackAttribute(op.SinkSlot.Itemstack))
+            {
+                op.SinkSlot.Itemstack?.Attributes?.RemoveAttribute("backpack");
+            }
+        }
+
         public List<ItemSlotBagContent> GetOrCreateSlots(ItemStack bagstack, InventoryBase parentinv, int bagIndex, IWorldAccessor world)
         {
             var bagContents = new List<ItemSlotBagContent>();
@@ -208,6 +259,13 @@ namespace Vintagestory.GameContent
             if (!controls.CtrlKey)
             {
                 handled = EnumHandling.PreventDefault;
+
+                if (EntityUtil.RestrictedByOwnership(onEntity, byEntity))
+                {
+                    (onEntity.World.Api as ICoreClientAPI)?.TriggerIngameError(this, "requiresownership", Lang.Get("mount-interact-requiresownership"));
+                    return;
+                }
+
                 if (onEntity.Api.Side == EnumAppSide.Client)
                 {
                     var workspace = getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave);
@@ -219,13 +277,17 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public void OnReceivedClientPacket(ItemSlot bagSlot, int slotIndex, Entity onEntity, IServerPlayer player, int packetid, byte[] data, ref EnumHandling handled, Action onRequireSave)
+        void IAttachedInteractions.OnReceivedClientPacket(ItemSlot bagSlot, int slotIndex, Entity onEntity, IServerPlayer player, int packetId, SerializedData packetData, ref EnumHandling handled, ref Entity.CachedAccessPerms perms, Action onRequireSave)
         {
-            int targetSlotIndex = packetid >> PacketIdBitShift;
+            int targetSlotIndex = packetId >> PacketIdBitShift;
 
             if (slotIndex != targetSlotIndex) return; // Do this first because it's way cheaper that the perms check.
 
-            var perms = new Entity.CachedAccessPerms(onEntity, player);
+            if (EntityUtil.RestrictedByOwnership(onEntity, player.Entity))
+            {
+                return;
+            }
+
             if(!perms.IsInteractingPlayerAllowedTo(EnumBlockAccessFlags.None, true, "collectible behavior held bag"))
             {
                 // Rennorb 23.06.2026 correctness: Since we only handle inventory interactions here this blanket rejection should be ok.
@@ -234,9 +296,9 @@ namespace Vintagestory.GameContent
             }
 
             int first10Bits = (1 << PacketIdBitShift) - 1;
-            packetid = packetid & first10Bits;
+            packetId = packetId & first10Bits;
 
-            getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnReceivedClientPacket(player, packetid, data, bagSlot, slotIndex, ref handled);
+            getOrCreateContainerWorkspace(slotIndex, onEntity, onRequireSave).OnReceivedClientPacket(player, packetId, packetData, bagSlot, slotIndex, ref handled);
         }
 
         public bool OnTryAttach(ItemSlot itemslot, int slotIndex, Entity toEntity)
@@ -413,23 +475,25 @@ namespace Vintagestory.GameContent
         }
 
 
-        public void OnReceivedClientPacket(IServerPlayer player, int packetid, byte[] data, ItemSlot bagSlot, int slotIndex, ref EnumHandling handled)
+        public void OnReceivedClientPacket(IServerPlayer player, int packetId, SerializedData packetData, ItemSlot bagSlot, int slotIndex, ref EnumHandling handled)
         {
             // Rennorb 23.06.2026 security: This does not do access checks for any operations - those are validated in the attachable behavior.
-            if (packetid < 1000)
+            switch (packetId)
             {
+                case < 1000:
                     if (wrapperInv != null && wrapperInv.HasOpened(player))
                     {
-                        wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetid, data);
+                        wrapperInv.InvNetworkUtil.HandleClientPacket(player, packetId, packetData);
                         handled = EnumHandling.PreventSubsequent;
                     }
 
-                return;
-            }
+                    break;
 
-            if (packetid == (int)EntityClientPacketId.OpenAttachedInventory)       // radfast 3.3.2025:  Compare BEOpenableContainer.OnReceivedClientPacket(), this is similar
-            {
+
+                case (int)EntityClientPacketId.OpenAttachedInventory: // radfast 3.3.2025:  Compare BEOpenableContainer.OnReceivedClientPacket(), this is similar
                     OnInteract(bagSlot, slotIndex, entity, player.Entity, null);   // null hitPosition here is ok, it is never used in the OnInteract() method. If we need to use it in future, it would need to be encoded in the packet data byte[]
+
+                    break;
             }
         }
 

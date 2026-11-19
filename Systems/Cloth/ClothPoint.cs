@@ -1,12 +1,11 @@
 using ProtoBuf;
 using System;
+using System.ComponentModel;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
-
-#nullable disable
 
 namespace Vintagestory.GameContent
 {
@@ -17,32 +16,34 @@ namespace Vintagestory.GameContent
 
         [ProtoMember(1)]
         public int PointIndex;
-        [ProtoMember(2)]
-        public float Mass;
-        [ProtoMember(3)]
-        public float InvMass;
+        [ProtoMember(2), DefaultValue(1f)]
+        public float Mass = 1f;
+        [ProtoMember(3), DefaultValue(1f)]
+        public float InvMass = 1f;
         [ProtoMember(4)]
         public Vec3d Pos;
         [ProtoMember(5)]
         public Vec3f Velocity = new Vec3f();
         [ProtoMember(6)]
         public Vec3f Tension = new Vec3f();
-        [ProtoMember(7)]
+        [ProtoMember(7), DefaultValue(1)]
         float GravityStrength = 1;
         [ProtoMember(8)]
         bool pinned;
         [ProtoMember(9)]
         public long pinnedToEntityId;
         [ProtoMember(10)]
-        BlockPos pinnedToBlockPos;
+        BlockPos? pinnedToBlockPos;
         [ProtoMember(11)]
-        public Vec3f pinnedToOffset;
+        public Vec3f? pinnedToOffset;
         [ProtoMember(12)]
         float pinnedToOffsetStartYaw;
         [ProtoMember(13)]
-        string pinnedToPlayerUid; // player entity ids change over time >.<
+        string? pinnedToPlayerUid; // player entity ids change over time >.<
         [ProtoMember(14)]
         public bool NoAttachTransform;
+        [ProtoMember(15)]
+        public bool ApplyOffsetToAttachment;
 
         public bool Dirty { get; internal set; }
 
@@ -51,8 +52,8 @@ namespace Vintagestory.GameContent
         public float YCollideRestMul;
         Vec4f tmpvec = new Vec4f();
         ClothSystem cs;
-        Entity pinnedTo;
-        Matrixf pinOffsetTransform;
+        Entity? pinnedTo;
+        Matrixf? pinOffsetTransform;
 
         // These values are set be the constraints, they should actually get summed up though.
         // For rope, a single set works though, because we only need the ends, connected by 1 constraint
@@ -70,17 +71,17 @@ namespace Vintagestory.GameContent
         {
             this.cs = cs;
             Pos = new Vec3d();
-            init();
         }
 
+#pragma warning disable CS8618 // Protobuf needs this parameterless constructor, which leaves some fields null
         protected ClothPoint() { }
+#pragma warning restore CS8618
 
         public ClothPoint(ClothSystem cs, int pointIndex, double x, double y, double z)
         {
             this.cs = cs;
             this.PointIndex = pointIndex;
             Pos = new Vec3d(x, y, z);
-            init();
         }
 
         public void setMass(float mass)
@@ -89,14 +90,8 @@ namespace Vintagestory.GameContent
             InvMass = 1 / mass;
         }
 
-
-        void init()
-        {
-            setMass(1);
-        }
-
-        public Entity PinnedToEntity => pinnedTo;
-        public BlockPos PinnedToBlockPos => pinnedToBlockPos;
+        public Entity? PinnedToEntity => pinnedTo;
+        public BlockPos? PinnedToBlockPos => pinnedToBlockPos;
         public bool Pinned => pinned;
 
 
@@ -109,7 +104,7 @@ namespace Vintagestory.GameContent
             pinnedToOffsetStartYaw = toEntity.Pos.Yaw;
             pinOffsetTransform = Matrixf.Create();
             pinnedToBlockPos = null;
-            if (toEntity is EntityPlayer eplr) pinnedToPlayerUid = eplr.PlayerUID;
+            pinnedToPlayerUid = (toEntity as EntityPlayer)?.PlayerUID;
 
             MarkDirty();
         }
@@ -132,6 +127,7 @@ namespace Vintagestory.GameContent
             pinnedTo = null;
             pinnedToPlayerUid = null;
             pinnedToEntityId = 0L;
+            pinnedToBlockPos = null;
             MarkDirty();
         }
 
@@ -145,7 +141,7 @@ namespace Vintagestory.GameContent
             if (pinnedTo == null && pinnedToPlayerUid != null)
             {
                 var eplr = world.PlayerByUid(pinnedToPlayerUid)?.Entity;
-                if (eplr?.World != null) PinTo(eplr, pinnedToOffset);
+                if (eplr?.World != null) PinTo(eplr, pinnedToOffset ?? new Vec3f());
             }
 
             if (pinned)
@@ -169,15 +165,16 @@ namespace Vintagestory.GameContent
                     float tensionResistStrength = weight / 10f * (extraResist ? 200 : 1);
 
                     var eplr = pinnedTo as EntityPlayer;
-                    var eagent = pinnedTo as EntityAgent;
                     Vec4f outvec;
 
-                    AttachmentPointAndPose apap = eplr?.AnimManager?.Animator?.GetAttachmentPointPose("RightHand");
-                    if (apap == null) apap = pinnedTo?.AnimManager?.Animator?.GetAttachmentPointPose("rope");
+                    AttachmentPointAndPose? apap = eplr?.AnimManager?.Animator?.GetAttachmentPointPose("RightHand");
+                    apap ??= pinnedTo.AnimManager?.Animator?.GetAttachmentPointPose("rope");
 
+                    pinnedToOffset ??= new Vec3f();
                     if (apap == null || NoAttachTransform)
                     {
-                        pinOffsetTransform.Identity();
+                        pinOffsetTransform?.Identity();
+                        pinOffsetTransform ??= Matrixf.Create();
                         if (!NoAttachTransform) pinOffsetTransform.RotateY(pinnedTo.Pos.Yaw - pinnedToOffsetStartYaw);
                         tmpvec.Set(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1f);
                         outvec = pinOffsetTransform.TransformVector(tmpvec);
@@ -185,12 +182,14 @@ namespace Vintagestory.GameContent
                     else
                     {
                         Matrixf modelmat = new Matrixf();
-                        if (eplr != null) modelmat.RotateY(eagent.BodyYaw + GameMath.PIHALF);
+                        if (eplr != null) modelmat.RotateY(eplr.BodyYaw + GameMath.PIHALF);
                         else modelmat.RotateY(pinnedTo.Pos.Yaw + GameMath.PIHALF);
 
                         modelmat.Translate(-0.5, 0, -0.5);
                         apap.MulUncentered(modelmat);
-                        outvec = modelmat.TransformVector(new Vec4f(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1f));
+                        tmpvec.Set(0f, 0f, 0f, 1f);
+                        if (ApplyOffsetToAttachment) tmpvec.Set(pinnedToOffset.X, pinnedToOffset.Y, pinnedToOffset.Z, 1f);
+                        outvec = modelmat.TransformVector(tmpvec);
                     }
 
                     EntityPos pos = pinnedTo.Pos; // This makes the physics magic equation : entity.SidedPos.Motion.Add
@@ -282,7 +281,7 @@ namespace Vintagestory.GameContent
                         if (accum1s >= 1f)
                         {
                             accum1s = 0f;
-                            if (!cs.api.World.BlockAccessor.GetBlock(PinnedToBlockPos).HasBehavior<BlockBehaviorRopeTieable>())
+                            if (cs.api.World.BlockAccessor.GetChunkAtBlockPos(PinnedToBlockPos) != null && !cs.api.World.BlockAccessor.GetBlock(PinnedToBlockPos).HasBehavior<BlockBehaviorRopeTieable>())
                             {
                                 UnPin();
                             }
@@ -312,8 +311,8 @@ namespace Vintagestory.GameContent
 
             // Collision detection
             float size = 0.1f;
-            cs.pp.HandleBoyancy(Pos, nextVelocity, cs.boyant, GravityStrength, dt, size);
-            CollideFlags = cs.pp.UpdateMotion(Pos, nextVelocity, size);
+            cs.ParticlePhysics.HandleBoyancy(Pos, nextVelocity, cs.boyant, GravityStrength, dt, size);
+            CollideFlags = cs.ParticlePhysics.UpdateMotion(Pos, nextVelocity, size);
 
             dt *= 0.99f;
             Pos.Add(nextVelocity.X * dt, nextVelocity.Y * dt, nextVelocity.Z * dt);
@@ -329,12 +328,12 @@ namespace Vintagestory.GameContent
             if (pinnedToEntityId != 0L)
             {
                 pinnedTo = world.GetEntityById(pinnedToEntityId);
-                if (pinnedTo != null) PinTo(pinnedTo, pinnedToOffset);
+                if (pinnedTo != null) PinTo(pinnedTo, pinnedToOffset ?? new Vec3f());
             }
 
             if (pinnedToBlockPos != null)
             {
-                PinTo(pinnedToBlockPos, pinnedToOffset);
+                PinTo(pinnedToBlockPos, pinnedToOffset ?? new Vec3f());
             }
         }
 
@@ -342,7 +341,7 @@ namespace Vintagestory.GameContent
         {
             if (pinnedToEntityId == entity.EntityId)
             {
-                PinTo(entity, pinnedToOffset);
+                PinTo(entity, pinnedToOffset ?? new Vec3f());
             }
         }
 
@@ -366,6 +365,8 @@ namespace Vintagestory.GameContent
             pinnedToEntityId = point.pinnedToEntityId;
             pinnedToBlockPos = pinnedToBlockPos.SetOrCreate(point.PinnedToBlockPos);
             pinnedToOffset = pinnedToOffset.SetOrCreate(point.pinnedToOffset);
+            NoAttachTransform = point.NoAttachTransform;
+            ApplyOffsetToAttachment = point.ApplyOffsetToAttachment;
 
             CollideFlags = point.CollideFlags;
             YCollideRestMul = point.YCollideRestMul;

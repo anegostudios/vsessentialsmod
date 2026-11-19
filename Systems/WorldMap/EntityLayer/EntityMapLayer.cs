@@ -49,8 +49,8 @@ namespace Vintagestory.GameContent
         private void Event_OnEntitySpawn(Entity entity)
         {
             if (capi == null || otherTexture == null) return;
+            if (!entity.IsCreature) return;
             if (entity is EntityPlayer) return;
-            if (entity.Code.Path.Contains("drifter")) return;
 
             if (mapSink.IsOpened && !mapComps.ContainsKey(entity.EntityId))
             {
@@ -77,19 +77,21 @@ namespace Vintagestory.GameContent
                 surface.Dispose();
             }
 
-            foreach (KeyValuePair<long, Entity> val in capi.World.LoadedEntities)
+            foreach ((_, Entity entity) in capi.World.LoadedEntities)
             {
+                // We want to skip anything that isn't a creature
+                if (!entity.IsCreature) continue;
                 // Players are rendered in PlayerMapLayer
-                if (val.Value is EntityPlayer) continue;
+                if (entity is EntityPlayer) continue;
 
-                if (mapComps.TryGetValue(val.Value.EntityId, out MapComponent? cmp))
+                if (mapComps.TryGetValue(entity.EntityId, out MapComponent? cmp))
                 {
                     cmp?.Dispose();
-                    mapComps.Remove(val.Value.EntityId);
+                    mapComps.Remove(entity.EntityId);
                 }
 
-                cmp = new EntityMapComponent(capi, otherTexture, val.Value, val.Value.Properties.Color);
-                mapComps[val.Value.EntityId] = cmp;
+                cmp = new EntityMapComponent(capi, otherTexture, entity, entity.Properties.Color);
+                mapComps[entity.EntityId] = cmp;
             }
         }
 

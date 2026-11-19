@@ -109,17 +109,17 @@ namespace Vintagestory.ServerMods
             terrainGenOctaves = TerraGenConfig.GetTerrainOctaveCount(api.WorldManager.MapSizeY);
 
             terrainNoise = NewNormalizedSimplexFractalNoise.FromDefaultOctaves(
-                terrainGenOctaves, 0.0005 * NewSimplexNoiseLayer.OldToNewFrequency / noiseScale, 0.9, api.WorldManager.Seed
+                terrainGenOctaves, 0.0005 * NewSimplexNoiseLayer.OldToNewFrequency / noiseScale, 0.9, api.WorldManager.SeedWorldgen
             );
             distort2dx = new SimplexNoise(
                 new double[] { 55, 40, 30, 10 },
                 scaleAdjustedFreqs(new double[] { 1 / 5.0, 1 / 2.50, 1 / 1.250, 1 / 0.65 }, noiseScale),
-                api.World.Seed + 9876 + 0
+                api.World.SeedWorldgen + 9876 + 0
             );
             distort2dz = new SimplexNoise(
                 new double[] { 55, 40, 30, 10 },
                 scaleAdjustedFreqs(new double[] { 1 / 5.0, 1 / 2.50, 1 / 1.250, 1 / 0.65 }, noiseScale),
-                api.World.Seed + 9876 + 2
+                api.World.SeedWorldgen + 9876 + 2
             );
             geoUpheavalNoise = new NormalizedSimplexNoise(
                 new double[] { 55, 40, 30, 15, 7, 4 },
@@ -131,7 +131,7 @@ namespace Vintagestory.ServerMods
                     1.2 / 0.45,
                     1.2 / 0.25
                 }, noiseScale),
-                api.World.Seed + 9876 + 1
+                api.World.SeedWorldgen + 9876 + 1
             );
 
             tempDataThreadLocal = new ThreadLocal<ThreadLocalTempData>(() => new ThreadLocalTempData

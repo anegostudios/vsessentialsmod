@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
@@ -17,6 +17,8 @@ namespace Vintagestory.ServerMods.NoObf
         public AssetLocation otherLogBlockCode = null;
         [JsonProperty]
         public double otherLogChance = 0.01;
+        [JsonProperty]
+        public AssetLocation topLeavesBlockCode = null;
         [JsonProperty]
         public AssetLocation leavesBlockCode = null;
         [JsonProperty]
@@ -40,6 +42,7 @@ namespace Vintagestory.ServerMods.NoObf
         public int logBlockId;
         public int otherLogBlockId;
         public int leavesBlockId;
+        public int topLeavesBlockId;
         public int leavesBranchyBlockId;
         public int leavesBranchyDeadBlockId;
         public int[] trunkSegmentBlockIds;
@@ -48,6 +51,7 @@ namespace Vintagestory.ServerMods.NoObf
         private int[][] leavesByLevel = new int[2][];
 
         public HashSet<int> blockIds = new HashSet<int>();
+        
 
         public void ResolveBlockNames(ICoreServerAPI api, string treeName)
         {
@@ -80,6 +84,16 @@ namespace Vintagestory.ServerMods.NoObf
             }
             this.leavesBlockId = leavesBlockId;
 
+            if (topLeavesBlockCode != null)
+            {
+                int topLeavesBlockId = api.WorldManager.GetBlockId(topLeavesBlockCode);
+                if (topLeavesBlockId == -1)
+                {
+                    api.Server.LogWarning("Tree gen tree " + treeName + ": No block found with the blockcode " + topLeavesBlockCode);
+                    topLeavesBlockId = 0;
+                }
+                this.topLeavesBlockId = topLeavesBlockId;
+            }
 
             int leavesBranchyBlockId = api.WorldManager.GetBlockId(leavesBranchyBlockCode);
             if (leavesBranchyBlockId == -1)

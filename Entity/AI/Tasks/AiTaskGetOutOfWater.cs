@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -8,16 +9,20 @@ namespace Vintagestory.GameContent
 {
     public class AiTaskGetOutOfWater : AiTaskBase
     {
+        [JsonProperty]
+        float moveSpeed;
+        private string gaitCode;
+        GaitMeta PreferredGait {get; set;} = null;
+
         Vec3d target = new Vec3d();
         BlockPos pos = new BlockPos(API.Config.Dimensions.WillSetLater);
 
         bool done;
-        float moveSpeed = 0.03f;
         int searchattempts = 0;
 
         public AiTaskGetOutOfWater(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            moveSpeed = taskConfig["movespeed"].AsFloat(0.06f);
+            gaitCode = taskConfig["preferredGait"].AsString();
         }
 
         protected override void SetDefaultValues()
@@ -25,6 +30,19 @@ namespace Vintagestory.GameContent
             base.SetDefaultValues();
             ExecutionChance = 0.04;
             WhenSwimming = true;
+            moveSpeed = 0.06f;
+        }
+
+        public override void AfterInitialize()
+        {
+            if (gaitCode != null)
+            {
+                EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+                if (gaitBehavior != null)
+                {
+                    PreferredGait = gaitBehavior.Gaits[gaitCode];
+                }
+            }
         }
 
         public override bool ShouldExecute()
@@ -72,19 +90,17 @@ namespace Vintagestory.GameContent
 
             searchattempts = 0;
             done = false;
-            pathTraverser.WalkTowards(target, moveSpeed, 0.5f, OnGoalReached, OnStuck);
+            pathTraverser.WalkTowards(target, moveSpeed, 0.5f, OnGoalReached, OnStuck, EnumAICreatureType.Default, PreferredGait);
+        }
 
-            //entity.world.SpawnParticles(10, ColorUtil.WhiteArgb, target.AddCopy(new Vec3f(-0.1f, -0.1f, -0.1f)), target.AddCopy(new Vec3f(0.1f, 0.1f, 0.1f)), new Vec3f(), new Vec3f(), 1f, 1f);
-
+        public override bool CanContinueExecute()
+        {
+            return pathTraverser.Ready;
         }
 
         public override bool ContinueExecute(float dt)
         {
-            /*if (entity.Swimming)
-            {
-                Block aboveblock = entity.World.BlockAccessor.GetBlock((int)entity.Pos.X, (int)(entity.Pos.Y + entity.CollisionBox.Y2 * 0.25f), (int)entity.Pos.Z);
-                if (aboveblock.IsLiquid()) entity.Pos.Motion.Y = Math.Min(entity.Pos.Motion.Y + 0.005f, 0.03f);
-            }*/
+            // Staying near the surface of the water is handled by the gait behavior, if present, or otherwise the path navigator
 
             //Check if time is still valid for task.
             if (!IsInValidDayTimeHours(false)) return false;
@@ -92,9 +108,6 @@ namespace Vintagestory.GameContent
             if (rand.NextDouble() < 0.1f)
             {
                 if (!entity.FeetInLiquid) return false;
-
-                //Block block = entity.World.BlockAccessor.GetBlock((int)entity.Pos.X, (int)entity.Pos.Y, (int)entity.Pos.Z);
-                //if (block.CollisionBoxes != null && block.CollisionBoxes.Length > 0 && !entity.FeetInLiquid) return false;
             }
 
             return !done;

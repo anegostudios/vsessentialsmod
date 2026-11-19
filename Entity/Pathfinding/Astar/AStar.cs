@@ -114,26 +114,28 @@ namespace Vintagestory.Essentials
                 {
                     Cardinal card = Cardinal.ALL[i];
 
-                    PathNode neighbourNode = new PathNode(nearestNode, card);
+                    tmpNode.Set(nearestNode.X + card.Normali.X, nearestNode.Y + card.Normali.Y, nearestNode.Z + card.Normali.Z);
+                    tmpNode.dimension = nearestNode.dimension;
 
                     float extraCost = 0;
-                    PathNode existingNeighbourNode = openSet.TryFindValue(neighbourNode);
+                    PathNode existingNeighbourNode = openSet.TryFindValue(tmpNode);
                     if (!(existingNeighbourNode is null))   // we have to do a null check using "is null" due to foibles in PathNode.Equals()
                     {
                         // if it is already in openSet, update the gCost and parent if this nearestNode gives a shorter route to it
-                        float baseCostToNeighbour = nearestNode.gCost + nearestNode.distanceTo(neighbourNode);
+                        float baseCostToNeighbour = nearestNode.gCost + nearestNode.distanceTo(tmpNode);
                         if (existingNeighbourNode.gCost > baseCostToNeighbour + 0.0001f)
                         {
-                            if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost) && existingNeighbourNode.gCost > baseCostToNeighbour + extraCost + 0.0001f)
+                            if (traversable(tmpNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost) && existingNeighbourNode.gCost > baseCostToNeighbour + extraCost + 0.0001f)
                             {
                                 UpdateNode(nearestNode, existingNeighbourNode, extraCost);
                             }
                         }
                     }
-                    else if (!closedSet.Contains(neighbourNode))
+                    else if (!closedSet.Contains(tmpNode))
                     {
-                        if (traversable(neighbourNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost))
+                        if (traversable(tmpNode, stepHeight, maxFallHeight, entityCollBox, card, ref extraCost))
                         {
+                            PathNode neighbourNode = new PathNode(tmpNode);
                             UpdateNode(nearestNode, neighbourNode, extraCost);
                             
                             neighbourNode.hCost = modeMinFleeDistance > 0 ? 1 + modeMinFleeDistance - neighbourNode.distanceTo(targetNode) : neighbourNode.distanceTo(targetNode);
@@ -163,6 +165,8 @@ namespace Vintagestory.Essentials
         protected readonly Vec3d tmpVec = new Vec3d();
         protected readonly BlockPos tmpPos = new BlockPos(API.Config.Dimensions.WillSetLater);
         protected Cuboidd tmpCub = new Cuboidd();
+
+        protected readonly PathNode tmpNode = new PathNode(new BlockPos(0, 0, 0, 0));
 
         protected bool traversable(PathNode node, float stepHeight, int maxFallHeight, Cuboidf entityCollBox, Cardinal fromDir, ref float extraCost)
         {

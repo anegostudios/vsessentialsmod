@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Vintagestory.API;
 using Vintagestory.API.Client;
@@ -43,7 +44,7 @@ namespace Vintagestory.GameContent
         /// <param name="intoDict"></param>
         void CollectTextures(ItemStack stack, Shape shape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict);
         string? GetCategoryCode(ItemStack stack);
-        CompositeShape? GetAttachedShape(ItemStack stack, string slotCode);
+        CompositeShape? GetAttachedShape(ItemStack stack, Entity onentity, string slotCode);
         string[]? GetDisableElements(ItemStack stack);
         string[]? GetKeepElements(ItemStack stack);
         string? GetTexturePrefixCode(ItemStack stack);
@@ -64,9 +65,9 @@ namespace Vintagestory.GameContent
             {
                 return new AttributeAttachableToEntity()
                 {
-                    CategoryCode = cobj.Attributes["clothescategory"].AsString() ?? cobj.Attributes?["attachableToEntity"]["categoryCode"].AsString(),
-                    KeepElements = cobj.Attributes["keepElements"].AsArray<string>(),
-                    DisableElements = cobj.Attributes["disableElements"].AsArray<string>()
+                    CategoryCode = cobj.Attributes?["clothescategory"]?.AsString() ?? cobj.Attributes?["attachableToEntity"]["categoryCode"]?.AsString() ?? "",
+                    KeepElements = cobj.Attributes?["keepElements"].AsArray<string>()?.OfType<string>().ToArray(),
+                    DisableElements = cobj.Attributes?["disableElements"].AsArray<string>()?.OfType<string>().ToArray()
                 };
             }
 
@@ -75,99 +76,27 @@ namespace Vintagestory.GameContent
 
         public static void CollectTexturesFromCollectible(ItemStack stack, string texturePrefixCode, Shape gearShape, Dictionary<string, CompositeTexture> intoDict)
         {
-            if (gearShape.Textures == null) gearShape.Textures = new Dictionary<string, AssetLocation>();
-            var collectibleDict = stack.Class == EnumItemClass.Block ? stack.Block.Textures : stack.Item.Textures;
+            gearShape.Textures ??= [];
+
+            IDictionary<string, CompositeTexture>? collectibleDict = stack.Class == EnumItemClass.Block ? stack.Block.Textures : stack.Item.Textures;
             if (collectibleDict != null)
             {
-                foreach (var val in collectibleDict)
+                foreach ((string code, CompositeTexture texture) in collectibleDict)
                 {
-                    gearShape.Textures[val.Key] = val.Value.Baked.BakedName;
+                    gearShape.Textures[code] = texture.Baked.BakedName;
                 }
             }
         }
     }
-#nullable disable
 
-    /// <summary>
-    /// A set of properties that make a collectible attachable to an entity
-    /// </summary>
-    [DocumentAsJson]
-    public class AttributeAttachableToEntity : IAttachableToEntity
+    public interface ILayeredAttachableToEntity : IAttachableToEntity
     {
-        /// <summary>
-        /// Allows this collectible to be attached to slot with specified category code
-        /// </summary>
-        [DocumentAsJson("Required")]
-        public string CategoryCode { get; set; }
+        CompositeShape GetAttachedShape(ItemStack stack, Entity forEntity, string slotCode, string? layer);
 
-        /// <summary>
-        /// The shape used when this collectible is attached. If not set, the shape of the collectible is used
-        /// </summary>
-        [DocumentAsJson("Recommended", "None")]
-        public CompositeShape AttachedShape { get; set; }
-
-        /// <summary>
-        /// The shape elements that should not be rendered
-        /// </summary>
-        [DocumentAsJson("Optional", "None")]
-        public string[] DisableElements { get; set; }
-
-        /// <summary>
-        /// The shape elements that should still be rendered even if they are covered by <see cref="DisableElements"/>
-        /// </summary>
-        [DocumentAsJson("Optional", "None")]
-        public string[] KeepElements { get; set; }
-
-        /// <summary>
-        /// Unique key for this attachable to make sure it is rendered correctly
-        /// </summary>
-        [DocumentAsJson("Recommended", "None")]
-        public string TexturePrefixCode { get; set; }
-
-        public string GetTexturePrefixCode(ItemStack stack) => TexturePrefixCode;
-
-        /// <summary>
-        /// The shape used when this collectible is attached to specific slot
-        /// </summary>
-        [DocumentAsJson("Recommended", "None")]
-        public API.Datastructures.OrderedDictionary<string, CompositeShape> AttachedShapeBySlotCode { get; set; }
-
-        public void CollectTextures(ItemStack stack, Shape gearShape, string texturePrefixCode, Dictionary<string, CompositeTexture> intoDict) => IAttachableToEntity.CollectTexturesFromCollectible(stack, texturePrefixCode, gearShape, intoDict);
-
-        /// <summary>
-        /// Occupy additional space behind this slot
-        /// </summary>
-        [DocumentAsJson("Optional", "0")]
-        public int RequiresBehindSlots { get; set; }
-
-
-        public CompositeShape GetAttachedShape(ItemStack stack, string slotCode)
-        {
-            if (AttachedShape != null)
-            {
-                return AttachedShape;
-            }
-
-            if (AttachedShapeBySlotCode != null)
-            {
-                foreach (var val in AttachedShapeBySlotCode)
-                {
-                    if (WildcardUtil.Match(val.Key, slotCode))
-                    {
-                        return val.Value;
-                    }
-                }
-            }
-
-            return stack.Class == EnumItemClass.Item ? stack.Item.Shape : stack.Block.Shape;
-        }
-
-        public string GetCategoryCode(ItemStack stack) => CategoryCode;
-        public string[] GetDisableElements(ItemStack stack) => DisableElements;
-        public string[] GetKeepElements(ItemStack stack) => KeepElements;
-        public bool IsAttachable(Entity toEntity, ItemStack itemStack) => true;
+        IDictionary<string, CompositeTexture> GetAttachedTextures(ItemStack stack, Entity forEntity, string slotCode, string? layer);
     }
 
+#nullable disable
     /// <summary>
     /// A type of entity behavior that can be used to hold an inventory.
     /// This is not a usable entity behavior, but other entity behaviors may used this.
@@ -280,7 +209,7 @@ namespace Vintagestory.GameContent
 
             if (Inventory != null)
             {
-                var brightestSlot = Inventory.MaxBy(slot => slot.Empty ? 0 : slot.Itemstack.Collectible.LightHsv[2]);
+                var brightestSlot = Inventory.MaxBy(slot => slot.Empty ? 0 : slot.Itemstack.Collectible.GetLightHsv(entity.World.BlockAccessor, null, slot.Itemstack)[2]);
                 if (!brightestSlot.Empty)
                 {
                     entity.LightHsv = brightestSlot.Itemstack.Collectible.GetLightHsv(entity.World.BlockAccessor, null, brightestSlot.Itemstack);
@@ -345,7 +274,19 @@ namespace Vintagestory.GameContent
                 shapeIsCloned = true;
             }
 
-            return addGearToShape(entityShape, gearslot.Itemstack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, overrideStepParent);
+            ICustomAttachableGear customAttached = gearslot.Itemstack?.Collectible?.GetCollectibleInterface<ICustomAttachableGear>();
+
+            if (customAttached != null)
+            {
+                IDictionary<string, CompositeTexture> collectedTextures = entity?.Properties.Client.Textures;
+                entityShape = customAttached.AddGearToShape(entityShape, gearslot, slotCode, shapePathForLogging, ref shapeIsCloned, ref willDeleteElements, collectedTextures);
+            }
+            else
+            {
+                entityShape = addGearToShape(entityShape, gearslot.Itemstack, iatta, slotCode, shapePathForLogging, ref willDeleteElements, overrideStepParent);
+            }
+
+            return entityShape;
         }
 
         public virtual Shape addGearToShape(Shape entityShape, ItemStack stack, IAttachableToEntity iatta, string slotCode, string shapePathForLogging, ref string[] willDeleteElements, Dictionary<string, StepParentElementTo> overrideStepParent = null)
@@ -377,9 +318,14 @@ namespace Vintagestory.GameContent
             }
 
             string texturePrefixCode = iatta.GetTexturePrefixCode(stack);
-            if(optionalTargetEntity?.Properties.Attributes?["useSlotPrefix"].AsBool() == true)
+            if (optionalTargetEntity?.Properties.Attributes?["useSlotPrefix"].AsBool() == true)
             {
                 texturePrefixCode = texturePrefixCode != null ? texturePrefixCode + "-" + slotCode : slotCode;
+            }
+
+            if (texturePrefixCode != null && texturePrefixCode != "" && optionalTargetEntity?.Properties.Attributes?["ignorePrefixForRemovingElements"].AsBool() == true)
+            {
+                texturePrefixCode += Shape.RemoveElementPrefixDelimeter;
             }
 
             Shape gearShape = null;
@@ -392,9 +338,8 @@ namespace Vintagestory.GameContent
 
             if (gearShape == null)
             {
-                compGearShape = iatta.GetAttachedShape(stack, slotCode);
+                compGearShape = iatta.GetAttachedShape(stack, optionalTargetEntity, slotCode);
                 if (compGearShape == null) return entityShape;
-
 
                 shapePath = compGearShape.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json");
 
@@ -405,6 +350,7 @@ namespace Vintagestory.GameContent
                     return entityShape;
                 }
 
+                gearShape.RemoveElements(compGearShape.IgnoreElements);
                 gearShape.SubclassForStepParenting(texturePrefixCode, damageEffect);
                 gearShape.ResolveReferences(api.World.Logger, shapePath);
             }
@@ -417,6 +363,23 @@ namespace Vintagestory.GameContent
                 intoDict = new Dictionary<string, CompositeTexture>();
                 // Item stack textures take precedence over shape textures
                 iatta.CollectTextures(stack, gearShape, texturePrefixCode, intoDict);
+            }
+
+            var attachedTextures = (iatta as AttributeAttachableToEntity)?.GetAttachedTextures(stack, optionalTargetEntity, slotCode);
+            if (attachedTextures != null && capi != null && intoDict != null)
+            {
+                var itemAtlas = capi.ItemTextureAtlas;
+                foreach (var val in attachedTextures)
+                {
+                    if (val.Value.Baked != null) continue;
+                    itemAtlas.GetOrInsertTexture(val.Value, out int textureSubid, out _);
+                    val.Value.Baked.TextureSubId = textureSubid;
+                }
+
+                foreach ((string textureCode, var compositeTexutre) in attachedTextures)
+                {
+                    intoDict[texturePrefixCode + textureCode] = compositeTexutre;
+                }
             }
 
 

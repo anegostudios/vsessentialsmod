@@ -28,6 +28,7 @@ namespace Vintagestory.GameContent
             modifiers.Add(new BaseAimingAccuracy(agent));
             modifiers.Add(new MovingAimingAccuracy(agent));
             modifiers.Add(new SprintAimingAccuracy(agent));
+            modifiers.Add(new FloatingAimingAccuracy(agent));
             modifiers.Add(new OnHurtAimingAccuracy(agent));
 
             entity.Attributes.RegisterModifiedListener("aiming", OnAimingChanged);
@@ -219,6 +220,35 @@ namespace Vintagestory.GameContent
             accuracy -= accuracyPenalty / Math.Max(1, rangedAcc);
         }
     }
+
+    /// <summary>
+    /// Floating while swimming decreases accuracy by 20% in 0.75 seconds
+    /// </summary>
+    public class FloatingAimingAccuracy : AccuracyModifier
+    {
+        float accuracyPenalty;
+
+        public FloatingAimingAccuracy(EntityAgent entity) : base(entity)
+        {
+        }
+
+        public override void Update(float dt, ref float accuracy)
+        {
+            float rangedAcc = entity.Stats.GetBlended("rangedWeaponsAcc");
+
+            if (entity.Swimming && !entity.OnGround)
+            {
+                accuracyPenalty = GameMath.Clamp(accuracyPenalty + dt / 0.75f, 0, 0.2f);
+            }
+            else
+            {
+                accuracyPenalty = GameMath.Clamp(accuracyPenalty - dt / 2f, 0, 0.2f);
+            }
+
+            accuracy -= accuracyPenalty / Math.Max(1, rangedAcc);
+        }
+    }
+
 
     public class OnHurtAimingAccuracy : AccuracyModifier
     {

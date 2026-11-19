@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -15,8 +15,7 @@ namespace Vintagestory.ServerMods.NoObf
         public ushort leavesBlockId;
         public ushort leavesBranchyBlockId;
 
-        [JsonProperty]
-        public EnumTreeGenMode mode = EnumTreeGenMode.NORMAL;
+
         [JsonProperty]
         AssetLocation logBlockCode = null;
         [JsonProperty]

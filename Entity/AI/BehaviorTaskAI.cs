@@ -9,7 +9,7 @@ namespace Vintagestory.GameContent;
 public class EntityBehaviorTaskAI(Entity entity) : EntityBehavior(entity)
 {
     public AiTaskManager TaskManager = new(entity);
-    public WaypointsTraverser? PathTraverser;
+    public WaypointsTraverser PathTraverser = null!;
 
     public override string PropertyName() => "taskai";
 
@@ -107,7 +107,11 @@ public class EntityBehaviorTaskAI(Entity entity) : EntityBehavior(entity)
         }
     }
 
-    public override void AfterInitialized(bool onFirstSpawn) => TaskManager.AfterInitialize();
+    public override void AfterInitialized(bool onFirstSpawn)
+    {
+        PathTraverser.AfterInitialized();
+        TaskManager.AfterInitialize();
+    }
 
     public override void OnGameTick(float deltaTime)
     {
@@ -115,7 +119,7 @@ public class EntityBehaviorTaskAI(Entity entity) : EntityBehavior(entity)
         if (entity.State != EnumEntityState.Active || !entity.Alive) return;
         entity.World.FrameProfiler.Mark("ai-init");
 
-        PathTraverser?.OnGameTick(deltaTime);
+        PathTraverser.OnGameTick(deltaTime);
 
         entity.World.FrameProfiler.Mark("ai-pathfinding");
 

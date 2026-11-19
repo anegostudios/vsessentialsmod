@@ -31,9 +31,16 @@ namespace Vintagestory.GameContent
 
 
 
+        [Obsolete("Use searchRange instead")]
+        // This was never read from json, so no need for backwards compatibility
+        protected float attackRange
+        {
+            get => searchRange;
+            set => searchRange = value;
+        }
+
         public EnumDamageType damageType = EnumDamageType.BluntAttack;
         public int damageTier = 0;
-        protected float attackRange = 3f;
         protected bool turnToTarget = true;
 
         public AiTaskMeleeAttack(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
@@ -57,6 +64,12 @@ namespace Vintagestory.GameContent
             tree.SetString("dmgTier", Lang.Get("Damage tier: {0}", damageTier));
         }
 
+        protected override void SetDefaultValues()
+        {
+            base.SetDefaultValues();
+            searchRange = 3f;
+        }
+
         public override bool ShouldExecute()
         {
             long elapsedMs = entity.World.ElapsedMilliseconds;
@@ -66,8 +79,6 @@ namespace Vintagestory.GameContent
             }
 
             if (!PreconditionsSatisfied()) return false;
-
-            Vec3d pos = entity.Pos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.Pos.Yaw);
 
             int generation = GetOwnGeneration();
             bool fullyTamed = generation >= tamingGenerations;
@@ -87,11 +98,14 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                targetEntity = entity.World.GetNearestEntity(pos, attackRange * fearReductionFactor, attackRange * fearReductionFactor, (e) =>
+
+                Vec3d pos = entity.Pos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.Pos.Yaw);
+
+                targetEntity = partitionUtil.GetNearestEntity(pos, searchRange * fearReductionFactor, (e) =>
                 {
                     if (fullyTamed && (isNonAttackingPlayer(e) || entity.ToleratesDamageFrom(attackedByEntity))) return false;
                     return IsTargetableEntity(e, 15) && hasDirectContact(e, minDist, minVerDist);
-                });
+                }, SearchType);
             }
 
             lastCheckOrAttackMs = entity.World.ElapsedMilliseconds;

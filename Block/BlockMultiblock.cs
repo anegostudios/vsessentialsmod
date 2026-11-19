@@ -496,6 +496,16 @@ namespace Vintagestory.GameContent
             return block.GetBlockEntity<T>(bs);
         }
 
+        public override T GetBlockEntity<T>(FastBlockPos position)
+        {
+            var block = api.World.BlockAccessor.GetBlock(position.AddCopy(OffsetInv));
+
+            // Prevent endless recursion stack overflow, should we ever end up in a corrupted world situation
+            if (block is BlockMultiblock) return base.GetBlockEntity<T>(position);
+
+            return block.GetBlockEntity<T>(position.AddCopy(OffsetInv));
+        }
+
         public override AssetLocation GetRotatedBlockCode(int angle)
         {
             int angleIndex = ((angle / 90) % 4 + 4) % 4;

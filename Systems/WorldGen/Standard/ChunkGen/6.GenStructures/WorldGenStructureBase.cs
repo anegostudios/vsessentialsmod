@@ -7,6 +7,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.Common.Collectible.Block;
+using Vintagestory.Datastructures;
 
 #nullable disable
 
@@ -262,6 +263,16 @@ namespace Vintagestory.ServerMods
                     schematic.DecorIndices[i] = move(flagSum, schematic.DecorIndices[i]);
                 }
 
+                if (schematic.ModData.Count > 0)
+                {
+                    var tmpModData = new Dictionary<uint, Dictionary<string, byte[]>>();
+                    foreach (var (index,data) in schematic.ModData)
+                    {
+                        tmpModData.Add(move(flagSum, index),data);
+                    }
+                    schematic.ModData = tmpModData;
+                }
+
                 var tmpBlockEntities = new Dictionary<uint, string>();
                 foreach (var (index, data) in schematic.BlockEntities)
                 {
@@ -273,13 +284,12 @@ namespace Vintagestory.ServerMods
                 schematic.EntitiesUnpacked.Clear();
                 foreach (var entityData in schematic.Entities)
                 {
-                    using var ms = new MemoryStream(Ascii85.Decode(entityData));
-                    var reader = new BinaryReader(ms);
+                    var reader = new BinarySpanReader(Ascii85.Decode(entityData));
 
                     var className = reader.ReadString();
                     var entity = api.ClassRegistry.CreateEntity(className);
 
-                    entity.FromBytes(reader, false);
+                    entity.FromBytes(ref reader, false);
 
                     if (flagSum.MoveX0)
                     {

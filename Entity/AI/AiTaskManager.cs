@@ -54,6 +54,7 @@ public static class AiTaskRegistry
         Register<AiTaskLookAtEntity>("lookatentity");
         Register<AiTaskGotoEntity>("gotoentity");
 
+#pragma warning disable CS0618 // Type or member is obsolete
         // Refactored
         Register<AiTaskWanderR>("wander-r");
         Register<AiTaskBellAlarmR>("bellalarm-r");
@@ -71,6 +72,7 @@ public static class AiTaskRegistry
         Register<AiTaskStayCloseToEntityR>("stayclosetoentity-r");
         Register<AiTaskStayInRangeR>("stayinrange-r");
         Register<AiTaskTurretModeR>("turretmode-r");
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 }
 
@@ -163,7 +165,7 @@ public sealed class AiTaskManager(Entity entity)
     }
 
     /// <summary>
-    /// Runs supplied task in given slot. 
+    /// Runs supplied task in given slot.
     /// Stops the previous task if necessary, runs OnTaskStopped/OnTaskStarted events
     /// </summary>
     /// <param name="task"></param>
@@ -194,7 +196,7 @@ public sealed class AiTaskManager(Entity entity)
         task.StartExecute();
         activeTasksBySlot[slot] = task;
         OnTaskStarted?.Invoke(task);
-        
+
         if (entity.World.FrameProfiler.Enabled)
         {
             entity.World.FrameProfiler.Mark(task.ProfilerName);
@@ -227,6 +229,34 @@ public sealed class AiTaskManager(Entity entity)
         {
             ExecuteTask(taskToExecute, taskToExecute.Slot);
         }
+    }
+
+    /// <summary>
+    /// Attempts to continue execution of the given task using the given delta time, provided the task exists,
+    /// is active (in any slot), and reports that it can continue.
+    /// Finishes task execution if necessary and invokes the OnTaskStopped event.
+    /// </summary>
+    /// <param name="task"></param>
+    /// <param name="deltaTime"></param>
+    /// <returns>False if the task is active and should stop</returns>
+    public bool ContinueTask(IAiTask? task, float deltaTime)
+    {
+        if (task == null || !activeTasksBySlot.Contains(task) || !task.CanContinueExecute()) return true;
+
+        if (!task.ContinueExecute(deltaTime))
+        {
+            task.FinishExecute(false);
+            OnTaskStopped?.Invoke(task);
+            activeTasksBySlot[task.Slot] = null;
+            return false;
+        }
+
+        if (entity.World.FrameProfiler.Enabled)
+        {
+            entity.World.FrameProfiler.Mark("task-continueexec-", AiTaskRegistry.TaskCodes[task.GetType()]);
+        }
+
+        return true;
     }
 
     public TTask? GetTask<TTask>() where TTask : IAiTask => (TTask?)tasks.Find(task => task is TTask);
@@ -490,20 +520,7 @@ public sealed class AiTaskManager(Entity entity)
         for (int index = 0; index < activeTasksBySlot.Length; index++)
         {
             IAiTask? task = activeTasksBySlot[index];
-            if (task == null) continue;
-            if (!task.CanContinueExecute()) continue;
-
-            if (!task.ContinueExecute(dt))
-            {
-                task.FinishExecute(false);
-                OnTaskStopped?.Invoke(task);
-                activeTasksBySlot[index] = null;
-            }
-
-            if (entity.World.FrameProfiler.Enabled)
-            {
-                entity.World.FrameProfiler.Mark("task-continueexec-", AiTaskRegistry.TaskCodes[task.GetType()]);
-            }
+            ContinueTask(task, dt);
         }
     }
 

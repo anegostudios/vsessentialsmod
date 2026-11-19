@@ -215,20 +215,21 @@ public class AiTaskWanderR : AiTaskBaseR
         if (entity.Controls.IsClimbing && entity.Properties.CanClimbAnywhere && entity.ClimbingIntoFace != null)
         {
             BlockFacing facing = entity.ClimbingIntoFace;
+            Vec3d currentTarget = pathTraverser.CurrentTarget!;
 
-            if (Math.Sign(facing.Normali.X) == Math.Sign(pathTraverser.CurrentTarget.X - entity.Pos.X))
+            if (Math.Sign(facing.Normali.X) == Math.Sign(currentTarget.X - entity.Pos.X))
             {
-                pathTraverser.CurrentTarget.X = entity.Pos.X;
+                currentTarget.X = entity.Pos.X;
             }
 
-            if (Math.Sign(facing.Normali.Y) == Math.Sign(pathTraverser.CurrentTarget.Y - entity.Pos.Y))
+            if (Math.Sign(facing.Normali.Y) == Math.Sign(currentTarget.Y - entity.Pos.Y))
             {
-                pathTraverser.CurrentTarget.Y = entity.Pos.Y;
+                currentTarget.Y = entity.Pos.Y;
             }
 
-            if (Math.Sign(facing.Normali.Z) == Math.Sign(pathTraverser.CurrentTarget.Z - entity.Pos.Z))
+            if (Math.Sign(facing.Normali.Z) == Math.Sign(currentTarget.Z - entity.Pos.Z))
             {
-                pathTraverser.CurrentTarget.Z = entity.Pos.Z;
+                currentTarget.Z = entity.Pos.Z;
             }
         }
 

@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
@@ -5,65 +6,56 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
-    class FailedAttempt
+    public class AiTaskSeekFoodAndEat : AiTaskSeekPoiBase<IAnimalFoodSource>
     {
-        public long LastTryMs;
-        public int Count;
-    }
+        protected AssetLocation? eatSound;
+        protected bool soundPlayed = false;
 
-    public class AiTaskSeekFoodAndEat : AiTaskBase
-    {
-        AssetLocation eatSound;
-        POIRegistry porregistry;
-        IAnimalFoodSource targetPoi;
+        /// <summary>
+        /// How long it takes to eat, in seconds. At 75% of this time, the eatSound will play.
+        /// </summary>
+        [JsonProperty]
+        protected float eatTime = 1.5f;
 
-        float moveSpeed = 0.02f;
-        long stuckatMs = 0;
-        bool nowStuck = false;
-        float eatTime = 1f;
-        float eatTimeNow = 0;
-        bool soundPlayed = false;
-        bool doConsumePortion = true;
-        bool eatAnimStarted = false;
+        /// <summary>
+        /// If true, the creature will use up some of the food to increase its saturation. Otherwise, it will walk to the food and play the animation, but not consume any.
+        /// </summary>
+        [JsonProperty]
+        protected bool doConsumePortion = true;
 
+        /// <summary>
+        /// If true, the creature will check dropped items and go after any that match its diet.
+        /// </summary>
+        [JsonProperty]
+        protected bool eatLooseItems = true;
 
-        bool eatLooseItems;
-        float quantityEaten;
+        /// <summary>
+        /// Chance for entity to go to the food source (without eating) when it has a multiply behavior that isn't ready to eat
+        /// If eatAnyway is true on the multiply behavior, this will never be used because that will always be ready to eat
+        /// </summary>
+        [JsonProperty]
+        public float seekFoodAnywayChance = 0.004f;
 
-        AnimationMetaData eatAnimMeta;
-        AnimationMetaData eatAnimMetaLooseItems;
+        protected float quantityEaten;
 
-        Dictionary<IAnimalFoodSource, FailedAttempt> failedSeekTargets = new Dictionary<IAnimalFoodSource, FailedAttempt>();
-
-        float extraTargetDist;
-        long lastPOISearchTotalMs;
+        protected AnimationMetaData? eatAnimMeta;
+        protected AnimationMetaData? eatAnimMetaLooseItems;
 
         public CreatureDiet Diet;
-        EntityBehaviorMultiplyBase bhMultiply;
-
-        ICoreAPI api;
+        protected EntityBehaviorMultiplyBase? bhMultiply;
 
         public AiTaskSeekFoodAndEat(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
-            api = entity.Api;
-            porregistry = api.ModLoader.GetModSystem<POIRegistry>();
-
             entity.WatchedAttributes.SetBool("doesEat", true);
 
-            string eatsoundstring = taskConfig["eatSound"].AsString(null);
+            // As of 1.23, we no longer support the pre-1.19 lack of creature diet
+            Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>()
+                ?? throw new Exception("Creature " + entity.Code.ToShortString() + " has SeekFoodAndEat task but no Diet specified");
+
+            string? eatsoundstring = taskConfig["eatSound"].AsString(null);
             if (eatsoundstring != null) eatSound = new AssetLocation(eatsoundstring).WithPathPrefix("sounds/");
-
-            moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-            eatTime = taskConfig["eatTime"].AsFloat(1.5f);
-            doConsumePortion = taskConfig["doConsumePortion"].AsBool(true);
-            eatLooseItems = taskConfig["eatLooseItems"].AsBool(true);
-
-            Diet = entity.Properties.Attributes["creatureDiet"].AsObject<CreatureDiet>();
-            if (Diet == null) api.Logger.Warning("Creature " + entity.Code.ToShortString() + " has SeekFoodAndEat task but no Diet specified");
 
             if (taskConfig["eatAnimation"].Exists)
             {
@@ -94,27 +86,23 @@ namespace Vintagestory.GameContent
 
         public override void AfterInitialize()
         {
+            base.AfterInitialize();
             bhMultiply = entity.GetBehavior<EntityBehaviorMultiplyBase>();
         }
 
         public override bool ShouldExecute()
         {
             if (entity.World.Rand.NextDouble() > ExecutionChance) return false;
-            // Don't search more often than every 15 seconds
-            if (lastPOISearchTotalMs + 15000 > entity.World.ElapsedMilliseconds) return false;
-            if (IsOnCooldown()) return false;
-            if (!PreconditionsSatisfied()) return false;
+            if (!IsSearchTime()) return false;
 
-            if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() < 0.996) return false; // 0.4% chance go to the food source anyway just because (without eating anything).
-            if (Diet == null) return false;   // Deals with mods which have not properly updated for 1.19, check this condition last because always passes in vanilla
+            if (bhMultiply != null && !bhMultiply.ShouldEat && entity.World.Rand.NextDouble() >= seekFoodAnywayChance) return false;
 
             targetPoi = null;
-            extraTargetDist = 0;
             lastPOISearchTotalMs = entity.World.ElapsedMilliseconds;
 
             if (eatLooseItems)
             {
-                api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.Pos.XYZ, 10, (e) =>
+                entity.Api.ModLoader.GetModSystem<EntityPartitioning>().WalkEntities(entity.Pos.XYZ, 10, (e) =>
                 {
                     if (e is EntityItem eitem && suitableFoodSource(eitem.Itemstack))
                     {
@@ -128,21 +116,12 @@ namespace Vintagestory.GameContent
 
             if (targetPoi == null)
             {
-                targetPoi = porregistry.GetNearestPoi(entity.Pos.XYZ, 48, (poi) =>
+                targetPoi = pointsOfInterest.GetNearestPoi(entity.Pos.XYZ, 48, (poi) =>
                 {
                     if (poi.Type != "food") return false;
-                    IAnimalFoodSource foodPoi;
-
-                    if ((foodPoi = poi as IAnimalFoodSource)?.IsSuitableFor(entity, Diet) == true)
-                    {
-                        failedSeekTargets.TryGetValue(foodPoi, out FailedAttempt attempt);
-                        if (attempt == null || (attempt.Count < 4 || attempt.LastTryMs < world.ElapsedMilliseconds - 60000))
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
+                    IAnimalFoodSource? foodPoi = poi as IAnimalFoodSource;
+                
+                    return foodPoi != null && foodPoi.IsSuitableFor(entity, Diet) && !RecentlyFailedSeek(foodPoi);
                 }) as IAnimalFoodSource;
             }
 
@@ -157,139 +136,81 @@ namespace Vintagestory.GameContent
             return Diet.Matches(cat, tags, 0f);
         }
 
-        public float MinDistanceToTarget()
-        {
-            return Math.Max(extraTargetDist + 0.6f, entity.SelectionBox.XSize / 2 + 0.05f);
-        }
-
 
         public override void StartExecute()
         {
             base.StartExecute();
-            stuckatMs = -9999;
-            nowStuck = false;
             soundPlayed = false;
-            eatTimeNow = 0;
-            pathTraverser.NavigateTo_Async(targetPoi.Position, moveSpeed, MinDistanceToTarget() - 0.1f, OnGoalReached, OnStuck, null, 1000, 1);
-            eatAnimStarted = false;
         }
 
-        public override bool CanContinueExecute()
+        protected override void OnArrival()
         {
-            return pathTraverser.Ready;
-        }
-
-        public override bool ContinueExecute(float dt)
-        {
-            // Check if time is still valid for task.
-            if (!IsInValidDayTimeHours(false)) return false;
-
-            Vec3d pos = targetPoi.Position;
-
-            pathTraverser.CurrentTarget.X = pos.X;
-            pathTraverser.CurrentTarget.Y = pos.Y;
-            pathTraverser.CurrentTarget.Z = pos.Z;
-
-            Cuboidd targetBox = entity.SelectionBox.ToDouble().Translate(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
-            double distance = targetBox.ShortestDistanceFrom(pos);
-
-            float minDist = MinDistanceToTarget();
-
-            if (distance <= minDist)
+            if (eatAnimMeta != null)
             {
-                pathTraverser.Stop();
-                if (animMeta != null && entity.AnimManager.IsAnimationActive(animMeta.Code))
-                {
-                    entity.AnimManager.StopAnimation(animMeta.Code);
-                }
-
-                if (bhMultiply != null && !bhMultiply.ShouldEat)
-                {
-                    return false;
-                }
-
-                if (targetPoi.IsSuitableFor(entity, Diet) != true) return false;
-
-                if (eatAnimMeta != null && !eatAnimStarted)
-                {
-                    entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);
-
-                    eatAnimStarted = true;
-                }
-
-                eatTimeNow += dt;
-
-                if (targetPoi is LooseItemFoodSource foodSource && foodSource.ItemStack != null)
-                {
-                    entity.World.SpawnCubeParticles(targetPoi.Position, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
-                }
-
-                if (eatTimeNow > eatTime * 0.75f && !soundPlayed)
-                {
-                    soundPlayed = true;
-                    if (eatSound != null) entity.World.PlaySoundAt(eatSound, entity, null, true, 16, 1);
-                }
-
-
-                if (eatTimeNow >= eatTime)
-                {
-                    ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
-                    if (tree == null) entity.WatchedAttributes["hunger"] = tree = new TreeAttribute();
-
-                    if (doConsumePortion)
-                    {
-                        float sat = targetPoi.ConsumeOnePortion(entity);
-                        quantityEaten += sat;
-                        tree.SetFloat("saturation", sat + tree.GetFloat("saturation", 0));
-                        entity.WatchedAttributes.SetDouble("lastMealEatenTotalHours", entity.World.Calendar.TotalHours);
-                        entity.WatchedAttributes.MarkPathDirty("hunger");
-                    }
-                    else quantityEaten = 1;
-
-                    failedSeekTargets.Remove(targetPoi);
-
-                    return false;
-                }
-            } else
-            {
-                if (!pathTraverser.Active)
-                {
-                    float rndx = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    float rndz = (float)entity.World.Rand.NextDouble() * 0.3f - 0.15f;
-                    if (!pathTraverser.NavigateTo(targetPoi.Position.AddCopy(rndx, 0, rndz), moveSpeed, minDist - 0.15f, OnGoalReached, OnStuck, null, false, 500, 1))
-                    {
-                        return false;
-                    }
-                }
+                entity.AnimManager.StartAnimation((targetPoi is LooseItemFoodSource && eatAnimMetaLooseItems != null) ? eatAnimMetaLooseItems : eatAnimMeta);
             }
 
-
-            if (nowStuck && entity.World.ElapsedMilliseconds > stuckatMs + eatTime * 1000)
+            if (bhMultiply != null && !bhMultiply.ShouldEat)
             {
-                return false;
+                done = true;
             }
-
-
-            return true;
         }
 
+        protected override void TickTargetReached()
+        {
+            if (targetPoi == null)
+            {
+                done = true;
+                return;
+            }
+
+            if (targetPoi is LooseItemFoodSource foodSource && foodSource.ItemStack != null)
+            {
+                entity.World.SpawnCubeParticles(targetPoi.Position, foodSource.ItemStack, 0.25f, 1, 0.25f + 0.5f * (float)entity.World.Rand.NextDouble());
+            }
+
+            if (timeSinceTargetReached > eatTime * 0.75f && !soundPlayed)
+            {
+                soundPlayed = true;
+                if (eatSound != null) entity.World.PlaySoundAt(eatSound, entity, null, true, 16, 1);
+            }
+
+            if (timeSinceTargetReached >= eatTime)
+            {
+                ITreeAttribute tree = entity.WatchedAttributes.GetTreeAttribute("hunger");
+                if (tree == null) entity.WatchedAttributes["hunger"] = tree = new TreeAttribute();
+
+                if (doConsumePortion)
+                {
+                    float sat = targetPoi.ConsumeOnePortion(entity);
+                    quantityEaten += sat;
+                    tree.SetFloat("saturation", sat + tree.GetFloat("saturation", 0));
+                    entity.WatchedAttributes.SetDouble("lastMealEatenTotalHours", entity.World.Calendar.TotalHours);
+                    entity.WatchedAttributes.MarkPathDirty("hunger");
+                }
+                else quantityEaten = 1;
+
+                done = true;
+            }
+        }
+
+        protected override bool ShouldAbort()
+        {
+            return base.ShouldAbort() || targetPoi?.IsSuitableFor(entity, Diet) != true;
+        }
 
 
         public override void FinishExecute(bool cancelled)
         {
-            // don't call base method, we set the cool down manually
+            double prevCooldownHours = cooldownUntilTotalHours;
+            base.FinishExecute(cancelled);
+
             // Instead of resetting the cool down to current time + delta, we add it, so that the animal can eat multiple times, to catch up on lost time
-            var bh = entity.GetBehavior<EntityBehaviorMultiply>();
-            if (bh != null && bh.PortionsLeftToEat > 0 && !bh.IsPregnant)
+            EntityBehaviorMultiply? multiplyBehavior = entity.GetBehavior<EntityBehaviorMultiply>();
+            if (multiplyBehavior != null && multiplyBehavior.PortionsLeftToEat > 0 && !multiplyBehavior.IsPregnant)
             {
-                cooldownUntilTotalHours += MinCooldownHours + entity.World.Rand.NextDouble() * (MaxCooldownHours - MinCooldownHours);
-            } else
-            {
-                cooldownUntilTotalHours = api.World.Calendar.TotalHours + MinCooldownHours + entity.World.Rand.NextDouble() * (MaxCooldownHours - MinCooldownHours);
+                cooldownUntilTotalHours = prevCooldownHours + MinCooldownHours + entity.World.Rand.NextDouble() * (MaxCooldownHours - MinCooldownHours);
             }
-
-            pathTraverser.Stop();
-
 
             if (eatAnimMeta != null)
             {
@@ -299,11 +220,6 @@ namespace Vintagestory.GameContent
             if (eatAnimMetaLooseItems != null)
             {
                 entity.AnimManager.StopAnimation(eatAnimMetaLooseItems.Code);
-            }
-
-            if (animMeta != null)
-            {
-                entity.AnimManager.StopAnimation(animMeta.Code);
             }
 
             if (cancelled)
@@ -319,32 +235,6 @@ namespace Vintagestory.GameContent
                 quantityEaten = 0;
             }
         }
-
-
-
-        private void OnStuck()
-        {
-            stuckatMs = entity.World.ElapsedMilliseconds;
-            nowStuck = true;
-
-            failedSeekTargets.TryGetValue(targetPoi, out FailedAttempt attempt);
-            if (attempt == null)
-            {
-                failedSeekTargets[targetPoi] = attempt = new FailedAttempt();
-            }
-
-            attempt.Count++;
-            attempt.LastTryMs = world.ElapsedMilliseconds;
-
-        }
-
-        private void OnGoalReached()
-        {
-            pathTraverser.Active = true;
-            failedSeekTargets.Remove(targetPoi);
-        }
-
-
     }
 
     public class PlayerPoi : IAnimalFoodSource

@@ -5,8 +5,6 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     [ProtoContract]

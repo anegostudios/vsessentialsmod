@@ -8,8 +8,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
     [ProtoContract]
@@ -20,61 +18,70 @@ namespace Vintagestory.GameContent
     }
 
     [ProtoContract]
-    public class PointList 
+    public class PointList
     {
         [ProtoMember(1)]
         public List<ClothPoint> Points = new List<ClothPoint>();
     }
 
-
-    // How to synchronize this over the network?
-    // Idea: We run the simulation client and server, but server 
+    // These values are serialized, but not automatically synced.
+    // So if you change one on the server, either do it right away on a new cloth system
+    // before the client knows about it, or send an update packet.
     [ProtoContract]
     public class ClothSystem
     {
         [ProtoMember(1)]
         public int ClothId;
+
         [ProtoMember(2)]
         EnumClothType clothType;
+
         [ProtoMember(3)]
         List<PointList> Points2d = new List<PointList>();
+
         [ProtoMember(4)]
         List<ClothConstraint> Constraints = new List<ClothConstraint>();
+
         [ProtoMember(5)]
         public bool Active { get; set; }
-        [DefaultValue(true)]
-        [ProtoMember(6)]
+        [ProtoMember(6), DefaultValue(true)]
         public bool CanRip { get; set; } = true;
-        [DefaultValue(true)]
-        [ProtoMember(7)]
+        [ProtoMember(7), DefaultValue(true)]
         public bool CanPull { get; set; } = true;
-        [ProtoMember(8)]
+        [ProtoMember(8), DefaultValue(1f)]
         public float RopeRenderThickness = 1f;
 
         /// <summary>
         /// 10 joints per meter
         /// </summary>
+        [ProtoMember(9), DefaultValue(2)]
         public float Resolution = 2;
 
+        [ProtoMember(10), DefaultValue(0.6f)]
         public float StretchWarn = 0.6f;
+        [ProtoMember(11), DefaultValue(0.75f)]
         public float StretchRip = 0.75f;
+
+        [ProtoMember(12), DefaultValue(1.5f)]
+        public float MinLength = 1.5f;
+        [ProtoMember(13), DefaultValue(10)]
+        public float MaxLength = 10;
 
         public bool LineDebug=false;
         public bool boyant = false;
-        protected ICoreClientAPI capi;
-        public ICoreAPI api;        
+        protected ICoreClientAPI? capi;
+        public ICoreAPI api = null!;
         public Vec3d windSpeed = new Vec3d();
-        public ParticlePhysics pp;
-        protected NormalizedSimplexNoise noiseGen;
+        public ParticlePhysics ParticlePhysics = null!;
+        protected NormalizedSimplexNoise noiseGen = null!;
         protected float[] tmpMat = new float[16];
         protected Vec3f distToCam = new Vec3f();
-        protected AssetLocation ropeSectionModel;
-        protected MeshData debugUpdateMesh;
-        protected MeshRef debugMeshRef;
+        protected AssetLocation? ropeSectionModel;
+        protected MeshData? debugUpdateMesh;
+        protected MeshRef? debugMeshRef;
 
         public float secondsOverStretched;
 
-        
 
         public bool PinnedAnywhere
         {
@@ -98,27 +105,18 @@ namespace Vintagestory.GameContent
         {
             get
             {
-                // Loop twice to not loose decimal precision
-
                 Vec3d pos = new Vec3d();
-                int cnt = 0;
+                int count = 0;
                 foreach (var pointlist in Points2d)
                 {
+                    count += pointlist.Points.Count;
                     foreach (var point in pointlist.Points)
                     {
-                        cnt++;
+                        pos.Add(point.Pos.X, point.Pos.Y, point.Pos.Z);
                     }
                 }
 
-                foreach (var pointlist in Points2d)
-                {
-                    foreach (var point in pointlist.Points)
-                    {
-                        pos.Add(point.Pos.X / cnt, point.Pos.Y / cnt, point.Pos.Z / cnt);
-                    }
-                }
-
-                return pos;
+                return count == 0 ? pos : pos / count;
             }
         }
 
@@ -139,15 +137,15 @@ namespace Vintagestory.GameContent
             return new ClothSystem(api, cm, start, end, EnumClothType.Cloth);
         }
 
-        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, AssetLocation clothSectionModel, float resolution = 2)
+        public static ClothSystem CreateRope(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, AssetLocation? clothSectionModel, float resolution = 2)
         {
             return new ClothSystem(api, cm, start, end, EnumClothType.Rope, clothSectionModel, resolution);
         }
 
+#pragma warning disable CS8618 // Protobuf needs this parameterless constructor, which leaves some fields null
         private ClothSystem() { }
+#pragma warning restore CS8618
 
-        double minLen = 1.5;
-        double maxLen = 10;
 
         public bool ChangeRopeLength(double len)
         {
@@ -157,14 +155,16 @@ namespace Vintagestory.GameContent
 
             bool isAdd = len > 0;
 
-            if (isAdd && len + currentLength > maxLen) return false;
-            if (!isAdd && len + currentLength < minLen) return false;
+            if (isAdd && len + currentLength > MaxLength) return false;
+            if (!isAdd && len + currentLength < MinLength) return false;
 
             int pointIndex = plist.Points.Max(p => p.PointIndex)+1;
             var fp = FirstPoint;
             var pine = fp.PinnedToEntity;
             var pinb = fp.PinnedToBlockPos;
-            var pino = fp.pinnedToOffset;
+            var pino = fp.pinnedToOffset ?? new Vec3f();
+            bool noAttachTransform = fp.NoAttachTransform;
+            bool applyOffsetToAttachment = fp.ApplyOffsetToAttachment;
             fp.UnPin();
             float step = 1 / Resolution;
             int totalPoints = Math.Abs((int)(len * Resolution));
@@ -186,7 +186,7 @@ namespace Vintagestory.GameContent
                 {
                     var point = plist.Points[0];
                     plist.Points.RemoveAt(0);
-                        
+
                     for (int k = 0; k < Constraints.Count; k++)
                     {
                         var c = Constraints[k];
@@ -201,20 +201,22 @@ namespace Vintagestory.GameContent
 
             if (pine != null) FirstPoint.PinTo(pine, pino);
             if (pinb != null) FirstPoint.PinTo(pinb, pino);
-            
+            FirstPoint.NoAttachTransform = noAttachTransform;
+            FirstPoint.ApplyOffsetToAttachment = applyOffsetToAttachment;
+
             genDebugMesh();
 
             return true;
         }
 
-        private ClothSystem(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, EnumClothType clothType, AssetLocation ropeSectionModel = null, float resolution = 2)
+        private ClothSystem(ICoreAPI api, ClothManager cm, Vec3d start, Vec3d end, EnumClothType clothType, AssetLocation? ropeSectionModel = null, float resolution = 2)
         {
             this.clothType = clothType;
             this.ropeSectionModel = ropeSectionModel;
             this.Resolution = resolution;
 
             Init(api, cm);
-            
+
             float step = 1 / Resolution;
 
             var dir = end - start;
@@ -318,13 +320,13 @@ namespace Vintagestory.GameContent
             debugUpdateMesh.Rgba = null;
         }
 
-        
+
 
         public void Init(ICoreAPI api, ClothManager cm)
         {
             this.api = api;
             this.capi = api as ICoreClientAPI;
-            pp = cm.partPhysics;
+            ParticlePhysics = cm.partPhysics;
 
             noiseGen = NormalizedSimplexNoise.FromDefaultOctaves(4, 100, 0.9, api.World.Seed + CenterPosition.GetHashCode());
         }
@@ -345,7 +347,7 @@ namespace Vintagestory.GameContent
         public int UpdateMesh(MeshData updateMesh, float dt)
         {
             var cfloats = updateMesh.CustomFloats;
-            Vec3d campos = capi.World.Player.Entity.CameraPos;
+            Vec3d campos = capi!.World.Player.Entity.CameraPos;
             int basep = cfloats.Count;
 
 
@@ -444,6 +446,7 @@ namespace Vintagestory.GameContent
             if (LineDebug && capi != null)
             {
                 if (debugMeshRef == null) genDebugMesh();
+                var debugUpdateMesh = this.debugUpdateMesh!;
 
                 BlockPos originPos = CenterPosition.AsBlockPos;
 
@@ -501,7 +504,7 @@ namespace Vintagestory.GameContent
             accum += dt;
             if (accum > 1) accum = 0.25f;
 
-            float step = pp.PhysicsTickTime;
+            float step = ParticlePhysics.PhysicsTickTime;
 
             while (accum >= step)
             {
@@ -548,7 +551,7 @@ namespace Vintagestory.GameContent
             foreach (var c in Constraints)
             {
                 c.RestorePoints(pointsByIndex);
-            }            
+            }
         }
 
         public bool updateActiveState(EnumActiveStateChange stateChange)
@@ -571,8 +574,6 @@ namespace Vintagestory.GameContent
 
             return false;
         }
-
-
 
 
         public void CollectDirtyPoints(List<ClothPointPacket> packets)
@@ -607,7 +608,7 @@ namespace Vintagestory.GameContent
             point.updateFromPoint(msg.Point, api.World);
         }
 
-        public void OnPinnnedEntityLoaded(Entity entity)
+        public void OnPinnedEntityLoaded(Entity entity)
         {
             if (FirstPoint.pinnedToEntityId == entity.EntityId) FirstPoint.restoreReferences(entity);
             if (LastPoint.pinnedToEntityId == entity.EntityId) LastPoint.restoreReferences(entity);

@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using Vintagestory.API.MathTools;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
     [ProtoContract]
@@ -38,10 +36,9 @@ namespace Vintagestory.GameContent
         public double SpringLength => springLength;
         public double Extension => extension;
 
-        public ClothConstraint()
-        {
-
-        }
+#pragma warning disable CS8618 // Protobuf needs this parameterless constructor, which leaves some fields null
+        public ClothConstraint() { }
+#pragma warning restore CS8618
 
         public ClothConstraint(ClothPoint p1, ClothPoint p2)
         {

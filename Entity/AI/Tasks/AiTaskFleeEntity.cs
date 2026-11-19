@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -16,7 +17,18 @@ namespace Vintagestory.GameContent
         float targetYaw = 0f;
 
         float moveSpeed = 0.02f;
-        float seekingRange = 25f;
+        [JsonProperty("fastestGait")]
+        private string gaitCode = null;
+        public GaitMeta FastestGait { get; set; } = null;
+
+        [Obsolete("Use searchRange instead")]
+        [JsonProperty]
+        protected float seekingRange
+        {
+            get => searchRange;
+            set => searchRange = value;
+        }
+
         float fleeingDistance = 31f;
         float minDayLight = -1f;
         float fleeDurationMs = 5000;
@@ -35,7 +47,8 @@ namespace Vintagestory.GameContent
         bool instafleenow=false;
 
         bool intelligentFlee = false;
-        protected EnumAICreatureType? creatureType = null;
+        [JsonProperty]
+        public EnumAICreatureType? creatureType = null;
         public override bool AggressiveTargeting => false;
 
         long lastFailedPathSearchTotalMs = -9999;
@@ -43,19 +56,14 @@ namespace Vintagestory.GameContent
         public AiTaskFleeEntity(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig) : base(entity, taskConfig, aiConfig)
         {
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
-            seekingRange = taskConfig["seekingRange"].AsFloat(25);
             minDayLight = taskConfig["minDayLight"].AsFloat(-1f);
             cancelOnHurt = taskConfig["cancelOnHurt"].AsBool(false);
             intelligentFlee = taskConfig["intelligentFlee"].AsBool(false);
             ignoreDeepDayLight = taskConfig["ignoreDeepDayLight"].AsBool(false);
-            fleeingDistance = taskConfig["fleeingDistance"].AsFloat(seekingRange + 15);
+            fleeingDistance = taskConfig["fleeingDistance"].AsFloat(searchRange + 15);
             fleeDurationMs = taskConfig["fleeDurationMs"].AsInt(9000);
             instafleeOnDamageChance = taskConfig["instafleeOnDamageChance"].AsFloat(0f);
             lowStabilityAttracted = entity.World.Config.GetString("temporalStability").ToBool(true) && entity.Properties.Attributes?["spawnCloserDuringLowStability"].AsBool() == true;
-            if (taskConfig["aiCreatureType"].Exists)
-            {
-                creatureType = (EnumAICreatureType)taskConfig["aiCreatureType"].AsInt(0);
-            }
 
             rndnum = entity.World.Rand.Next(2000);
         }
@@ -65,6 +73,20 @@ namespace Vintagestory.GameContent
             base.SetDefaultValues();
             ExecutionChance = 0.1;
             TargetOnlyInteractableEntities = false;
+        }
+
+        public override void AfterInitialize()
+        {
+            base.AfterInitialize();
+            if (gaitCode != null)
+            {
+                EntityBehaviorGait gaitBehavior = entity.GetBehavior<EntityBehaviorGait>();
+                if (gaitBehavior != null)
+                {
+                    FastestGait = gaitBehavior.Gaits[gaitCode];
+                    moveSpeed = FastestGait.MoveSpeed;
+                }
+            }
         }
 
 
@@ -103,7 +125,7 @@ namespace Vintagestory.GameContent
             float fearReductionFactor = (WhenInEmotionStates != null) ? 1 : Math.Max(0f, (tamingGenerations - generation) / tamingGenerations);
 
             ownPos.SetWithDimension(entity.Pos);
-            float hereRange = fearReductionFactor * seekingRange;
+            float hereRange = fearReductionFactor * searchRange;
 
             entity.World.FrameProfiler.Mark("task-fleeentity-shouldexecute-init");
 
@@ -111,11 +133,10 @@ namespace Vintagestory.GameContent
             {
                 targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity =>
                 {
-                    if (entity is not EntityAgent) return false;
                     if (!IsTargetableEntity(entity, hereRange)) return false;
                     if (entity is not EntityPlayer) return true;
                     return entity.WatchedAttributes.GetDouble("temporalStability", 1) > 0.25;
-                }, EnumEntitySearchType.Creatures) as EntityAgent;
+                }, SearchType);
             }
             else
             {
@@ -123,16 +144,16 @@ namespace Vintagestory.GameContent
                 {
                     if (targetEntityFirstLetters.Length == 0)
                     {
-                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsAll(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsAll(entity, hereRange), SearchType);
                     }
                     else
                     {
-                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsNoAll(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                        targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntityNoTagsNoAll(entity, hereRange), SearchType);
                     }
                 }
                 else
                 {
-                    targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntity(entity, hereRange) && entity is EntityAgent, EnumEntitySearchType.Creatures) as EntityAgent;
+                    targetEntity = partitionUtil.GetNearestEntity(ownPos, hereRange, entity => IsTargetableEntity(entity, hereRange), SearchType);
                 }
             }
 
@@ -160,7 +181,7 @@ namespace Vintagestory.GameContent
         private bool TryInstaFlee()
         {
             // Beyond visual range: Run in looking direction
-            if (targetEntity == null || entity.Pos.DistanceTo(targetEntity.Pos) > seekingRange)
+            if (targetEntity == null || entity.Pos.DistanceTo(targetEntity.Pos) > searchRange)
             {
                 float cosYaw = GameMath.Cos(entity.Pos.Yaw);
                 float sinYaw = GameMath.Sin(entity.Pos.Yaw);
@@ -197,12 +218,12 @@ namespace Vintagestory.GameContent
                     searchDepth = 10000;
                 }
 
-                pathTraverser.Flee_Async(targetEntity.Pos.XYZ, fleeingDistance, moveSpeed, OnGoalReached, OnStuck, OnINoPath, searchDepth, creatureType);
+                pathTraverser.Flee_Async(targetEntity.Pos.XYZ, fleeingDistance, moveSpeed, OnGoalReached, OnStuck, OnINoPath, searchDepth, creatureType, FastestGait);
             }
             else
             {
                 float size = targetEntity?.SelectionBox.XSize ?? 0;
-                pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck);
+                pathTraverser.WalkTowards(targetPos, moveSpeed, size + 0.2f, OnGoalReached, OnStuck, creatureType, FastestGait);
             }
 
             fleeStartMs = entity.World.ElapsedMilliseconds;
@@ -237,9 +258,7 @@ namespace Vintagestory.GameContent
                     float yaw = targetEntity == null ? -targetYaw : (float)Math.Atan2(targetEntity.Pos.X - entity.Pos.X, targetEntity.Pos.Z - entity.Pos.Z);
 
                     updateTargetPosFleeMode(tmpTargetPos.Set(targetPos), yaw);
-                    pathTraverser.CurrentTarget.X = tmpTargetPos.X;
-                    pathTraverser.CurrentTarget.Y = tmpTargetPos.Y;
-                    pathTraverser.CurrentTarget.Z = tmpTargetPos.Z;
+                    pathTraverser.CurrentTarget!.Set(tmpTargetPos);
                     pathTraverser.Retarget();
                 }
             }

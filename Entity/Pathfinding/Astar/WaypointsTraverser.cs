@@ -6,8 +6,6 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
-#nullable disable
-
 namespace Vintagestory.Essentials
 {
     public class WaypointsTraverser : PathTraverserBase
@@ -17,31 +15,21 @@ namespace Vintagestory.Essentials
 
         Vec3f targetVec = new Vec3f();
 
-        List<Vec3d> waypoints;
-        List<Vec3d> newWaypoints;
-        private PathfinderTask asyncSearchObject;
+        List<Vec3d>? waypoints;
+        List<Vec3d>? newWaypoints;
+        private PathfinderTask? asyncSearchObject;
 
         int waypointToReachIndex = 0;
         long lastWaypointIncTotalMs;
-        Vec3d desiredTarget;
+        Vec3d? desiredTarget;
 
-        PathfindSystem psys;
-        private PathfindingAsync asyncPathfinder;
+        PathfindSystem psys = null!;
+        private PathfindingAsync asyncPathfinder = null!;
         protected EnumAICreatureType creatureType;
 
         public bool PathFindDebug = false;
 
-        public override Vec3d CurrentTarget {
-            get
-            {
-                if (waypoints == null)
-                {
-                    return null;
-                }
-
-                return waypoints[waypoints.Count - 1];
-            }
-        }
+        public override Vec3d? CurrentTarget => waypoints?[waypoints.Count - 1];
 
         public override bool Ready
         {
@@ -52,16 +40,16 @@ namespace Vintagestory.Essentials
         }
 
         // These next five fields are used to save parameters, ready for the AfterPathFound() call which might be next tick or even later, after asynchronous pathfinding has finished
-        private Action OnNoPath;
-        public Action OnFoundPath;
-        private Action OnGoalReached_New;
-        private Action OnStuck_New;
+        private Action? OnNoPath;
+        public Action? OnFoundPath;
+        private Action? OnGoalReached_New;
+        private Action? OnStuck_New;
         private float movingSpeed_New;
         private float targetDistance_New;
 
         public WaypointsTraverser(EntityAgent entity, EnumAICreatureType creatureType = EnumAICreatureType.Default) : base(entity)
         {
-            if (entity?.Properties.Server?.Attributes?.GetTreeAttribute("pathfinder") != null)
+            if (entity.Properties.Server?.Attributes?.GetTreeAttribute("pathfinder") != null)
             {
                 minTurnAnglePerSec = (float)entity.Properties.Server.Attributes.GetTreeAttribute("pathfinder").GetDecimal("minTurnAnglePerSec", 250);
                 maxTurnAnglePerSec = (float)entity.Properties.Server.Attributes.GetTreeAttribute("pathfinder").GetDecimal("maxTurnAnglePerSec", 450);
@@ -71,24 +59,28 @@ namespace Vintagestory.Essentials
                 maxTurnAnglePerSec = 450;
             }
 
-            psys = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>();
-            asyncPathfinder = entity.World.Api.ModLoader.GetModSystem<PathfindingAsync>();
+            if (entity.World.Api is ICoreServerAPI)
+            {
+                psys = entity.World.Api.ModLoader.GetModSystem<PathfindSystem>() ?? throw new Exception("Waypoints traverser needs PathfindSystem");
+                asyncPathfinder = entity.World.Api.ModLoader.GetModSystem<PathfindingAsync>() ?? throw new Exception("Waypoints traverser needs PathfindingAsync");
+            }
             this.creatureType = creatureType;
         }
 
-        public void FollowRoute(List<Vec3d> swoopPath, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck)
+        public void FollowRoute(List<Vec3d> swoopPath, float movingSpeed, float targetDistance, Action? OnGoalReached, Action? OnStuck)
         {
             waypoints = swoopPath;
-            base.WalkTowards(desiredTarget, movingSpeed, targetDistance, OnGoalReached, OnStuck);
+            base.WalkTowards(desiredTarget, movingSpeed, targetDistance, OnGoalReached, OnStuck, creatureType, preferredGait);
         }
 
-        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
+        public override bool NavigateTo(Vec3d target, float movingSpeed, float targetDistance, Action? OnGoalReached, Action? OnStuck, Action? onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null, GaitMeta? preferredGait = null)
         {
             this.desiredTarget = target;
             this.OnNoPath = onNoPath;
             this.OnStuck_New = OnStuck;
             this.OnGoalReached_New = OnGoalReached;
             this.movingSpeed_New = movingSpeed;
+            this.preferredGait = preferredGait;
             this.targetDistance_New = targetDistance;
             if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
 
@@ -105,13 +97,14 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool FleeFrom(Vec3d target, float movingSpeed, float fleedistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        public override bool FleeFrom(Vec3d target, float movingSpeed, float fleedistance, Action? OnGoalReached, Action? OnStuck, Action? onNoPath = null, bool giveUpWhenNoPath = false, int searchDepth = 999, EnumAICreatureType? creatureType = null, GaitMeta? preferredGait = null)
         {
             this.desiredTarget = target;
             this.OnNoPath = onNoPath;
             this.OnStuck_New = OnStuck;
             this.OnGoalReached_New = OnGoalReached;
             this.movingSpeed_New = movingSpeed;
+            this.preferredGait = preferredGait;
             this.targetDistance_New = 1;
             if (creatureType != null) this.creatureType = (EnumAICreatureType)creatureType;
 
@@ -130,7 +123,7 @@ namespace Vintagestory.Essentials
 
 
 
-        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null)
+        public override bool NavigateTo_Async(Vec3d target, float movingSpeed, float targetDistance, Action? OnGoalReached, Action? OnStuck, Action? onNoPath = null, int searchDepth = 999, int mhdistanceTolerance = 0, EnumAICreatureType? creatureType = null, GaitMeta? preferredGait = null)
         {
             if (this.asyncSearchObject != null) return false;  // Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
 
@@ -142,6 +135,7 @@ namespace Vintagestory.Essentials
             this.OnGoalReached_New = OnGoalReached;
             this.OnStuck_New = OnStuck;
             this.movingSpeed_New = movingSpeed;
+            this.preferredGait = preferredGait;
             this.targetDistance_New = targetDistance;
 
             BlockPos startBlockPos = entity.Pos.AsBlockPos;
@@ -157,7 +151,7 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool Flee_Async(Vec3d fleeFromPos, float fleeDistance, float movingSpeed, Action OnGoalReached, Action OnStuck, Action onNoPath = null, int searchDepth = 999, EnumAICreatureType? creatureType = null)
+        public override bool Flee_Async(Vec3d fleeFromPos, float fleeDistance, float movingSpeed, Action? OnGoalReached, Action? OnStuck, Action? onNoPath = null, int searchDepth = 999, EnumAICreatureType? creatureType = null, GaitMeta? preferredGait = null)
         {
             if (this.asyncSearchObject != null) return false;  // Allow the one in progress to finish before trying another - maybe more than one AI task in the same tick tries to find a path?
 
@@ -169,6 +163,7 @@ namespace Vintagestory.Essentials
             this.OnGoalReached_New = OnGoalReached;
             this.OnStuck_New = OnStuck;
             this.movingSpeed_New = movingSpeed;
+            this.preferredGait = preferredGait;
             this.targetDistance_New = 1;
 
             BlockPos startBlockPos = entity.Pos.AsBlockPos;
@@ -267,7 +262,7 @@ namespace Vintagestory.Essentials
 
             if (desiredTarget != null) waypoints.Add(desiredTarget);
 
-            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
+            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New, creatureType, preferredGait);
 
             OnFoundPath?.Invoke();
 
@@ -285,7 +280,7 @@ namespace Vintagestory.Essentials
                 List<BlockPos> poses = new List<BlockPos>();
                 List<int> colors = new List<int>();
                 int i = 0;
-                foreach (var node in entity.World.Api.ModLoader.GetModSystem<PathfindSystem>().astar.closedSet)
+                foreach (var node in psys.astar.closedSet)
                 {
                     poses.Add(node);
                     colors.Add(ColorUtil.ColorFromRgba(Math.Min(255, i * 4), 0, 0, 150));
@@ -301,7 +296,7 @@ namespace Vintagestory.Essentials
 
             if (desiredTarget != null) waypoints.Add(desiredTarget);
 
-            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New);
+            base.WalkTowards(desiredTarget, movingSpeed_New, targetDistance_New, OnGoalReached_New, OnStuck_New, creatureType, preferredGait);
 
             if (OnNoPath != null)
             {
@@ -311,12 +306,12 @@ namespace Vintagestory.Essentials
         }
 
 
-        public override bool WalkTowards(Vec3d target, float movingSpeed, float targetDistance, Action OnGoalReached, Action OnStuck, EnumAICreatureType creatureType = EnumAICreatureType.Default)
+        public override bool WalkTowards(Vec3d? target, float movingSpeed, float targetDistance, Action? OnGoalReached, Action? OnStuck, EnumAICreatureType? creatureType = null, GaitMeta? preferredGait = null)
         {
             waypoints = new List<Vec3d>();
-            waypoints.Add(target);
+            if (target != null) waypoints.Add(target);
 
-            return base.WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck, creatureType);
+            return base.WalkTowards(target, movingSpeed, targetDistance, OnGoalReached, OnStuck, creatureType, preferredGait);
         }
 
 
@@ -370,9 +365,7 @@ namespace Vintagestory.Essentials
                 lastWaypointIncTotalMs = entity.World.ElapsedMilliseconds;
             }
 
-            target = waypoints[Math.Min(waypoints.Count - 1, waypointToReachIndex)];
-
-            bool onlastWaypoint = waypointToReachIndex == waypoints.Count - 1;
+            if (waypoints == null) throw new Exception("Pathfinding is active, so waypoints shouldn't have been null");
 
             if (waypointToReachIndex >= waypoints.Count)
             {
@@ -380,6 +373,10 @@ namespace Vintagestory.Essentials
                 OnGoalReached?.Invoke();
                 return;
             }
+
+            target = waypoints[Math.Min(waypoints.Count - 1, waypointToReachIndex)];
+
+            bool onlastWaypoint = waypointToReachIndex == waypoints.Count - 1;
 
             bool stuckBelowOrAbove = (nearHorizontally && !nearAllDirs && entity.Properties.Habitat == EnumHabitat.Land);
 
@@ -455,6 +452,13 @@ namespace Vintagestory.Essentials
             if (sqDistToTarget < 1)
             {
                 nowMoveSpeed = Math.Max(0.005f, movingSpeed * Math.Max(sqDistToTarget, 0.2f));
+            }
+
+
+            if (gaitBehavior?.NavigateUsingGaits == true)
+            {
+                gaitBehavior.SetMotion(dt, controls, desiredYaw, nowMoveSpeed, preferredGait);
+                return;
             }
 
             float yawDist = GameMath.AngleRadDistance(entity.Pos.Yaw, desiredYaw);
@@ -542,6 +546,7 @@ namespace Vintagestory.Essentials
 
         bool IsNearTarget(int waypointOffset, ref bool nearHorizontally)
         {
+            if (waypoints == null) return false;
             if (waypoints.Count - 1 < waypointToReachIndex + waypointOffset) return false;
 
             int wayPointIndex = Math.Min(waypoints.Count - 1, waypointToReachIndex + waypointOffset);
@@ -573,10 +578,13 @@ namespace Vintagestory.Essentials
             distCheckAccum = 0;
             prevPosAccum = 0;
             asyncSearchObject = null;
+            gaitBehavior?.SetIdle();
         }
 
         public override void Retarget()
         {
+            if (waypoints == null) return;
+
             Active = true;
             distCheckAccum = 0;
             prevPosAccum = 0;

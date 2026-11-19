@@ -63,6 +63,8 @@ namespace Vintagestory.ServerMods
                     float rain = (climate >> 8) & 0xff;
                     float temperature = (climate >> 16) & 0xff;
 
+                    // Note: This is written oddly if the result really is the intention. rain * temperature / (255 * 255) varies between 0 and 1, so has almost no effect at the scale of 255
+                    // See https://github.com/anegostudios/VintageStory-Issues/issues/10166 - sekelsta, Oct 2026
                     outData[z*sizeX + x] = (int)GameMath.Clamp(forestValue - GameMath.Clamp(128 - rain * temperature / (255 * 255), 0, 128), 0, 255);
                 }
             }

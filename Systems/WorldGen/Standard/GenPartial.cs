@@ -27,7 +27,7 @@ namespace Vintagestory.ServerMods
             LoadGlobalConfig(api);
 
             worldheight = api.WorldManager.MapSizeY;
-            chunkRand = new LCGRandom(api.WorldManager.Seed);
+            chunkRand = new LCGRandom(api.WorldManager.SeedWorldgen);
         }
 
 

@@ -461,17 +461,9 @@ namespace Vintagestory.GameContent
         }
 
 
-        [Obsolete("Receiving the OnViewChangedPacket now calls: OnViewChangedServer(fromPlayer, int x1, int z1, int x2, int z2) but retained in 1.20.10 for backwards compatibility")]
-        public override void OnViewChangedServer(IServerPlayer fromPlayer, List<FastVec2i> nowVisible, List<FastVec2i> nowHidden)
-        {
-            ResendWaypoints(fromPlayer);
-        }
-
         public override void OnViewChangedServer(IServerPlayer fromPlayer, int x1, int z1, int x2, int z2)
         {
-#pragma warning disable CS0618 // Type or member is obsolete - intentionally called here for mod backwards compatibility if a mod extended this class
-            OnViewChangedServer(fromPlayer, null, null);
-#pragma warning restore CS0618
+            ResendWaypoints(fromPlayer);
         }
 
 
@@ -654,7 +646,7 @@ namespace Vintagestory.GameContent
         }
 
 
-        void ResendWaypoints(IServerPlayer toPlayer)
+        public void ResendWaypoints(IServerPlayer toPlayer)
         {
             Dictionary<int, PlayerGroupMembership> memberOfGroups = toPlayer.ServerData.PlayerGroupMemberships;
             List<Waypoint> hisMarkers = new List<Waypoint>();

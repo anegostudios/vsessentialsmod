@@ -1,26 +1,26 @@
 using ProtoBuf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
-
-#nullable disable
 
 namespace Vintagestory.GameContent
 {
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class UnregisterClothSystemPacket
     {
-        public int[] ClothIds;
+        public required int[] ClothIds;
     }
 
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
     public class ClothSystemPacket
     {
-        public ClothSystem[] ClothSystems;
+        public required ClothSystem[] ClothSystems;
     }
 
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -29,7 +29,7 @@ namespace Vintagestory.GameContent
         public int ClothId;
         public int PointX;
         public int PointY;
-        public ClothPoint Point;
+        public required ClothPoint Point;
     }
 
     [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
@@ -43,27 +43,27 @@ namespace Vintagestory.GameContent
 	{
         int nextClothId = 1;
 
-        ICoreClientAPI capi;
-        ICoreServerAPI sapi;
-        ICoreAPI api;
+        ICoreClientAPI? capi;
+        ICoreServerAPI? sapi;
+        ICoreAPI api = null!;
 
         Dictionary<int, ClothSystem> clothSystems = new Dictionary<int, ClothSystem>();
 
-        internal ParticlePhysics partPhysics;
+        internal ParticlePhysics partPhysics = null!;
 
         public double RenderOrder => 1;
 
         public int RenderRange => 12;
 
 
-        MeshRef ropeMeshRef;
-        MeshData updateMesh;
-        IShaderProgram prog;
-        ILoadedSound stretchSound;
+        MeshRef? ropeMeshRef;
+        MeshData? updateMesh;
+        IShaderProgram? prog;
+        ILoadedSound? stretchSound;
 
         public float accum3s;
         public float accum100ms;
-        private IServerNetworkChannel clothSystemChannel;
+        private IServerNetworkChannel? clothSystemChannel;
 
         public override double ExecuteOrder()
         {
@@ -123,9 +123,9 @@ namespace Vintagestory.GameContent
         }
 
 
-        public ClothSystem GetClothSystem(int clothid)
+        public ClothSystem? GetClothSystem(int clothid)
         {
-            clothSystems.TryGetValue(clothid, out ClothSystem sys);
+            clothSystems.TryGetValue(clothid, out ClothSystem? sys);
             return sys;
         }
 
@@ -134,7 +134,7 @@ namespace Vintagestory.GameContent
         /// </summary>
         /// <param name="pos"></param>
         /// <returns></returns>
-        public ClothSystem GetClothSystemAttachedToBlock(BlockPos pos)
+        public ClothSystem? GetClothSystemAttachedToBlock(BlockPos pos)
         {
             foreach (var sys in clothSystems.Values)
             {
@@ -152,7 +152,7 @@ namespace Vintagestory.GameContent
         /// </summary>
         /// <param name="pos"></param>
         /// <returns></returns>
-        public ClothSystem GetClothSystemAttachedToEntity(long entityid)
+        public ClothSystem? GetClothSystemAttachedToEntity(long entityid)
         {
             foreach (var sys in clothSystems.Values)
             {
@@ -170,6 +170,7 @@ namespace Vintagestory.GameContent
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (updateMesh == null) return;
+            ICoreClientAPI capi = this.capi!;
 
             dt = System.Math.Min(dt, 0.5f);
             if (!capi.IsGamePaused)
@@ -180,13 +181,10 @@ namespace Vintagestory.GameContent
             accum100ms += dt;
             if (accum100ms > 0.1)
             {
-                accum100ms = 0;
-
                 if (clothSystems.Count > 0)
                 {
-                    float maxext = -1;
-                    ClothSystem maxcs = null;
-                    float stretchWarn =0.4f;
+                    ClothSystem? maxcs = null;
+                    float maxIntensity = 0;
 
                     foreach (var val in clothSystems)
                     {
@@ -195,37 +193,41 @@ namespace Vintagestory.GameContent
 
                         if (cs.MaxExtension > cs.StretchWarn)
                         {
-                            cs.secondsOverStretched += dt;
+                            cs.secondsOverStretched += accum100ms;
                         } else
                         {
                             cs.secondsOverStretched = 0;
+                            continue;
                         }
 
-                        if (cs.MaxExtension > maxext)
+                        if (cs.secondsOverStretched <= 0.2) continue;
+
+                        float intensity = 1.5f * (float)(cs.MaxExtension - cs.StretchWarn) / Math.Max(cs.StretchRip - cs.StretchWarn, 0.001f);
+
+                        if (intensity > maxIntensity)
                         {
-                            maxext = (float)cs.MaxExtension;
                             maxcs = cs;
-                            stretchWarn = cs.StretchWarn;
+                            maxIntensity = intensity;
                         }
                     }
 
-                    if (maxext > stretchWarn && maxcs.secondsOverStretched > 0.2)
+                    if (maxIntensity > 0 && maxcs != null && stretchSound != null)
                     {
-                        float intensity = 10 * (float)(maxext - stretchWarn);
-
                         if (!stretchSound.IsPlaying) stretchSound.Start();
                         stretchSound.SetPosition((float)maxcs.CenterPosition.X, (float)maxcs.CenterPosition.Y, (float)maxcs.CenterPosition.Z);
-                        stretchSound.SetVolume(GameMath.Clamp((float)intensity, 0.5f, 1f));
-                        stretchSound.SetPitch((float)GameMath.Clamp(intensity + 0.7f, 0.7f, 1.2f));
+                        stretchSound.SetVolume(GameMath.Clamp((float)maxIntensity, 0.5f, 1f));
+                        stretchSound.SetPitch((float)GameMath.Clamp(maxIntensity + 0.7f, 0.7f, 1.2f));
                     }
                     else
                     {
-                        stretchSound.Stop();
+                        stretchSound?.Stop();
                     }
                 } else
                 {
-                    stretchSound.Stop();
+                    stretchSound?.Stop();
                 }
+
+                accum100ms = 0;
             }
 
             int count = 0;
@@ -241,7 +243,7 @@ namespace Vintagestory.GameContent
 
             if (count > 0)
             {
-                if (prog.Disposed) prog = capi.Shader.GetProgramByName("instanced");
+                if (prog == null || prog.Disposed) prog = capi.Shader.GetProgramByName("instanced");
 
                 capi.Render.GlToggleBlend(false); // Seems to break SSAO without
                 prog.Use();
@@ -284,22 +286,21 @@ namespace Vintagestory.GameContent
                 accum100ms += dt;
                 if (accum100ms > 0.1f)
                 {
-                    accum100ms = 0;
                     List<ClothPointPacket> packets = new List<ClothPointPacket>();
 
-                    foreach (var val in clothSystems)
+                    foreach ((int key, ClothSystem cs) in clothSystems)
                     {
-                        if (!val.Value.CanRip) continue;
+                        if (!cs.CanRip || !cs.Active) continue;
 
-                        var cs = val.Value;
                         cs.CollectDirtyPoints(packets);
 
                         // Overextended -> Rip it apart
                         if (cs.MaxExtension > cs.StretchRip)
                         {
-                            cs.secondsOverStretched += 0.1f;
+                            cs.secondsOverStretched += accum100ms;
 
-                            if (cs.secondsOverStretched > 4 - cs.MaxExtension*2)
+                            // Base of 2.5 seconds over-stretched to rip, quickened by stretching further
+                            if (cs.secondsOverStretched > 2.5f * cs.StretchRip / Math.Max(0.001f, cs.MaxExtension))
                             {
                                 Vec3d soundPos = cs.CenterPosition;
 
@@ -318,20 +319,21 @@ namespace Vintagestory.GameContent
                                     sapi.World.SpawnParticles(2, ColorUtil.ColorFromRgba(60, 97, 115, 255), pos, pos, new Vec3f(-4f, -1f, -4f), new Vec3f(4, 2, 4), 2, 1, 0.5f, EnumParticleModel.Cube);
                                 }
 
-                                if (cs.FirstPoint.PinnedToEntity is IRopeRippedListener listenerf) listenerf.OnRopeRipped(cs);
-                                if (cs.LastPoint.PinnedToEntity is IRopeRippedListener listenerl) listenerl.OnRopeRipped(cs);
+                                cs.FirstPoint.PinnedToEntity?.GetInterface<IRopeRippedListener>()?.OnRopeRipped(cs);
+                                cs.LastPoint.PinnedToEntity?.GetInterface<IRopeRippedListener>()?.OnRopeRipped(cs);
 
-                                toRemove.Add(val.Key);
+                                toRemove.Add(key);
                             }
                         } else
                         {
                             cs.secondsOverStretched = 0;
                         }
                     }
+                    accum100ms = 0;
 
                     foreach (var p in packets)
                     {
-                        clothSystemChannel.BroadcastPacket(p);
+                        clothSystemChannel?.BroadcastPacket(p);
                     }
                 }
 
@@ -340,14 +342,16 @@ namespace Vintagestory.GameContent
                 {
                     accum3s = 0;
 
-                    foreach (var val in clothSystems)
+                    foreach ((int key, ClothSystem clothSystem) in clothSystems)
                     {
-                        if (!val.Value.PinnedAnywhere)
+                        if (!clothSystem.Active) continue;
+
+                        if (!clothSystem.PinnedAnywhere)
                         {
-                            toRemove.Add(val.Key);
+                            toRemove.AddIfNotPresent(key);
                         } else
                         {
-                            val.Value.slowTick3s();
+                            clothSystem.slowTick3s();
                         }
                     }
                 }
@@ -365,12 +369,13 @@ namespace Vintagestory.GameContent
                         eagentn.WalkInventory((slot) =>
                         {
                             if (slot.Empty) return true;
-                            int clothId = slot.Itemstack.Attributes?.GetInt("clothId") ?? 0;
+                            int clothId = slot.Itemstack.Attributes.GetInt("clothId");
                             if (clothId == id)
                             {
                                 spawnitem = false;
                                 slot.Itemstack.Attributes.RemoveAttribute("clothId");
                                 slot.Itemstack.Attributes.RemoveAttribute("ropeHeldByEntityId");
+                                slot.MarkDirty();
                                 return false;
                             }
 
@@ -383,12 +388,13 @@ namespace Vintagestory.GameContent
                         eagentn2.WalkInventory((slot) =>
                         {
                             if (slot.Empty) return true;
-                            int clothId = slot.Itemstack.Attributes?.GetInt("clothId") ?? 0;
+                            int clothId = slot.Itemstack.Attributes.GetInt("clothId");
                             if (clothId == id)
                             {
                                 spawnitem = false;
                                 slot.Itemstack.Attributes.RemoveAttribute("clothId");
                                 slot.Itemstack.Attributes.RemoveAttribute("ropeHeldByEntityId");
+                                slot.MarkDirty();
                                 return false;
                             }
 
@@ -442,7 +448,7 @@ namespace Vintagestory.GameContent
         {
             foreach (ClothSystem system in msg.ClothSystems)
             {
-                system.Init(capi, this);
+                system.Init(capi ?? throw new Exception("Expected onRegPacketClient to be called on the client"), this);
                 system.restoreReferences();
                 clothSystems[system.ClothId] = system;
             }
@@ -458,25 +464,24 @@ namespace Vintagestory.GameContent
 
         private void Event_BlockTexturesLoaded()
         {
-            if (stretchSound == null)
+            ICoreClientAPI capi = this.capi!;
+
+            stretchSound ??= capi.World.LoadSound(new SoundParams()
             {
-                stretchSound = capi.World.LoadSound(new SoundParams()
-                {
-                    Location = new AssetLocation("sounds/effect/ropestretch"),
-                    DisposeOnFinish = false,
-                    ShouldLoop = true,
-                    SoundType = EnumSoundType.Sound,
-                    Volume = 0.5f,
-                    ReferenceDistance = 5
-                });
-            }
+                Location = new AssetLocation("sounds/effect/ropestretch"),
+                DisposeOnFinish = false,
+                ShouldLoop = true,
+                SoundType = EnumSoundType.Sound,
+                Volume = 0.5f,
+                ReferenceDistance = 5
+            });
 
             // This shader is created by the essentials mod in Core.cs
             prog = capi.Shader.GetProgramByName("instanced");
 
-            Item itemRope = capi.World.GetItem(new AssetLocation("rope"));
+            Item? itemRope = capi.World.GetItem(new AssetLocation("rope"));
 
-            Shape shape = Shape.TryGet(capi, "shapes/item/ropesection.json");
+            Shape? shape = Shape.TryGet(capi, "shapes/item/ropesection.json");
             if (itemRope == null || shape == null) return;
             capi.Tesselator.TesselateShape(itemRope, shape, out MeshData meshData);
 
@@ -507,12 +512,13 @@ namespace Vintagestory.GameContent
             api.Event.RegisterGameTickListener(tickPhysics, 30);
 
             api.Event.ChunkColumnLoaded += Event_ChunkColumnLoaded;
+            api.Event.ChunkColumnUnloaded += Event_ChunkColumnUnloaded;
             api.Event.MapRegionLoaded += Event_MapRegionLoaded;
             api.Event.MapRegionUnloaded += Event_MapRegionUnloaded;
 
             api.Event.SaveGameLoaded += Event_SaveGameLoaded;
             api.Event.GameWorldSave += Event_GameWorldSave;
-            api.Event.ServerRunPhase(EnumServerRunPhase.RunGame, onNowRunGame);
+            api.Event.ServerRunPhase(EnumServerRunPhase.RunGame, updateActiveState);
 
             api.Event.PlayerJoin += Event_PlayerJoin;
             clothSystemChannel = api.Network.GetChannel("clothphysics");
@@ -545,14 +551,51 @@ namespace Vintagestory.GameContent
 
         private void Event_ChunkColumnLoaded(Vec2i chunkCoord, IWorldChunk[] chunks)
         {
-            updateActiveState();
+            // Minor bug: When this is called, the chunk hasn't been added to the list of loaded chunks yet, so this is actually loading the previous chunk column's ropes
+            if (sapi!.Server.CurrentRunPhase >= EnumServerRunPhase.RunGame)
+            {
+                updateActiveState();
+            }
         }
 
-        private void onNowRunGame()
+        private void Event_ChunkColumnUnloaded(Vec3i chunkCoord)
         {
+            if (sapi!.Server.CurrentRunPhase >= EnumServerRunPhase.Shutdown) return;
+
+            List<ClothSystem> deactivated = new();
+            foreach ((_, ClothSystem clothSystem) in clothSystems)
+            {
+                if (!clothSystem.Active) continue;
+
+                clothSystem.WalkPoints((p) => {
+                    clothSystem.Active &= ((int)p.Pos.X) / GlobalConstants.ChunkSize != chunkCoord.X
+                        // Skip Y - this is a column.
+                        || ((int)p.Pos.Z) / GlobalConstants.ChunkSize != chunkCoord.Z;
+                });
+
+                if (!clothSystem.Active) deactivated.Add(clothSystem);
+            }
+            if (deactivated.Count > 0)
+            {
+                clothSystemChannel?.BroadcastPacket(new ClothSystemPacket() { ClothSystems = deactivated.ToArray() });
+            }
+        }
+
+        private void updateActiveState()
+        {
+            List<ClothSystem> cs = new List<ClothSystem>();
             foreach (var sys in clothSystems.Values)
             {
-                sys.updateActiveState(EnumActiveStateChange.Default);
+                bool nowActive = sys.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
+
+                if (nowActive) {
+                    cs.Add(sys);
+                }
+            }
+
+            if (cs.Count > 0)
+            {
+                clothSystemChannel?.BroadcastPacket(new ClothSystemPacket() { ClothSystems = cs.ToArray() });
             }
         }
 
@@ -560,36 +603,39 @@ namespace Vintagestory.GameContent
         {
             if (clothSystems.Values.Count > 0)
             {
-                clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = clothSystems.Values.ToArray() });
+                clothSystemChannel?.SendPacket(new ClothSystemPacket() { ClothSystems = clothSystems.Values.ToArray() }, byPlayer);
             }
         }
 
         private void Event_GameWorldSave()
         {
-            byte[] data = sapi.WorldManager.SaveGame.GetData("nextClothId");
+            ICoreServerAPI sapi = this.sapi!;
+            sapi.WorldManager.SaveGame.StoreData("nextClothId", SerializerUtil.Serialize(nextClothId));
+
+            foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
+            {
+                Vec3i pos = sapi.WorldManager.MapRegionPosFromIndex2D(val.Key);
+                saveRegion(new Vec2i(pos.X, pos.Z), val.Value);
+            }
+        }
+
+        private void Event_SaveGameLoaded()
+        {
+            byte[]? data = sapi!.WorldManager.SaveGame.GetData("nextClothId");
             if (data != null)
             {
                 nextClothId = SerializerUtil.Deserialize<int>(data);
             }
         }
 
-        private void Event_SaveGameLoaded()
-        {
-            sapi.WorldManager.SaveGame.StoreData("nextClothId", SerializerUtil.Serialize(nextClothId));
-        }
-
-        // How to store/load ropes
-
-        // Store it inside regions. Use start point as reference position
-        // What about cloth points that cross a region border? Maybe just never simulate anything at a chunk edge?
-        // What about cloth points attached to entities that get unloaded? 
-
-        // Ok, let's just do the stupid most method and improve from there.
-        private void Event_MapRegionUnloaded(Vec2i mapCoord, IMapRegion region)
+        // Ropes stored by region, decided by the location of their starting point.
+        // Simulation is stopped once any part of the rope is in an unloaded chunk,
+        // preventing the starting point from moving to a different region after being saved.
+        private List<ClothSystem> saveRegion(Vec2i mapCoord, IMapRegion region)
         {
             List<ClothSystem> systems = new List<ClothSystem>();
 
-            int regionSize = sapi.WorldManager.RegionSize;
+            int regionSize = sapi!.WorldManager.RegionSize;
 
             foreach (var cs in clothSystems.Values)
             {
@@ -603,97 +649,51 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            region.SetModdata("clothSystems", SerializerUtil.Serialize(systems));
-            if (systems.Count == 0) return;
+            if (systems.Count > 0)
+            {
+                region.SetModdata("clothSystems", SerializerUtil.Serialize(systems));
+            }
+            else if (region.GetModdata("clothSystems") != null)
+            {
+                region.RemoveModdata("clothSystems");
+            }
+
+            return systems;
+        }
+
+        private void Event_MapRegionUnloaded(Vec2i mapCoord, IMapRegion region)
+        {
+            // If shutting down, ropes will be saved from Event_GameWorldSave, so skip it here
+            if (sapi!.Server.CurrentRunPhase >= EnumServerRunPhase.Shutdown) return;
+
+            List<ClothSystem> systems = saveRegion(mapCoord, region);
+
+            if (systems == null || systems.Count == 0) return;
 
             int[] clothIds = new int[systems.Count];
-
-
             for (int i = 0; i < systems.Count; i++)
             {
                 clothSystems.Remove(systems[i].ClothId);
                 clothIds[i] = systems[i].ClothId;
             }
 
-            foreach (var system in clothSystems.Values)
-            {
-                system.updateActiveState(EnumActiveStateChange.RegionNowUnloaded);
-            }
-
-            if (!sapi.Server.IsShuttingDown)
-            {
-                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = clothIds });
-            }
+            clothSystemChannel?.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = clothIds });
         }
 
         private void Event_MapRegionLoaded(Vec2i mapCoord, IMapRegion region)
         {
-            byte[] data = region.GetModdata("clothSystems");
+            byte[]? data = region.GetModdata("clothSystems");
             
             if (data != null && data.Length != 0)
             {
-                loadFromRegion(data);
-            }
-            else
-            {
-                updateActiveState();
-            }
-        }
+                var rsystems = SerializerUtil.Deserialize<List<ClothSystem>>(data);
 
-        private void updateActiveState()
-        {
-            if (sapi.Server.CurrentRunPhase >= EnumServerRunPhase.RunGame)
-            {
-                List<ClothSystem> cs = new List<ClothSystem>();
-
-                foreach (var system in clothSystems.Values)
-                {
-                    bool nowActive = system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
-
-                    if (nowActive) {
-                        cs.Add(system);
-                    }
-                }
-
-                if (cs.Count > 0)
-                {
-                    clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = cs.ToArray() });
-                }
-            }
-        }
-
-        private void loadFromRegion(byte[] data)
-        {
-            var rsystems = SerializerUtil.Deserialize<List<ClothSystem>>(data);
-
-            // Don't even try to resolve anything while the server is still starting up
-            if (sapi.Server.CurrentRunPhase < EnumServerRunPhase.RunGame)
-            {
                 foreach (var system in rsystems)
                 {
+                    // When the region first loads none of the chunks in it are loaded yet
                     system.Active = false;
                     system.Init(api, this);
                     clothSystems[system.ClothId] = system;
-                }
-            }
-            else
-            {
-                foreach (var system in clothSystems.Values)
-                {
-                    system.updateActiveState(EnumActiveStateChange.RegionNowLoaded);
-                }
-
-                foreach (var system in rsystems)
-                {
-                    system.Init(api, this);
-                    system.restoreReferences();
-                    clothSystems[system.ClothId] = system;
-                }
-
-
-                if (rsystems.Count > 0)
-                {
-                    clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = rsystems.ToArray() });
                 }
             }
         }
@@ -703,23 +703,21 @@ namespace Vintagestory.GameContent
             int cnt = clothSystems.Count;
             int[] clothids = clothSystems.Select(s => s.Value.ClothId).ToArray();
             if (clothids.Length > 0)
-                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket()
+                clothSystemChannel?.BroadcastPacket(new UnregisterClothSystemPacket()
                     { ClothIds = clothids });
             clothSystems.Clear();
-            nextClothId = 1;
             return TextCommandResult.Success(cnt + " cloth sims removed");
         }
         
         private TextCommandResult onClothTestDeleteloaded(TextCommandCallingArgs args)
         {
             int cnt = 0;
-            foreach (var val in sapi.WorldManager.AllLoadedMapRegions)
+            foreach (var val in sapi!.WorldManager.AllLoadedMapRegions)
             {
                 val.Value.RemoveModdata("clothSystems");
                 cnt++;
             }
             clothSystems.Clear();
-            nextClothId = 1;
 
             return TextCommandResult.Success($"Ok, deleted in {cnt} regions");
         }
@@ -733,14 +731,14 @@ namespace Vintagestory.GameContent
 
             sys.updateActiveState(EnumActiveStateChange.Default);
 
-            clothSystemChannel.BroadcastPacket(new ClothSystemPacket() { ClothSystems = new ClothSystem[] { sys } });
+            clothSystemChannel?.BroadcastPacket(new ClothSystemPacket() { ClothSystems = new ClothSystem[] { sys } });
         }
 
         public void UnregisterCloth(int clothId)
         {
             if (sapi != null)
             {
-                clothSystemChannel.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = new int[] { clothId } });
+                clothSystemChannel?.BroadcastPacket(new UnregisterClothSystemPacket() { ClothIds = new int[] { clothId } });
             }
 
             clothSystems.Remove(clothId);
@@ -750,7 +748,6 @@ namespace Vintagestory.GameContent
         {
             int cnt = clothSystems.Count;
             clothSystems.Clear();
-            nextClothId = 1;
             return TextCommandResult.Success(cnt + " cloth sims removed");
         }
         private TextCommandResult onClothTestCloth(TextCommandCallingArgs args)

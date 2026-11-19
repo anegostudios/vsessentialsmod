@@ -177,7 +177,7 @@ namespace Vintagestory.GameContent
 
             movable = attributes["movable"].AsBool(true);
             partitionUtil = entity.Api.ModLoader.GetModSystem<EntityPartitioning>();
-            ignorePlayers = entity is EntityPlayer && entity.World.Config.GetAsBool("player2PlayerCollisions", true);
+            ignorePlayers = entity is EntityPlayer && !entity.World.Config.GetAsBool("player2PlayerCollisions", true);
 
             cworld = entity.World as IClientWorldAccessor;
         }
@@ -190,12 +190,18 @@ namespace Vintagestory.GameContent
         }
 
         public double ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ;
+        private long standingColliderId;
+        private FastVec3d standingLocalPosition;
         public float mySize;
         protected int dimension;
+
+        public static double ConvervativePlayerWidth = 4f;
+        protected double clientRepulseCutoffDistanceSq;
 
         public override void UpdateColSelBoxes()
         {
             touchdist = entity.touchDistance;
+            clientRepulseCutoffDistanceSq = Math.Pow(entity.CollisionBox.Width + ConvervativePlayerWidth, 2);
         }
 
         public void AfterPhysicsTick()
@@ -207,16 +213,36 @@ namespace Vintagestory.GameContent
             ownPosRepulseX = SidedPos.X + (CollisionBox.X2 - OriginCollisionBox.X2);
             ownPosRepulseY = SidedPos.Y + (CollisionBox.Y2 - OriginCollisionBox.Y2);
             ownPosRepulseZ = SidedPos.Z + (CollisionBox.Z2 - OriginCollisionBox.Z2);
+            standingColliderId = entity.OnGround ? entity.GetBehavior<PhysicsBehaviorBase>()?.StandingColliderId ?? 0 : 0;
+            if (standingColliderId != 0 && entity.World.CollisionScene.TryGetCollider(standingColliderId, out var collider))
+            {
+                collider.Transform.InverseTransformPoint(ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ, out standingLocalPosition);
+            }
+            else standingColliderId = 0;
         }
 
         public override void OnGameTick(float deltaTime)
         {
             var entity = this.entity;
             if (entity.State == EnumEntityState.Inactive || !entity.IsInteractable || !movable) return;
+                        
+            if (cworld != null)
+            {
+                var plr = cworld.Player?.Entity;
+                if (plr == null) return;
+
+                if (entity != plr)
+                {
+                    double dx = entity.Pos.X - plr.Pos.X;
+                    double dz = entity.Pos.Z - plr.Pos.Z;
+                    if (dx * dx + dz * dz > clientRepulseCutoffDistanceSq) return;
+                }
+            }
+
             EntityAgent eagent = entity as EntityAgent;
             if (eagent?.MountedOn != null) return;
             if (entity.World.ElapsedMilliseconds < 2000) return;
-
+                        
             var pushVector = this.pushVector;
             pushVector.Set(0, 0, 0);
 
@@ -229,7 +255,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                partitionUtil.WalkEntities(ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity, IsInRangePartition, EnumEntitySearchType.Creatures);
+                partitionUtil.WalkEntities(ownPosRepulseX, ownPosRepulseY, ownPosRepulseZ, touchdist + partitionUtil.LargestTouchDistance + 0.1, WalkEntity, null, EnumEntitySearchType.Creatures);
             }
 
             if (pushVector.X == 0 && pushVector.Z == 0 && pushVector.Y == 0) return;
@@ -265,15 +291,28 @@ namespace Vintagestory.GameContent
             double dx = ownPosRepulseX - theirRepulse.ownPosRepulseX;
             double dy = ownPosRepulseY - theirRepulse.ownPosRepulseY;
             double dz = ownPosRepulseZ - theirRepulse.ownPosRepulseZ;
+            bool sameCarrier = standingColliderId != 0 && standingColliderId == theirRepulse.standingColliderId;
+            if (sameCarrier && ourEntity.World.CollisionScene.TryGetCollider(standingColliderId, out var carrier))
+            {
+                // Compare positions in the same boat pose because physics workers can sample them at different times.
+                carrier.Transform.TransformDirection(standingLocalPosition.X - theirRepulse.standingLocalPosition.X, standingLocalPosition.Y - theirRepulse.standingLocalPosition.Y, standingLocalPosition.Z - theirRepulse.standingLocalPosition.Z, out dx, out dy, out dz);
+            }
 
             double distSq = dx * dx + dy * dy + dz * dz;
             double minDistSq = ourEntity.touchDistanceSq + e.touchDistanceSq;
 
             if (distSq >= minDistSq) return true;
 
+            if (sameCarrier && dx == 0 && dz == 0)
+            {
+                // Coincident passengers still need opposite horizontal separation directions.
+                dx = ourEntity.EntityId < e.EntityId ? -0.001 : 0.001;
+                distSq = dx * dx + dy * dy;
+            }
+
             double pushForce = (1 - distSq / minDistSq) / Math.Max(0.001f, GameMath.Sqrt(distSq));
             double px = dx * pushForce;
-            double py = dy * pushForce;
+            double py = sameCarrier ? 0 : dy * pushForce;
             double pz = dz * pushForce;
 
             float theirSize = e.SelectionBox.Length * e.SelectionBox.Height;
@@ -291,12 +330,6 @@ namespace Vintagestory.GameContent
         public override string PropertyName()
         {
             return "repulseagents";
-        }
-
-
-        private bool IsInRangePartition(Entity e, double posX, double posY, double posZ, double radiusSq)
-        {
-            return true;
         }
     }
 }

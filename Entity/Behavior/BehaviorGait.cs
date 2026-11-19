@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Text;
 using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -10,6 +12,13 @@ using Vintagestory.API.MathTools;
 
 namespace Vintagestory.GameContent
 {
+    public enum EnumDirection
+    {
+        Backwards = -1,
+        Stationary = 0,
+        Forwards = 1
+    }
+
     /// <summary>
     /// Controls how a gait should be used. Also uses properties from <see cref="AnimationMetaData"/>
     /// </summary>
@@ -35,7 +44,7 @@ namespace Vintagestory.GameContent
         public bool Backwards = false;
 
         /// <summary> 
-        /// If true, the animal may use this gait of its own volition </summary>
+        /// If true, the animal may use this gait of its own volition
         /// </summary>
         [DocumentAsJson("Optional", "True")]
         public bool Natural = true;
@@ -53,101 +62,108 @@ namespace Vintagestory.GameContent
         public string? FallbackGaitCode;
 
         /// <summary>
-        /// Sound used during the gait
+        /// Sound played during the gait
         /// </summary>
-        [DocumentAsJson("Optional", "None")]
+        [Obsolete("Use SoundCode instead")]
         public AssetLocation? Sound;
 
         /// <summary>
-        /// The environment that this gait should be played in
+        /// Sound played during the gait
+        /// </summary>
+        [DocumentAsJson("Optional", "None")]
+        public string? SoundCode;
+
+        /// <summary>
+        /// The environment that this gait should be used in
         /// </summary>
         [DocumentAsJson("Optional", "Land")]
         public EnumHabitat Environment = EnumHabitat.Land;
 
-        public int Direction => MoveSpeed == 0f ? 0 : Backwards ? -1 : 1;
+        public EnumDirection Direction => MoveSpeed == 0f ? EnumDirection.Stationary : Backwards ? EnumDirection.Backwards : EnumDirection.Forwards;
         public bool HasMotion => MoveSpeed > 0f;
         public bool HasForwardMotion => MoveSpeed > 0f && !Backwards;
         public bool HasBackwardMotion => MoveSpeed > 0f && Backwards;
+
+        /// <summary>
+        /// The gait's environment typically has this much drag. May miss special cases.
+        /// </summary>
+        public float ExpectedDragFactor => Environment switch
+        {
+            EnumHabitat.Land => 0.7f,
+            EnumHabitat.Sea => GlobalConstants.WaterDrag,
+            EnumHabitat.Underwater => GlobalConstants.WaterDrag,
+            EnumHabitat.Air => GlobalConstants.AirDragFlying,
+            _ => 0.7f
+        };
+        /// <summary>
+        /// If an entity stayed at this gait for a while, this is our best guess for how big entity.Pos.Motion will be
+        /// </summary>
+        public float EquilibriumMoveSpeed => MoveSpeed * ExpectedDragFactor / (1 - ExpectedDragFactor);
     }
 
     /// <summary>
-    /// Allows to define gaits of an entity.
-    /// <br/>Uses the "gait" code
+    /// Defines gaits and movement for an entity
     /// </summary>
     /// <example><code lang="json">
     /// "behaviors": [
     ///   {
     ///     "code": "gait",
-    ///     "idleGait": "idle",
+    ///     "navigateUsingGaits": true,
+    ///     "idleGaits": { "Land": "idle", "Sea": "swimidle" },
     ///     "gaits": [
-    ///       {
-    ///           "code": "walkback",
+    ///       "walkback": {
     ///           "movespeed": 0.011,
     ///           "backwards": true,
-    ///           "yawMultiplier": 1,
-    ///           "sound": "game:creature/hooved/trot"
+    ///           // "trot" sound needs to be defined in the "sounds" section of the entity file
+    ///           "soundCode": "trot",
+    ///           "animation": "walkback",
+    ///           "animationSpeed": 2.55
     ///       },
-    ///       {
-    ///           "code": "idle",
-    ///           "yawMultiplier": 1
+    ///       "idle": {
+    ///           "animation": "idle",
     ///       },
-    ///       {
-    ///           "code": "walk",
+    ///       "walk": {
     ///           "movespeed": 0.019,
-    ///           "yawMultiplier": 1,
-    ///           "sound": "game:creature/hooved/trot"
+    ///           "soundCode": "trot",
+    ///           "animation": "walk",
+    ///           "animationSpeed": 1.8
     ///       },
-    ///       {
-    ///           "code": "trot",
-    ///           "movespeed": 0.036,
-    ///           "yawMultiplier": 0.85,
-    ///           "fallbackGaitCode": "walk",
-    ///           "sound": "game:creature/hooved/trot"
-    ///       },
-    ///       {
-    ///           "code": "canter",
-    ///           "movespeed": 0.075,
-    ///           "yawMultiplier": 0.75,
-    ///           "fallbackGaitCode": "trot",
-    ///           "sound": "game:creature/hooved/trot"
-    ///       },
-    ///       {
-    ///           "code": "sprint",
+    ///       "gallop": {
     ///           "movespeed": 0.1067,
-    ///           "yawMultiplier": 1,
-    ///           "isSprint": true,
     ///           "fallbackGaitCode": "walk",
-    ///           "sound": "game:creature/hooved/gallop"
+    ///           "soundCode": "gallop",
+    ///           "animation": "Run",
+    ///           "weight": 10,
+    ///           "animationSpeed": 1.2,
+    ///           "blendMode": "Average",
+    ///           "easeOutSpeed": 30
     ///       },
-    ///       {
-    ///           "code": "swim",
-    ///           "movespeed": 0.02,
-    ///           "yawMultiplier": 1,
-    ///           "fallbackGaitCode": "idle",
-    ///           "sound": "game:creature/hooved/gallop"
+    ///       "swimforth": {
+    ///           "movespeed": 0.015,
+    ///           "fallbackGaitCode": "swimidle",
+    ///           "environment": "Sea",
+    ///           "animation": "Swim",
+    ///           "animationSpeed": 1
     ///       },
-    ///       {
-    ///           "code": "swimback",
-    ///           "movespeed": 0.02,
+    ///       "swimidle": {
+    ///           "movespeed": 0.0,
+    ///           "environment": "Sea",
+    ///           "animation": "Swim",
+    ///           "animationSpeed": 1
+    ///       },
+    ///       "swimback": {
+    ///           "movespeed": 0.008,
     ///           "backwards": true,
-    ///           "yawMultiplier": 1,
-    ///           "fallbackGaitCode": "idle",
-    ///           "sound": "game:creature/hooved/gallop"
-    ///       },
-    ///       {
-    ///           "code": "jump",
-    ///           "movespeed": 0.1067,
-    ///           "yawMultiplier": 1,
-    ///           "fallbackGaitCode": "walk",
-    ///           "sound": "game:creature/hooved/gallop"
+    ///           "fallbackGaitCode": "swimidle",
+    ///           "environment": "Sea",
+    ///           "animation": "Swim",
+    ///           "animationSpeed": 1
     ///       }
     ///     ]
     ///   }
     /// ]
     /// </code></example>
     [DocumentAsJson]
-    [AddDocumentationProperty("gaits", "List of gaits in order of increasing speed for the rideable entity", "Vintagestory.GameContent.GaitMeta[]", "Required", "", false)]
-    [AddDocumentationProperty("idleGait", "The code of idle gait used when no other gait is triggered", "System.String", "Required", "idle", false)]
     public class EntityBehaviorGait : EntityBehavior
     {
         public override string PropertyName()
@@ -157,7 +173,15 @@ namespace Vintagestory.GameContent
 
         protected EntityAgent eagent = null!;
 
-        public readonly FastSmallDictionary<string, GaitMeta> Gaits = new(1);
+        [DocumentAsJson("Optional", "false")]
+        public bool NavigateUsingGaits = false;
+
+        /// <summary>
+        /// All available gaits.
+        /// </summary>
+        [DocumentAsJson("Required", "Empty")]
+        public FastSmallDictionary<string, GaitMeta> Gaits { get; private set; } = new(1);
+
         protected GaitMeta currentGait = null!;
         public GaitMeta CurrentGait
         {
@@ -169,25 +193,40 @@ namespace Vintagestory.GameContent
                 if (entity.WatchedAttributes.GetString("currentgait") != value.Code)
                 {
                     entity.WatchedAttributes.SetString("currentgait", value.Code);
+                }
+                if (prevGait?.Code != currentGait.Code)
+                {
                     OnGaitChangedFrom(prevGait);
                 }
             }
         }
+
         protected string? currentTurnAnimation = null;
-        // Current turning speed (rad/tick)
+        /// <summary>
+        /// Turning speed. Exact values are currently unused other than positive or negative. Units may possibly be radians/second, but don't count on this.
+        /// </summary>
         public double AngularVelocity = 0.0;
 
-        // Movement speed is multiplied by this
+        /// <summary>
+        /// Movement speed is multiplied by this
+        /// </summary>
         public double MoveSpeedModifier = 1;
 
         protected ILoadedSound? gaitSound;
 
         public event Action? GaitChangedForEnvironmentDelegate;
 
-        public FastSmallDictionary<EnumHabitat, GaitMeta> IdleGaits = new(1);
+        protected IMountable? mountableSupplier;
+
+        /// <summary>
+        /// Per environment, the gait to use when standing still, treading water, hovering, or otherwise not doing anything in particular. Provided from json as gait codes.
+        /// </summary>
+        [DocumentAsJson("Required", "Empty")]
+        public FastSmallDictionary<EnumHabitat, GaitMeta> IdleGaits { get; private set; } = new(1);
+
         public GaitMeta FallbackGait => CurrentGait.FallbackGaitCode == null ? IdleGaits[CurrentGait.Environment] : Gaits[CurrentGait.FallbackGaitCode];
 
-        public float GetYawMultiplier() => CurrentGait?.YawMultiplier ?? 3.5f; // Default yaw multiplier if not set
+        public float GetYawMultiplier() => CurrentGait?.YawMultiplier ?? 1f;
 
         public virtual void SetIdle() => CurrentGait = IdleGaits.TryGetValue(CurrentGait.Environment) ?? IdleGaits[EnumHabitat.Land];
         public bool IsIdle => IsIdleGait(CurrentGait);
@@ -220,13 +259,31 @@ namespace Vintagestory.GameContent
             ArgumentNullException.ThrowIfNull(attributes);
             base.Initialize(properties, attributes);
 
-            GaitMeta?[]? gaitarray = attributes["gaits"].AsArray<GaitMeta>();
-            ArgumentNullException.ThrowIfNull(gaitarray);
-            foreach (GaitMeta? gait in gaitarray)
+            NavigateUsingGaits = attributes["navigateUsingGaits"].AsBool();
+            JsonObject gaitsJson = attributes["gaits"];
+            // Support older format for gaits
+            if (gaitsJson.IsArray())
             {
-                ArgumentNullException.ThrowIfNull(gait);
-                gait.ClientSide = true; // Opt out of animation syncing
-                Gaits[gait.Code] = gait;
+                entity.Api.Logger.Warning("Gaits are being provided as an array for entity " + entity.Code + ". For better mod compat, provide them in object format instead.");
+                GaitMeta?[]? gaitarray = attributes["gaits"].AsArray<GaitMeta>();
+                ArgumentNullException.ThrowIfNull(gaitarray);
+                foreach (GaitMeta? gait in gaitarray)
+                {
+                    ArgumentNullException.ThrowIfNull(gait);
+                    gait.ClientSide = true; // Opt out of animation syncing
+                    Gaits[gait.Code] = gait;
+                }
+            }
+            // Mods are encouraged to switch to providing the gaits in this format instead
+            else
+            {
+                Gaits = gaitsJson.AsObject<FastSmallDictionary<string, GaitMeta>>(Gaits);
+                foreach ((string key, GaitMeta gait) in Gaits)
+                {
+                    gait.Code = key;
+                    gait.ClientSide = true; // Opt out of animation syncing
+                    gait.Init();
+                }
             }
 
             FastSmallDictionary<EnumHabitat, string>? idleGaitCodes = attributes["idleGaits"].AsObject<FastSmallDictionary<EnumHabitat, string>>();
@@ -236,7 +293,6 @@ namespace Vintagestory.GameContent
                 {
                     IdleGaits[entry.Key] = Gaits[entry.Value];
                 }
-                if (!IdleGaits.ContainsKey(EnumHabitat.Land)) throw new ArgumentException("JSON error. An idle gait usable on land must be provided for {0}", entity.Code);
             }
             else
             {
@@ -246,12 +302,35 @@ namespace Vintagestory.GameContent
                 IdleGaits[EnumHabitat.Land] = idle;
             }
 
+            // Sanity checks on the json data
+            if (!IdleGaits.ContainsKey(EnumHabitat.Land))
+            {
+                throw new ArgumentException("JSON error. Gait behavior is missing idle land gait for entity " + entity.Code);
+            }
+            if (!IdleGaits.ContainsKey(EnumHabitat.Sea))
+            {
+                entity.Api.Logger.Warning("JSON error. Gait behavior is missing idle sea gait for entity " + entity.Code);
+            }
+            if (!Gaits.Values.Any(g => g.Environment == EnumHabitat.Land && g.Direction == EnumDirection.Forwards))
+            {
+                entity.Api.Logger.Warning("JSON error. Gait behavior is missing a forward land gait for entity " + entity.Code);
+            }
+            if (!Gaits.Values.Any(g => g.Environment == EnumHabitat.Sea && g.Direction == EnumDirection.Forwards))
+            {
+                entity.Api.Logger.Warning("JSON error. Gait behavior is missing a forward sea gait for entity " + entity.Code);
+            }
+
             if (entity.Api.Side == EnumAppSide.Client)
             {
                 // Only needed on the client, because on the server all changes will go through the CurrentGait property setter, which calls OnGaitChangedFrom directly
                 entity.WatchedAttributes.RegisterModifiedListener("currentgait", OnGaitChanged);
+                OnGaitChangedFrom(null);
             }
-            CurrentGait = IdleGaits[EnumHabitat.Land];
+            else
+            {
+                // Server-only stand still on loaded, clients will be sent the already correct value. E.g. elk loaded on one client gallops into range of another.
+                CurrentGait = IdleGaits[EnumHabitat.Land];
+            }
 
             if (entity.Api is ICoreClientAPI capi)
             {
@@ -259,8 +338,32 @@ namespace Vintagestory.GameContent
             }
         }
 
+        public override void AfterInitialized(bool onFirstSpawn)
+        {
+            mountableSupplier = entity.GetInterface<IMountable>();
+
+            // Another sanity check here, since entity sounds aren't yet set up when Initialize() is called
+            foreach (GaitMeta gait in Gaits.Values)
+            {
+                if (gait.SoundCode != null && entity.TryGetEntitySound(gait.SoundCode, entity.World.Rand) == null)
+                {
+                    entity.Api.Logger.Warning($"JSON Error: Entity {entity.Code} has sound {gait.SoundCode} set for gait {gait.Code}, but no such sound was found");
+                }
+            }
+        }
+
         protected virtual void OnGaitChanged()
         {
+            if (entity.Api is ICoreClientAPI capi && entity.IsControlledByClient(capi.World.Player.Entity))
+            {
+                // Client-authoritative, so keep our existing value
+                if (entity.WatchedAttributes.GetString("currentgait") != currentGait.Code)
+                {
+                    entity.WatchedAttributes.SetString("currentgait", currentGait.Code);
+                }
+                return;
+            }
+
             OnGaitChangedFrom(currentGait);
         }
 
@@ -269,14 +372,34 @@ namespace Vintagestory.GameContent
             currentGait = Gaits[entity.WatchedAttributes.GetString("currentgait")];
             if (currentGait.Code == prevGait?.Code) return;
 
+#pragma warning disable CS0618 // Type or member is obsolete (gait.Sound)
             ICoreClientAPI? capi = entity.Api as ICoreClientAPI;
-            if (capi != null && CurrentGait.Sound != prevGait?.Sound)
+            if (capi != null && (CurrentGait.Sound != prevGait?.Sound || CurrentGait.SoundCode != prevGait?.SoundCode))
             {
                 gaitSound?.Stop();
                 gaitSound?.Dispose();
                 gaitSound = null;
 
-                if (CurrentGait.Sound != null)
+                if (CurrentGait.SoundCode != null)
+                {
+                    SoundAttributes? fetchedSound = entity.TryGetEntitySound(CurrentGait.SoundCode, entity.World.Rand);
+                    if (fetchedSound != null)
+                    {
+                        SoundAttributes entitySound = fetchedSound.Value;
+                        gaitSound = capi.World.LoadSound(new SoundParams()
+                        {
+                            Location = entitySound.Location,
+                            DisposeOnFinish = false,
+                            Position = entity.Pos.XYZ.ToVec3f(),
+                            ShouldLoop = true,
+                            Range = entitySound.Range,
+                            SoundType = entitySound.Type,
+                            Volume = entitySound.Volume.nextFloat(1f, entity.World.Rand),
+                            Pitch = entitySound.Pitch.nextFloat(1f, entity.World.Rand),
+                        });
+                    }
+                }
+                else if (CurrentGait.Sound != null)
                 {
                     gaitSound = capi.World.LoadSound(new SoundParams()
                     {
@@ -286,30 +409,38 @@ namespace Vintagestory.GameContent
                         ShouldLoop = true
                     });
                 }
+#pragma warning restore CS0618 // Type or member is obsolete (gait.Sound)
 
                 gaitSound?.Start();
             }
 
-            if (CurrentGait.Animation != prevGait?.Animation)
+            if (prevGait?.Animation != null && CurrentGait.Animation != prevGait.Animation)
             {
-                if (prevGait?.Animation != null && prevGait.Animation != "jump") eagent.AnimManager.StopAnimation(prevGait.Animation); // Should this be checking something else, like looping settings?
-
-                if (CurrentGait.Animation != null)
+                RunningAnimation? prev = eagent.AnimManager.Animator?.GetAnimationState(prevGait.Animation);
+                var onEnd = prev?.Animation?.OnAnimationEnd;
+                // Stop repeating or malformed animations, let others ease out or play til end
+                if (onEnd == null || onEnd == EnumEntityAnimationEndHandling.Repeat)
                 {
-                    eagent.AnimManager.StartAnimation(CurrentGait);
-                    eagent.AnimManager.AnimationsDirty = true;
+                    eagent.AnimManager.StopAnimation(prevGait.Animation);
                 }
+            }
+
+            // Even if the animation is already playing from the previous gait, update in case this one has different metadata
+            if (CurrentGait.Animation != null)
+            {
+                eagent.AnimManager.StartAnimation(CurrentGait);
             }
 
             if (CurrentGait.MoveSpeed == 0)
             {
                 eagent.Controls.StopAllMovement();
+                // On swimming entities this causes a tick where controls.Up is set false and PModuleGravity is applied, causing extra
+                // bobbing motion. The effect looks nice on ridden elk so I'll keep it.
                 // Don't immediately set the walk and fly vectors to 0. They will decrease naturally from drag, which looks nicer.
 
                 if (currentTurnAnimation != null)
                 {
                     eagent.StopAnimation(currentTurnAnimation);
-                    eagent.AnimManager.AnimationsDirty = true;
                     currentTurnAnimation = null;
                 }
             }
@@ -330,7 +461,22 @@ namespace Vintagestory.GameContent
         protected float notOnGroundAccum;
         public override void OnGameTick(float dt)
         {
-            UpdateGaitForEnvironment();
+            if (!entity.Alive)
+            {
+                eagent.Controls.StopAllMovement();
+                eagent.AnimManager.StopAnimation(currentGait.Animation);
+                gaitSound?.Stop();
+                gaitSound?.Dispose();
+                gaitSound = null;
+                return;
+            }
+
+            if (entity.Api is ICoreClientAPI capi && entity.IsControlledByClient(capi.World.Player.Entity)
+                || entity.Api.Side == EnumAppSide.Server && entity.IsControlledByServer(mountableSupplier))
+            {
+                UpdateGaitForEnvironment();
+                Move(dt);
+            }
 
             if (entity.Api.Side != EnumAppSide.Client) return;
 
@@ -351,30 +497,96 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            Move(dt);
             UpdateTurnAnimation();
         }
 
-        public virtual void UpdateGaitForEnvironment()
+        public virtual EnumHabitat GetTargetEnvironment()
         {
-            EnumHabitat targetEnvironment = entity.Swimming ? EnumHabitat.Sea : EnumHabitat.Land;
-            // No conditions for air or underwater implemented at this time
+            if (eagent.Controls.IsFlying)
+            {
+                return EnumHabitat.Air;
+            }
+            return entity.Swimming ? EnumHabitat.Sea : EnumHabitat.Land;
+        }
 
-            if (CurrentGait.Environment == targetEnvironment) return;
-
+        public virtual GaitMeta? ChooseGait(EnumHabitat environment, EnumDirection direction, float moveSpeed)
+        {
             GaitMeta? closest = null;
             foreach (GaitMeta gait in Gaits.Values)
             {
-                if (!gait.Natural || gait.Environment != targetEnvironment || gait.Direction != CurrentGait.Direction) continue;
+                if (!gait.Natural || gait.Environment != environment || gait.Direction != direction) continue;
 
-                if (closest == null || (Math.Abs(gait.MoveSpeed - CurrentGait.MoveSpeed) < Math.Abs(closest.MoveSpeed - CurrentGait.MoveSpeed)))
+                if (closest == null || (Math.Abs(gait.MoveSpeed - moveSpeed) < Math.Abs(closest.MoveSpeed - moveSpeed)))
                 {
                     closest = gait;
                 }
             }
 
-            CurrentGait = closest;
+            return closest;
+        }
+
+        public virtual void UpdateGaitForEnvironment()
+        {
+            EnumHabitat targetEnvironment = GetTargetEnvironment();
+            if (CurrentGait.Environment == targetEnvironment) return;
+
+            CurrentGait = ChooseGait(targetEnvironment, CurrentGait.Direction, CurrentGait.MoveSpeed)
+                ?? IdleGaits.TryGetValue(targetEnvironment)
+                ?? throw new Exception("Error changing gait for " + entity.Code + ". No gait found for target environment " + targetEnvironment + " and direction " + CurrentGait.Direction);
+
             GaitChangedForEnvironmentDelegate?.Invoke();
+        }
+
+        public void SetMotion(float dt, EntityControls controls, float desiredYaw, float nowMoveSpeed, GaitMeta? preferredGait)
+        {
+            if (!entity.Alive)
+            {
+                return;
+            }
+
+            float yawDist = GameMath.AngleRadDistance(entity.Pos.Yaw, desiredYaw);
+            bool backwards = Math.Abs(yawDist) > GameMath.PIHALF;
+
+            EnumHabitat targetEnvironment = GetTargetEnvironment();
+            if (preferredGait != null && preferredGait.Environment == targetEnvironment && (preferredGait.Direction == EnumDirection.Backwards) == backwards)
+            {
+                CurrentGait = preferredGait;
+            }
+            else
+            {
+                GaitMeta? nextGait = ChooseGait(targetEnvironment, backwards ? EnumDirection.Backwards : EnumDirection.Forwards, nowMoveSpeed);
+                if (nextGait == null)
+                {
+                    backwards = !backwards;
+                    nextGait = ChooseGait(targetEnvironment, backwards ? EnumDirection.Backwards : EnumDirection.Forwards, nowMoveSpeed);
+                }
+
+                if (nextGait != null) CurrentGait = nextGait;
+            }
+            MoveSpeedModifier = Math.Min(1, nowMoveSpeed / Math.Max(CurrentGait.MoveSpeed, 0.001f)); // Careful not to divide by 0
+
+            eagent.Controls.Forward = !backwards;
+            eagent.ServerControls.Forward = !backwards;
+            eagent.Controls.Backward = backwards;
+            eagent.ServerControls.Backward = backwards;
+
+            float minTurnAnglePerSec = 250;
+            float maxTurnAnglePerSec = 450;
+            ITreeAttribute? pathfinder = entity.Properties.Server?.Attributes?.GetTreeAttribute("pathfinder");
+            if (pathfinder != null)
+            {
+                minTurnAnglePerSec = (float)pathfinder.GetDecimal("minTurnAnglePerSec", 250);
+                maxTurnAnglePerSec = (float)pathfinder.GetDecimal("maxTurnAnglePerSec", 450);
+            }
+
+            float curTurnRadPerSec = minTurnAnglePerSec + (float)entity.World.Rand.NextDouble() * (maxTurnAnglePerSec - minTurnAnglePerSec);
+            curTurnRadPerSec *= GameMath.DEG2RAD;
+
+            float turnSpeed = curTurnRadPerSec * GetYawMultiplier() * dt * GlobalConstants.OverallSpeedMultiplier;
+            AngularVelocity = GameMath.Clamp(yawDist, -turnSpeed, turnSpeed);
+
+            entity.Pos.Yaw += (float)AngularVelocity;
+            entity.Pos.Yaw = entity.Pos.Yaw % GameMath.TWOPI;
         }
 
         protected virtual void Move(float dt)
@@ -384,7 +596,7 @@ namespace Vintagestory.GameContent
             double cosYaw = Math.Cos(entity.Pos.Yaw);
             double sinYaw = Math.Sin(entity.Pos.Yaw);
             controls.WalkVector.Set(sinYaw, 0, cosYaw);
-            controls.WalkVector.Mul(CurrentGait.MoveSpeed * GlobalConstants.OverallSpeedMultiplier * CurrentGait.Direction * MoveSpeedModifier);
+            controls.WalkVector.Mul(CurrentGait.MoveSpeed * GlobalConstants.OverallSpeedMultiplier * (int)CurrentGait.Direction * MoveSpeedModifier);
 
             // Make it walk along the wall, but not walk into the wall, which causes it to climb
             if (entity.Properties.RotateModelOnClimb && controls.IsClimbing && entity.ClimbingOnFace != null && entity.Alive)
@@ -419,10 +631,12 @@ namespace Vintagestory.GameContent
 
                 if (entity.CollidedHorizontally)
                 {
-                    controls.FlyVector.Y = 0.05f;
+                    controls.FlyVector.Y = Math.Max(0.05f, controls.FlyVector.Y);
                 }
 
                 eagent.Pos.Motion.Y += (swimlineSubmergedness-0.1)/300.0;
+
+                controls.Up = controls.FlyVector.Y > 0;
             }
         }
 
@@ -446,7 +660,6 @@ namespace Vintagestory.GameContent
                 if (currentTurnAnimation != null)
                 {
                     eagent.StopAnimation(currentTurnAnimation);
-                    eagent.AnimManager.AnimationsDirty = true;
                 }
                 if (nowTurnAnim == null)
                 {
@@ -458,6 +671,14 @@ namespace Vintagestory.GameContent
                     currentTurnAnimation = anim;
                     eagent.StartAnimation(anim);
                 }
+            }
+        }
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+            if (entity.Api is ICoreClientAPI capi && capi.Settings.Bool["extendedDebugInfo"])
+            {
+                infotext.AppendLine("<font color=\"#bbbbbb\">Gait: " + entity.WatchedAttributes.GetString("currentgait") + "</font>");
             }
         }
     }

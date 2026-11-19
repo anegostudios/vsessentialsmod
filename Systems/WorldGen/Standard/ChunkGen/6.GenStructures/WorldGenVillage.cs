@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.Datastructures;
 using Vintagestory.ServerMods.NoObf;
 
 #nullable disable
@@ -132,10 +133,8 @@ namespace Vintagestory.ServerMods
                     {
                         throw new Exception(string.Format("Schematic with code {0} has replace block layer {1} defined, but no such block found!", Code, ReplaceWithBlocklayers[i]));
                     }
-                    else
-                    {
-                        replaceblockids[i] = (ushort)block.Id;
-                    }
+
+                    replaceblockids[i] = (ushort)block.Id;
                 }
             }
 
@@ -153,7 +152,7 @@ namespace Vintagestory.ServerMods
 
 
 
-        public bool TryGenerate(IBlockAccessor blockAccessor, IWorldAccessor worldForCollectibleResolve, BlockPos pos, int climateUpLeft, int climateUpRight, int climateBotLeft, int climateBotRight, DidGenerate didGenerateStructure, BlockPos spawnPos)
+        public bool TryGenerate(IBlockAccessor blockAccessor, IServerWorldAccessor worldForCollectibleResolve, BlockPos pos, int climateUpLeft, int climateUpRight, int climateBotLeft, int climateBotRight, DidGenerate didGenerateStructure, BlockPos spawnPos)
         {
             if (!WorldGenStructure.SatisfiesMinDistance(pos, worldForCollectibleResolve, MinGroupDistance, Group)) return false;
 
@@ -256,12 +255,24 @@ namespace Vintagestory.ServerMods
                     }
                 }
             }
-
+            var data = new SchematicPlacementData(blockAccessor, worldForCollectibleResolve)
+            {
+                ReplaceMeta = GlobalConfig.ReplaceMetaBlocks,
+                ReplaceBlockEntities = true,
+                DisplaceWater = true,
+                ResolvedRockTypeRemaps = resolvedRockTypeRemaps,
+                ReplaceWithBlockLayersBlockids = replaceblockids,
+                ClimateBotLeft = climateBotLeft,
+                ClimateBotRight = climateBotRight,
+                ClimateUpLeft = climateUpLeft,
+                ClimateUpRight = climateUpRight,
+            };
             if (generatables.Count >= minQuantity && mustGenerate.Count == 0)
             {
                 foreach (var val in generatables)
                 {
-                    val.Structure.PlaceRespectingBlockLayers(blockAccessor, worldForCollectibleResolve, val.StartPos, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, resolvedRockTypeRemaps, replaceblockids, GlobalConfig.ReplaceMetaBlocks);
+                    data.StartPos = val.StartPos;
+                    val.Structure.PlaceRespectingBlockLayers(data);
                     didGenerateStructure(val.Location, val.Structure);
                 }
 

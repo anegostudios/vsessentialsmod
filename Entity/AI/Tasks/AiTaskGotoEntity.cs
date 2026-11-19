@@ -67,9 +67,7 @@ namespace Vintagestory.GameContent
             //Check if time is still valid for task.
             if (!IsInValidDayTimeHours(false)) return false;
 
-            pathTraverser.CurrentTarget.X = targetEntity.Pos.X;
-            pathTraverser.CurrentTarget.Y = targetEntity.Pos.Y;
-            pathTraverser.CurrentTarget.Z = targetEntity.Pos.Z;
+            pathTraverser.CurrentTarget!.Set(targetEntity.Pos.X, targetEntity.Pos.Y, targetEntity.Pos.Z);
 
             Cuboidd targetBox = targetEntity.SelectionBox.ToDouble().Translate(targetEntity.Pos.X, targetEntity.Pos.Y, targetEntity.Pos.Z);
             Vec3d pos = entity.Pos.XYZ.Add(0, entity.SelectionBox.Y2 / 2, 0).Ahead(entity.SelectionBox.XSize / 2, 0, entity.Pos.Yaw);

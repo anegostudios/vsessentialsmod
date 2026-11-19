@@ -52,7 +52,7 @@ namespace Vintagestory.ServerMods
         private void initWorldGen()
         {
             LoadGlobalConfig(api);
-            rnd = new LCGRandom(api.WorldManager.Seed);
+            rnd = new LCGRandom(api.WorldManager.SeedWorldgen);
             chunkMapSizeY = api.WorldManager.MapSizeY / chunksize;
         }
 

@@ -237,9 +237,6 @@ namespace Vintagestory.ServerMods.NoObf
             Block[] blocks = getBlocks(firstBlockId);
             if (blocks.Length == 0) return;
 
-            ModStdWorldGen modSys = null;
-            if (blockAccessor is IWorldGenBlockAccessor wgba) modSys = wgba.WorldgenWorldAccessor.Api.ModLoader.GetModSystem<GenVegetationAndPatches>();
-
             while (quantity-- > 0)
             {
                 if (quantity < 1 && rnd.NextFloat() > quantity) break;

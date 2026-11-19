@@ -13,7 +13,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Util;
 
-#nullable disable
+#nullable disable annotations
 
 namespace Vintagestory.ServerMods.NoObf
 {
@@ -223,7 +223,7 @@ namespace Vintagestory.ServerMods.NoObf
             int unmetConditionCount = 0;
 
             // List of loaded mods for dependency checks
-            HashSet<string> loadedModIds = [.. api.ModLoader.Mods.Select((m) => m.Info.ModID)];
+            HashSet<string> loadedModIds = api.ModLoader.Mods.Where(m => m.Info != null).Select(m => m.Info!.ModID).ToHashSet();
 
             // First collect all valid patches
             var validPatches = new List<(JsonPatch patch, AssetLocation source, int index)>();
@@ -262,7 +262,7 @@ namespace Vintagestory.ServerMods.NoObf
 
                         if (patch.Condition.useValue)
                         {
-                            patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken()));
+                            patch.Value = new JsonObject(JToken.Parse(attr.ToJsonToken(), JsonUtil.DefaultLoadSettings));
                         }
                         else if (!patch.Condition.IsValue.Equals(attr.GetValue() + "", StringComparison.InvariantCultureIgnoreCase))
                         {
@@ -442,7 +442,7 @@ namespace Vintagestory.ServerMods.NoObf
                 try
                 {
                     var jsonText = asset.ToText();
-                    token = JToken.Parse(jsonText);
+                    token = JToken.Parse(jsonText, JsonUtil.DefaultLoadSettings);
                 }
                 catch (Exception e)
                 {
@@ -690,7 +690,7 @@ namespace Vintagestory.ServerMods.NoObf
             JToken token;
             try
             {
-                token = JToken.Parse(asset.ToText());
+                token = JToken.Parse(asset.ToText(), JsonUtil.DefaultLoadSettings);
             }
             catch (Exception e)
             {

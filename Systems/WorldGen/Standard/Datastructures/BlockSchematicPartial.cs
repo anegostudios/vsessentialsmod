@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,19 +7,12 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.Datastructures;
 
 #nullable disable
 
 namespace Vintagestory.ServerMods
 {
-    public enum EnumStructurePlacement
-    {
-        SurfaceRuin,
-        Surface,
-        Underwater,
-        Underground,
-        Shallowwater
-    }
 
     public class BlockSchematicPartial : BlockSchematicStructure
     {
@@ -28,28 +20,25 @@ namespace Vintagestory.ServerMods
 
         static BlockPos Zero = new BlockPos(0, 0, 0);
 
-        public virtual int PlacePartial(IServerChunk[] chunks, IWorldGenBlockAccessor blockAccessor,
-            IWorldAccessor worldForResolve, int chunkX, int chunkZ, BlockPos startPos, EnumReplaceMode mode, EnumStructurePlacement? structurePlacement,
-            bool replaceMeta, bool resolveImports, Dictionary<int, Dictionary<int, int>> resolvedRockTypeRemaps = null,
-            int[] replaceWithBlockLayersBlockids = null, Block rockBlock = null, bool disableSurfaceTerrainBlending = false)
+        public virtual int PlacePartial(SchematicPlacementData data)
         {
-            Unpack(worldForResolve.Api);
+            Unpack(data.World.Api);
             const int chunksize = GlobalConstants.ChunkSize;
-            var rect = new Rectanglei(chunkX * chunksize, chunkZ * chunksize, chunksize, chunksize);
+            var rect = new Rectanglei(data.ChunkX * chunksize, data.ChunkZ * chunksize, chunksize, chunksize);
 
-            if (!rect.IntersectsOrTouches(startPos.X, startPos.Z, startPos.X + SizeX, startPos.Z + SizeZ)) return 0;
+            if (!rect.IntersectsOrTouches(data.StartPos.X, data.StartPos.Z, data.StartPos.X + SizeX, data.StartPos.Z + SizeZ)) return 0;
             var placed = 0;
 
-            var curPos = new BlockPos(startPos.dimension);
+            var curPos = new BlockPos(data.StartPos.dimension);
 
             int climateUpLeft = 0, climateUpRight = 0, climateBotLeft = 0, climateBotRight = 0;
-            if(replaceWithBlockLayersBlockids != null)
+            if(data.ReplaceWithBlockLayersBlockids != null)
             {
-                var regionChunkSize = blockAccessor.RegionSize / chunksize;
-                var region = chunks[0].MapChunk.MapRegion;
+                var regionChunkSize = data.BlockAccessor.RegionSize / chunksize;
+                var region = data.Chunks[0].MapChunk.MapRegion;
                 var climateMap = region.ClimateMap;
-                var rlX = chunkX % regionChunkSize;
-                var rlZ = chunkZ % regionChunkSize;
+                var rlX = data.ChunkX % regionChunkSize;
+                var rlZ = data.ChunkZ % regionChunkSize;
                 var facC = (float)climateMap.InnerSize / regionChunkSize;
                 climateUpLeft = climateMap.GetUnpaddedInt((int)(rlX * facC), (int)(rlZ * facC));
                 climateUpRight = climateMap.GetUnpaddedInt((int)(rlX * facC + facC), (int)(rlZ * facC));
@@ -57,9 +46,9 @@ namespace Vintagestory.ServerMods
                 climateBotRight = climateMap.GetUnpaddedInt((int)(rlX * facC + facC), (int)(rlZ * facC + facC));
             }
 
-            if (genBlockLayers == null) genBlockLayers = worldForResolve.Api.ModLoader.GetModSystem<GenBlockLayers>();
+            if (genBlockLayers == null) genBlockLayers = data.World.Api.ModLoader.GetModSystem<GenBlockLayers>();
 
-            var rockblockid = rockBlock?.BlockId ?? chunks[0].MapChunk.TopRockIdMap[15 * chunksize + 15];
+            var rockblockid = data.RockBlock?.BlockId ?? data.Chunks[0].MapChunk.TopRockIdMap[15 * chunksize + 15];
 
 
             int i = -1;
@@ -69,51 +58,51 @@ namespace Vintagestory.ServerMods
                 i++;   // increment i first, because we have various continue statements
 
                 dx = (int)(index & PosBitMask);
-                int posX = startPos.X + dx;
+                int posX = data.StartPos.X + dx;
                 dz = (int)((index >> 10) & PosBitMask);
-                int posZ = startPos.Z + dz;
+                int posZ = data.StartPos.Z + dz;
 
                 if (!rect.Contains(posX, posZ)) continue;
                 dy = (int)((index >> 20) & PosBitMask);
-                int posY = startPos.Y + dy;
+                int posY = data.StartPos.Y + dy;
                 int storedBlockid = BlockIds[i];
                 AssetLocation blockCode = BlockCodes[storedBlockid];
 
-                Block newBlock = blockAccessor.GetBlock(blockCode);
-                if (newBlock == null || (replaceMeta && (newBlock.Id == UndergroundBlockId || newBlock.Id == AbovegroundBlockId))) continue;
+                Block newBlock = data.BlockAccessor.GetBlock(blockCode);
+                if (newBlock == null || (data.ReplaceMeta && (newBlock.Id == UndergroundBlockId || newBlock.Id == AbovegroundBlockId))) continue;
 
-                int blockId = replaceMeta && IsFillerOrPath(newBlock) ? empty : newBlock.BlockId;
+                int blockId = data.ReplaceMeta && IsFillerOrPath(newBlock) ? empty : newBlock.BlockId;
 
-                IChunkBlocks chunkData = chunks[posY / chunksize].Data;
+                IChunkBlocks chunkData = data.Chunks[posY / chunksize].Data;
                 int posIndex = ((posY % chunksize) * chunksize + (posZ % chunksize)) * chunksize + (posX % chunksize);
 
                 // update blocks that will be exposed to air to their top surface variant ex soil with grass
-                if (structurePlacement is EnumStructurePlacement.SurfaceRuin && newBlock.Id == FillerBlockId)
+                if (data.StructurePlacement is EnumStructurePlacement.SurfaceRuin && newBlock.Id == FillerBlockId)
                 {
                     var belowIndex = (uint)(((dy-1) << 20) | (dz << 10) | dx);
                     if (!Indices.Contains(belowIndex))
                     {
                         var belowPos = (((posY - 1) % chunksize) * chunksize + (posZ % chunksize)) * chunksize + (posX % chunksize);
-                        var belowBlock = blockAccessor.GetBlock(chunkData[belowPos]);
+                        var belowBlock = data.BlockAccessor.GetBlock(chunkData[belowPos]);
 
                         if (belowBlock.BlockMaterial == EnumBlockMaterial.Soil)
                         {
-                            var belowBlockId = GetReplaceLayerBlockId(blockAccessor, worldForResolve, replaceWithBlockLayersBlockids, belowBlock.Id, curPos, posX, posY, posZ, chunksize, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, dy, dx, dz, rockblockid, ref belowBlock, true);
+                            var belowBlockId = GetReplaceLayerBlockId(data.BlockAccessor, data.World, data.ReplaceWithBlockLayersBlockids, belowBlock.Id, curPos, posX, posY, posZ, chunksize, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, dy, dx, dz, rockblockid, ref belowBlock, true);
 
                             chunkData[belowPos] = belowBlockId;
                         }
                     }
                 }
 
-                blockId = GetReplaceLayerBlockId(blockAccessor, worldForResolve, replaceWithBlockLayersBlockids, blockId, curPos, posX, posY, posZ, chunksize, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, dy, dx, dz, rockblockid, ref newBlock);
+                blockId = GetReplaceLayerBlockId(data.BlockAccessor, data.World, data.ReplaceWithBlockLayersBlockids, blockId, curPos, posX, posY, posZ, chunksize, climateUpLeft, climateUpRight, climateBotLeft, climateBotRight, dy, dx, dz, rockblockid, ref newBlock);
 
-                blockId = GetRocktypeBlockId(blockAccessor, resolvedRockTypeRemaps, blockId, rockblockid, ref newBlock);
+                blockId = GetRocktypeBlockId(data.BlockAccessor, data.ResolvedRockTypeRemaps, blockId, rockblockid, ref newBlock);
 
                 // surface sits on top of terrain and so needs to blend with existing one better
                 // do not place grass or loose rocks below terrain if there was a solid blocks
-                if (!disableSurfaceTerrainBlending && structurePlacement is EnumStructurePlacement.Surface)
+                if (!data.DisableSurfaceTerrainBlending && data.StructurePlacement is EnumStructurePlacement.Surface)
                 {
-                    var oldBlock = blockAccessor.GetBlock(chunkData[posIndex]);
+                    var oldBlock = data.BlockAccessor.GetBlock(chunkData[posIndex]);
                     // if we have solid blocks at the same pos keep the old one to blend in better with the terrain
                     if((newBlock.Replaceable >= 5500 || newBlock.BlockMaterial == EnumBlockMaterial.Plant) && oldBlock.Replaceable < newBlock.Replaceable && !newBlock.IsLiquid()) continue;
                 }
@@ -134,49 +123,49 @@ namespace Vintagestory.ServerMods
                     chunkData[posIndex] = blockId;
                 }
 
-                if (newBlock.LightHsv[2] > 0)
+                if (newBlock.LightHsv[2] > 0 && data.BlockAccessor is IWorldGenBlockAccessor wgen)
                 {
                     curPos.Set(posX, posY, posZ);
-                    blockAccessor.ScheduleBlockLightUpdate(curPos, 0, newBlock.BlockId);
+                    wgen.ScheduleBlockLightUpdate(curPos, 0, newBlock.BlockId);
                 }
 
                 placed++;
             }
 
-            PlaceDecors(blockAccessor, startPos, rect);
+            PlaceDecors(data, rect);
 
-            int schematicSeed = worldForResolve.Rand.Next();
+            int schematicSeed = data.World.Rand.Next();
 
             foreach (var val in BlockEntities)
             {
                 uint index = val.Key;
-                int posX = startPos.X + (int)(index & PosBitMask);
-                int posZ = startPos.Z + (int)((index >> 10) & PosBitMask);
+                int posX = data.StartPos.X + (int)(index & PosBitMask);
+                int posZ = data.StartPos.Z + (int)((index >> 10) & PosBitMask);
 
                 if (!rect.Contains(posX, posZ)) continue;
-                int posY = startPos.Y + (int)((index >> 20) & PosBitMask);
+                int posY = data.StartPos.Y + (int)((index >> 20) & PosBitMask);
 
                 curPos.Set(posX, posY, posZ);
-                BlockEntity be = blockAccessor.GetBlockEntity(curPos);
+                BlockEntity be = data.BlockAccessor.GetBlockEntity(curPos);
 
                 // Block entities need to be manually initialized for world gen block access
-                if (be == null && blockAccessor != null)
+                if (be == null && data.BlockAccessor != null)
                 {
-                    Block block = blockAccessor.GetBlock(curPos, BlockLayersAccess.Solid);
+                    Block block = data.BlockAccessor.GetBlock(curPos, BlockLayersAccess.Solid);
 
                     if (block.EntityClass != null)
                     {
-                        blockAccessor.SpawnBlockEntity(block.EntityClass, curPos);
-                        be = blockAccessor.GetBlockEntity(curPos);
+                        data.BlockAccessor.SpawnBlockEntity(block.EntityClass, curPos);
+                        be = data.BlockAccessor.GetBlockEntity(curPos);
                     }
                 }
 
                 if (be != null)
                 {
-                    Block block = blockAccessor.GetBlock(curPos, BlockLayersAccess.Solid);
-                    if (block.EntityClass != worldForResolve.ClassRegistry.GetBlockEntityClass(be.GetType()))
+                    Block block = data.BlockAccessor.GetBlock(curPos, BlockLayersAccess.Solid);
+                    if (block.EntityClass != data.World.ClassRegistry.GetBlockEntityClass(be.GetType()))
                     {
-                        worldForResolve.Logger.Warning("Could not import block entity data for schematic at {0}. There is already {1}, expected {2}. Probably overlapping ruins.", curPos, be.GetType(), block.EntityClass);
+                        data.World.Logger.Warning("Could not import block entity data for schematic at {0}. There is already {1}, expected {2}. Probably overlapping ruins.", curPos, be.GetType(), block.EntityClass);
                         continue;
                     }
 
@@ -191,17 +180,21 @@ namespace Vintagestory.ServerMods
                         climateUpLeft, climateUpRight, climateBotLeft, climateBotRight
                     );
                     var layerBlock = GetBlockLayerBlock((climate >> 8) & 0xff, (climate >> 16) & 0xff, curPos.Y, rockblockid, 0, null,
-                        worldForResolve.Blocks, curPos, -1);
+                        data.World.Blocks, curPos, -1);
 
-                    be.FromTreeAttributes(tree, worldForResolve);
-                    be.OnLoadCollectibleMappings(worldForResolve, BlockCodes, ItemCodes, schematicSeed, resolveImports);
-                    be.OnPlacementBySchematic(worldForResolve.Api as ICoreServerAPI, blockAccessor, curPos, resolvedRockTypeRemaps, rockblockid, layerBlock, resolveImports);
+                    be.FromTreeAttributes(tree, data.World);
+                    be.OnLoadCollectibleMappings(data.World, BlockCodes, ItemCodes, schematicSeed, data.ReplaceMeta);
+                    be.OnPlacementBySchematic(data.World.Api as ICoreServerAPI, data.BlockAccessor, curPos, data.ResolvedRockTypeRemaps, rockblockid, layerBlock, data.ReplaceMeta);
+                    if (data.Attributes != null)
+                    {
+                        data.AttributesDirty |= be.OnPlacementBySchematicCustom(data.World.Api as ICoreServerAPI, data.BlockAccessor, data.Attributes);
+                    }
                 }
             }
 
             // We need to decode entity each time since IWorldGenBlockAccessor does AddEntity and would add the same entity again. So the positon would be wrong for those "new" ones
             // if (EntitiesDecoded == null)
-            DecodeEntities(worldForResolve, startPos, worldForResolve as IServerWorldAccessor);
+            DecodeEntities(data.World, data.StartPos, data.World);
 
             foreach (Entity entity in EntitiesDecoded)
             {
@@ -210,29 +203,35 @@ namespace Vintagestory.ServerMods
                     if (OriginalPos != null)
                     {
                         var prevOffset = entity.WatchedAttributes.GetBlockPos("importOffset", Zero);
-                        entity.WatchedAttributes.SetBlockPos("importOffset", startPos - OriginalPos + prevOffset);
+                        entity.WatchedAttributes.SetBlockPos("importOffset", data.StartPos - OriginalPos + prevOffset);
                     }
                     // Not ideal but whatever
-                    if (blockAccessor is IWorldGenBlockAccessor)
+                    if (data.BlockAccessor is IWorldGenBlockAccessor wgen)
                     {
-                        blockAccessor.AddEntity(entity);
-                        if (!entity.TryEarlyLoadCollectibleMappings(worldForResolve, BlockCodes, ItemCodes, schematicSeed, resolveImports))
+                        wgen.AddEntity(entity);
+                        if (!entity.TryEarlyLoadCollectibleMappings(data.World, BlockCodes, ItemCodes, schematicSeed, data.ReplaceMeta))
                         {
-                            entity.OnInitialized += () => entity.OnLoadCollectibleMappings(worldForResolve, BlockCodes, ItemCodes, schematicSeed, resolveImports);
+                            entity.OnInitialized += () => entity.OnLoadCollectibleMappings(data.World, BlockCodes, ItemCodes, schematicSeed, data.ReplaceMeta);
                         }
                     }
                     else
                     {
-                        worldForResolve.SpawnEntity(entity);
-                        entity.OnLoadCollectibleMappings(worldForResolve, BlockCodes, ItemCodes, schematicSeed, resolveImports);
+                        entity.Attributes.SetBool("onFirstSpawn", false);
+                        data.World.SpawnEntity(entity);
+                        entity.OnLoadCollectibleMappings(data.World, BlockCodes, ItemCodes, schematicSeed, data.ReplaceMeta);
                     }
                 }
+            }
+
+            if (ModData.Count > 0)
+            {
+                ((IServerEventAPI)data.World.Api.Event).TriggerSchematicImport(data.BlockAccessor, data.World, data.StartPos, ModData, rect);
             }
 
             return placed;
         }
 
-        private int GetReplaceLayerBlockId(IWorldGenBlockAccessor blockAccessor, IWorldAccessor worldForResolve, int[] replaceWithBlockLayersBlockids,
+        private int GetReplaceLayerBlockId(IBlockAccessor blockAccessor, IWorldAccessor worldForResolve, int[] replaceWithBlockLayersBlockids,
             int blockId, BlockPos curPos, int posX, int posY, int posZ, int chunksize, int climateUpLeft, int climateUpRight, int climateBotLeft,
             int climateBotRight, int dy, int dx, int dz, int rockblockid, ref Block newBlock, bool topBlockOnly = false)
         {
@@ -267,7 +266,7 @@ namespace Vintagestory.ServerMods
             return blockId;
         }
 
-        private static int GetRocktypeBlockId(IWorldGenBlockAccessor blockAccessor, Dictionary<int, Dictionary<int, int>> resolvedRockTypeRemaps, int blockId, int rockblockid,
+        private static int GetRocktypeBlockId(IBlockAccessor blockAccessor, Dictionary<int, Dictionary<int, int>> resolvedRockTypeRemaps, int blockId, int rockblockid,
             ref Block newBlock)
         {
             if (resolvedRockTypeRemaps != null)
@@ -290,18 +289,15 @@ namespace Vintagestory.ServerMods
             EntitiesDecoded = new List<Entity>(Entities.Count);
             foreach (string entityData in Entities)
             {
-                using (MemoryStream ms = new MemoryStream(Ascii85.Decode(entityData)))
-                {
-                    BinaryReader reader = new BinaryReader(ms);
+                var reader = new BinarySpanReader(Ascii85.Decode(entityData));
 
-                    string className = reader.ReadString();
-                    Entity entity = worldForResolve.ClassRegistry.CreateEntity(className);
-                    entity.Api = worldForResolve.Api;   // FromBytes works better for some entities (e.g. EntityArmorStand) if the Api is already set
-                    entity.FromBytes(reader, false, serverWorldAccessor.RemappedEntities);
-                    entity.DidImportOrExport(startPos);
+                string className = reader.ReadString();
+                Entity entity = worldForResolve.ClassRegistry.CreateEntity(className);
+                entity.Api = worldForResolve.Api;   // FromBytes works better for some entities (e.g. EntityArmorStand) if the Api is already set
+                entity.FromBytes(ref reader, false, serverWorldAccessor.RemappedEntities);
+                entity.DidImportOrExport(startPos);
 
-                    EntitiesDecoded.Add(entity);
-                }
+                EntitiesDecoded.Add(entity);
             }
         }
 
@@ -332,6 +328,7 @@ namespace Vintagestory.ServerMods
             cloned.EntranceRotation = EntranceRotation;
             cloned.OriginalPos = OriginalPos;
 
+            cloned.ModData = ModData.ToDictionary(s => s.Key, s => new Dictionary<string, byte[]>(s.Value));
 
             return cloned;
         }

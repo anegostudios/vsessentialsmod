@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
@@ -22,7 +22,9 @@ namespace Vintagestory.ServerMods.NoObf
         public TreeGenBranch[] branches;
         [JsonProperty]
         public TreeGenBlocks treeBlocks = null;
-
+        [JsonProperty]
+        public EnumTreeGenMode GenMode = EnumTreeGenMode.Normal;
+        [JsonProperty]
         public EnumTreeType Treetype;
 
         internal void Init(AssetLocation location, ILogger logger)

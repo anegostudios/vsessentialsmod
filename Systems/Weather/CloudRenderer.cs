@@ -405,6 +405,7 @@ namespace Vintagestory.GameContent
             int prevTopLeftRegZ = -9999;
             Vec3i tileOffset = new Vec3i(offThreadState.TileOffsetX - offThreadState.WindTileOffsetX, 0, offThreadState.TileOffsetZ - offThreadState.WindTileOffsetZ);
             Vec3i tileCenterPos = offThreadState.CenterTilePos;
+            Vec3d cloudTilePos = new Vec3d();
 
             for (int i = 0; i < cnt; i++)
             {
@@ -413,15 +414,10 @@ namespace Vintagestory.GameContent
                 int tileXPos = tileCenterPos.X + cloudTile.GridXOffset;
                 int tileZPos = tileCenterPos.Z + cloudTile.GridZOffset;
 
-                /*if (cloudTile.GridXOffset == 0 && cloudTile.GridZOffset == 0 && reloadRainNoiseValues)
-                {
-                    int a = 1;
-                }*/
-
                 cloudTile.brightnessRand.InitPositionSeed(tileXPos - offThreadState.WindTileOffsetX, tileZPos - offThreadState.WindTileOffsetZ);
 
                 // This is a block position
-                Vec3d cloudTilePos = new Vec3d(tileXPos * CloudTileSize, capi.World.SeaLevel, tileZPos * CloudTileSize);
+                cloudTilePos.Set(tileXPos * CloudTileSize, capi.World.SeaLevel, tileZPos * CloudTileSize);
 
                 int regSize = capi.World.BlockAccessor.RegionSize;
                 int topLeftRegX = (int)Math.Round(cloudTilePos.X / regSize) - 1;

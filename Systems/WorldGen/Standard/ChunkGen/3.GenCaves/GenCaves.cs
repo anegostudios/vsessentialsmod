@@ -48,9 +48,9 @@ namespace Vintagestory.ServerMods
         public override void initWorldGen()
         {
             base.initWorldGen();
-            caveRand = new LCGRandom(api.WorldManager.Seed + 123128);
-            basaltNoise = NormalizedSimplexNoise.FromDefaultOctaves(2, 1f / 3.5f, 0.9f, api.World.Seed + 12);
-            heightvarNoise = NormalizedSimplexNoise.FromDefaultOctaves(3, 1f / 20f, 0.9f, api.World.Seed + 12);
+            caveRand = new LCGRandom(api.WorldManager.SeedWorldgen + 123128);
+            basaltNoise = NormalizedSimplexNoise.FromDefaultOctaves(2, 1f / 3.5f, 0.9f, api.World.SeedWorldgen + 12);
+            heightvarNoise = NormalizedSimplexNoise.FromDefaultOctaves(3, 1f / 20f, 0.9f, api.World.SeedWorldgen + 12);
 
             regionsize = api.World.BlockAccessor.RegionSize;
         }
@@ -76,7 +76,7 @@ namespace Vintagestory.ServerMods
 
         private TextCommandResult CmdCaveGenTest(TextCommandCallingArgs args)
         {
-            caveRand = new LCGRandom(api.WorldManager.Seed + 123128);
+            caveRand = new LCGRandom(api.WorldManager.SeedWorldgen + 123128);
             initWorldGen();
 
 
@@ -526,6 +526,7 @@ namespace Vintagestory.ServerMods
             double vRadiusSq = vertRadius * vertRadius;
             double distortStrength = GameMath.Clamp(vertRadius / 4.0, 0, 0.1);
 
+            // Don't carve into bodies of water
             for (int lx = mindx; lx <= maxdx; lx++)
             {
                 xdistRel = (lx - centerX) * (lx - centerX) / hRadiusSq;
@@ -595,6 +596,7 @@ namespace Vintagestory.ServerMods
 
                     double heightrnd = (mapchunk.CaveHeightDistort[lz * chunksize + lx] - 127) * distortStrength;
                     int surfaceY = terrainheightmap[lz * chunksize + lx];
+                    int index3d;
 
                     for (int y = maxdy + 10; y >= mindy; y--)
                     {
@@ -605,22 +607,14 @@ namespace Vintagestory.ServerMods
 
                         if (y > worldheight - 1 || xdistRel + ydistRel + zdistRel > 1.0) continue;
 
-                        if (terrainheightmap[lz * chunksize + lx] == y)
-                        {
-                            terrainheightmap[lz * chunksize + lx] = (ushort)(y - 1);
-                            rainheightmap[lz * chunksize + lx]--;
-                        }
-
                         IChunkBlocks chunkBlockData = chunks[y / chunksize].Data;
-                        int index3d = ((y % chunksize) * chunksize + lz) * chunksize + lx;
+                        index3d = ((y % chunksize) * chunksize + lz) * chunksize + lx;
 
                         if (y == 11)
                         {
                             if (basaltNoise.Noise(chunkX * chunksize + lx, chunkZ * chunksize + lz) > 0.65)
                             {
                                 chunkBlockData[index3d] = gcfg.basaltBlockId;
-                                terrainheightmap[lz * chunksize + lx] = Math.Max(terrainheightmap[lz * chunksize + lx], (ushort)11);
-                                rainheightmap[lz * chunksize + lx] = Math.Max(rainheightmap[lz * chunksize + lx], (ushort)11);
                             }
                             else
                             {
@@ -654,6 +648,24 @@ namespace Vintagestory.ServerMods
                             chunkBlockData.SetBlockAir(index3d);
                         }
                     }
+
+
+                    // Needs a seperate, dedicated loop because carving might go in the other direction
+                    IChunkBlocks schunkBlockData = chunks[surfaceY / chunksize].Data;
+                    index3d = ((surfaceY % chunksize) * chunksize + lz) * chunksize + lx;
+                    int rainY = rainheightmap[lz * chunksize + lx];
+
+                    while (surfaceY > 0 && schunkBlockData[index3d] == 0)
+                    {
+                        surfaceY--;
+                        index3d = ((surfaceY % chunksize) * chunksize + lz) * chunksize + lx;
+                        schunkBlockData = chunks[surfaceY / chunksize].Data;
+
+                        if (rainY > TerraGenConfig.seaLevel) rainY--;
+                    }
+
+                    terrainheightmap[lz * chunksize + lx] = (ushort)surfaceY;
+                    rainheightmap[lz * chunksize + lx] = (ushort)rainY;
                 }
             }
 

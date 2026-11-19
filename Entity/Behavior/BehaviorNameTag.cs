@@ -7,8 +7,6 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
-#nullable disable
-
 namespace Vintagestory.GameContent
 {
     /// <summary>
@@ -28,26 +26,38 @@ namespace Vintagestory.GameContent
     [AddDocumentationProperty("selectFromRandomName", "Randomly choose and set the entity's display name to one of the specified names", "System.Single[]", "Recommended", "", false)]
     public class EntityBehaviorNameTag : EntityBehavior, IRenderer
     {
-        protected LoadedTexture nameTagTexture = null;
+        protected LoadedTexture? nameTagTexture = null;
+        [Obsolete("Use the property instead")]
         protected bool showNameTagOnlyWhenTargeted = false;
-        protected NameTagRendererDelegate nameTagRenderHandler;
-        ICoreClientAPI capi;
+        protected NameTagRendererDelegate? nameTagRenderHandler;
+        ICoreClientAPI? capi;
         protected int renderRange = 999;
-        IPlayer player;
+        IPlayer? player;
 
-        public string DisplayName
+        public string? DisplayName
         {
             get {
                 if (capi != null && TriggeredNameReveal && !IsNameRevealedFor(capi.World.Player.PlayerUID)) return UnrevealedDisplayName;
-                return entity.WatchedAttributes.GetTreeAttribute("nametag")?.GetString("name"); 
+                return GetName(entity); 
             }
+        }
+
+        public static string? GetName(Entity entity)
+        {
+            return entity.WatchedAttributes.GetTreeAttribute("nametag")?.GetString("name");
         }
 
         /// <summary>
         /// The name that is shown when the real name is not yet revealed. Only used if <see cref="TriggeredNameReveal"/> is true.
         /// </summary>
         [DocumentAsJson("Optional", "nametag-default-unrevealedname")]
-        public string UnrevealedDisplayName { get; set; }
+        public string? UnrevealedDisplayName { get; set; }
+
+        /// <summary>
+        /// Set to false to continue showing the default name (e.g. Bighorn ewe) elsewhere
+        /// </summary>
+        [DocumentAsJson("Optional", "true")]
+        public bool ReplaceDefaultName { get; set; } = true;
 
         /// <summary>
         /// <!--<jsonalias>ShowTagOnlyWhenTargeted</jsonalias>-->
@@ -72,10 +82,8 @@ namespace Vintagestory.GameContent
         }
         public void SetNameRevealedFor(string playeruid)
         {
-            var ntree = entity.WatchedAttributes.GetTreeAttribute("nametag");
-            if (ntree == null) entity.WatchedAttributes["nametag"] = ntree = new TreeAttribute();
-            var tree = ntree?.GetTreeAttribute("nameRevealedFor");
-            if (tree == null) ntree["nameRevealedFor"] = tree = new TreeAttribute();
+            var ntree = entity.WatchedAttributes.GetOrAddTreeAttribute("nametag");
+            var tree = ntree.GetOrAddTreeAttribute("nameRevealedFor");
             tree.SetBool(playeruid, true);
             OnNameChanged();
         }
@@ -86,7 +94,7 @@ namespace Vintagestory.GameContent
         [DocumentAsJson("Optional", "999")]
         public int RenderRange
         {
-            get { return entity.WatchedAttributes.GetTreeAttribute("nametag").GetInt("renderRange"); }
+            get { return entity.WatchedAttributes.GetTreeAttribute("nametag")?.GetInt("renderRange") ?? 999; }
             set { entity.WatchedAttributes.GetTreeAttribute("nametag")?.SetInt("renderRange", value); }
         }
 
@@ -109,16 +117,19 @@ namespace Vintagestory.GameContent
         {
             base.Initialize(entityType, attributes);
 
-            if ((DisplayName == null || DisplayName.Length == 0) && attributes["selectFromRandomName"].Exists)
+            if ((DisplayName == null || DisplayName.Length == 0))
             {
-                string[] randomName = attributes["selectFromRandomName"].AsArray<string>();
-
-                SetName(randomName[entity.World.Rand.Next(randomName.Length)]);
+                string?[]? randomName = attributes["selectFromRandomName"].AsArray<string>();
+                if (randomName != null && randomName.Length > 0)
+                {
+                    SetName(randomName[entity.World.Rand.Next(randomName.Length)]);
+                }
             }
                 
             TriggeredNameReveal = attributes["triggeredNameReveal"].AsBool(false);
             RenderRange = attributes["renderRange"].AsInt(999);
             ShowOnlyWhenTargeted = attributes["showtagonlywhentargeted"].AsBool(false);
+            ReplaceDefaultName = attributes["replaceDefaultName"].AsBool(true);
             UnrevealedDisplayName = Lang.Get(attributes["unrevealedDisplayName"].AsString("nametag-default-unrevealedname"));
 
             entity.WatchedAttributes.OnModified.Add(new TreeModifiedListener() { path = "nametag", listener = OnNameChanged });
@@ -132,9 +143,10 @@ namespace Vintagestory.GameContent
         }
 
 
-        protected bool IsSelf => entity.EntityId == capi.World.Player.Entity.EntityId;
+        protected bool IsSelf => capi == null ? false : entity.EntityId == capi.World.Player.Entity.EntityId;
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
+            ICoreClientAPI capi = this.capi!;
             if (IsSelf)
             {
                 if (capi.Render.CameraType == EnumCameraMode.FirstPerson) return;
@@ -145,7 +157,8 @@ namespace Vintagestory.GameContent
                 player = (entity as EntityPlayer)?.Player;
                 if (player != null || !(entity is EntityPlayer))
                 {
-                    nameTagRenderHandler = capi.ModLoader.GetModSystem<EntityNameTagRendererRegistry>().GetNameTagRenderer(entity);
+                    nameTagRenderHandler = capi.ModLoader.GetModSystem<EntityNameTagRendererRegistry>()?.GetNameTagRenderer(entity)
+                        ?? throw new Exception("Can't render name tag without a renderer");
                     OnNameChanged();
                 }
             }
@@ -202,21 +215,24 @@ namespace Vintagestory.GameContent
             }
         }
 
-        public override string GetName(ref EnumHandling handling)
+        public override string? GetName(ref EnumHandling handling)
         {
-            handling = EnumHandling.PreventDefault;
-            return DisplayName;
+            string? name = DisplayName;
+            if (ReplaceDefaultName && name != null && name != "") handling = EnumHandling.PreventDefault;
+            return name;
         }
 
-        public void SetName(string playername)
+        public void SetName(string? newName)
         {
-            ITreeAttribute nametagTree = entity.WatchedAttributes.GetTreeAttribute("nametag");
-            if (nametagTree == null)
-            {
-                entity.WatchedAttributes.SetAttribute("nametag", nametagTree = new TreeAttribute());
-            }
+            SetName(entity, newName);
+        }
 
-            nametagTree.SetString("name", playername);
+        public static void SetName(Entity entity, string? newName)
+        {
+            if (newName == "") newName = null;
+
+            ITreeAttribute nametagTree = entity.WatchedAttributes.GetOrAddTreeAttribute("nametag");
+            nametagTree.SetString("name", newName);
             entity.WatchedAttributes.MarkPathDirty("nametag");
         }
 
