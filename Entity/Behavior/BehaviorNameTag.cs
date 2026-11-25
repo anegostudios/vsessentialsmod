@@ -30,6 +30,7 @@ namespace Vintagestory.GameContent
         [Obsolete("Use the property instead")]
         protected bool showNameTagOnlyWhenTargeted = false;
         protected NameTagRendererDelegate? nameTagRenderHandler;
+        bool nameTagTextureDirty = true;
         ICoreClientAPI? capi;
         protected int renderRange = 999;
         IPlayer? player;
@@ -152,6 +153,8 @@ namespace Vintagestory.GameContent
                 if (capi.Render.CameraType == EnumCameraMode.FirstPerson) return;
             }
 
+            if (ShowOnlyWhenTargeted && capi.World.Player.CurrentEntitySelection?.Entity != entity) return;
+
             if (nameTagRenderHandler == null || (entity is EntityPlayer && player == null))
             {
                 player = (entity as EntityPlayer)?.Player;
@@ -165,11 +168,14 @@ namespace Vintagestory.GameContent
 
             bool isSpectator = player != null && player.WorldData.CurrentGameMode == EnumGameMode.Spectator;
 
-            if (isSpectator || nameTagTexture == null) return;
+            if (isSpectator) return;
             if (player?.Entity?.ServerControls.Sneak == true) return;
 
             IRenderAPI rapi = capi.Render;
             EntityPlayer entityPlayer = capi.World.Player.Entity;
+            double dist = entityPlayer.Pos.SquareDistanceTo(entity.Pos);
+            if (renderRange * renderRange <= dist) return;
+
             var esr = (entity.Properties.Client.Renderer as EntityShapeRenderer);
             if (esr == null) return;
 
@@ -180,25 +186,20 @@ namespace Vintagestory.GameContent
             // Z negative seems to indicate that the name tag is behind us \o/
             if (pos.Z < 0) return;
 
+            EnsureNameTagTextureExists();
+            if (nameTagTexture == null) return;
+
             float scale = 4f / Math.Max(1, (float)pos.Z);
 
             float cappedScale = Math.Min(1f, scale);
             if (cappedScale > 0.75f) cappedScale = 0.75f + (cappedScale - 0.75f) / 2;
 
-            float offY = 0;
+            float posx = (float)pos.X - cappedScale * nameTagTexture.Width / 2;
+            float posy = rapi.FrameHeight - (float)pos.Y - (nameTagTexture.Height * Math.Max(0, cappedScale));
 
-            double dist = entityPlayer.Pos.SquareDistanceTo(entity.Pos);
-            if (nameTagTexture != null && (!ShowOnlyWhenTargeted || capi.World.Player.CurrentEntitySelection?.Entity == entity) && renderRange * renderRange > dist)
-            {
-                float posx = (float)pos.X - cappedScale * nameTagTexture.Width / 2;
-                float posy = rapi.FrameHeight - (float)pos.Y - (nameTagTexture.Height * Math.Max(0, cappedScale));
-
-                rapi.Render2DTexture(
-                    nameTagTexture.TextureId, posx, posy, cappedScale * nameTagTexture.Width, cappedScale * nameTagTexture.Height, 20
-                );
-
-                offY += nameTagTexture.Height;
-            }
+            rapi.Render2DTexture(
+                nameTagTexture.TextureId, posx, posy, cappedScale * nameTagTexture.Width, cappedScale * nameTagTexture.Height, 20
+            );
         }
 
         public void Dispose()
@@ -238,14 +239,22 @@ namespace Vintagestory.GameContent
 
         protected void OnNameChanged()
         {
-            if (nameTagRenderHandler == null) return;
             if (nameTagTexture != null)
             {
                 nameTagTexture.Dispose();
                 nameTagTexture = null;
             }
 
+            nameTagTextureDirty = true;
+            if (!ShowOnlyWhenTargeted) EnsureNameTagTextureExists();
+        }
+
+        private void EnsureNameTagTextureExists()
+        {
+            if (!nameTagTextureDirty || nameTagRenderHandler == null) return;
+
             nameTagTexture = nameTagRenderHandler.Invoke(capi, entity);
+            nameTagTextureDirty = false;
         }
 
         public override void OnEntityDeath(DamageSource damageSourceForDeath)

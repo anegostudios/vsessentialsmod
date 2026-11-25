@@ -331,6 +331,7 @@ namespace Vintagestory.GameContent
             Shape gearShape = null;
             AssetLocation shapePath = null;
             CompositeShape compGearShape = null;
+            ModSystemWearableGearCache shapeCache = null;
             if (stack.Collectible is IWearableShapeSupplier iwss)
             {
                 gearShape = iwss.GetShape(stack, optionalTargetEntity, texturePrefixCode);
@@ -343,7 +344,8 @@ namespace Vintagestory.GameContent
 
                 shapePath = compGearShape.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json");
 
-                gearShape = Shape.TryGet(api, shapePath);
+                shapeCache = api.ModLoader.GetModSystem<ModSystemWearableGearCache>();
+                gearShape = shapeCache.GetOrLoadClonedShape(shapePath);
                 if (gearShape == null)
                 {
                     api.World.Logger.Warning("Entity attachable shape {0} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath);
@@ -397,7 +399,7 @@ namespace Vintagestory.GameContent
             {
                 foreach (var overlay in compGearShape.Overlays)
                 {
-                    Shape oshape = Shape.TryGet(api, overlay.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json"));
+                    Shape oshape = shapeCache.GetOrLoadClonedShape(overlay.Base.CopyWithPathPrefixAndAppendixOnce("shapes/", ".json"));
                     if (oshape == null)
                     {
                         api.World.Logger.Warning("Entity attachable shape {0} overlay {4} defined in {1} {2} not found or errored, was supposed to be at {3}. Shape will be invisible.", compGearShape.Base, stack.Class, stack.Collectible.Code, shapePath, overlay.Base);

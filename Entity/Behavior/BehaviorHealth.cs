@@ -347,7 +347,7 @@ public class EntityBehaviorHealth : EntityBehavior
         float damageBeforeDelegatesApplied = damage;
 
         int dmgTypeIndex = (int)damageSource.Type;
-        if (dmgTypeIndex < 0 && this.DamageMultipliers != null && dmgTypeIndex < this.DamageMultipliers.Length)
+        if (dmgTypeIndex >= 0 && this.DamageMultipliers != null && dmgTypeIndex < this.DamageMultipliers.Length)
         {
             damage *= this.DamageMultipliers[dmgTypeIndex];
         }

@@ -90,7 +90,7 @@ namespace Vintagestory.GameContent
                 }
                 Mat4f.MulWithVec3_Position(matrix, mesh.xyz, mesh.xyz, vertex * 3);
 
-                if (mesh.Flags != null)
+                if (mesh.Flags != null && !VertexFlags.IsUnshadedNormal(mesh.Flags[vertex]))
                 {
                     VertexFlags.UnpackNormal(mesh.Flags[vertex], normal);
                     TransformPoseNormal(matrix, normal);

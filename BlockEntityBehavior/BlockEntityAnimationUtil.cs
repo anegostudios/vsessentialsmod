@@ -12,43 +12,46 @@ namespace Vintagestory.GameContent
     {
         private readonly BlockEntity be;
         private readonly float settleDurationSeconds;
-        private readonly Func<bool> canBakePose;
         private StaticAnimationState staticAnimationState;
         private MeshData sourceMesh;
-        private volatile MeshData terrainMesh;
+        private volatile MeshData settledMesh;
         private volatile bool staticMeshInitialized;
         private bool disposed;
         public Action<MeshData> OnAfterTesselate;
 
-        /// <summary>Whether this utility handles both animated and static terrain rendering.</summary>
         public bool UsesStaticMesh => settleDurationSeconds > 0 && staticMeshInitialized;
+
+        public bool Initialized => animator != null;
+        public bool Disposed => disposed;
 
         public BlockEntityAnimationUtil(ICoreAPI api, BlockEntity be) : this(api, be, 0)
         {
         }
 
         /// <summary>
-        /// Opts into baking resting poses into the terrain mesh on the client.
+        /// Variant of the anim util with static meshing after a animation has settled
         /// </summary>
-        /// <param name="api">Core API.</param>
-        /// <param name="be">Block entity owning the animated mesh.</param>
-        /// <param name="settleDurationSeconds">Animation time after the latest change before baking is allowed. Zero disables baking.</param>
-        /// <param name="canBakePose">Optional main-thread predicate that must also allow baking. Use it to exclude moving or looping animations.</param>
-        public BlockEntityAnimationUtil(ICoreAPI api, BlockEntity be, float settleDurationSeconds, Func<bool> canBakePose = null)
-            : base(api, be.Pos.ToVec3d(), be.Pos.dimension)
+        /// <param name="api"></param>
+        /// <param name="be"></param>
+        /// <param name="settleDurationSeconds"></param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public BlockEntityAnimationUtil(ICoreAPI api, BlockEntity be, float settleDurationSeconds) : base(api, be.Pos.ToVec3d(), be.Pos.dimension)
         {
+            if (settleDurationSeconds < 0 || settleDurationSeconds > 1000) throw new InvalidOperationException("settleDurationSeconds must be within 0...1000");
+            
             this.be = be;
-            this.settleDurationSeconds = api.Side == EnumAppSide.Client && float.IsFinite(settleDurationSeconds) && settleDurationSeconds > 0
-                ? settleDurationSeconds : 0;
-            this.canBakePose = canBakePose;
+            this.settleDurationSeconds = api.Side == EnumAppSide.Client ? settleDurationSeconds : 0;
         }
 
-        /// <summary>Settling delay for constant-pose animations whose transition is controlled by easing.</summary>
-        public static float CalculateSettleDuration(float easingSpeed)
+        /// <summary>
+        /// Door animations are single frame animations, the motion is merely the ease-in of the animation. This is a heuristic to get the settle duration.
+        /// </summary>
+        /// <param name="easingSpeed"></param>
+        /// <returns></returns>
+        public static float GetSettleDurationFromEasing(float easingSpeed)
         {
-            if (!float.IsFinite(easingSpeed) || easingSpeed <= 0) return 0;
-            float duration = MathF.Ceiling(8f / easingSpeed);
-            return float.IsFinite(duration) ? duration : 0;
+            if (easingSpeed <= 0) return 0;
+            return MathF.Ceiling(8f / easingSpeed);
         }
 
         public override void InitializeAnimator(string cacheDictKey, MeshData meshdata, Shape shape, Vec3f rotation, EnumRenderStage renderStage = EnumRenderStage.Opaque)
@@ -59,24 +62,41 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// Initializes the animator, optionally retaining an immutable source mesh without copying it.
         /// </summary>
-        /// <remarks>When shareSourceMesh is true, the caller must not modify or recycle the source while this animator uses it.</remarks>
+        /// <remarks>When shareSourceMesh is true, the caller must not modify meshdata while this animator uses it.</remarks>
         public virtual void InitializeAnimator(string cacheDictKey, MeshData meshdata, Shape shape, Vec3f rotation, bool shareSourceMesh, EnumRenderStage renderStage = EnumRenderStage.Opaque)
+        {
+            InitializeAnimator(cacheDictKey, meshdata, shape, rotation, shareSourceMesh, null, renderStage);
+        }
+
+        internal void InitializeAnimator(string cacheDictKey, MeshData meshdata, Shape shape, Vec3f rotation, bool shareSourceMesh, Action<AnimatableRenderer> applyPlacement, EnumRenderStage renderStage = EnumRenderStage.Opaque)
         {
             staticMeshInitialized = false;
             base.InitializeAnimator(cacheDictKey, meshdata, shape, rotation, renderStage);
-            if (settleDurationSeconds <= 0) return;
 
-            sourceMesh = shareSourceMesh ? meshdata : meshdata.Clone();
-            if (!shareSourceMesh) sourceMesh.NormalsCount = meshdata.NormalsCount;
-            staticAnimationState = new StaticAnimationState(settleDurationSeconds);
+            if (settleDurationSeconds > 0)
+            {
+                sourceMesh = shareSourceMesh ? meshdata : meshdata.Clone();
+                if (!shareSourceMesh) sourceMesh.NormalsCount = meshdata.NormalsCount;
+                staticAnimationState = new StaticAnimationState(settleDurationSeconds);
+            }
+            else if (applyPlacement == null) return;
+
             StaticAnimationState initializedState = staticAnimationState;
             AnimatableRenderer initializedRenderer = renderer;
 
             void FinishStaticInitialization()
             {
                 if (disposed || staticAnimationState != initializedState || renderer != initializedRenderer) return;
-                renderer.ShouldRender = false;
-                RefreshStaticMesh();
+
+                applyPlacement?.Invoke(initializedRenderer);
+                if (initializedState == null) return;
+
+                initializedRenderer.ShouldRender = false;
+                bool hasActiveAnimation = activeAnimationsByAnimCode.Count > 0;
+                EnumStaticAnimState handoff = hasActiveAnimation ? initializedState.OnAnimationChanged() : EnumStaticAnimState.None;
+                settledMesh = hasActiveAnimation ? null : BakePose();
+                staticMeshInitialized = true;
+                UpdateStaticAnimState(handoff);
             }
 
             if (Environment.CurrentManagedThreadId == RuntimeEnv.MainThreadId) FinishStaticInitialization();
@@ -89,20 +109,12 @@ namespace Vintagestory.GameContent
         /// </summary>
         public void RefreshStaticMesh()
         {
-            if (settleDurationSeconds <= 0 || sourceMesh == null || disposed) return;
+            if (!UsesStaticMesh || sourceMesh == null || disposed) return;
 
-            if (staticAnimationState.IncludeTerrainMesh) terrainMesh = BakePose();
-            if (!staticMeshInitialized)
+            if (staticAnimationState.IncludeTerrainMesh) settledMesh = BakePose();
+            if (staticAnimationState.RefreshPendingTerrainMesh())
             {
-                staticMeshInitialized = true;
-                if (activeAnimationsByAnimCode.Count > 0 || canBakePose?.Invoke() == false)
-                {
-                    RequestHandoff(staticAnimationState.AnimationChanged());
-                }
-            }
-            else if (staticAnimationState.RefreshPendingTerrainMesh())
-            {
-                RequestHandoff(StaticAnimationHandoff.AddTerrainMesh);
+                UpdateStaticAnimState(EnumStaticAnimState.AddTerrainMesh);
             }
         }
 
@@ -114,7 +126,7 @@ namespace Vintagestory.GameContent
         {
             if (!UsesStaticMesh) return false;
 
-            MeshData mesh = terrainMesh;
+            MeshData mesh = settledMesh;
             if (mesh != null) mesher.AddMeshData(mesh);
             return true;
         }
@@ -125,7 +137,7 @@ namespace Vintagestory.GameContent
         /// </summary>
         public void NotifyAnimationChanged()
         {
-            if (UsesStaticMesh && !disposed) RequestHandoff(staticAnimationState.AnimationChanged());
+            if (UsesStaticMesh && !disposed) UpdateStaticAnimState(staticAnimationState.OnAnimationChanged());
         }
 
         public override bool StartAnimation(AnimationMetaData meta)
@@ -152,7 +164,8 @@ namespace Vintagestory.GameContent
             if (disposed || !staticMeshInitialized || !staticAnimationState.AdvanceAnimation || capi.IsGamePaused) return;
 
             base.OnRenderFrame(deltaTime, stage);
-            RequestHandoff(staticAnimationState.Advance(deltaTime, canBakePose));
+
+            UpdateStaticAnimState(staticAnimationState.Advance(deltaTime));
         }
 
         private MeshData BakePose()
@@ -169,30 +182,32 @@ namespace Vintagestory.GameContent
                 Mat4f.RotateY(transform, transform, renderer.rotationDeg.Y * GameMath.DEG2RAD);
                 Mat4f.Translate(transform, transform, -0.5f, 0, -0.5f);
             }
+
             return BEBehaviorAnimatable.BakePoseMesh(sourceMesh, animator.Matrices, transform);
         }
 
-        private void RequestHandoff(StaticAnimationHandoff handoff)
+        private void UpdateStaticAnimState(EnumStaticAnimState handoff)
         {
-            if (handoff == StaticAnimationHandoff.None) return;
+            if (handoff == EnumStaticAnimState.None) return;
 
-            terrainMesh = handoff == StaticAnimationHandoff.AddTerrainMesh ? BakePose() : null;
+            settledMesh = handoff == EnumStaticAnimState.AddTerrainMesh ? BakePose() : null;
             StaticAnimationState requestedState = staticAnimationState;
             int generation = staticAnimationState.Generation;
+
             api.World.BlockAccessor.MarkBlockDirty(be.Pos, () =>
             {
                 if (disposed || staticAnimationState != requestedState || staticAnimationState.Generation != generation) return;
 
-                StaticAnimationHandoff next = staticAnimationState.CompleteHandoff(generation);
+                EnumStaticAnimState next = staticAnimationState.CompleteHandoff(generation);
                 renderer.ShouldRender = staticAnimationState.RenderAnimation;
-                RequestHandoff(next);
+                UpdateStaticAnimState(next);
             });
         }
 
         public override void Dispose()
         {
             disposed = true;
-            terrainMesh = null;
+            settledMesh = null;
             sourceMesh = null;
             base.Dispose();
         }
@@ -258,7 +273,6 @@ namespace Vintagestory.GameContent
                 //Rotation = rotationDeg - why was this here? It breaks animations
             };
 
-
             capi.Tesselator.TesselateShape(meta, shape, out MeshData meshdata);
             OnAfterTesselate?.Invoke(meshdata);
 
@@ -290,7 +304,7 @@ namespace Vintagestory.GameContent
 
     }
 
-    internal enum StaticAnimationHandoff
+    internal enum EnumStaticAnimState
     {
         None,
         RemoveTerrainMesh,
@@ -300,73 +314,73 @@ namespace Vintagestory.GameContent
     /// <summary>Serializes terrain/animation handoffs while retaining the latest animation request.</summary>
     internal sealed class StaticAnimationState(float settleDurationSeconds)
     {
-        private enum Phase { Static, RemovingTerrainMesh, Animated, AddingTerrainMesh }
+        private enum EnumPhase { Static, RemovingTerrainMesh, Animated, AddingTerrainMesh }
 
-        private Phase phase;
+        private EnumPhase phase;
         private float secondsRemaining;
         private bool animationRequested;
 
         public int Generation { get; private set; }
-        public bool AdvanceAnimation => phase == Phase.Animated;
-        public bool RenderAnimation => phase == Phase.Animated || phase == Phase.AddingTerrainMesh;
-        public bool IncludeTerrainMesh => phase == Phase.Static || phase == Phase.AddingTerrainMesh;
+        public bool AdvanceAnimation => phase == EnumPhase.Animated;
+        public bool RenderAnimation => phase == EnumPhase.Animated || phase == EnumPhase.AddingTerrainMesh;
+        public bool IncludeTerrainMesh => phase == EnumPhase.Static || phase == EnumPhase.AddingTerrainMesh;
 
         public bool RefreshPendingTerrainMesh()
         {
-            if (phase != Phase.AddingTerrainMesh) return false;
+            if (phase != EnumPhase.AddingTerrainMesh) return false;
             Generation++;
             return true;
         }
 
-        public StaticAnimationHandoff AnimationChanged()
+        public EnumStaticAnimState OnAnimationChanged()
         {
             switch (phase)
             {
-                case Phase.Static:
-                    phase = Phase.RemovingTerrainMesh;
+                case EnumPhase.Static:
+                    phase = EnumPhase.RemovingTerrainMesh;
                     Generation++;
-                    return StaticAnimationHandoff.RemoveTerrainMesh;
-                case Phase.Animated:
+                    return EnumStaticAnimState.RemoveTerrainMesh;
+                case EnumPhase.Animated:
                     secondsRemaining = settleDurationSeconds;
                     break;
-                case Phase.AddingTerrainMesh:
+                case EnumPhase.AddingTerrainMesh:
                     animationRequested = true;
                     break;
             }
-            return StaticAnimationHandoff.None;
+            return EnumStaticAnimState.None;
         }
 
-        public StaticAnimationHandoff Advance(float deltaTime, Func<bool> canBakePose = null)
+        public EnumStaticAnimState Advance(float deltaTime)
         {
-            if (phase != Phase.Animated) return StaticAnimationHandoff.None;
+            if (phase != EnumPhase.Animated) return EnumStaticAnimState.None;
 
             secondsRemaining = Math.Max(0, secondsRemaining - deltaTime);
-            if (secondsRemaining > 0 || canBakePose?.Invoke() == false) return StaticAnimationHandoff.None;
+            if (secondsRemaining > 0) return EnumStaticAnimState.None;
 
-            phase = Phase.AddingTerrainMesh;
+            phase = EnumPhase.AddingTerrainMesh;
             Generation++;
-            return StaticAnimationHandoff.AddTerrainMesh;
+            return EnumStaticAnimState.AddTerrainMesh;
         }
 
-        public StaticAnimationHandoff CompleteHandoff(int generation)
+        public EnumStaticAnimState CompleteHandoff(int generation)
         {
-            if (generation != Generation) return StaticAnimationHandoff.None;
+            if (generation != Generation) return EnumStaticAnimState.None;
 
-            if (phase == Phase.RemovingTerrainMesh)
+            if (phase == EnumPhase.RemovingTerrainMesh)
             {
-                phase = Phase.Animated;
+                phase = EnumPhase.Animated;
                 secondsRemaining = settleDurationSeconds;
             }
-            else if (phase == Phase.AddingTerrainMesh)
+            else if (phase == EnumPhase.AddingTerrainMesh)
             {
-                phase = Phase.Static;
+                phase = EnumPhase.Static;
                 if (animationRequested)
                 {
                     animationRequested = false;
-                    return AnimationChanged();
+                    return OnAnimationChanged();
                 }
             }
-            return StaticAnimationHandoff.None;
+            return EnumStaticAnimState.None;
         }
     }
 }

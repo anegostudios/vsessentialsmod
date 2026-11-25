@@ -108,7 +108,14 @@ namespace Vintagestory.ServerMods
             bool isDungeon = false) where T : BlockSchematicStructure
         {
             string cacheKey = asset.Location.ToShortString() + "~" + offsety;
-            if (structureConfig != null && structureConfig.LoadedSchematicsCache.TryGetValue(cacheKey, out BlockSchematicStructure[] cached) && cached is T[] result) return result;
+            if (isDungeon)
+            {
+                cacheKey = $"dungeon~{typeof(T).FullName}~{cacheKey}~{struc?.MaxYDiff ?? 3}~{struc?.MaxBelowSealevel ?? 3}~{struc?.StoryLocationMaxAmount}";
+            }
+            if (structureConfig != null && structureConfig.LoadedSchematicsCache.TryGetValue(cacheKey, out BlockSchematicStructure[] cached) && cached is T[] result)
+            {
+                return result;
+            }
 
             T schematic = asset.ToObject<T>();
 
